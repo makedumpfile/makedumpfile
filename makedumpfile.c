@@ -22,17 +22,19 @@
 
 #include "makedumpfile.h"
 
-struct dwarf_info dwarf_info;
-extern struct symbol_table	symbol_table;
-extern struct size_table	size_table;
-extern struct offset_table	offset_table;
-int retcd = COMPLETED;	/* return code */
-struct vm_table *vt = 0;
+struct symbol_table	symbol_table;
+struct size_table	size_table;
+struct offset_table	offset_table;
+
+struct dwarf_info	dwarf_info;
+struct vm_table		*vt = 0;
+
+int retcd = FAILED;	/* return code */
 
 void
 show_version()
 {
-	MSG("makedumpfile: version 1.0.1 (released 04 October 2006)\n");
+	MSG("makedumpfile: version " VERSION " (released on " RELEASE_DATE ")\n");
 	MSG("\n");
 }
 
@@ -182,14 +184,16 @@ check_release(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
-	if (!readmem(info, sym_system_utsname, &system_utsname, sizeof(struct utsname))) {
+	if (!readmem(info, sym_system_utsname, &system_utsname,
+	    sizeof(struct utsname))) {
 		ERRMSG("Can't get the address of system_utsname.\n");
 		return FALSE;
 	}
 
 	if (info->flag_read_config) {
 		if (strcmp(system_utsname.release, info->release)) {
-			ERRMSG("%s doesn't suit the dump_mem.\n", info->name_configfile);
+			ERRMSG("%s doesn't suit the dump_mem.\n",
+			    info->name_configfile);
 			retcd = WRONG_RELEASE;
 			return FALSE;
 		}
@@ -321,7 +325,7 @@ open_config_file(struct DumpInfo *info, char *mode)
 
 	if ((file_configfile = fopen(info->name_configfile, mode)) == NULL) {
 		ERRMSG("Can't open the config file(%s). %s\n",
-		info->name_configfile, strerror(errno));
+		    info->name_configfile, strerror(errno));
 		return FALSE;
 	}
 	info->file_configfile = file_configfile;
@@ -488,28 +492,31 @@ dump_Elf_pt_load(struct DumpInfo *info, GElf_Phdr *prog, int num_load)
 int
 get_elf_info(struct DumpInfo *info)
 {
+	int i, j;
+	unsigned long tmp;
 	Elf *elfd = NULL;
 	GElf_Ehdr ehdr;
 	GElf_Phdr load;
-	int i, j;
-	unsigned long tmp;
-	int rc = FALSE;
 
-	elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL);
+	int ret = FALSE;
 
-	if (!elfd) {
-		ERRMSG("Could not obtain first elf header\n");
+	lseek(info->fd_memory, 0, SEEK_SET);
+	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
+		ERRMSG("Can't get first elf header of %s.\n",
+		    info->name_memory);
 		goto out;
 	}
-
 	if (gelf_getehdr(elfd, &ehdr) == NULL) {
-		ERRMSG("Could not find file header\n");
+		ERRMSG("Can't find file header of %s.\n",
+		    info->name_memory);
 		goto out;
 	}
 
-	/* get the ident string */
+	/*
+	 * get the ident string
+	 */
 	if (ehdr.e_ident[EI_CLASS] == ELFCLASSNONE) {
-		ERRMSG("Elf File has no class\n");
+		ERRMSG("Elf File has no class.\n");
 		goto out;
 	}
 
@@ -530,7 +537,7 @@ get_elf_info(struct DumpInfo *info)
 
 	for (i = 0, j = 0; i < ehdr.e_phnum; i++) {
 		if (gelf_getphdr(elfd, i, &load) == NULL) {
-			ERRMSG("Could not find Phdr %d\n", i);
+			ERRMSG("Can't find Phdr %d.\n", i);
 			goto out;
 		}
 
@@ -544,6 +551,7 @@ get_elf_info(struct DumpInfo *info)
 			}
 			if (j >= info->num_load_memory)
 				goto out;
+
 			if(!dump_Elf_pt_load(info, &load, j))
 				goto out;
 			j++;
@@ -555,9 +563,8 @@ get_elf_info(struct DumpInfo *info)
 	 *   If the page_size of 1st-kernel is different from the one of
 	 *   capture(2nd)-kernel, the problem will happen.
 	 */
-	if (!info->page_size) {
-		info->page_size = sysconf(_SC_PAGE_SIZE);
-	}
+	info->page_size = sysconf(_SC_PAGE_SIZE);
+
 	info->max_mapnr = get_max_mapnr(info);
 	tmp = 2*divideup(info->max_mapnr, BITPERBYTE);
 	tmp = divideup(tmp, info->page_size);
@@ -565,11 +572,12 @@ get_elf_info(struct DumpInfo *info)
 	if (info->flag_exclude_free)
 		info->len_3rd_bitmap = info->len_bitmap / 2;
 
-	if (elf_end(elfd) == 0)
-		rc = TRUE;
+	ret = TRUE;
 out:
-	
-	return rc;
+	if (elfd != NULL)
+		elf_end(elfd);
+
+	return ret;
 }
 
 unsigned long
@@ -584,34 +592,35 @@ get_symbol_addr(struct DumpInfo *info, char *symname, int get_next_symbol)
 	Elf_Scn *scn = NULL;
 	char *sym_name = NULL;
 
-	lseek(info->fd_memory,0,SEEK_SET);
+	lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET);
 	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ, NULL))) {
-		ERRMSG(" Could not start elf file\n");
+		ERRMSG("Can't get first elf header of %s.\n",
+		    dwarf_info.vmlinux_name);
 		return FALSE;
 	}
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
 		if (gelf_getshdr (scn, &shdr) == NULL) {
-			ERRMSG("Could not get section header\n");
+			ERRMSG("Can't get section header.\n");
 			goto out;
 		}
 		if (shdr.sh_type == SHT_SYMTAB)
 			break;
 	}
 	if (!scn) {
-		ERRMSG("Could not find symbol table\n");
+		ERRMSG("Can't find symbol table.\n");
 		goto out;
 	}
 
 	data = elf_getdata(scn, data);
 
 	if ((!data) || (data->d_size == 0)) {
-		ERRMSG("Zero data in symtab\n");
+		ERRMSG("No data in symbol table.\n");
 		goto out;
 	}
 
 	for (i = 0; i < (shdr.sh_size/shdr.sh_entsize); i++) {
 		if (gelf_getsym(data, i, &sym) == NULL) {
-			ERRMSG("Unable to get symbol at index %d\n", i);
+			ERRMSG("Can't get symbol at index %d.\n", i);
 			goto out;
 		}
 		sym_name = elf_strptr(elfd, shdr.sh_link, sym.st_name);
@@ -644,20 +653,19 @@ int
 get_symbol_info(struct DumpInfo *info)
 {
 	/*
-	 * Get symbol info from the System.map.
+	 * Get symbol info.
 	 */
-	SYMBOL(mem_map) = get_symbol_addr(info, "mem_map", 0);
-	SYMBOL(mem_section) = get_symbol_addr(info, "mem_section", 0);
-	SYMBOL(pkmap_count) = get_symbol_addr(info, "pkmap_count", 0);
-	SYMBOL(pkmap_count_next) = get_symbol_addr(info, "pkmap_count", 1);
-	SYMBOL(system_utsname) = get_symbol_addr(info, "system_utsname", 0);
-	SYMBOL(_stext) = get_symbol_addr(info, "_stext", 0);
-	SYMBOL(_text) = get_symbol_addr(info, "_text", 0);
-	SYMBOL(phys_base) = get_symbol_addr(info, "phys_base", 0);
-	SYMBOL(node_online_map) = get_symbol_addr(info, "node_online_map", 0);
-	SYMBOL(node_data) = get_symbol_addr(info, "node_data", 0);
-	SYMBOL(pgdat_list) = get_symbol_addr(info, "pgdat_list", 0);
-	SYMBOL(contig_page_data) = get_symbol_addr(info, "contig_page_data", 0);
+	SYMBOL_INIT(mem_map, "mem_map");
+	SYMBOL_INIT(mem_section, "mem_section");
+	SYMBOL_INIT(pkmap_count, "pkmap_count");
+	SYMBOL_INIT_NEXT(pkmap_count_next, "pkmap_count");
+	SYMBOL_INIT(system_utsname, "system_utsname");
+	SYMBOL_INIT(_stext, "_stext");
+	SYMBOL_INIT(phys_base, "phys_base");
+	SYMBOL_INIT(node_online_map, "node_online_map");
+	SYMBOL_INIT(node_data, "node_data");
+	SYMBOL_INIT(pgdat_list, "pgdat_list");
+	SYMBOL_INIT(contig_page_data, "contig_page_data");
 
 	return TRUE;
 }
@@ -668,29 +676,29 @@ is_kvaddr(unsigned long addr)
 	return (addr >= (unsigned long)(KVBASE));
 }
 
-static int process_attribute(Dwarf_Attribute *attr, void *cb_data)
+static int
+process_attribute(Dwarf_Attribute *attr, void *cb_data)
 {
 	struct dwarf_values *args = cb_data;
+	Dwarf_Op *expr;
+	size_t expcnt;
 
 	switch (attr->code) {
-		case DW_AT_data_member_location: {
-			Dwarf_Op *expr;
-			size_t expcnt;
-
-			dwarf_getlocation (attr, &expr, &expcnt);
-			if (dwarf_info.member_offset == NOT_FOUND_STRUCTURE)
-				dwarf_info.member_offset = expr[0].number;
-			*args->found_map |= DWARF_INFO_FOUND_LOCATION;
-			break;
-		}
-		default:
-			break;
+	case DW_AT_data_member_location:
+		dwarf_getlocation (attr, &expr, &expcnt);
+		if (dwarf_info.member_offset == NOT_FOUND_STRUCTURE)
+			dwarf_info.member_offset = expr[0].number;
+		*args->found_map |= DWARF_INFO_FOUND_LOCATION;
+		break;
+	default:
+		break;
 	}
 
 	return 0;
 }
 
-static int process_children(Dwarf_Die *die, uint32_t *found_map)
+static int
+process_children(Dwarf_Die *die, uint32_t *found_map)
 {
 	Dwarf_Die child;
 	Dwarf_Die *walker;
@@ -703,26 +711,26 @@ static int process_children(Dwarf_Die *die, uint32_t *found_map)
 	
 	while (rc == 0) {
 		name = dwarf_diename(walker);
-		if (dwarf_info.cmd == DWARF_INFO_GET_MEMBER_OFFSET &&
-			(dwarf_tag(walker) == DW_TAG_member) &&
-			(name) && (!strcmp(name, dwarf_info.member_name))) {
+		if ((dwarf_info.cmd == DWARF_INFO_GET_MEMBER_OFFSET)
+		    && (dwarf_tag(walker) == DW_TAG_member)
+		    && (name) && (!strcmp(name, dwarf_info.member_name))) {
 			/*
 			 * get the attirbutes of this die to record the
-			 *location of the symbol
+			 * location of the symbol
 			 */
 			*found_map |= DWARF_INFO_FOUND_MEMBER;
 		}
-		if (dwarf_info.cmd == DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET &&
-			(dwarf_tag(walker) == DW_TAG_member) &&
-			(!name)) {
+		if ((dwarf_info.cmd == DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET)
+		    && (dwarf_tag(walker) == DW_TAG_member)
+		    && (!name)) {
 			*found_map |= DWARF_INFO_FOUND_MEMBER;
 		}
 		if (*found_map & DWARF_INFO_FOUND_MEMBER) {
 			args.die = walker;
 			args.found_map = found_map;
 			dwarf_getattrs(walker, process_attribute, &args, 0);
-			if ((*found_map & DWARF_INFO_FOUND_ALL) ==
-				DWARF_INFO_FOUND_ALL)
+			if ((*found_map & DWARF_INFO_FOUND_ALL)
+			    == DWARF_INFO_FOUND_ALL)
 				return TRUE;
 		}
 
@@ -736,15 +744,12 @@ static int process_children(Dwarf_Die *die, uint32_t *found_map)
 	return TRUE;
 }
 
-static void search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, uint32_t *found_map)
+static void
+search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, uint32_t *found_map)
 {
 	Dwarf_Die child; 
 	int tag;
 	const char *name;
-	/*
-	 * We are searching the die tree for the mappings member
-	 * of the page struct defined in mm.h
-	 */
 
 	/* 
 	 * start by looking at the children
@@ -759,8 +764,8 @@ static void search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, uint32_t *found_map)
 next_tag:
 	tag = dwarf_tag(die);
 	name = dwarf_diename(die);
-	if ((tag == DW_TAG_structure_type) &&
-	   (name) && (!strcmp(name, dwarf_info.struct_name))) {
+	if ((tag == DW_TAG_structure_type)
+	    && (name) && (!strcmp(name, dwarf_info.struct_name))) {
 		/*
 		 * this is our structure
 		 * process the children
@@ -799,28 +804,28 @@ get_debug_info(void)
 	Dwarf_Die cu_die;
 	uint8_t address_size;
 	uint8_t offset_size;
-	int rc;
 	uint32_t found_map = 0;
 	char *name = NULL;
 	size_t shstrndx;
 
-	rc = FALSE;
+	int ret = FALSE;
 
 	lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET);
+	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ_MMAP, NULL))) {
+		ERRMSG("Can't get first elf header of %s.\n",
+		    dwarf_info.vmlinux_name);
+		return FALSE;
+	}
 
-	elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ_MMAP, NULL);
+	if (!(dwarfd = dwarf_begin_elf(elfd, DWARF_C_READ, NULL))) {
+		ERRMSG("Can't create a handle for a new debug session.\n");
+		goto out;
+	}
 
-	if (!elfd)
-		goto out_close_elf;
-
-	dwarfd = dwarf_begin_elf(elfd, DWARF_C_READ, NULL);
-
-	if (!dwarfd)
-		goto out_close_dwarf;
-
-	if (elf_getshstrndx (elfd, &shstrndx) < 0)
-		goto out_close_dwarf;
-
+	if (elf_getshstrndx (elfd, &shstrndx) < 0) {
+		ERRMSG("Can't get the section index of the string table.\n");
+		goto out;
+	}
 	while ((scn = elf_nextscn (elfd, scn)) != NULL) {
 
 		scnhdr = gelf_getshdr(scn, &scnhdr_mem);
@@ -831,28 +836,29 @@ get_debug_info(void)
 			continue;
 
 		while (dwarf_nextcu(dwarfd, off, &next_off, &header_size,
-				   &abbrev_offset, &address_size, &offset_size) == 0) {
+		    &abbrev_offset, &address_size, &offset_size) == 0) {
 			off += header_size;
 			if (dwarf_offdie(dwarfd, off, &cu_die) == NULL)
-				goto out_close_dwarf;
+				goto out;
 			search_die_tree(dwarfd, &cu_die, &found_map);
 			if (found_map & DWARF_INFO_FOUND_STRUCT)
-				goto out_found;
+				break;
 			off = next_off;
 		}
+		if (found_map & DWARF_INFO_FOUND_STRUCT)
+			break;
 	}
-
-out_found:
-	rc = TRUE;
-
-out_close_dwarf:
-	dwarf_end(dwarfd);
-out_close_elf:
-	elf_end(elfd);
+	ret = TRUE;
+out:
+	if (dwarfd != NULL)
+		dwarf_end(dwarfd);
+	if (elfd != NULL)
+		elf_end(elfd);
 	dwarf_info.status = found_map;
-	return rc;
 
+	return ret;
 }
+
 /*
  * Get the size of structure.
  */
@@ -918,8 +924,7 @@ get_structure_info(struct DumpInfo *info)
 	 * Get offsets of the pglist_data's members.
 	 */
 	SIZE_INIT(pglist_data, "pglist_data");
-	OFFSET_INIT(pglist_data.node_zones, "pglist_data",
-	    "node_zones");
+	OFFSET_INIT(pglist_data.node_zones, "pglist_data", "node_zones");
 
 	/*
 	 * Get offsets of the zone's members.
@@ -1031,7 +1036,6 @@ generate_config(struct DumpInfo *info)
 	WRITE_SYMBOL("pkmap_count_next", pkmap_count_next);
 	WRITE_SYMBOL("system_utsname", system_utsname);
 	WRITE_SYMBOL("_stext", _stext);
-	WRITE_SYMBOL("_text", _text);
 	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
 	WRITE_SYMBOL("node_data", node_data);
@@ -1175,7 +1179,6 @@ read_config(struct DumpInfo *info)
 	READ_SYMBOL("pkmap_count_next", pkmap_count_next);
 	READ_SYMBOL("system_utsname", system_utsname);
 	READ_SYMBOL("_stext", _stext);
-	READ_SYMBOL("_text", _text);
 	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
 	READ_SYMBOL("node_data", node_data);
@@ -1307,7 +1310,9 @@ get_mm_sparsemem(struct DumpInfo *info)
 	unsigned int section_nr, mem_section_size, num_section;
 	unsigned long pfn_start, pfn_end;
 	unsigned long addr_section, addr_mem_map;
-	unsigned long *mem_sec;
+	unsigned long *mem_sec = NULL;
+
+	int ret = FALSE;
 
 	/*
 	 * Get the address of the symbol "mem_section".
@@ -1327,14 +1332,14 @@ get_mm_sparsemem(struct DumpInfo *info)
 	}
 	if (!readmem(info, SYMBOL(mem_section), mem_sec, mem_section_size)) {
 		ERRMSG("Can't get the address of mem_section.\n");
-		return FALSE;
+		goto out;
 	}
 	info->num_mem_map = num_section;
 	if ((info->mem_map_data = (struct mem_map_data *)
 	    malloc(sizeof(struct mem_map_data)*info->num_mem_map)) == NULL) {
 		ERRMSG("Can't allocate memory for the mem_map_data. %s\n",
 		    strerror(errno));
-		return FALSE;
+		goto out;
 	}
 	for (section_nr = 0; section_nr < num_section; section_nr++) {
 		addr_section = nr_to_section(info, section_nr, mem_sec);
@@ -1348,8 +1353,12 @@ get_mm_sparsemem(struct DumpInfo *info)
 			pfn_end = info->max_mapnr;
 		dump_mem_map(info, pfn_start, pfn_end, addr_mem_map, section_nr);
 	}
-	free(mem_sec);
-	return TRUE;
+	ret = TRUE;
+out:
+	if (mem_sec != NULL)
+		free(mem_sec);
+
+	return ret;
 }
 
 int
@@ -1750,7 +1759,9 @@ unsigned long
 next_online_pgdat(struct DumpInfo *info, int node)
 {
 	unsigned long pgdat;
-	/* node_data must be an array. */
+	/*
+	 * node_data must be an array.
+	 */
 	if (SYMBOL(node_data) == NOT_FOUND_SYMBOL)
 		goto pgdat2;
 	if (!readmem(info, SYMBOL(node_data) + (node * sizeof(void *)),
@@ -1763,7 +1774,9 @@ next_online_pgdat(struct DumpInfo *info, int node)
 	return pgdat;
 
 pgdat2:
-	/* pgdat_list must be an array. */
+	/*
+	 * pgdat_list must be an array.
+	 */
 	if (SYMBOL(pgdat_list) == NOT_FOUND_SYMBOL)
 		goto pgdat3;
 	if (!readmem(info, SYMBOL(pgdat_list) + (node * sizeof(void *)),
@@ -1799,8 +1812,10 @@ page_to_pfn(struct DumpInfo *info, unsigned long page)
 			break;
 		}
 	}
-	if (!pfn)
+	if (!pfn) {
+		ERRMSG("Can't convert the address of page descriptor (%lx) to pfn.\n", page);
 		return ULONG_MAX;
+	}
 	return pfn;
 }
 
@@ -1843,11 +1858,8 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 		pfn, free_pages;
 
 	for (order = MAX_ORDER - 1; order >= 0; --order) {
-		/* head = &zone->free_area[order].free_list; */
 		head = node_zones + OFFSET(zone.free_area)
 			+ SIZE(free_area) * order + OFFSET(free_area.free_list);
-		/* for (previous = head, curr = head->next;
-		    curr != head; previous=curr, curr = curr->next) { */
 		previous = head;
 		if (!readmem(info, head + OFFSET(list_head.next), &curr,
 		    sizeof curr)) {
@@ -1855,13 +1867,11 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 			return FALSE;
 		}
 		for (;curr != head;) {
-			/* start_pfn = page_to_pfn(list_entry(curr, struct page, lru)); */
 			curr_page = curr - OFFSET(page.lru);
 			start_pfn = page_to_pfn(info, curr_page);
 			if (start_pfn == ULONG_MAX)
 				return FALSE;
 
-			/* if (previous != curr->prev) */
 			if (!readmem(info, curr + OFFSET(list_head.prev),
 			    &curr_prev, sizeof curr_prev)) {
 				ERRMSG("Can't get prev list_head.\n");
@@ -1904,11 +1914,12 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 int
 dump_memory_nodes(struct DumpInfo *info)
 {
-	int	node, n, i;
-	unsigned long	node_zones, spanned_pages, pgdat;
+	int i, num_nodes, node;
+	unsigned long node_zones, zone, spanned_pages, pgdat;
 
-	vt->nr_zones = MAX_NR_ZONES;
-	/* In case that (vt->flags & NODES_ONLINE) is 1. */
+	/*
+	 * In case that (vt->flags & NODES_ONLINE) is 1.
+	 */
 	if ((node = next_online_node(0)) < 0) {
 		ERRMSG("Can't get next online node.\n");
 		return FALSE;
@@ -1917,35 +1928,35 @@ dump_memory_nodes(struct DumpInfo *info)
 		ERRMSG("Can't get pgdat list.\n");
 		return FALSE;
 	}
-	for (n = 0; pgdat; n++) {
-		if (n >= vt->numnodes) {
+	for (num_nodes = 1;; num_nodes++) {
+		if (num_nodes > vt->numnodes) {
 			ERRMSG("numnodes out of sync with pgdat_list\n");
 			return FALSE;
 		}
 		node_zones = pgdat + OFFSET(pglist_data.node_zones);
-		for (i = 0; i < vt->nr_zones; i++) {
-			if (!readmem(info,node_zones+OFFSET(zone.spanned_pages),
+		for (i = 0; i < MAX_NR_ZONES; i++) {
+			zone = node_zones + (i * SIZE(zone));
+			if (!readmem(info, zone + OFFSET(zone.spanned_pages),
 			    &spanned_pages, sizeof spanned_pages)) {
 				ERRMSG("Can't get spanned_pages.\n");
 				return FALSE;
 			}
 			if (!spanned_pages)
 				continue;
-			if (!reset_bitmap_of_free_pages(info, node_zones))
+			if (!reset_bitmap_of_free_pages(info, zone))
 				return FALSE;
-			node_zones += SIZE(zone);
 		}
 		if (vt->flags & NODES_ONLINE) {
-			if ((node = next_online_node(node+1)) < 0)
-				pgdat = 0; /* Exit the loop. */
+			if ((node = next_online_node(node + 1)) < 0)
+				break;
 			else if (!(pgdat = next_online_pgdat(info, node))) {
-				ERRMSG("Cannot determine pgdat list (node %d)\n\n",
+				ERRMSG("Can't determine pgdat list (node %d).\n",
 				    node);
 				return FALSE;
 			}
 		}
 	}
-	if (n != vt->numnodes) {
+	if (num_nodes != vt->numnodes) {
 		ERRMSG("numnodes out of sync with pgdat_list\n");
 		return FALSE;
 	}
@@ -1962,7 +1973,6 @@ dump_memory_nodes(struct DumpInfo *info)
 int
 _exclude_free_page(struct DumpInfo *info)
 {
-	/* vt->flags |= ZONES; */
 	if ((vt->numnodes = get_nodes_online(info))) {
 		vt->flags |= NODES_ONLINE;
 	} else {
@@ -2074,6 +2084,8 @@ create_dump_bitmap(struct DumpInfo *info)
 	struct mem_map_data *mmd;
 	off_t offset_page;
 	const off_t failed = (off_t)-1;
+
+	int ret = FALSE;
 
 	offset_page  = info->offset_load_memory;
 
@@ -2271,14 +2283,7 @@ create_dump_bitmap(struct DumpInfo *info)
 		if (!create_contig_bitmap(info))
 			goto out;
 
-	if (page_cache != NULL)
-		free(page_cache);
-	free(buf);
-	free(bm1.buf);
-	free(bm2.buf);
-	if (bm3.buf != NULL)
-		free(bm3.buf);
-	return TRUE;
+	ret = TRUE;
 out:
 	if (page_cache != NULL)
 		free(page_cache);
@@ -2290,7 +2295,8 @@ out:
 		free(bm2.buf);
 	if (bm3.buf != NULL)
 		free(bm3.buf);
-	return FALSE;
+
+	return ret;
 }
 
 int
@@ -2312,6 +2318,8 @@ write_elf_header(struct DumpInfo *info)
 	struct pt_load_segment *pls;
 	struct dump_bitmap bitmap2;
 	const off_t failed = (off_t)-1;
+
+	int ret = FALSE;
 
 	size_hdr_memory = info->offset_load_memory;
 
@@ -2559,14 +2567,7 @@ write_elf_header(struct DumpInfo *info)
 		goto out;
 	}
 
-	free(bitmap2.buf);
-	free(header_memory);
-	if (info->flag_elf & ELF32)
-		free(load32);
-	else
-		free(load64);
-	free(buf);
-	return TRUE;
+	ret = TRUE;
 out:
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
@@ -2578,7 +2579,8 @@ out:
 		free(load64);
 	if (buf != NULL)
 		free(buf);
-	return FALSE;
+
+	return ret;
 }
 
 int
@@ -2680,6 +2682,8 @@ write_pages(struct DumpInfo *info)
 	struct cache_data bm2, pdesc, pdata;
 	struct dump_bitmap bitmap1, bitmap2;
 	const off_t failed = (off_t)-1;
+
+	int ret = FALSE;
 
 	bm2.fd         = info->fd_bitmap;
 	bm2.file_name  = info->name_bitmap;
@@ -2886,14 +2890,7 @@ write_pages(struct DumpInfo *info)
 	 */
 	print_progress(info->max_mapnr, info->max_mapnr);
 
-	free(buf);
-	free(buf_out);
-	free(bm2.buf);
-	free(pdesc.buf);
-	free(pdata.buf);
-	free(bitmap1.buf);
-	free(bitmap2.buf);
-	return TRUE;
+	ret = TRUE;
 out:
 	if (buf != NULL)
 		free(buf);
@@ -2909,7 +2906,8 @@ out:
 		free(bitmap1.buf);
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
-	return FALSE;
+
+	return ret;
 }
 
 int write_dump_bitmap(struct DumpInfo *info)
@@ -2917,6 +2915,8 @@ int write_dump_bitmap(struct DumpInfo *info)
 	struct cache_data bm;
 	long buf_size;
 	const off_t failed = (off_t)-1;
+
+	int ret = FALSE;
 
 	if (info->flag_elf_dumpfile)
 		return TRUE;
@@ -2956,12 +2956,12 @@ int write_dump_bitmap(struct DumpInfo *info)
 		}
 		buf_size -= BUFSIZE_BITMAP;
 	}
-	free(bm.buf);
-	return TRUE;
+	ret = TRUE;
 out:
 	if (bm.buf != NULL)
 		free(bm.buf);
-	return FALSE;
+
+	return ret;
 }
 
 void
@@ -2969,13 +2969,13 @@ close_config_file(struct DumpInfo *info)
 {
 	if(fclose(info->file_configfile) < 0)
 		ERRMSG("Can't close the config file(%s). %s\n",
-		info->name_configfile, strerror(errno));
+		    info->name_configfile, strerror(errno));
 }
 
 void
 close_dump_memory(struct DumpInfo *info)
 {
-	if (close(info->fd_memory) < 0)
+	if ((info->fd_memory = close(info->fd_memory)) < 0)
 		ERRMSG("Can't close the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 }
@@ -2983,7 +2983,7 @@ close_dump_memory(struct DumpInfo *info)
 void
 close_dump_file(struct DumpInfo *info)
 {
-	if (close(info->fd_dumpfile) < 0)
+	if ((info->fd_dumpfile = close(info->fd_dumpfile)) < 0)
 		ERRMSG("Can't close the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 }
@@ -2991,7 +2991,7 @@ close_dump_file(struct DumpInfo *info)
 void
 close_3rd_bitmap(struct DumpInfo *info)
 {
-	if (close(info->fd_3rd_bitmap) < 0)
+	if ((info->fd_3rd_bitmap = close(info->fd_3rd_bitmap)) < 0)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
 		    info->name_3rd_bitmap, strerror(errno));
 	free(info->name_3rd_bitmap);
@@ -3000,7 +3000,7 @@ close_3rd_bitmap(struct DumpInfo *info)
 void
 close_dump_bitmap(struct DumpInfo *info)
 {
-	if (close(info->fd_bitmap) < 0)
+	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));
 	free(info->name_bitmap);
@@ -3148,8 +3148,7 @@ main(int argc, char *argv[])
 			goto out;
 		}
 		if ((argc != optind + 2)
-		    || ((info->flag_compress == 1)
-		    && (info->flag_elf_dumpfile == 1))
+		    || (info->flag_compress && info->flag_elf_dumpfile)
 		    || info->flag_vmlinux) {
 			ERRMSG("Commandline parameter is invalid.\n");
 			print_usage();
@@ -3192,6 +3191,7 @@ main(int argc, char *argv[])
 			goto out;
 
 		MSG("\n");
+		MSG("The configfile is saved to %s.\n", info->name_configfile);
 	} else {
 		if (!open_files_for_creating_dumpfile(info))
 			goto out;
@@ -3217,18 +3217,14 @@ main(int argc, char *argv[])
 		MSG("\n");
 		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
 	}
-	MSG("makedumpfile Completed.\n");
-	if (!info->flag_generate_config) {
-		free(info->pt_load_segments);
-		free(info->mem_map_data);
-	}
-	free(info->dump_header);
-	free(info);
-	return COMPLETED;
-
+	retcd = COMPLETED;
 out:
 	ERRMSG("\n");
-	ERRMSG("makedumpfile Failed.\n");
+	if (retcd == COMPLETED)
+		MSG("makedumpfile Completed.\n");
+	else
+		ERRMSG("makedumpfile Failed.\n");
+
 	if (info->fd_memory)
 		close(info->fd_memory);
 	if (info->fd_dumpfile)
@@ -3245,8 +3241,6 @@ out:
 		free(info->dump_header);
 	if (info != NULL)
 		free(info);
-	if (retcd != COMPLETED)
-		return retcd;
-	else
-		return FAILED;
+
+	return retcd;
 }

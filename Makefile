@@ -1,5 +1,11 @@
+# makedumpfile
+
+VERSION=1.0.2
+DATE=13 October 2006
+
 CC	= gcc
-CFLAGS	= -g -O2 -Wall -D_FILE_OFFSET_BITS=64
+CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
+	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
 CFLAGS_ARCH	= -g -O2 -Wall
 
 ARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \

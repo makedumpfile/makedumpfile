@@ -17,10 +17,6 @@
 
 #include "makedumpfile.h"
 
-extern struct symbol_table	symbol_table;
-extern struct size_table	size_table;
-extern struct offset_table	offset_table;
-
 /*
  *  Include both vmalloc'd and module address space as VMALLOC space.
  */

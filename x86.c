@@ -17,10 +17,6 @@
 
 #include "makedumpfile.h"
 
-extern struct symbol_table	symbol_table;
-extern struct size_table	size_table;
-extern struct offset_table	offset_table;
-
 int
 get_machdep_info_x86(struct DumpInfo *info)
 {

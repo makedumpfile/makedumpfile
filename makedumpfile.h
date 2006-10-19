@@ -178,6 +178,14 @@ isAnon(unsigned long mapping)
 #define NOT_FOUND_SYMBOL	(0)
 #define INVALID_SYMBOL_DATA	(ULONG_MAX)
 #define SYMBOL(X)		(symbol_table.X)
+#define SYMBOL_INIT(symbol, str_symbol) \
+do { \
+	SYMBOL(symbol) = get_symbol_addr(info, str_symbol, 0); \
+} while (0)
+#define SYMBOL_INIT_NEXT(symbol, str_symbol) \
+do { \
+	SYMBOL(symbol) = get_symbol_addr(info, str_symbol, 1); \
+} while (0)
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \
 	if (SYMBOL(symbol) != NOT_FOUND_SYMBOL) { \
@@ -332,7 +340,7 @@ do { \
 #define DEFAULT_PHYS_START	(KERNEL_TR_PAGE_SIZE * 1)
 #define _SECTION_SIZE_BITS	(30)
 #define SIZEOF_NODE_ONLINE_MAP	(32)
-#define MAX_ORDER		(18)
+#define MAX_ORDER		(17)
 #endif          /* ia64 */
 
 /*
@@ -465,7 +473,6 @@ struct DumpInfo {
 	struct vm_table {                /* kernel VM-related data */
 		ulong flags;
 		int numnodes;
-		int nr_zones;
 		int nr_free_areas;
 		ulong *node_online_map;
 		int node_online_map_len;
@@ -486,7 +493,6 @@ struct symbol_table {
 	unsigned long	pkmap_count_next;
 	unsigned long	system_utsname;
 	unsigned long	_stext;
-	unsigned long	_text;
 	unsigned long	phys_base;
 	unsigned long	node_online_map;
 	unsigned long	node_data;
@@ -530,9 +536,9 @@ struct offset_table {
 	} list_head;
 };
 
-struct symbol_table	symbol_table;
-struct size_table	size_table;
-struct offset_table	offset_table;
+extern struct symbol_table	symbol_table;
+extern struct size_table	size_table;
+extern struct offset_table	offset_table;
 
 /*
  * Debugging information
@@ -556,9 +562,10 @@ struct dwarf_info {
 	int	member_offset;		/* OUT */
 };
 
-extern struct dwarf_info dwarf_info;
-
 struct dwarf_values {
 	Dwarf_Die *die;
 	uint32_t *found_map;
 };
+
+extern struct dwarf_info	dwarf_info;
+

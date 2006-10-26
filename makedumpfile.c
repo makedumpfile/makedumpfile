@@ -91,7 +91,7 @@ vaddr_to_offset_general(struct DumpInfo *info, unsigned long vaddr)
 /*
  * Get the number of the page descriptors from the ELF info.
  */
-unsigned int
+unsigned long
 get_max_mapnr(struct DumpInfo *info)
 {
 	int i;
@@ -1437,7 +1437,7 @@ initial(struct DumpInfo *info)
 }
 
 static inline void
-set_bitmap(char *bitmap, unsigned int pfn, int val)
+set_bitmap(char *bitmap, unsigned long pfn, int val)
 {
 	int byte, bit;
 
@@ -1457,7 +1457,7 @@ is_on(char *bitmap, int i)
 }
 
 static inline int
-is_dumpable(struct dump_bitmap *bitmap, unsigned int pfn)
+is_dumpable(struct dump_bitmap *bitmap, unsigned long pfn)
 {
 	off_t offset;
 	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
@@ -1473,7 +1473,7 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned int pfn)
 }
 
 static inline int
-is_memory_hole(struct dump_bitmap *bitmap, unsigned int pfn)
+is_memory_hole(struct dump_bitmap *bitmap, unsigned long pfn)
 {
 	return !is_dumpable(bitmap, pfn);
 }
@@ -1571,8 +1571,9 @@ write_cache_bufsz(struct cache_data *cd)
 int
 create_contig_bitmap(struct DumpInfo *info)
 {
-	unsigned int i, pfn, remain_size, last_pfn, contig_exclude;
+	unsigned int i, remain_size, contig_exclude;
 	unsigned int num_load_dumpfile;
+	unsigned long pfn, last_pfn;
 	int lastpage_mhole;
 	struct cache_data bm2;
 	struct dump_bitmap bitmap1, bitmap2;
@@ -2075,8 +2076,8 @@ int
 create_dump_bitmap(struct DumpInfo *info)
 {
 	int val, not_found_mem_map;
-	unsigned int i, mm, pfn, remain_size;
-	unsigned long addr_mem_map, paddr;
+	unsigned int i, mm, remain_size;
+	unsigned long pfn, addr_mem_map, paddr;
 	unsigned char *page_cache = NULL, *buf = NULL, *pcache;
 	unsigned int _count;
 	unsigned long flags, mapping;
@@ -2304,7 +2305,7 @@ write_elf_header(struct DumpInfo *info)
 {
 	int i, lastpage_dumpable;
 	size_t size_hdr_memory, size_Ehdr, size_Phdr, size_note;
-	unsigned int pfn, pfn_start, pfn_end, num_file, num_mem;
+	unsigned long pfn, pfn_start, pfn_end, num_file, num_mem;
 	loff_t offset_seg, offset_note_memory, offset_note_dumpfile;
 	unsigned long long  vaddr_seg, paddr_seg;
 	unsigned char *header_memory = NULL;
@@ -2650,7 +2651,7 @@ write_dump_header(struct DumpInfo *info)
 }
 
 void
-print_progress(int current, int end)
+print_progress(unsigned long current, unsigned long end)
 {
 	int progress;
 	time_t tm;
@@ -2672,7 +2673,7 @@ print_progress(int current, int end)
 int
 write_pages(struct DumpInfo *info)
 {
-	unsigned int pfn, num_dump, per = info->max_mapnr/100;
+	unsigned long pfn, num_dump, per = info->max_mapnr/100;
 	unsigned int flag_change_bitmap = 0;
 	unsigned long size_out;
 	struct page_desc pd;

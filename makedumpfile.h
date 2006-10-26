@@ -421,7 +421,7 @@ struct DumpInfo {
 	int		flag_exclude_free;   /* flag of excluding free page */
 	int		flag_show_version;   /* flag of showing version */
 	size_t		page_size;           /* size of page */
-	unsigned int	max_mapnr;           /* number of page descriptor */
+	unsigned long	max_mapnr;           /* number of page descriptor */
 	unsigned long   section_size_bits;
 	unsigned long   sections_per_root;
 	unsigned long	phys_base;

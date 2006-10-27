@@ -2673,8 +2673,8 @@ print_progress(unsigned long current, unsigned long end)
 int
 write_pages(struct DumpInfo *info)
 {
-	unsigned long pfn, num_dump, per = info->max_mapnr/100;
 	unsigned int flag_change_bitmap = 0;
+ 	unsigned long pfn, per, num_dumpable = 0, num_dumped = 0;
 	unsigned long size_out;
 	struct page_desc pd;
 	off_t offset_data = 0, offset_memory = 0;
@@ -2755,19 +2755,24 @@ write_pages(struct DumpInfo *info)
 		goto out;
 	}
 
+	/*
+	 * Count the number of dumpable pages.
+	 */
+	for (pfn = 0 ; pfn < dh->max_mapnr; pfn++) {
+		if (is_dumpable(&bitmap2, pfn))
+			num_dumpable++;
+	}
+	per = num_dumpable / 100;
+
 	if (info->flag_elf_dumpfile) {
 		pdata.offset = info->offset_load_dumpfile;
 	} else {
 		/*
 		 * Calculate the offset of the page data.
 		 */
-		for (pfn = 0, num_dump = 0; pfn < dh->max_mapnr; pfn++) {
-			if (is_dumpable(&bitmap2, pfn))
-				num_dump++;
-		}
 		pdesc.offset
 		    = (1 + dh->sub_hdr_size + dh->bitmap_blocks)*dh->block_size;
-		pdata.offset = pdesc.offset + sizeof(page_desc_t) * num_dump;
+		pdata.offset = pdesc.offset + sizeof(page_desc_t)*num_dumpable;
 		offset_data  = pdata.offset;
 	}
 	/*
@@ -2782,8 +2787,8 @@ write_pages(struct DumpInfo *info)
 
 	for (pfn = 0; pfn < info->max_mapnr; pfn++) {
 
-		if ((pfn % per) == 0)
-			print_progress(pfn, info->max_mapnr);
+		if ((num_dumped % per) == 0)
+			print_progress(num_dumped, num_dumpable);
 
 		if ((pfn % PFN_BUFBITMAP) == 0) {
 			if (flag_change_bitmap) {
@@ -2809,6 +2814,8 @@ write_pages(struct DumpInfo *info)
 		 */
 		if (!is_dumpable(&bitmap2, pfn))
 			continue;
+
+		num_dumped++;
 
 		offset_memory = paddr_to_offset(info, info->page_size*pfn);
 		if (lseek(info->fd_memory, offset_memory, SEEK_SET)
@@ -2889,7 +2896,7 @@ write_pages(struct DumpInfo *info)
 	/*
 	 * Print the progress of the end.
 	 */
-	print_progress(info->max_mapnr, info->max_mapnr);
+	print_progress(num_dumpable, num_dumpable);
 
 	ret = TRUE;
 out:

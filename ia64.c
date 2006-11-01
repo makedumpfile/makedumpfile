@@ -34,8 +34,8 @@ get_phys_base_ia64(struct DumpInfo *info)
 
 			info->phys_base = pls->phys_start;
 			break;
-                }
-        }
+		}
+	}
 	return TRUE;
 }
 

@@ -148,15 +148,14 @@ get_kernel_version(char *release)
 	} else if (!strncmp(release, "2.6.18", strlen("2.6.18"))) {
 		return VERSION_2_6_18;
 	} else {
-		ERRMSG("Can't get kernel version from system_utsname.\n");
 		return FALSE;
 	}
 }
 
 int
-is_page_size(unsigned long page_size)
+is_page_size(long page_size)
 {
-	unsigned long bitbuf = page_size;
+	long bitbuf = page_size;
 	unsigned int i, sum = 0;
 
 	/* Only 1 bit is set because of page size. */
@@ -173,10 +172,8 @@ is_page_size(unsigned long page_size)
 int
 check_release(struct DumpInfo *info)
 {
-	unsigned long sym_system_utsname;
 	struct utsname system_utsname;
 
-	sym_system_utsname = SYMBOL(system_utsname);
 	/*
 	 * Get the kernel version from the symbol "system_utsname".
 	 */
@@ -184,7 +181,7 @@ check_release(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
-	if (!readmem(info, sym_system_utsname, &system_utsname,
+	if (!readmem(info, SYMBOL(system_utsname), &system_utsname,
 	    sizeof(struct utsname))) {
 		ERRMSG("Can't get the address of system_utsname.\n");
 		return FALSE;
@@ -192,16 +189,23 @@ check_release(struct DumpInfo *info)
 
 	if (info->flag_read_config) {
 		if (strcmp(system_utsname.release, info->release)) {
-			ERRMSG("%s doesn't suit the dump_mem.\n",
-			    info->name_configfile);
+			ERRMSG("%s and %s don't match.\n",
+			    info->name_configfile, info->name_memory);
 			retcd = WRONG_RELEASE;
 			return FALSE;
 		}
 	}
 
 	info->kernel_version = get_kernel_version(system_utsname.release);
-	if (info->kernel_version == FALSE)
+	if (info->kernel_version == FALSE) {
+		if (info->flag_read_config)
+			ERRMSG("%s and %s don't match, or the kernel version is not supported.\n",
+			    info->name_configfile, info->name_memory);
+		else
+			ERRMSG("%s and %s don't match, or the kernel version is not supported.\n",
+			    dwarf_info.vmlinux_name, info->name_memory);
 		return FALSE;
+	}
 
 	return TRUE;
 }
@@ -612,7 +616,7 @@ get_symbol_addr(struct DumpInfo *info, char *symname, int get_next_symbol)
 		return FALSE;
 	}
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
-		if (gelf_getshdr (scn, &shdr) == NULL) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
 			ERRMSG("Can't get section header.\n");
 			goto out;
 		}
@@ -796,7 +800,7 @@ next_tag:
 		 */
 	}
 
-	if (dwarf_siblingof(die,die) == 0)
+	if (dwarf_siblingof(die, die) == 0)
 		goto next_tag;
 
 }
@@ -840,17 +844,17 @@ get_debug_info(void)
 		goto out;
 	}
 
-	if (elf_getshstrndx (elfd, &shstrndx) < 0) {
+	if (elf_getshstrndx(elfd, &shstrndx) < 0) {
 		ERRMSG("Can't get the section index of the string table.\n");
 		goto out;
 	}
-	while ((scn = elf_nextscn (elfd, scn)) != NULL) {
+	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
 
 		scnhdr = gelf_getshdr(scn, &scnhdr_mem);
 
 		name = elf_strptr(elfd, shstrndx, scnhdr->sh_name);
 
-		if (strcmp(name,".debug_info"))
+		if (strcmp(name, ".debug_info"))
 			continue;
 
 		while (dwarf_nextcu(dwarfd, off, &next_off, &header_size,
@@ -1017,8 +1021,10 @@ generate_config(struct DumpInfo *info)
 		ERRMSG("Can't get the size of page.\n");
 		return FALSE;
 	}
-	if (!(info->kernel_version = get_kernel_version(utsname_buf.release)))
+	if (!(info->kernel_version = get_kernel_version(utsname_buf.release))) {
+		ERRMSG("The kernel version is not supported.\n");
 		return FALSE;
+	}
 
 	if (!get_symbol_info(info))
 		return FALSE;
@@ -1044,8 +1050,8 @@ generate_config(struct DumpInfo *info)
 	/*
 	 * write 1st kernel's PAGESIZE
 	 */
-	fprintf(info->file_configfile, "%s%d\n", STR_PAGESIZE,
-	    (int)info->page_size);
+	fprintf(info->file_configfile, "%s%ld\n", STR_PAGESIZE,
+	    info->page_size);
 
 	/*
 	 * write the symbol of 1st kernel
@@ -1095,7 +1101,7 @@ generate_config(struct DumpInfo *info)
 int
 read_config_basic_info(struct DumpInfo *info)
 {
-	unsigned long page_size;
+	long page_size;
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int get_release = FALSE, i;
 
@@ -1114,8 +1120,8 @@ read_config_basic_info(struct DumpInfo *info)
 			get_release = TRUE;
 		}
 		if (strncmp(buf, STR_PAGESIZE, strlen(STR_PAGESIZE)) == 0) {
-			page_size = strtoul(buf+strlen(STR_PAGESIZE),&endp,10);
-			if ((!page_size || page_size == ULONG_MAX)
+			page_size = strtol(buf+strlen(STR_PAGESIZE),&endp,10);
+			if ((!page_size || page_size == LONG_MAX)
 			    || strlen(endp) != 0) {
 				ERRMSG("Invalid data in %s: %s",
 				    info->name_configfile, buf);
@@ -1258,13 +1264,13 @@ dump_mem_map(struct DumpInfo *info, unsigned long pfn_start,
 int
 get_mm_flatmem(struct DumpInfo *info)
 {
-	unsigned long addr_mem_map;
+	unsigned long mem_map;
 
 	/*
 	 * Get the address of the symbol "mem_map".
 	 */
-	if (!readmem(info, SYMBOL(mem_map), &addr_mem_map, sizeof addr_mem_map)
-	    || !addr_mem_map) {
+	if (!readmem(info, SYMBOL(mem_map), &mem_map, sizeof mem_map)
+	    || !mem_map) {
 		ERRMSG("Can't get the address of mem_map.\n");
 		return FALSE;
 	}
@@ -1275,7 +1281,7 @@ get_mm_flatmem(struct DumpInfo *info)
 		    strerror(errno));
 		return FALSE;
 	}
-	dump_mem_map(info, 0, info->max_mapnr, addr_mem_map, 0);
+	dump_mem_map(info, 0, info->max_mapnr, mem_map, 0);
 
 	return TRUE;
 }
@@ -1341,7 +1347,7 @@ get_mm_sparsemem(struct DumpInfo *info)
 {
 	unsigned int section_nr, mem_section_size, num_section;
 	unsigned long pfn_start, pfn_end;
-	unsigned long addr_section, addr_mem_map;
+	unsigned long section, mem_map;
 	unsigned long *mem_sec = NULL;
 
 	int ret = FALSE;
@@ -1374,16 +1380,16 @@ get_mm_sparsemem(struct DumpInfo *info)
 		goto out;
 	}
 	for (section_nr = 0; section_nr < num_section; section_nr++) {
-		addr_section = nr_to_section(info, section_nr, mem_sec);
-		addr_mem_map = section_mem_map_addr(info, addr_section);
-		addr_mem_map = sparse_decode_mem_map(info, addr_mem_map, section_nr);
-		if (!is_kvaddr(addr_mem_map))
-			addr_mem_map = NOT_MEMMAP_ADDR;
+		section = nr_to_section(info, section_nr, mem_sec);
+		mem_map = section_mem_map_addr(info, section);
+		mem_map = sparse_decode_mem_map(info, mem_map, section_nr);
+		if (!is_kvaddr(mem_map))
+			mem_map = NOT_MEMMAP_ADDR;
 		pfn_start = section_nr * PAGES_PER_SECTION();
 		pfn_end   = pfn_start + PAGES_PER_SECTION();
 		if (info->max_mapnr < pfn_end)
 			pfn_end = info->max_mapnr;
-		dump_mem_map(info, pfn_start, pfn_end, addr_mem_map, section_nr);
+		dump_mem_map(info, pfn_start, pfn_end, mem_map, section_nr);
 	}
 	ret = TRUE;
 out:
@@ -1520,7 +1526,7 @@ is_in_segs(struct DumpInfo *info, unsigned long long paddr)
 }
 
 static inline int
-is_zero_page(unsigned char *buf, size_t page_size)
+is_zero_page(unsigned char *buf, long page_size)
 {
 	size_t i;
 
@@ -2109,7 +2115,7 @@ create_dump_bitmap(struct DumpInfo *info)
 {
 	int val, not_found_mem_map;
 	unsigned int i, mm, remain_size;
-	unsigned long pfn, addr_mem_map, paddr;
+	unsigned long pfn, mem_map, paddr;
 	unsigned char *page_cache = NULL, *buf = NULL, *pcache;
 	unsigned int _count;
 	unsigned long flags, mapping;
@@ -2175,15 +2181,15 @@ create_dump_bitmap(struct DumpInfo *info)
 		mmd = &info->mem_map_data[mm];
 		pfn   = mmd->pfn_start;
 		paddr = pfn*info->page_size;
-		addr_mem_map = mmd->mem_map;
+		mem_map = mmd->mem_map;
 
-		if (addr_mem_map == NOT_MEMMAP_ADDR)
+		if (mem_map == NOT_MEMMAP_ADDR)
 			not_found_mem_map = TRUE;
 		else
 			not_found_mem_map = FALSE;
 
 		for (; pfn < mmd->pfn_end;
-		    pfn++, addr_mem_map += SIZE(page),
+		    pfn++, mem_map += SIZE(page),
 		    paddr += info->page_size) {
 
 			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
@@ -2256,7 +2262,7 @@ create_dump_bitmap(struct DumpInfo *info)
 			}
 
 			if ((pfn % PGMM_CACHED) == 0) {
-				if (!readmem(info, addr_mem_map, page_cache,
+				if (!readmem(info, mem_map, page_cache,
 				    SIZE(page) * PGMM_CACHED))
 					goto out;
 			}
@@ -2950,7 +2956,8 @@ out:
 	return ret;
 }
 
-int write_dump_bitmap(struct DumpInfo *info)
+int
+write_dump_bitmap(struct DumpInfo *info)
 {
 	struct cache_data bm;
 	long buf_size;
@@ -3057,7 +3064,6 @@ close_kernel_file()
 /*
  * Close the following files when it generates the configuration file.
  * - vmlinux
- * - system.map
  * - configuration file
  */
 int
@@ -3079,7 +3085,6 @@ close_files_for_generating_configfile(struct DumpInfo *info)
  *   - configuration file
  * else
  *   - vmlinux
- *   - system.map
  */
 int
 close_files_for_creating_dumpfile(struct DumpInfo *info)
@@ -3217,7 +3222,7 @@ main(int argc, char *argv[])
 		/*
 		 * library out of date
 		 */
-		ERRMSG("Elf library out of date!n");
+		ERRMSG("Elf library out of date!\n");
 		goto out;
 	}
 	if (info->flag_generate_config) {

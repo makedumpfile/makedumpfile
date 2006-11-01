@@ -47,8 +47,8 @@ get_phys_base_x86_64(struct DumpInfo *info)
 			    (pls->virt_start & ~(__START_KERNEL_map));
 
 			break;
-                }
-        }
+		}
+	}
 
 	return TRUE;
 }

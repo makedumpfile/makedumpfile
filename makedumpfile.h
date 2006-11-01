@@ -420,7 +420,7 @@ struct DumpInfo {
 	int		flag_read_config;    /* flag of reading config file */
 	int		flag_exclude_free;   /* flag of excluding free page */
 	int		flag_show_version;   /* flag of showing version */
-	size_t		page_size;           /* size of page */
+	long		page_size;           /* size of page */
 	unsigned long	max_mapnr;           /* number of page descriptor */
 	unsigned long   section_size_bits;
 	unsigned long   sections_per_root;

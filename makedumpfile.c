@@ -333,12 +333,17 @@ open_config_file(struct DumpInfo *info, char *mode)
 }
 
 int
-open_kernel_file(char *name)
+open_kernel_file()
 {
-    int fd;
+	int fd;
 
-    fd = open(name, O_RDONLY);
-    return fd;
+	if ((fd = open(dwarf_info.vmlinux_name, O_RDONLY)) < 0) {
+		ERRMSG("Can't open the kernel file(%s). %s\n",
+		    dwarf_info.vmlinux_name, strerror(errno));
+		return FALSE;
+	}
+	dwarf_info.vmlinux_fd = fd;
+	return TRUE;
 }
 
 int
@@ -424,8 +429,7 @@ open_dump_bitmap(struct DumpInfo *info)
 int
 open_files_for_generating_configfile(struct DumpInfo *info)
 {
-	if ((dwarf_info.vmlinux_fd
-	    = open_kernel_file(dwarf_info.vmlinux_name)) == -1)
+	if (!open_kernel_file())
 		return FALSE;
 
 	if (!open_config_file(info, "w"))
@@ -451,8 +455,7 @@ open_files_for_creating_dumpfile(struct DumpInfo *info)
 		if (!open_config_file(info, "r"))
 			return FALSE;
 	} else if (info->dump_level > DL_EXCLUDE_ZERO) {
-		if ((dwarf_info.vmlinux_fd
-		    = open_kernel_file(dwarf_info.vmlinux_name)) == -1)
+		if (!open_kernel_file())
 			return FALSE;
 	}
 	if (!open_dump_memory(info))
@@ -3015,10 +3018,10 @@ close_dump_bitmap(struct DumpInfo *info)
 }
 
 void
-close_kernel_file(int fd)
+close_kernel_file()
 {
-	if (close(fd) < 0)
-		ERRMSG("Can't close vmlinux file(%s). %s\n",
+	if ((dwarf_info.vmlinux_fd = close(dwarf_info.vmlinux_fd)) < 0)
+		ERRMSG("Can't close the kernel file(%s). %s\n",
 			dwarf_info.vmlinux_name, strerror(errno));
 }
 
@@ -3031,7 +3034,7 @@ close_kernel_file(int fd)
 int
 close_files_for_generating_configfile(struct DumpInfo *info)
 {
-	close_kernel_file(dwarf_info.vmlinux_fd);
+	close_kernel_file();
 
 	close_config_file(info);
 
@@ -3055,7 +3058,7 @@ close_files_for_creating_dumpfile(struct DumpInfo *info)
 	if (info->flag_read_config)
 		close_config_file(info);
 	else if (info->dump_level > DL_EXCLUDE_ZERO)
-		close_kernel_file(dwarf_info.vmlinux_fd);
+		close_kernel_file();
 
 	close_dump_memory(info);
 

@@ -500,10 +500,15 @@ get_elf_info(struct DumpInfo *info)
 	Elf *elfd = NULL;
 	GElf_Ehdr ehdr;
 	GElf_Phdr load;
+	const off_t failed = (off_t)-1;
 
 	int ret = FALSE;
 
-	lseek(info->fd_memory, 0, SEEK_SET);
+	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
 	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
 		    info->name_memory);
@@ -594,8 +599,13 @@ get_symbol_addr(struct DumpInfo *info, char *symname, int get_next_symbol)
 	Elf_Data *data = NULL;
 	Elf_Scn *scn = NULL;
 	char *sym_name = NULL;
+	const off_t failed = (off_t)-1;
 
-	lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET);
+	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the kernel file(%s). %s\n",
+		    dwarf_info.vmlinux_name, strerror(errno));
+		return FALSE;
+	}
 	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
 		    dwarf_info.vmlinux_name);
@@ -810,10 +820,15 @@ get_debug_info(void)
 	uint32_t found_map = 0;
 	char *name = NULL;
 	size_t shstrndx;
+	const off_t failed = (off_t)-1;
 
 	int ret = FALSE;
 
-	lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET);
+	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the kernel file(%s). %s\n",
+		    dwarf_info.vmlinux_name, strerror(errno));
+		return FALSE;
+	}
 	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ_MMAP, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
 		    dwarf_info.vmlinux_name);
@@ -841,8 +856,10 @@ get_debug_info(void)
 		while (dwarf_nextcu(dwarfd, off, &next_off, &header_size,
 		    &abbrev_offset, &address_size, &offset_size) == 0) {
 			off += header_size;
-			if (dwarf_offdie(dwarfd, off, &cu_die) == NULL)
+			if (dwarf_offdie(dwarfd, off, &cu_die) == NULL) {
+				ERRMSG("Can't get CU die.\n");
 				goto out;
+			}
 			search_die_tree(dwarfd, &cu_die, &found_map);
 			if (found_map & DWARF_INFO_FOUND_STRUCT)
 				break;
@@ -1082,7 +1099,11 @@ read_config_basic_info(struct DumpInfo *info)
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int get_release = FALSE, i;
 
-	fseek(info->file_configfile, 0L, SEEK_SET);
+	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the config file(%s). %s\n",
+		    info->name_configfile, strerror(errno));
+		return FALSE;
+	}
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
 		i = strlen(buf);
@@ -1124,7 +1145,11 @@ read_config_symbol(struct DumpInfo *info, char *str_symbol)
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int i;
 
-	fseek(info->file_configfile, 0L, SEEK_SET);
+	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the config file(%s). %s\n",
+		    info->name_configfile, strerror(errno));
+		return INVALID_SYMBOL_DATA;
+	}
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
 		i = strlen(buf);
@@ -1151,7 +1176,11 @@ read_config_structure(struct DumpInfo *info, char *str_structure)
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int i;
 
-	fseek(info->file_configfile, 0L, SEEK_SET);
+	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the config file(%s). %s\n",
+		    info->name_configfile, strerror(errno));
+		return INVALID_STRUCTURE_DATA;
+	}
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
 		i = strlen(buf);

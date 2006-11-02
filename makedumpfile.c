@@ -949,6 +949,11 @@ get_structure_info(struct DumpInfo *info)
 	 */
 	SIZE_INIT(pglist_data, "pglist_data");
 	OFFSET_INIT(pglist_data.node_zones, "pglist_data", "node_zones");
+	OFFSET_INIT(pglist_data.node_mem_map, "pglist_data", "node_mem_map");
+	OFFSET_INIT(pglist_data.node_start_pfn, "pglist_data","node_start_pfn");
+	OFFSET_INIT(pglist_data.node_spanned_pages, "pglist_data",
+	    "node_spanned_pages");
+	OFFSET_INIT(pglist_data.pgdat_next, "pglist_data", "pgdat_next");
 
 	/*
 	 * Get offsets of the zone's members.
@@ -996,6 +1001,13 @@ get_mem_type(struct DumpInfo *info)
 	    || (OFFSET(page._count) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE))
 		ret = NOT_FOUND_MEMTYPE;
+	else if ((SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
+	    && (SIZE(pglist_data) != NOT_FOUND_STRUCTURE)
+	    && (OFFSET(pglist_data.node_mem_map) != NOT_FOUND_STRUCTURE)
+	    && (OFFSET(pglist_data.node_start_pfn) != NOT_FOUND_STRUCTURE)
+	    && (OFFSET(pglist_data.node_spanned_pages) != NOT_FOUND_STRUCTURE)
+	    && (OFFSET(pglist_data.pgdat_next) != NOT_FOUND_STRUCTURE))
+		ret = DISCONTIGMEM;
 	else if ((SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
 	    && (SIZE(mem_section) != NOT_FOUND_STRUCTURE)
 	    && (OFFSET(mem_section.section_mem_map) != NOT_FOUND_STRUCTURE))
@@ -1088,6 +1100,13 @@ generate_config(struct DumpInfo *info)
 	WRITE_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	WRITE_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
+	WRITE_MEMBER_OFFSET("pglist_data.node_mem_map",
+	    pglist_data.node_mem_map);
+	WRITE_MEMBER_OFFSET("pglist_data.node_start_pfn",
+	    pglist_data.node_start_pfn);
+	WRITE_MEMBER_OFFSET("pglist_data.node_spanned_pages",
+	    pglist_data.node_spanned_pages);
+	WRITE_MEMBER_OFFSET("pglist_data.pgdat_next", pglist_data.pgdat_next);
 	WRITE_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	WRITE_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	WRITE_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
@@ -1237,6 +1256,12 @@ read_config(struct DumpInfo *info)
 	READ_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	READ_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
+	READ_MEMBER_OFFSET("pglist_data.node_mem_map",pglist_data.node_mem_map);
+	READ_MEMBER_OFFSET("pglist_data.node_start_pfn",
+	    pglist_data.node_start_pfn);
+	READ_MEMBER_OFFSET("pglist_data.node_spanned_pages",
+	    pglist_data.node_spanned_pages);
+	READ_MEMBER_OFFSET("pglist_data.pgdat_next", pglist_data.pgdat_next);
 	READ_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	READ_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	READ_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
@@ -1244,6 +1269,56 @@ read_config(struct DumpInfo *info)
 	READ_MEMBER_OFFSET("list_head.next", list_head.next);
 	READ_MEMBER_OFFSET("list_head.prev", list_head.prev);
 
+	return TRUE;
+}
+
+/*
+ * Get the number of online nodes.
+ */
+int
+get_nodes_online(struct DumpInfo *info)
+{
+	int len, i, j, online;
+	unsigned long bitbuf, *maskptr;
+
+	if (SYMBOL(node_online_map) == NOT_FOUND_SYMBOL)
+		return 0;
+	/*
+	 * FIXME
+	 * Size of node_online_map must be dynamically got from debugging
+	 * information each architecture or each config.
+	 */
+	len = SIZEOF_NODE_ONLINE_MAP;
+	if (!(vt->node_online_map = (unsigned long *)malloc(len))) {
+		ERRMSG("Can't allocate memory for the node online map. %s\n",
+		    strerror(errno));
+		return 0;
+	}
+	if (!readmem(info, SYMBOL(node_online_map), vt->node_online_map, len)) {
+		ERRMSG("Can't get the node online map.\n");
+		return 0;
+	}
+	vt->node_online_map_len = len/sizeof(unsigned long);
+	online = 0;
+	maskptr = (unsigned long *)vt->node_online_map;
+	for (i = 0; i < vt->node_online_map_len; i++, maskptr++) {
+		bitbuf = *maskptr;
+		for (j = 0; j < sizeof(bitbuf) * 8; j++) {
+			online += bitbuf & 1;
+			bitbuf = bitbuf >> 1;
+		}
+	}
+	return online;
+}
+
+int
+get_numnodes(struct DumpInfo *info)
+{
+	if ((vt->numnodes = get_nodes_online(info))) {
+		vt->flags |= NODES_ONLINE;
+	} else {
+		vt->numnodes = 1;
+	}
 	return TRUE;
 }
 
@@ -1259,6 +1334,57 @@ dump_mem_map(struct DumpInfo *info, unsigned long pfn_start,
 	mmd->mem_map   = mem_map;
 
 	return;
+}
+
+int
+get_mm_discontigmem(struct DumpInfo *info)
+{
+	int i;
+	unsigned long pglist, mem_map, pfn_start, pfn_end, node_spanned_pages;
+
+	info->num_mem_map = vt->numnodes;
+
+	if ((info->mem_map_data = (struct mem_map_data *)
+	    malloc(sizeof(struct mem_map_data)*info->num_mem_map)) == NULL) {
+		ERRMSG("Can't allocate memory for the mem_map_data. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	if (!readmem(info, SYMBOL(pgdat_list), &pglist, sizeof pglist)
+	    || !pglist) {
+		ERRMSG("Can't get the address of pgdat_list.\n");
+		return FALSE;
+	}
+	for (i = 0; i < vt->numnodes; i++) {
+		if (!readmem(info, pglist + OFFSET(pglist_data.node_mem_map),
+		    &mem_map, sizeof mem_map)) {
+			ERRMSG("Can't get mem_map.\n");
+			return FALSE;
+		}
+		if (!readmem(info, pglist + OFFSET(pglist_data.node_start_pfn),
+		    &pfn_start, sizeof pfn_start)) {
+			ERRMSG("Can't get node_start_pfn.\n");
+			return FALSE;
+		}
+		if (!readmem(info,pglist+OFFSET(pglist_data.node_spanned_pages),
+		    &node_spanned_pages, sizeof node_spanned_pages)) {
+			ERRMSG("Can't get node_spanned_pages.\n");
+			return FALSE;
+		}
+		pfn_end = pfn_start + node_spanned_pages;
+		dump_mem_map(info, pfn_start, pfn_end, mem_map, i);
+
+		/*
+		 * Get pglist_data of next node.
+		 */
+		if ((i + 1 < vt->numnodes)
+		    && !readmem(info, pglist + OFFSET(pglist_data.pgdat_next),
+		    &pglist, sizeof pglist)) {
+			ERRMSG("Can't get next pglist_data.\n");
+			return FALSE;
+		}
+	}
+	return TRUE;
 }
 
 int
@@ -1420,6 +1546,10 @@ get_mem_map(struct DumpInfo *info)
 	int ret;
 
 	switch (get_mem_type(info)) {
+	case DISCONTIGMEM:
+		MSG("Memory type : DISCONTIGMEM\n");
+		ret = get_mm_discontigmem(info);
+		break;
 	case SPARSEMEM:
 		MSG("Memory type : SPARSEMEM\n");
 		ret = get_mm_sparsemem(info);
@@ -1466,6 +1596,9 @@ initial(struct DumpInfo *info)
 			return FALSE;
 	}
 	if (!get_machdep_info(info))
+		return FALSE;
+
+	if (!get_numnodes(info))
 		return FALSE;
 
 	if (!get_mem_map(info))
@@ -1729,45 +1862,6 @@ out:
 	return FALSE;
 }
 
-/*
- * Get the number of online nodes.
- */
-int
-get_nodes_online(struct DumpInfo *info)
-{
-	int len, i, j, online;
-	unsigned long bitbuf, *maskptr;
-
-	if (SYMBOL(node_online_map) == NOT_FOUND_SYMBOL)
-		return 0;
-	/*
-	 * FIXME
-	 * Size of node_online_map must be dynamically got from debugging
-	 * information each architecture or each config.
-	 */
-	len = SIZEOF_NODE_ONLINE_MAP;
-	if (!(vt->node_online_map = (unsigned long *)malloc(len))) {
-		ERRMSG("Can't allocate memory for the node online map. %s\n",
-		    strerror(errno));
-		return 0;
-	}
-	if (!readmem(info, SYMBOL(node_online_map), vt->node_online_map, len)) {
-		ERRMSG("Can't get the node online map.\n");
-		return 0;
-	}
-	vt->node_online_map_len = len/sizeof(unsigned long);
-	online = 0;
-	maskptr = (unsigned long *)vt->node_online_map;
-	for (i = 0; i < vt->node_online_map_len; i++, maskptr++) {
-		bitbuf = *maskptr;
-		for (j = 0; j < sizeof(bitbuf) * 8; j++) {
-			online += bitbuf & 1;
-			bitbuf = bitbuf >> 1;
-		}
-	}
-	return online;
-}
-
 int
 next_online_node(first)
 {
@@ -2012,11 +2106,6 @@ dump_memory_nodes(struct DumpInfo *info)
 int
 _exclude_free_page(struct DumpInfo *info)
 {
-	if ((vt->numnodes = get_nodes_online(info))) {
-		vt->flags |= NODES_ONLINE;
-	} else {
-		vt->numnodes = 1;
-	}
 	/*
 	 * FIXME
 	 * Array length of zone.free_area must be dynamically got

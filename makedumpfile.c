@@ -2796,7 +2796,7 @@ write_pages(struct DumpInfo *info)
 	/*
 	 * Count the number of dumpable pages.
 	 */
-	for (pfn = 0 ; pfn < dh->max_mapnr; pfn++) {
+	for (pfn = 0 ; pfn < info->max_mapnr; pfn++) {
 		if (is_dumpable(&bitmap2, pfn))
 			num_dumpable++;
 	}

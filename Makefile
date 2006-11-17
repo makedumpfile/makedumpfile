@@ -14,9 +14,15 @@ ARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
 			       -e s/ppc64/powerpc/ )
 CFLAGS += -D__$(ARCH)__
 CFLAGS_ARCH += -D__$(ARCH)__
+
+ifeq ($(ARCH), powerpc)
+CFLAGS += -m64
+CFLAGS_ARCH += -m64
+endif
+
 SRC	= makedumpfile.c makedumpfile.h diskdump_mod.h
-SRC_ARCH = x86.c x86_64.c ia64.c
-OBJ_ARCH = x86.o x86_64.o ia64.o
+SRC_ARCH = x86.c x86_64.c ia64.c ppc64.c
+OBJ_ARCH = x86.o x86_64.o ia64.o ppc64.o
 
 all: makedumpfile
 

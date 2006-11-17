@@ -300,6 +300,17 @@ do { \
 #define MAX_ORDER		(11)
 #endif /* x86_64 */
 
+#ifdef __powerpc__
+#define PAGE_OFFSET		(0xc000000000000000)
+#define KERNELBASE		PAGE_OFFSET
+#define VMALLOCBASE     	(0xD000000000000000)
+#define MAXMEM			(-KERNELBASE-VMALLOCBASE)
+#define KVBASE			(SYMBOL(_stext))
+#define _SECTION_SIZE_BITS	(24)
+#define SIZEOF_NODE_ONLINE_MAP	(8)
+#define MAX_ORDER		(9)
+#endif
+
 #ifdef __ia64__ /* ia64 */
 #define MAXMEM			(0xffffffffffffffff)
 #define REGION_SHIFT		(61)
@@ -345,6 +356,13 @@ off_t vaddr_to_offset_x86_64();
 #define get_machdep_info(X)	get_machdep_info_x86_64(X)
 #define vaddr_to_offset(X, Y)	vaddr_to_offset_x86_64(X, Y)
 #endif /* x86_64 */
+
+#ifdef __powerpc__ /* powerpc */
+int get_machdep_info_ppc64();
+#define get_machdep_info(X)	get_machdep_info_ppc64(X)
+#define get_phys_base(X)	TRUE
+#define vaddr_to_offset(X, Y)	vaddr_to_offset_general(X, Y)
+#endif          /* powerpc */
 
 #ifdef __ia64__ /* ia64 */
 int get_phys_base_ia64();

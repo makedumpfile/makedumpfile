@@ -578,9 +578,8 @@ get_elf_info(struct DumpInfo *info)
 	info->page_size = sysconf(_SC_PAGE_SIZE);
 
 	info->max_mapnr = get_max_mapnr(info);
-	tmp = 2*divideup(info->max_mapnr, BITPERBYTE);
-	tmp = divideup(tmp, info->page_size);
-	info->len_bitmap = tmp*info->page_size;
+	tmp = divideup(divideup(info->max_mapnr, BITPERBYTE), info->page_size);
+	info->len_bitmap = tmp*info->page_size*2;
 	if (info->flag_exclude_free)
 		info->len_3rd_bitmap = info->len_bitmap / 2;
 

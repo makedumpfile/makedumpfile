@@ -235,12 +235,14 @@ print_usage()
 	MSG("  [-c]:\n");
 	MSG("      This option enables the compression function of each page.\n");
 	MSG("      You can not specify this opiton with [-E].\n");
-	MSG("      This is only for crash. [dump_mem] and [dump_file] must be specified.\n");
+	MSG("      THIS IS ONLY FOR THE CRASH UTILITY.\n");
+	MSG("      [dump_mem] and [dump_file] must be specified.\n");
 	MSG("\n");
 	MSG("  [-E]:\n");
 	MSG("      Create the ELF dump file.\n");
 	MSG("      You can not specify this opiton with [-c].\n");
-	MSG("      This is only for gdb. [dump_mem] and [dump_file] must be specified.\n");
+	MSG("      THIS IS ONLY FOR GDB. NOT FULLY READABLE FROM THE CRASH UTILITY.\n");
+	MSG("      [dump_mem] and [dump_file] must be specified.\n");
 	MSG("\n");
 	MSG("  [-d dump_level]:\n");
 	MSG("      This is specification of the skipped pages. \n");
@@ -533,7 +535,6 @@ get_elf_info(struct DumpInfo *info)
 		goto out;
 	}
 
-	info->flag_elf = (ehdr.e_ident[EI_CLASS] == ELFCLASS32) ? ELF32 : ELF64;
 	info->num_load_memory = ehdr.e_phnum - 1;
 	if (!info->num_load_memory) {
 		ERRMSG("Can't get the number of PT_LOAD.\n");
@@ -1606,129 +1607,6 @@ write_cache_bufsz(struct cache_data *cd)
 	return TRUE;
 }
 
-int
-create_contig_bitmap(struct DumpInfo *info)
-{
-	unsigned int i, remain_size, contig_exclude;
-	unsigned int num_load_dumpfile;
-	unsigned long long pfn, last_pfn;
-	int lastpage_mhole;
-	struct cache_data bm2;
-	struct dump_bitmap bitmap1, bitmap2;
-
-	bm2.fd         = info->fd_bitmap;
-	bm2.file_name  = info->name_bitmap;
-	bm2.cache_size = BUFSIZE_BITMAP;
-	bm2.buf_size   = 0;
-	bm2.offset     = info->len_bitmap/2;
-	bm2.buf        = NULL;
-
-	bitmap1.fd        = info->fd_bitmap;
-	bitmap1.file_name = info->name_bitmap;
-	bitmap1.no_block  = -1;
-	bitmap1.buf       = NULL;
-	bitmap1.offset    = 0;
-
-	bitmap2.fd        = info->fd_bitmap;
-	bitmap2.file_name = info->name_bitmap;
-	bitmap2.no_block  = -1;
-	bitmap2.buf       = NULL;
-	bitmap2.offset    = info->len_bitmap/2;
-
-	if ((bm2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for 2nd-bitmap buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((bitmap1.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for the 1st bitmap. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	num_load_dumpfile = info->num_load_memory;
-
-	for (pfn = 0, last_pfn = 0,
-	    contig_exclude = 0; pfn < info->max_mapnr; pfn++) {
-		if (is_memory_hole(&bitmap1, pfn)) {
-			for (i = 0; i <= contig_exclude; i++) {
-				if ((last_pfn+i) != 0
-				    && (last_pfn+i)%PFN_BUFBITMAP == 0) {
-					bm2.buf_size = BUFSIZE_BITMAP;
-					if (!write_cache_bufsz(&bm2))
-						goto out;
-				}
-				set_bitmap(bm2.buf,
-				    (last_pfn+i)%PFN_BUFBITMAP, 0);
-			}
-			contig_exclude = 0;
-			last_pfn = pfn+1;
-			lastpage_mhole = 1;
-			continue;
-		}
-		lastpage_mhole = 0;
-		if (!is_dumpable(&bitmap2, pfn)) {
-			contig_exclude++;
-			continue;
-		}
-		for (i = 0; i <= contig_exclude; i++) {
-			if ((last_pfn+i) != 0
-			    && (last_pfn+i)%PFN_BUFBITMAP == 0) {
-				bm2.buf_size = BUFSIZE_BITMAP;
-				if (!write_cache_bufsz(&bm2))
-					goto out;
-			}
-			if (contig_exclude < PFN_EXCLUDED)
-				set_bitmap(bm2.buf,
-				    (last_pfn+i)%PFN_BUFBITMAP, 1);
-			else if (i == contig_exclude)
-				set_bitmap(bm2.buf,
-				    (last_pfn+i)%PFN_BUFBITMAP, 1);
-			else
-				set_bitmap(bm2.buf,
-				    (last_pfn+i)%PFN_BUFBITMAP, 0);
-		}
-		if (contig_exclude >= PFN_EXCLUDED)
-			num_load_dumpfile++;
-		contig_exclude = 0;
-		last_pfn = pfn+1;
-	}
-	if (contig_exclude)
-		num_load_dumpfile++;
-
-	for (i = 0; i <= contig_exclude; i++) {
-		if ((last_pfn+i)%PFN_BUFBITMAP == 0) {
-			bm2.buf_size = BUFSIZE_BITMAP;
-			if (!write_cache_bufsz(&bm2))
-				goto out;
-		}
-		set_bitmap(bm2.buf, (last_pfn+i)%PFN_BUFBITMAP, 0);
-	}
-	remain_size = info->len_bitmap - bm2.offset;
-	bm2.buf_size = remain_size;
-	if (!write_cache_bufsz(&bm2))
-		goto out;
-
-	info->num_load_dumpfile = num_load_dumpfile;
-
-	free(bm2.buf);
-	free(bitmap1.buf);
-	free(bitmap2.buf);
-	return TRUE;
-out:
-	if (bm2.buf != NULL)
-		free(bm2.buf);
-	if (bitmap1.buf != NULL)
-		free(bitmap1.buf);
-	if (bitmap2.buf != NULL)
-		free(bitmap2.buf);
-	return FALSE;
-}
-
 /*
  * Get the number of online nodes.
  */
@@ -1916,6 +1794,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 				return FALSE;
 			}
 			if (previous != curr_prev) {
+				ERRMSG("The free list is broken.\n");
 				retcd = ANALYSIS_FAILED;
 				return FALSE;
 			}
@@ -1943,6 +1822,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 		return FALSE;
 	}
 	if (free_pages != free_page_cnt) {
+		ERRMSG("The number of free_pages is invalid.\n");
 		retcd = ANALYSIS_FAILED;
 		return FALSE;
 	}
@@ -2126,8 +2006,6 @@ create_dump_bitmap(struct DumpInfo *info)
 
 	int ret = FALSE;
 
-	offset_page  = info->offset_load_memory;
-
 	bm1.fd         = info->fd_bitmap;
 	bm1.file_name  = info->name_bitmap;
 	bm1.cache_size = BUFSIZE_BITMAP;
@@ -2239,6 +2117,12 @@ create_dump_bitmap(struct DumpInfo *info)
 			if (info->flag_elf_dumpfile
 			    && (val != 0)
 			    && (info->dump_level & DL_EXCLUDE_ZERO)) {
+				offset_page = paddr_to_offset(info, paddr);
+				if (!offset_page) {
+					ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
+					    paddr);
+					goto out;
+				}
 				if (lseek(info->fd_memory, offset_page,
 				    SEEK_SET) == failed) {
 					ERRMSG("Can't seek the dump memory(%s). %s\n",
@@ -2251,7 +2135,6 @@ create_dump_bitmap(struct DumpInfo *info)
 					    info->name_memory, strerror(errno));
 					goto out;
 				}
-				offset_page += info->page_size;
 				if (is_zero_page(buf, info->page_size))
 					val = 0;
 			}
@@ -2318,10 +2201,6 @@ create_dump_bitmap(struct DumpInfo *info)
 		if (!exclude_free_page(info, &bm2, &bm3))
 			goto out;
 
-	if (info->flag_elf_dumpfile)
-		if (!create_contig_bitmap(info))
-			goto out;
-
 	ret = TRUE;
 out:
 	if (page_cache != NULL)
@@ -2339,29 +2218,16 @@ out:
 }
 
 int
-write_elf_header(struct DumpInfo *info)
+get_loads_dumpfile(struct DumpInfo *info)
 {
-	int i, lastpage_dumpable;
-	size_t size_hdr_memory, size_Ehdr, size_Phdr, size_note;
-	unsigned long num_file, num_mem;
-	unsigned long long pfn, pfn_start, pfn_end;
-	loff_t offset_seg, offset_note_memory, offset_note_dumpfile;
-	unsigned long long  vaddr_seg, paddr_seg;
-	unsigned char *header_memory = NULL;
-	Elf32_Ehdr *elf32;
-	Elf64_Ehdr *elf64;
-	Elf32_Phdr *note32;
-	Elf64_Phdr *note64;
-	Elf32_Phdr *load32 = NULL;
-	Elf64_Phdr *load64 = NULL;
-	char *buf = NULL;
-	struct pt_load_segment *pls;
+	int i, num_new_load = 0;
+	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
+	unsigned long frac_head, frac_tail;
+	Elf *elfd = NULL;
+	GElf_Ehdr ehdr;
+	GElf_Phdr load;
 	struct dump_bitmap bitmap2;
 	const off_t failed = (off_t)-1;
-
-	int ret = FALSE;
-
-	size_hdr_memory = info->offset_load_memory;
 
 	bitmap2.fd        = info->fd_bitmap;
 	bitmap2.file_name = info->name_bitmap;
@@ -2374,214 +2240,152 @@ write_elf_header(struct DumpInfo *info)
 		    strerror(errno));
 		goto out;
 	}
-	if ((header_memory = calloc(1, size_hdr_memory)) == NULL) {
-		ERRMSG("Can't allocate memory for the ELF header. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 		goto out;
 	}
-	if (read(info->fd_memory, header_memory, size_hdr_memory)
-	    != size_hdr_memory) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
+	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
+		ERRMSG("Can't get first elf header of %s.\n",
+		    info->name_memory);
+		goto out;
+	}
+	if (gelf_getehdr(elfd, &ehdr) == NULL) {
+		ERRMSG("Can't find file header of %s.\n",
+		    info->name_memory);
+		goto out;
+	}
+	for (i = 0; i < ehdr.e_phnum; i++) {
+		if (gelf_getphdr(elfd, i, &load) == NULL) {
+			ERRMSG("Can't find Phdr %d.\n", i);
+			goto out;
+		}
+		if (load.p_type != PT_LOAD)
+			continue;
+
+		num_excluded = 0;
+		num_new_load++;
+		pfn_start = load.p_paddr / info->page_size;
+		pfn_end   = (load.p_paddr + load.p_memsz) / info->page_size;
+		frac_head = info->page_size - (load.p_paddr % info->page_size);
+		frac_tail = (load.p_paddr + load.p_memsz) % info->page_size;
+
+		if (frac_head && (frac_head != info->page_size))
+			pfn_start++;
+		if (frac_tail)
+			pfn_end++;
+
+		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
+			if (!is_dumpable(&bitmap2, pfn)) {
+				num_excluded++;
+				continue;
+			}
+
+			/*
+			 * If the number of the contiguous pages to be excluded
+			 * is 256 or more, those pages are excluded really.
+			 * And a new PT_LOAD segment is created. 
+			 */
+			if (num_excluded >= PFN_EXCLUDED) {
+				num_new_load++;
+			}
+			num_excluded = 0;
+		}
+	}
+out:
+	if (bitmap2.buf != NULL)
+		free(bitmap2.buf);
+	if (elfd != NULL)
+		elf_end(elfd);
+	return num_new_load;
+}
+
+int
+write_elf_header(struct DumpInfo *info)
+{
+	int i, num_loads_dumpfile;
+	off_t offset_note_memory;
+	Elf *elfd = NULL;
+	GElf_Ehdr ehdr;
+	GElf_Phdr note;
+
+	char *buf = NULL;
+	const off_t failed = (off_t)-1;
+
+	int ret = FALSE;
+
+	if (!info->flag_elf_dumpfile)
+		return FALSE;
+
+	/*
+	 * Get the PT_LOAD number of the dumpfile.
+	 */
+	if (!(num_loads_dumpfile = get_loads_dumpfile(info))) {
+		ERRMSG("Can't get a number of PT_LOAD.\n");
 		goto out;
 	}
 
+	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
+		ERRMSG("Can't get first elf header of %s.\n",
+		    info->name_memory);
+		goto out;
+	}
+	if (gelf_getehdr(elfd, &ehdr) == NULL) {
+		ERRMSG("Can't find file header of %s.\n",
+		    info->name_memory);
+		goto out;
+	}
 	/*
-	 * ELF header & PT_NOTE header
+	 * PT_NOTE(1) + PT_LOAD(1+)
+	 */
+	ehdr.e_phnum = 1 + num_loads_dumpfile; 
+
+	/*
+	 * Write a ELF header.
 	 */
 	if (lseek(info->fd_dumpfile, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 		goto out;
 	}
-	if (info->flag_elf & ELF32) {
-		size_Ehdr = sizeof(Elf32_Ehdr);
-		size_Phdr = sizeof(Elf32_Phdr);
-		elf32  = (Elf32_Ehdr *)header_memory;
-		elf32->e_phnum = 1 + info->num_load_dumpfile;
-		if (write(info->fd_dumpfile, elf32, size_Ehdr) != size_Ehdr) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
-			goto out;
-		}
-		note32 = (Elf32_Phdr *)(header_memory + size_Ehdr);
-		size_note = note32->p_filesz;
-		offset_note_memory   = note32->p_offset;
-		offset_note_dumpfile = size_Ehdr + size_Phdr * elf32->e_phnum;
-		note32->p_offset     = offset_note_dumpfile;
-		if (write(info->fd_dumpfile, note32, size_Phdr) != size_Phdr) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
-			goto out;
-		}
-	} else {
-		size_Ehdr = sizeof(Elf64_Ehdr);
-		size_Phdr = sizeof(Elf64_Phdr);
-		elf64  = (Elf64_Ehdr *)header_memory;
-		elf64->e_phnum = 1 + info->num_load_dumpfile;
-		if (write(info->fd_dumpfile, elf64, size_Ehdr) != size_Ehdr) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
-			goto out;
-		}
-		note64 = (Elf64_Phdr *)(header_memory + size_Ehdr);
-		size_note = note64->p_filesz;
-		offset_note_memory   = note64->p_offset;
-		offset_note_dumpfile = size_Ehdr + size_Phdr * elf64->e_phnum;
-		note64->p_offset     = offset_note_dumpfile;
-		if (write(info->fd_dumpfile, note64, size_Phdr) != size_Phdr) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
-			goto out;
-		}
-	}
-	info->offset_load_dumpfile = offset_note_dumpfile + size_note;
-
-	/*
-	 * PT_LOAD header
-	 */
-	if (info->flag_elf & ELF32) {
-		if ((load32 = malloc(size_Phdr)) == NULL) {
-			ERRMSG("Can't allocate memory for PT_LOAD header. %s\n",
-			    strerror(errno));
-			goto out;
-		}
-		load32->p_type   = PT_LOAD;
-		load32->p_flags  = 0;
-		load32->p_offset = 0;
-		load32->p_vaddr  = 0;
-		load32->p_paddr  = 0;
-		load32->p_filesz = 0;
-		load32->p_memsz  = 0;
-		load32->p_align  = 0;
-	} else {
-		if ((load64 = malloc(size_Phdr)) == NULL) {
-			ERRMSG("Can't allocate memory for PT_LOAD header. %s\n",
-			    strerror(errno));
-			goto out;
-		}
-		load64->p_type   = PT_LOAD;
-		load64->p_flags  = 0;
-		load64->p_offset = 0;
-		load64->p_vaddr  = 0;
-		load64->p_paddr  = 0;
-		load64->p_filesz = 0;
-		load64->p_memsz  = 0;
-	}
-	offset_seg = info->offset_load_dumpfile;
-
-	for (i = 0, num_mem = 0, num_file = 0;
-	    i < info->num_load_memory; i++) {
-		pls = &info->pt_load_segments[i];
-		paddr_seg = pls->phys_start;
-		vaddr_seg = pls->virt_start;
-		if (info->flag_elf & ELF32) {
-			load32->p_vaddr  = vaddr_seg;
-			load32->p_paddr  = paddr_seg;
-			load32->p_offset = offset_seg;
-		} else {
-			load64->p_vaddr  = vaddr_seg;
-			load64->p_paddr  = paddr_seg;
-			load64->p_offset = offset_seg;
-		}
-		if (pls->phys_start == 0)
-			pfn_start = 0;
-		else
-			pfn_start = pls->phys_start/info->page_size;
-
-		if (pls->phys_end == 0)
-			pfn_end = 0;
-		else
-			pfn_end = pls->phys_end/info->page_size;
-
-		if (is_dumpable(&bitmap2, pfn_start)) {
-			lastpage_dumpable = 1;
-			num_mem  = 1;
-			num_file = 1;
-		} else {
-			lastpage_dumpable = 0;
-			num_mem  = 1;
-			num_file = 0;
-		}
-		for (pfn = pfn_start + 1; pfn < pfn_end; pfn++) {
-			if (!is_dumpable(&bitmap2, pfn)) {
-				num_mem++;
-				lastpage_dumpable = 0;
-				continue;
-			}
-			if (lastpage_dumpable) {
-				num_mem++;
-				num_file++;
-				continue;
-			}
-			/*
-			 * Create new PT_LOAD segment.
-			 */
-			if (info->flag_elf & ELF32) {
-				load32->p_memsz  = info->page_size*num_mem;
-				load32->p_filesz = info->page_size*num_file;
-				if (write(info->fd_dumpfile, load32, size_Phdr)
-				    != size_Phdr) {
-					ERRMSG("Can't write the dump file(%s). %s\n",
-					    info->name_dumpfile, strerror(errno));
-					goto out;
-				}
-				offset_seg += load32->p_filesz;
-				if (load32->p_paddr < MAXMEM)
-					load32->p_vaddr += load32->p_memsz;
-				load32->p_paddr += load32->p_memsz;
-				load32->p_offset = offset_seg;
-			} else {
-				load64->p_memsz  = info->page_size*num_mem;
-				load64->p_filesz = info->page_size*num_file;
-				if (write(info->fd_dumpfile, load64, size_Phdr)
-				    != size_Phdr) {
-					ERRMSG("Can't write the dump file(%s). %s\n",
-					    info->name_dumpfile, strerror(errno));
-					goto out;
-				}
-				offset_seg += load64->p_filesz;
-				if (load64->p_paddr < MAXMEM)
-					load64->p_vaddr += load64->p_memsz;
-				load64->p_paddr += load64->p_memsz;
-				load64->p_offset = offset_seg;
-			}
-			num_mem  = 1;
-			num_file = 1;
-			lastpage_dumpable = 1;
-		}
-		if (info->flag_elf & ELF32) {
-			load32->p_memsz  = info->page_size*num_mem;
-			load32->p_filesz = info->page_size*num_file;
-			if (write(info->fd_dumpfile, load32, size_Phdr)
-			    != size_Phdr) {
-				ERRMSG("Can't write the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
-				goto out;
-			}
-			offset_seg += load32->p_filesz;
-		} else {
-			load64->p_memsz  = info->page_size*num_mem;
-			load64->p_filesz = info->page_size*num_file;
-			if (write(info->fd_dumpfile, load64, size_Phdr)
-			    != size_Phdr) {
-				ERRMSG("Can't write the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
-				goto out;
-			}
-			offset_seg += load64->p_filesz;
-		}
+	if (write(info->fd_dumpfile, &ehdr, sizeof(ehdr)) != sizeof(ehdr)) {
+		ERRMSG("Can't write the dump file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		goto out;
 	}
 	/*
-	 * Write PT_NOTE segment.
+	 * Write a PT_NOTE header.
 	 */
-	if ((buf = malloc(size_note)) == NULL) {
-		ERRMSG("Can't allocate memory for the ELF header. %s\n",
+	for (i = 0; i < ehdr.e_phnum; i++) {
+		if (gelf_getphdr(elfd, i, &note) == NULL) {
+			ERRMSG("Can't find Phdr %d.\n", i);
+			goto out;
+		}
+		if (note.p_type == PT_NOTE)
+			break;
+	}
+	if (note.p_type != PT_NOTE) {
+		ERRMSG("Can't get a PT_NOTE header.\n");
+		goto out;
+	}
+	offset_note_memory = note.p_offset;
+	note.p_offset = sizeof(ehdr) + sizeof(GElf_Phdr)*ehdr.e_phnum;
+	if (write(info->fd_dumpfile, &note, sizeof(note)) != sizeof(note)) {
+		ERRMSG("Can't write the dump file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		goto out;
+	}
+	/*
+	 * Write a PT_NOTE segment.
+	 * PT_LOAD header will be written later.
+	 */
+	if ((buf = malloc(note.p_filesz)) == NULL) {
+		ERRMSG("Can't allocate memory for PT_NOTE segment. %s\n",
 		    strerror(errno));
 		goto out;
 	}
@@ -2590,33 +2394,28 @@ write_elf_header(struct DumpInfo *info)
 		    info->name_memory, strerror(errno));
 		goto out;
 	}
-	if (lseek(info->fd_dumpfile, offset_note_dumpfile, SEEK_SET)
-	    == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		goto out;
-	}
-	if (read(info->fd_memory, buf, size_note) != size_note) {
+	if (read(info->fd_memory, buf, note.p_filesz) != note.p_filesz) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 		goto out;
 	}
-	if (write(info->fd_dumpfile, buf, size_note) != size_note) {
+	if (lseek(info->fd_dumpfile, note.p_offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+	}
+	if (write(info->fd_dumpfile, buf, note.p_filesz) != note.p_filesz) {
 		ERRMSG("Can't write the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 		goto out;
 	}
 
+	/*
+	 * Set a offset of PT_LOAD segment.
+	 */
+	info->offset_load_dumpfile = note.p_offset + note.p_filesz;
+
 	ret = TRUE;
 out:
-	if (bitmap2.buf != NULL)
-		free(bitmap2.buf);
-	if (header_memory != NULL)
-		free(header_memory);
-	if (load32 != NULL)
-		free(load32);
-	if (load64 != NULL)
-		free(load64);
 	if (buf != NULL)
 		free(buf);
 
@@ -2624,12 +2423,15 @@ out:
 }
 
 int
-write_diskdump_header(struct DumpInfo *info)
+write_kdump_header(struct DumpInfo *info)
 {
 	size_t size;
 	struct disk_dump_header *dh = info->dump_header;
 	struct kdump_sub_header sub_dump_header;
 	const off_t failed = (off_t)-1;
+
+	if (info->flag_elf_dumpfile)
+		return FALSE;
 
 	/*
 	 * Write common header
@@ -2676,19 +2478,6 @@ write_diskdump_header(struct DumpInfo *info)
 	return TRUE;
 }
 
-int
-write_dump_header(struct DumpInfo *info)
-{
-	if (info->flag_elf_dumpfile) {
-		if (!write_elf_header(info))
-			return FALSE;
-	} else {
-		if (!write_diskdump_header(info))
-			return FALSE;
-	}
-	return TRUE;
-}
-
 void
 print_progress(unsigned long current, unsigned long end)
 {
@@ -2710,7 +2499,300 @@ print_progress(unsigned long current, unsigned long end)
 }
 
 int
-write_pages(struct DumpInfo *info)
+write_elf_pages(struct DumpInfo *info)
+{
+	int i;
+	long long bufsz_write, bufsz_remain;
+	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
+	unsigned long long num_dumpable = 0, num_dumped = 0, per;
+	unsigned long long memsz, filesz;
+	unsigned long frac_head, frac_tail;
+	off_t off_hdr_load, off_seg_load, off_memory;
+	Elf *elfd = NULL;
+	GElf_Ehdr ehdr;
+	GElf_Phdr load;
+	char *buf = NULL;
+	struct dump_bitmap bitmap2;
+	const off_t failed = (off_t)-1;
+	int ret = FALSE;
+
+	if (!info->flag_elf_dumpfile)
+		return FALSE;
+
+	bitmap2.fd        = info->fd_bitmap;
+	bitmap2.file_name = info->name_bitmap;
+	bitmap2.no_block  = -1;
+	bitmap2.buf       = NULL;
+	bitmap2.offset    = info->len_bitmap/2;
+
+	if ((buf = malloc(info->page_size)) == NULL) {
+		ERRMSG("Can't allocate memory for buffer. %s\n",
+		    strerror(errno));
+		goto out;
+	}
+	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
+		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
+		    strerror(errno));
+		goto out;
+	}
+	/*
+	 * Count the number of dumpable pages.
+	 */
+	for (pfn = 0 ; pfn < info->max_mapnr; pfn++) {
+		if (is_dumpable(&bitmap2, pfn))
+			num_dumpable++;
+	}
+	per = num_dumpable / 100;
+
+	off_seg_load = info->offset_load_dumpfile;
+	off_hdr_load = sizeof(GElf_Ehdr) + sizeof(GElf_Phdr);
+	off_memory = 0;
+	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
+		ERRMSG("Can't get first elf header of %s.\n",
+		    info->name_memory);
+		goto out;
+	}
+	if (gelf_getehdr(elfd, &ehdr) == NULL) {
+		ERRMSG("Can't find file header of %s.\n",
+		    info->name_memory);
+		goto out;
+	}
+
+	for (i = 0; i < ehdr.e_phnum; i++) {
+		if (gelf_getphdr(elfd, i, &load) == NULL) {
+			ERRMSG("Can't find Phdr %d.\n", i);
+			goto out;
+		}
+		if (load.p_type != PT_LOAD)
+			continue;
+
+		num_excluded = 0;
+		memsz  = 0;
+		filesz = 0;
+		pfn_start = load.p_paddr / info->page_size;
+		pfn_end   = (load.p_paddr + load.p_memsz) / info->page_size;
+		frac_head = info->page_size - (load.p_paddr % info->page_size);
+		frac_tail = (load.p_paddr + load.p_memsz) % info->page_size;
+
+		if (frac_head && (frac_head != info->page_size)) {
+			memsz  = frac_head;
+			filesz = frac_head;
+			pfn_start++;
+		}
+		if (frac_tail)
+			pfn_end++;
+
+		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
+			if (!is_dumpable(&bitmap2, pfn)) {
+				num_excluded++;
+				if ((pfn == pfn_end - 1) && frac_tail)
+					memsz += frac_tail;
+				else
+					memsz += info->page_size;
+				continue;
+			}
+
+			/*
+			 * The dumpable pages are continuous.
+			 */
+			if (!num_excluded) {
+				if ((pfn == pfn_end - 1) && frac_tail) {
+					memsz  += frac_tail;
+					filesz += frac_tail;
+				} else {
+					memsz  += info->page_size;
+					filesz += info->page_size;
+				}
+				continue;
+			/*
+			 * If the number of the contiguous pages to be excluded
+			 * is 255 or less, those pages are not excluded.
+			 */
+			} else if (num_excluded < PFN_EXCLUDED) {
+				if ((pfn == pfn_end - 1) && frac_tail) {
+					memsz  += frac_tail;
+					filesz += (info->page_size*num_excluded
+					    + frac_tail);
+				}else {
+					memsz  += info->page_size;
+					filesz += (info->page_size*num_excluded
+					    + info->page_size);
+				}
+				num_excluded = 0;
+				continue;
+			}
+
+			/*
+			 * If the number of the contiguous pages to be excluded
+			 * is 256 or more, those pages are excluded really.
+			 * And a new PT_LOAD segment is created. 
+			 */
+			load.p_memsz  = memsz;
+			load.p_filesz = filesz;
+			load.p_offset = off_seg_load;
+
+			/*
+			 * Write a PT_LOAD header.
+			 */
+			if (lseek(info->fd_dumpfile, off_hdr_load, SEEK_SET)
+			    == failed) {
+				ERRMSG("Can't seek the dump file(%s). %s\n",
+				    info->name_dumpfile, strerror(errno));
+				goto out;
+			}
+			if (write(info->fd_dumpfile, &load, sizeof(load))
+			    != sizeof(load)) {
+				ERRMSG("Can't write the dump file(%s). %s\n",
+				    info->name_dumpfile, strerror(errno));
+				goto out;
+			}
+			/*
+			 * Write a PT_LOAD segment.
+			 */
+			off_memory = paddr_to_offset(info, load.p_paddr);
+			if (!off_memory) {
+				ERRMSG("Can't convert physaddr(%lx) to a offset.\n",
+				    (unsigned long)load.p_paddr);
+				goto out;
+			}
+			if (lseek(info->fd_memory, off_memory, SEEK_SET)
+			    == failed) {
+				ERRMSG("Can't seek the dump memory(%s). %s\n",
+				    info->name_memory, strerror(errno));
+				goto out;
+			}
+			if (lseek(info->fd_dumpfile, off_seg_load, SEEK_SET)
+			    == failed) {
+				ERRMSG("Can't seek the dump file(%s). %s\n",
+				    info->name_dumpfile, strerror(errno));
+				goto out;
+			}
+
+			bufsz_remain = load.p_filesz;
+			while (bufsz_remain > 0) {
+				if ((num_dumped % per) == 0)
+					print_progress(num_dumped, num_dumpable);
+
+				if (bufsz_remain >= info->page_size)
+					bufsz_write = info->page_size;
+				else
+					bufsz_write = bufsz_remain;
+
+				if (read(info->fd_memory, buf, bufsz_write)
+				    != bufsz_write) {
+					ERRMSG("Can't read the dump memory(%s). %s\n",
+					    info->name_memory, strerror(errno));
+					goto out;
+				}
+				if (write(info->fd_dumpfile, buf, bufsz_write)
+				    != bufsz_write) {
+					ERRMSG("Can't write the dump file(%s). %s\n",
+					    info->name_dumpfile, strerror(errno));
+					goto out;
+				}
+				bufsz_remain -= info->page_size;
+				num_dumped++;
+			}
+			load.p_paddr += load.p_memsz;
+			if (load.p_paddr < MAXMEM)
+				load.p_vaddr += load.p_memsz;
+			memsz  = info->page_size;
+			filesz = info->page_size;
+			off_hdr_load += sizeof(load);
+			off_seg_load += load.p_filesz;
+			num_excluded = 0;
+		}
+		/*
+		 * Write the last PT_LOAD.
+		 */
+		load.p_memsz  = memsz;
+		load.p_filesz = filesz;
+		load.p_offset = off_seg_load;
+
+		/*
+		 * Write a PT_LOAD header.
+		 */
+		if (lseek(info->fd_dumpfile, off_hdr_load, SEEK_SET)
+		    == failed) {
+			ERRMSG("Can't seek the dump file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
+		if (write(info->fd_dumpfile, &load, sizeof(load))
+		    != sizeof(load)) {
+			ERRMSG("Can't write the dump file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
+		/*
+		 * Write a PT_LOAD segment.
+		 */
+		off_memory = paddr_to_offset(info, load.p_paddr);
+		if (!off_memory) {
+			ERRMSG("Can't convert physaddr(%lx) to a offset.\n",
+			    (unsigned long)load.p_paddr);
+			goto out;
+		}
+		if (lseek(info->fd_memory, off_memory, SEEK_SET)
+		    == failed) {
+			ERRMSG("Can't seek the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			goto out;
+		}
+		if (lseek(info->fd_dumpfile, off_seg_load, SEEK_SET)
+		    == failed) {
+			ERRMSG("Can't seek the dump file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
+		bufsz_remain = load.p_filesz;
+		while (bufsz_remain > 0) {
+			if ((num_dumped % per) == 0)
+				print_progress(num_dumped, num_dumpable);
+
+			if (bufsz_remain >= info->page_size)
+				bufsz_write = info->page_size;
+			else
+				bufsz_write = bufsz_remain;
+
+			if (read(info->fd_memory, buf, bufsz_write)
+			    != bufsz_write) {
+				ERRMSG("Can't read the dump memory(%s). %s\n",
+				    info->name_memory, strerror(errno));
+				goto out;
+			}
+			if (write(info->fd_dumpfile, buf, bufsz_write)
+			    != bufsz_write) {
+				ERRMSG("Can't write the dump file(%s). %s\n",
+				    info->name_dumpfile, strerror(errno));
+				goto out;
+			}
+			bufsz_remain -= info->page_size;
+			num_dumped++;
+		}
+		off_hdr_load += sizeof(load);
+		off_seg_load += load.p_filesz;
+	}
+	print_progress(num_dumpable, num_dumpable);
+	ret = TRUE;
+out:
+	if (buf != NULL)
+		free(buf);
+	if (bitmap2.buf != NULL)
+		free(bitmap2.buf);
+	if (elfd != NULL)
+		elf_end(elfd);
+
+	return ret;
+}
+
+int
+write_kdump_pages(struct DumpInfo *info)
 {
 	unsigned int flag_change_bitmap = 0;
  	unsigned long long pfn, per, num_dumpable = 0, num_dumped = 0;
@@ -2724,6 +2806,9 @@ write_pages(struct DumpInfo *info)
 	const off_t failed = (off_t)-1;
 
 	int ret = FALSE;
+
+	if (info->flag_elf_dumpfile)
+		return FALSE;
 
 	bm2.fd         = info->fd_bitmap;
 	bm2.file_name  = info->name_bitmap;
@@ -2803,17 +2888,14 @@ write_pages(struct DumpInfo *info)
 	}
 	per = num_dumpable / 100;
 
-	if (info->flag_elf_dumpfile) {
-		pdata.offset = info->offset_load_dumpfile;
-	} else {
-		/*
-		 * Calculate the offset of the page data.
-		 */
-		pdesc.offset
-		    = (1 + dh->sub_hdr_size + dh->bitmap_blocks)*dh->block_size;
-		pdata.offset = pdesc.offset + sizeof(page_desc_t)*num_dumpable;
-		offset_data  = pdata.offset;
-	}
+	/*
+	 * Calculate the offset of the page data.
+	 */
+	pdesc.offset
+	    = (1 + dh->sub_hdr_size + dh->bitmap_blocks)*dh->block_size;
+	pdata.offset = pdesc.offset + sizeof(page_desc_t)*num_dumpable;
+	offset_data  = pdata.offset;
+
 	/*
 	 * Set a fileoffset of Physical Address 0x0.
 	 */
@@ -2870,45 +2952,40 @@ write_pages(struct DumpInfo *info)
 			goto out;
 		}
 
-		if (info->flag_elf_dumpfile) {
-			pd.size = info->page_size;
-		} else {
-			/*
-			 * Exclude the page filled with zeros.
-			 * In case of the elf dumpfile, the zero page had been
-			 * checked.
-			 */
-			if ((info->dump_level & DL_EXCLUDE_ZERO)
-			    && is_zero_page(buf, info->page_size)) {
-				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 0);
-				flag_change_bitmap = 1;
-				continue;
-			}
-			/*
-			 * Compress the page data.
-			 */
-			size_out = info->page_size;
-			if (info->flag_compress
-			    && (compress2(buf_out, &size_out, buf,
-			    info->page_size, Z_BEST_SPEED) == Z_OK)
-			    && (size_out < info->page_size)) {
-				pd.flags = 1;
-				pd.size  = size_out;
-				memcpy(buf, buf_out, pd.size);
-			} else {
-				pd.flags = 0;
-				pd.size  = info->page_size;
-			}
-			pd.page_flags = 0;
-			pd.offset     = offset_data;
-			offset_data  += pd.size;
-
-			/*
-			 * Write the page header.
-			 */
-			if (!write_cache(&pdesc, &pd, sizeof(page_desc_t)))
-				goto out;
+		/*
+		 * Exclude the page filled with zeros.
+		 */
+		if ((info->dump_level & DL_EXCLUDE_ZERO)
+		    && is_zero_page(buf, info->page_size)) {
+			set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 0);
+			flag_change_bitmap = 1;
+			continue;
 		}
+		/*
+		 * Compress the page data.
+		 */
+		size_out = info->page_size;
+		if (info->flag_compress
+		    && (compress2(buf_out, &size_out, buf,
+		    info->page_size, Z_BEST_SPEED) == Z_OK)
+		    && (size_out < info->page_size)) {
+			pd.flags = 1;
+			pd.size  = size_out;
+			memcpy(buf, buf_out, pd.size);
+		} else {
+			pd.flags = 0;
+			pd.size  = info->page_size;
+		}
+		pd.page_flags = 0;
+		pd.offset     = offset_data;
+		offset_data  += pd.size;
+
+		/*
+		 * Write the page header.
+		 */
+		if (!write_cache(&pdesc, &pd, sizeof(page_desc_t)))
+			goto out;
+
 		/*
 		 * Write the page data.
 		 */
@@ -2921,16 +2998,13 @@ write_pages(struct DumpInfo *info)
 	 */
 	if (!write_cache_bufsz(&pdata))
 		goto out;
-
-	if (!info->flag_elf_dumpfile) {
-		if (!write_cache_bufsz(&pdesc))
+	if (!write_cache_bufsz(&pdesc))
+		goto out;
+	if (flag_change_bitmap) {
+		bm2.buf_size = BUFSIZE_BITMAP;
+		bm2.offset  -= BUFSIZE_BITMAP;
+		if (!write_cache_bufsz(&bm2))
 			goto out;
-		if (flag_change_bitmap) {
-			bm2.buf_size = BUFSIZE_BITMAP;
-			bm2.offset  -= BUFSIZE_BITMAP;
-			if (!write_cache_bufsz(&bm2))
-				goto out;
-		}
 	}
 	/*
 	 * Print the progress of the end.
@@ -2958,7 +3032,7 @@ out:
 }
 
 int
-write_dump_bitmap(struct DumpInfo *info)
+write_kdump_bitmap(struct DumpInfo *info)
 {
 	struct cache_data bm;
 	long buf_size;
@@ -2967,7 +3041,7 @@ write_dump_bitmap(struct DumpInfo *info)
 	int ret = FALSE;
 
 	if (info->flag_elf_dumpfile)
-		return TRUE;
+		return FALSE;
 
 	bm.fd        = info->fd_bitmap;
 	bm.file_name = info->name_bitmap;
@@ -3248,15 +3322,19 @@ main(int argc, char *argv[])
 		if (!create_dump_bitmap(info))
 			goto out;
 
-		if (!write_dump_header(info))
-			goto out;
-
-		if (!write_pages(info))
-			goto out;
-
-		if (!write_dump_bitmap(info))
-			goto out;
-
+		if (info->flag_elf_dumpfile) {
+			if (!write_elf_header(info))
+				goto out;
+			if (!write_elf_pages(info))
+				goto out;
+		} else {
+			if (!write_kdump_header(info))
+				goto out;
+			if (!write_kdump_pages(info))
+				goto out;
+			if (!write_kdump_bitmap(info))
+				goto out;
+		}
 		if (!close_files_for_creating_dumpfile(info))
 			goto out;
 

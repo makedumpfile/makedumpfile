@@ -126,12 +126,6 @@ isAnon(unsigned long mapping)
 #define MAXARGS		(100)   /* max number of arguments to one function */
 #define LASTCHAR(s)	(s[strlen(s)-1])
 
-/*
- * ELF flags
- */
-#define ELF32	(1)
-#define ELF64	(2)
-
 #define BITPERBYTE		(8)
 #define PGMM_CACHED		(512)
 #define PFN_EXCLUDED		(256)
@@ -416,7 +410,6 @@ struct DumpInfo {
 	 */
 	int		dump_level;          /* dump level */
 	int		flag_compress;       /* flag of compression */
-	int		flag_elf;
 	int		flag_elf_dumpfile;   /* flag of elf dump file */
 	int		flag_vmlinux;	     /* flag of vmlinux */
 	int		flag_generate_config;/* flag of generating config file */

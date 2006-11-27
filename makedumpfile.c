@@ -45,7 +45,7 @@ show_version()
  *  It is not in the memory image.
  */
 off_t
-paddr_to_offset(struct DumpInfo *info, unsigned long paddr)
+paddr_to_offset(struct DumpInfo *info, unsigned long long paddr)
 {
 	int i;
 	off_t offset;
@@ -70,7 +70,7 @@ paddr_to_offset(struct DumpInfo *info, unsigned long paddr)
  *  It is not in the memory image.
  */
 off_t
-vaddr_to_offset_general(struct DumpInfo *info, unsigned long vaddr)
+vaddr_to_offset_general(struct DumpInfo *info, unsigned long long vaddr)
 {
 	int i;
 	off_t offset;
@@ -91,11 +91,11 @@ vaddr_to_offset_general(struct DumpInfo *info, unsigned long vaddr)
 /*
  * Get the number of the page descriptors from the ELF info.
  */
-unsigned long
+unsigned long long
 get_max_mapnr(struct DumpInfo *info)
 {
 	int i;
-	off_t max_paddr;
+	unsigned long long max_paddr;
 	struct pt_load_segment *pls;
 
 	for (i = 0, max_paddr = 0; i < info->num_load_memory; i++) {
@@ -107,7 +107,8 @@ get_max_mapnr(struct DumpInfo *info)
 }
 
 int
-readmem(struct DumpInfo *info, unsigned long vaddr, void *bufptr, size_t size)
+readmem(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
+    size_t size)
 {
 	off_t offset;
 	const off_t failed = (off_t)-1;
@@ -116,7 +117,7 @@ readmem(struct DumpInfo *info, unsigned long vaddr, void *bufptr, size_t size)
 	 * Convert Virtual Address to File Offset.
 	 */
 	if (!(offset = vaddr_to_offset(info, vaddr))) {
-		ERRMSG("Can't convert a virtual address(%lx) to offset.\n",
+		ERRMSG("Can't convert a virtual address(%llx) to offset.\n",
 		    vaddr);
 		return FALSE;
 	}
@@ -687,9 +688,9 @@ get_symbol_info(struct DumpInfo *info)
 }
 
 int
-is_kvaddr(unsigned long addr)
+is_kvaddr(unsigned long long addr)
 {
-	return (addr >= (unsigned long)(KVBASE));
+	return (addr >= (unsigned long long)(KVBASE));
 }
 
 static int
@@ -1247,8 +1248,8 @@ read_config(struct DumpInfo *info)
 }
 
 void
-dump_mem_map(struct DumpInfo *info, unsigned long pfn_start,
-    unsigned long pfn_end, unsigned long mem_map, int num_mm)
+dump_mem_map(struct DumpInfo *info, unsigned long long pfn_start,
+    unsigned long long pfn_end, unsigned long mem_map, int num_mm)
 {
 	struct mem_map_data *mmd;
 
@@ -1345,7 +1346,7 @@ int
 get_mm_sparsemem(struct DumpInfo *info)
 {
 	unsigned int section_nr, mem_section_size, num_section;
-	unsigned long pfn_start, pfn_end;
+	unsigned long long pfn_start, pfn_end;
 	unsigned long section, mem_map;
 	unsigned long *mem_sec = NULL;
 
@@ -1474,7 +1475,7 @@ initial(struct DumpInfo *info)
 }
 
 static inline void
-set_bitmap(char *bitmap, unsigned long pfn, int val)
+set_bitmap(char *bitmap, unsigned long long pfn, int val)
 {
 	int byte, bit;
 
@@ -1494,7 +1495,7 @@ is_on(char *bitmap, int i)
 }
 
 static inline int
-is_dumpable(struct dump_bitmap *bitmap, unsigned long pfn)
+is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 {
 	off_t offset;
 	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
@@ -1510,7 +1511,7 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long pfn)
 }
 
 static inline int
-is_memory_hole(struct dump_bitmap *bitmap, unsigned long pfn)
+is_memory_hole(struct dump_bitmap *bitmap, unsigned long long pfn)
 {
 	return !is_dumpable(bitmap, pfn);
 }
@@ -1610,7 +1611,7 @@ create_contig_bitmap(struct DumpInfo *info)
 {
 	unsigned int i, remain_size, contig_exclude;
 	unsigned int num_load_dumpfile;
-	unsigned long pfn, last_pfn;
+	unsigned long long pfn, last_pfn;
 	int lastpage_mhole;
 	struct cache_data bm2;
 	struct dump_bitmap bitmap1, bitmap2;
@@ -1830,13 +1831,12 @@ pgdat3:
 	return SYMBOL(contig_page_data);
 }
 
-unsigned long
+unsigned long long
 page_to_pfn(struct DumpInfo *info, unsigned long page)
 {
 	unsigned int num;
-	unsigned long pfn = 0;
+	unsigned long long pfn = 0, index = 0;
 	struct mem_map_data *mmd;
-	unsigned long index;
 
 	mmd = info->mem_map_data;
 	for (num = 0; num < info->num_mem_map; num++, mmd++) {
@@ -1852,13 +1852,13 @@ page_to_pfn(struct DumpInfo *info, unsigned long page)
 	}
 	if (!pfn) {
 		ERRMSG("Can't convert the address of page descriptor (%lx) to pfn.\n", page);
-		return ULONG_MAX;
+		return ULONGLONG_MAX;
 	}
 	return pfn;
 }
 
 int
-reset_3rd_bitmap(struct DumpInfo *info, unsigned long pfn)
+reset_3rd_bitmap(struct DumpInfo *info, unsigned long long pfn)
 {
 	off_t offset_pfn;
 	unsigned int buf_size;
@@ -1892,8 +1892,8 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 {
 
 	int order, free_page_cnt = 0, i;
-	unsigned long curr, previous, head, curr_page, curr_prev, start_pfn,
-		pfn, free_pages;
+	unsigned long curr, previous, head, curr_page, curr_prev, free_pages;
+	unsigned long long pfn, start_pfn;
 
 	for (order = MAX_ORDER - 1; order >= 0; --order) {
 		head = node_zones + OFFSET(zone.free_area)
@@ -1907,7 +1907,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 		for (;curr != head;) {
 			curr_page = curr - OFFSET(page.lru);
 			start_pfn = page_to_pfn(info, curr_page);
-			if (start_pfn == ULONG_MAX)
+			if (start_pfn == ULONGLONG_MAX)
 				return FALSE;
 
 			if (!readmem(info, curr + OFFSET(list_head.prev),
@@ -2114,7 +2114,8 @@ create_dump_bitmap(struct DumpInfo *info)
 {
 	int val, not_found_mem_map;
 	unsigned int i, mm, remain_size;
-	unsigned long pfn, mem_map, paddr;
+	unsigned long mem_map;
+	unsigned long long pfn, paddr;
 	unsigned char *page_cache = NULL, *buf = NULL, *pcache;
 	unsigned int _count;
 	unsigned long flags, mapping;
@@ -2342,7 +2343,8 @@ write_elf_header(struct DumpInfo *info)
 {
 	int i, lastpage_dumpable;
 	size_t size_hdr_memory, size_Ehdr, size_Phdr, size_note;
-	unsigned long pfn, pfn_start, pfn_end, num_file, num_mem;
+	unsigned long num_file, num_mem;
+	unsigned long long pfn, pfn_start, pfn_end;
 	loff_t offset_seg, offset_note_memory, offset_note_dumpfile;
 	unsigned long long  vaddr_seg, paddr_seg;
 	unsigned char *header_memory = NULL;
@@ -2711,7 +2713,7 @@ int
 write_pages(struct DumpInfo *info)
 {
 	unsigned int flag_change_bitmap = 0;
- 	unsigned long pfn, per, num_dumpable = 0, num_dumped = 0;
+ 	unsigned long long pfn, per, num_dumpable = 0, num_dumped = 0;
 	unsigned long size_out;
 	struct page_desc pd;
 	off_t offset_data = 0, offset_memory = 0;

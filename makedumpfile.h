@@ -270,6 +270,7 @@ do { \
 #define MAX_NR_ZONES	(4)
 #define LONG_MAX	((long)(~0UL>>1))
 #define ULONG_MAX	(~0UL)
+#define ULONGLONG_MAX	(~0ULL)
 
 /*
  * The value of dependence on machine
@@ -385,8 +386,8 @@ struct pt_load_segment {
 };
 
 struct mem_map_data {
-	unsigned long	pfn_start;
-	unsigned long	pfn_end;
+	unsigned long long	pfn_start;
+	unsigned long long	pfn_end;
 	unsigned long	mem_map;
 };
 
@@ -423,7 +424,7 @@ struct DumpInfo {
 	int		flag_exclude_free;   /* flag of excluding free page */
 	int		flag_show_version;   /* flag of showing version */
 	long		page_size;           /* size of page */
-	unsigned long	max_mapnr;           /* number of page descriptor */
+	unsigned long long	max_mapnr;   /* number of page descriptor */
 	unsigned long   section_size_bits;
 	unsigned long   sections_per_root;
 	unsigned long	phys_base;

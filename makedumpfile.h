@@ -184,8 +184,11 @@ do { \
 #define NOT_FOUND_STRUCTURE	(-1)
 #define FAILED_DWARFINFO	(-2)
 #define INVALID_STRUCTURE_DATA	(-3)
+#define NOT_FOUND_ARRAY		(-4)
+
 #define SIZE(X)			(size_table.X)
 #define OFFSET(X)		(offset_table.X)
+#define ARRAY_LENGTH(X)		(array_table.X)
 #define GET_STRUCTURE_SIZE	get_structure_size
 #define GET_MEMBER_OFFSET	get_member_offset
 #define SIZE_INIT(X, Y) \
@@ -205,6 +208,12 @@ do { \
 	     == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
+#define ARRAY_LENGTH_INIT(X, Y, Z) \
+do { \
+	if ((ARRAY_LENGTH(X) = get_array_length(Y, Z)) == FAILED_DWARFINFO) \
+		return FALSE; \
+} while (0)
+
 #define WRITE_STRUCTURE_SIZE(str_structure, structure) \
 do { \
 	if (SIZE(structure) != NOT_FOUND_STRUCTURE) { \
@@ -219,6 +228,13 @@ do { \
 		    STR_OFFSET(str_member), OFFSET(member)); \
 	} \
 } while (0)
+#define WRITE_ARRAY_LENGTH(str_array, array) \
+do { \
+	if (ARRAY_LENGTH(array) != NOT_FOUND_ARRAY) { \
+		fprintf(info->file_configfile, "%s%ld\n", \
+		    STR_LENGTH(str_array), ARRAY_LENGTH(array)); \
+	} \
+} while (0)
 #define READ_STRUCTURE_SIZE(str_structure, structure) \
 do { \
 	SIZE(structure) = read_config_structure(info,STR_SIZE(str_structure)); \
@@ -229,6 +245,12 @@ do { \
 do { \
 	OFFSET(member) = read_config_structure(info, STR_OFFSET(str_member)); \
 	if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
+		return FALSE; \
+} while (0)
+#define READ_ARRAY_LENGTH(str_array, array) \
+do { \
+	ARRAY_LENGTH(array) = read_config_structure(info, STR_LENGTH(str_array)); \
+	if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 
@@ -248,6 +270,7 @@ do { \
 #define STR_SYMBOL(X)	"SYMBOL("X")="
 #define STR_SIZE(X)	"SIZE("X")="
 #define STR_OFFSET(X)	"OFFSET("X")="
+#define STR_LENGTH(X)	"LENGTH("X")="
 
 /*
  * vm_table
@@ -278,7 +301,6 @@ do { \
 #define _SECTION_SIZE_BITS	(26)
 #define _SECTION_SIZE_BITS_PAE	(30)
 #define SIZEOF_NODE_ONLINE_MAP	(4)
-#define MAX_ORDER		(11)
 #endif /* x86 */
 
 #ifdef __x86_64__
@@ -291,7 +313,6 @@ do { \
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
 #define SIZEOF_NODE_ONLINE_MAP	(8)
-#define MAX_ORDER		(11)
 #endif /* x86_64 */
 
 #ifdef __powerpc__
@@ -301,7 +322,6 @@ do { \
 #define KVBASE			(SYMBOL(_stext))
 #define _SECTION_SIZE_BITS	(24)
 #define SIZEOF_NODE_ONLINE_MAP	(8)
-#define MAX_ORDER		(9)
 #endif
 
 #ifdef __ia64__ /* ia64 */
@@ -327,7 +347,6 @@ do { \
 #define DEFAULT_PHYS_START	(KERNEL_TR_PAGE_SIZE * 1)
 #define _SECTION_SIZE_BITS	(30)
 #define SIZEOF_NODE_ONLINE_MAP	(32)
-#define MAX_ORDER		(17)
 #endif          /* ia64 */
 
 /*
@@ -467,7 +486,6 @@ struct DumpInfo {
 	struct vm_table {                /* kernel VM-related data */
 		ulong flags;
 		int numnodes;
-		int nr_free_areas;
 		ulong *node_online_map;
 		int node_online_map_len;
 	} vm_table;
@@ -530,9 +548,19 @@ struct offset_table {
 	} list_head;
 };
 
+/*
+ * The number of array
+ */
+struct array_table {
+	struct zone_at {
+		long	free_area;
+	} zone;
+};
+
 extern struct symbol_table	symbol_table;
 extern struct size_table	size_table;
 extern struct offset_table	offset_table;
+extern struct array_table	array_table;
 
 /*
  * Debugging information
@@ -540,6 +568,7 @@ extern struct offset_table	offset_table;
 #define DWARF_INFO_GET_STRUCT_SIZE		1
 #define DWARF_INFO_GET_MEMBER_OFFSET		2
 #define DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET	3
+#define DWARF_INFO_GET_ARRAY_LENGTH		4
 
 struct dwarf_info {
 	unsigned int	cmd;		/* IN */
@@ -549,6 +578,7 @@ struct dwarf_info {
 	int	struct_size;		/* OUT */
 	char	*member_name;		/* IN */
 	int	member_offset;		/* OUT */
+	int	array_length;		/* OUT */
 };
 
 struct dwarf_values {

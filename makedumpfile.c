@@ -25,6 +25,7 @@
 struct symbol_table	symbol_table;
 struct size_table	size_table;
 struct offset_table	offset_table;
+struct array_table	array_table;
 
 struct dwarf_info	dwarf_info;
 struct vm_table		*vt = 0;
@@ -853,8 +854,59 @@ get_data_member_location(Dwarf_Die *die)
 	return TRUE;
 }
 
+static int
+get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
+{
+	int tag;
+	Dwarf_Attribute attr;
+	Dwarf_Off offset_type;
+	Dwarf_Die die_type;
+
+	/*
+	 * Get the offset of DW_AT_type
+	 */
+	if (dwarf_attr(die, DW_AT_type, &attr) == NULL)
+		return FALSE;
+
+	if (dwarf_formref(&attr, &offset_type) < 0)
+		return FALSE;
+
+	if (dwarf_offdie(dwarfd, offset_type, &die_type) == NULL) {
+		ERRMSG("Can't get CU die.\n");
+		return FALSE;
+	}
+
+	tag = dwarf_tag(&die_type);
+	if (tag != DW_TAG_array_type) {
+		/*
+		 * This kernel doesn't have the member of array.
+		 */
+		return TRUE;
+	}
+
+	/*
+	 * Get the demanded array length.
+	 */
+	dwarf_child(&die_type, &die_type);
+	do {
+		tag  = dwarf_tag(&die_type);
+		if (tag == DW_TAG_subrange_type)
+			break;
+	} while (dwarf_siblingof(&die_type, &die_type));
+
+	if (tag != DW_TAG_subrange_type)
+		return FALSE;
+
+	if (dwarf_attr(&die_type, DW_AT_upper_bound, &attr) == NULL)
+		return FALSE;
+
+	dwarf_info.array_length = (long)(*attr.valp) + 1;
+
+	return TRUE;
+}
+
 static void
-process_children(Dwarf_Die *die)
+process_children(Dwarf *dwarfd, Dwarf_Die *die)
 {
 	int tag;
 	const char *name;
@@ -889,6 +941,15 @@ process_children(Dwarf_Die *die)
 			 * Get the member offset.
 			 */
 			if (!get_data_member_location(walker))
+				continue;
+			return;
+		case DWARF_INFO_GET_ARRAY_LENGTH:
+			if ((!name) || strcmp(name, dwarf_info.member_name))
+				continue;
+			/*
+			 * Get the member length.
+			 */
+			if (!get_data_array_length(dwarfd, walker))
 				continue;
 			return;
 		}
@@ -952,7 +1013,8 @@ search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 		break;
 	case DWARF_INFO_GET_MEMBER_OFFSET:
 	case DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET:
-		process_children(die);
+	case DWARF_INFO_GET_ARRAY_LENGTH:
+		process_children(dwarfd, die);
 		break;
 	}
 }
@@ -1066,6 +1128,25 @@ get_member_offset(char *structname, char *membername, int cmd)
 	return dwarf_info.member_offset;
 }
 
+/*
+ * Get the length of member.
+ */
+long
+get_array_length(char *structname, char *membername)
+{
+	dwarf_info.cmd = DWARF_INFO_GET_ARRAY_LENGTH;
+	dwarf_info.struct_name = structname;
+	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
+	dwarf_info.member_name = membername;
+	dwarf_info.member_offset = NOT_FOUND_STRUCTURE;
+	dwarf_info.array_length = NOT_FOUND_ARRAY;
+
+	if (!get_debug_info())
+		return FAILED_DWARFINFO;
+
+	return dwarf_info.array_length;
+}
+
 int
 get_structure_info(struct DumpInfo *info)
 {
@@ -1104,6 +1185,7 @@ get_structure_info(struct DumpInfo *info)
 	OFFSET_INIT(zone.free_pages, "zone", "free_pages");
 	OFFSET_INIT(zone.free_area, "zone", "free_area");
 	OFFSET_INIT(zone.spanned_pages, "zone", "spanned_pages");
+	ARRAY_LENGTH_INIT(zone.free_area, "zone", "free_area");
 
 	/*
 	 * Get offsets of the free_area's members.
@@ -1241,6 +1323,8 @@ generate_config(struct DumpInfo *info)
 	WRITE_MEMBER_OFFSET("free_area.free_list", free_area.free_list);
 	WRITE_MEMBER_OFFSET("list_head.next", list_head.next);
 	WRITE_MEMBER_OFFSET("list_head.prev", list_head.prev);
+
+	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	return TRUE;
 }
@@ -1390,6 +1474,8 @@ read_config(struct DumpInfo *info)
 	READ_MEMBER_OFFSET("free_area.free_list", free_area.free_list);
 	READ_MEMBER_OFFSET("list_head.next", list_head.next);
 	READ_MEMBER_OFFSET("list_head.prev", list_head.prev);
+
+	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	return TRUE;
 }
@@ -1919,7 +2005,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 	unsigned long curr, previous, head, curr_page, curr_prev, free_pages;
 	unsigned long long pfn, start_pfn;
 
-	for (order = MAX_ORDER - 1; order >= 0; --order) {
+	for (order = (ARRAY_LENGTH(zone.free_area) - 1); order >= 0; --order) {
 		head = node_zones + OFFSET(zone.free_area)
 			+ SIZE(free_area) * order + OFFSET(free_area.free_list);
 		previous = head;
@@ -2042,13 +2128,6 @@ _exclude_free_page(struct DumpInfo *info)
 	} else {
 		vt->numnodes = 1;
 	}
-	/*
-	 * FIXME
-	 * Array length of zone.free_area must be dynamically got
-	 * each architecture or each config.
-	 */
-	vt->nr_free_areas = MAX_ORDER;
-
 	if (!dump_memory_nodes(info))
 		return FALSE;
 	return TRUE;
@@ -2105,7 +2184,8 @@ exclude_free_page(struct DumpInfo *info, struct cache_data *bm2, struct cache_da
 	    || (OFFSET(free_area.free_list) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(list_head.next) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(list_head.prev) == NOT_FOUND_STRUCTURE)
-	    || (OFFSET(page.lru) == NOT_FOUND_STRUCTURE)) {
+	    || (OFFSET(page.lru) == NOT_FOUND_STRUCTURE)
+	    || (ARRAY_LENGTH(zone.free_area) == NOT_FOUND_ARRAY)) {
 		ERRMSG("Can't get necessary structures for excluding free pages.\n");
 		return FALSE;
 	}

@@ -836,75 +836,72 @@ is_kvaddr(unsigned long long addr)
 }
 
 static int
-process_attribute(Dwarf_Attribute *attr, void *cb_data)
+get_data_member_location(Dwarf_Die *die)
 {
-	struct dwarf_values *args = cb_data;
-	Dwarf_Op *expr;
 	size_t expcnt;
+	Dwarf_Attribute attr;
+	Dwarf_Op *expr;
 
-	switch (attr->code) {
-	case DW_AT_data_member_location:
-		dwarf_getlocation (attr, &expr, &expcnt);
-		if (dwarf_info.member_offset == NOT_FOUND_STRUCTURE)
-			dwarf_info.member_offset = expr[0].number;
-		*args->found_map |= DWARF_INFO_FOUND_LOCATION;
-		break;
-	default:
-		break;
-	}
+	if (dwarf_attr(die, DW_AT_data_member_location, &attr) == NULL)
+		return FALSE;
 
-	return 0;
-}
+	if (dwarf_getlocation(&attr, &expr, &expcnt) < 0)
+		return FALSE;
 
-static int
-process_children(Dwarf_Die *die, uint32_t *found_map)
-{
-	Dwarf_Die child;
-	Dwarf_Die *walker;
-	int rc;
-	const char *name;
-	struct dwarf_values args;
+	dwarf_info.member_offset = expr[0].number;
 
-	rc = dwarf_child(die, &child);
-	walker = &child;
-	
-	while (rc == 0) {
-		name = dwarf_diename(walker);
-		if ((dwarf_info.cmd == DWARF_INFO_GET_MEMBER_OFFSET)
-		    && (dwarf_tag(walker) == DW_TAG_member)
-		    && (name) && (!strcmp(name, dwarf_info.member_name))) {
-			/*
-			 * get the attirbutes of this die to record the
-			 * location of the symbol
-			 */
-			*found_map |= DWARF_INFO_FOUND_MEMBER;
-		}
-		if ((dwarf_info.cmd == DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET)
-		    && (dwarf_tag(walker) == DW_TAG_member)
-		    && (!name)) {
-			*found_map |= DWARF_INFO_FOUND_MEMBER;
-		}
-		if (*found_map & DWARF_INFO_FOUND_MEMBER) {
-			args.die = walker;
-			args.found_map = found_map;
-			dwarf_getattrs(walker, process_attribute, &args, 0);
-			if ((*found_map & DWARF_INFO_FOUND_ALL)
-			    == DWARF_INFO_FOUND_ALL)
-				return TRUE;
-		}
-
-		rc = dwarf_siblingof(walker, walker); 
-	}
-
-	/*
-	 * Return TRUE even if not found. Return FALSE if I/O error
-	 * in the future.
-	 */
 	return TRUE;
 }
 
 static void
-search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, uint32_t *found_map)
+process_children(Dwarf_Die *die)
+{
+	int tag;
+	const char *name;
+	Dwarf_Die child, *walker;
+
+	if (dwarf_child(die, &child) != 0)
+		return;
+
+	walker = &child;
+	
+	do {
+		tag  = dwarf_tag(walker);
+		name = dwarf_diename(walker);
+
+		if (tag != DW_TAG_member)
+			continue;
+
+		switch (dwarf_info.cmd) {
+		case DWARF_INFO_GET_MEMBER_OFFSET:
+			if ((!name) || strcmp(name, dwarf_info.member_name))
+				continue;
+			/*
+			 * Get the member offset.
+			 */
+			if (!get_data_member_location(walker))
+				continue;
+			return;
+		case DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET:
+			if (name)
+				continue;
+			/*
+			 * Get the member offset.
+			 */
+			if (!get_data_member_location(walker))
+				continue;
+			return;
+		}
+	} while (!dwarf_siblingof(walker, walker)); 
+
+	/*
+	 * Return even if not found.
+	 */
+	return;
+}
+
+static void
+search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 {
 	Dwarf_Die child; 
 	int tag;
@@ -914,58 +911,65 @@ search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, uint32_t *found_map)
 	 * start by looking at the children
 	 */
 	if (dwarf_child(die, &child) == 0)
-		search_die_tree(dwarfd, &child, found_map);
+		search_die_tree(dwarfd, &child, found);
+
+	if (*found)
+		return;
 
 	/*
 	 * If we get to here then we don't have any more
 	 * children, check to see if this is a relevant tag
 	 */
-next_tag:
-	tag = dwarf_tag(die);
-	name = dwarf_diename(die);
-	if ((tag == DW_TAG_structure_type)
-	    && (name) && (!strcmp(name, dwarf_info.struct_name))) {
-		/*
-		 * this is our structure
-		 * process the children
-		 */
-		dwarf_info.struct_size = dwarf_bytesize(die);
-		if (dwarf_info.struct_size > 0) {
-			*found_map |= DWARF_INFO_FOUND_STRUCT;
-			if (dwarf_info.cmd == DWARF_INFO_GET_STRUCT_SIZE)
-				return;
-			if (process_children(die, found_map) == TRUE)
-				return;
-		}
+	do {
+		tag  = dwarf_tag(die);
+		name = dwarf_diename(die);
+		if ((tag != DW_TAG_structure_type) || (!name)
+		    || strcmp(name, dwarf_info.struct_name))
+			continue;
 		/*
 		 * Skip if DW_AT_byte_size is not included.
 		 */
+		dwarf_info.struct_size = dwarf_bytesize(die);
+
+		if (dwarf_info.struct_size > 0)
+			break;
+
+	} while (!dwarf_siblingof(die, die));
+
+	if (dwarf_info.struct_size <= 0) {
+		/*
+		 * Not found the demanded structure.
+		 */
+		return;
 	}
 
-	if (dwarf_siblingof(die, die) == 0)
-		goto next_tag;
-
+	/*
+	 * Found the demanded structure.
+	 */
+	*found = TRUE;
+	switch (dwarf_info.cmd) {
+	case DWARF_INFO_GET_STRUCT_SIZE:
+		break;
+	case DWARF_INFO_GET_MEMBER_OFFSET:
+	case DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET:
+		process_children(die);
+		break;
+	}
 }
-
 
 int
 get_debug_info(void)
 {
+	int found = FALSE;
+	char *name = NULL;
+	size_t shstrndx, header_size;
+	uint8_t address_size, offset_size;
 	Dwarf *dwarfd = NULL;
 	Elf *elfd = NULL;
-	Dwarf_Off off = 0;
-	Dwarf_Off next_off = 0;
+	Dwarf_Off off = 0, next_off = 0, abbrev_offset = 0;
 	Elf_Scn *scn = NULL;
-	GElf_Shdr scnhdr_mem;
-	GElf_Shdr *scnhdr = NULL;
-	size_t header_size;
-	Dwarf_Off abbrev_offset = 0;
+	GElf_Shdr scnhdr_mem, *scnhdr = NULL;
 	Dwarf_Die cu_die;
-	uint8_t address_size;
-	uint8_t offset_size;
-	uint32_t found_map = 0;
-	char *name = NULL;
-	size_t shstrndx;
 	const off_t failed = (off_t)-1;
 
 	int ret = FALSE;
@@ -980,39 +984,43 @@ get_debug_info(void)
 		    dwarf_info.vmlinux_name);
 		return FALSE;
 	}
-
 	if (!(dwarfd = dwarf_begin_elf(elfd, DWARF_C_READ, NULL))) {
 		ERRMSG("Can't create a handle for a new debug session.\n");
 		goto out;
 	}
-
 	if (elf_getshstrndx(elfd, &shstrndx) < 0) {
 		ERRMSG("Can't get the section index of the string table.\n");
 		goto out;
 	}
+
+	/*
+	 * Search for ".debug_info" section.
+	 */
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
-
 		scnhdr = gelf_getshdr(scn, &scnhdr_mem);
-
 		name = elf_strptr(elfd, shstrndx, scnhdr->sh_name);
-
 		if (strcmp(name, ".debug_info"))
 			continue;
+	}
+	if (!strcmp(name, ".debug_info")) {
+		ERRMSG("Can't get .debug_info section.\n");
+		goto out;
+	}
 
-		while (dwarf_nextcu(dwarfd, off, &next_off, &header_size,
-		    &abbrev_offset, &address_size, &offset_size) == 0) {
-			off += header_size;
-			if (dwarf_offdie(dwarfd, off, &cu_die) == NULL) {
-				ERRMSG("Can't get CU die.\n");
-				goto out;
-			}
-			search_die_tree(dwarfd, &cu_die, &found_map);
-			if (found_map & DWARF_INFO_FOUND_STRUCT)
-				break;
-			off = next_off;
+	/*
+	 * Search by each CompileUnit.
+	 */
+	while (dwarf_nextcu(dwarfd, off, &next_off, &header_size,
+	    &abbrev_offset, &address_size, &offset_size) == 0) {
+		off += header_size;
+		if (dwarf_offdie(dwarfd, off, &cu_die) == NULL) {
+			ERRMSG("Can't get CU die.\n");
+			goto out;
 		}
-		if (found_map & DWARF_INFO_FOUND_STRUCT)
+		search_die_tree(dwarfd, &cu_die, &found);
+		if (found)
 			break;
+		off = next_off;
 	}
 	ret = TRUE;
 out:
@@ -1020,7 +1028,6 @@ out:
 		dwarf_end(dwarfd);
 	if (elfd != NULL)
 		elf_end(elfd);
-	dwarf_info.status = found_map;
 
 	return ret;
 }
@@ -1032,7 +1039,6 @@ long
 get_structure_size(char *structname)
 {
 	dwarf_info.cmd = DWARF_INFO_GET_STRUCT_SIZE;
-	dwarf_info.status = 0;
 	dwarf_info.struct_name = structname;
 	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
 
@@ -1049,7 +1055,6 @@ long
 get_member_offset(char *structname, char *membername, int cmd)
 {
 	dwarf_info.cmd = cmd;
-	dwarf_info.status = 0;
 	dwarf_info.struct_name = structname;
 	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
 	dwarf_info.member_name = membername;

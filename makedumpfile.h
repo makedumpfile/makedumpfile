@@ -540,13 +540,8 @@ extern struct offset_table	offset_table;
 #define DWARF_INFO_GET_STRUCT_SIZE		1
 #define DWARF_INFO_GET_MEMBER_OFFSET		2
 #define DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET	3
-#define DWARF_INFO_FOUND_STRUCT			1
-#define DWARF_INFO_FOUND_MEMBER			2
-#define DWARF_INFO_FOUND_LOCATION		4
-#define DWARF_INFO_FOUND_ALL	(DWARF_INFO_FOUND_STRUCT|DWARF_INFO_FOUND_MEMBER|DWARF_INFO_FOUND_LOCATION)
 
 struct dwarf_info {
-	uint32_t	status;		/* TEMP */
 	unsigned int	cmd;		/* IN */
 	char	*vmlinux_name;		/* IN */
 	char	*struct_name;		/* IN */

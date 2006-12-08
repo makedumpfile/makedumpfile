@@ -481,7 +481,7 @@ open_files_for_creating_dumpfile(struct DumpInfo *info)
 }
 
 int
-dump_Elf_pt_load(struct DumpInfo *info, GElf_Phdr *prog, int num_load)
+dump_Elf64_load(struct DumpInfo *info, Elf64_Phdr *prog, int num_load)
 {
 	struct pt_load_segment *pls;
 
@@ -500,47 +500,169 @@ dump_Elf_pt_load(struct DumpInfo *info, GElf_Phdr *prog, int num_load)
 }
 
 int
-get_elf_info(struct DumpInfo *info)
+get_elf64_ehdr(struct DumpInfo *info, Elf64_Ehdr *ehdr)
 {
-	int i, j;
-	unsigned long tmp;
-	Elf *elfd = NULL;
-	GElf_Ehdr ehdr;
-	GElf_Phdr load;
 	const off_t failed = (off_t)-1;
-
-	int ret = FALSE;
 
 	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 		return FALSE;
 	}
-	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
-		ERRMSG("Can't get first elf header of %s.\n",
-		    info->name_memory);
-		goto out;
+	if (read(info->fd_memory, ehdr, sizeof(Elf64_Ehdr))
+	    != sizeof(Elf64_Ehdr)) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
 	}
-	if (gelf_getehdr(elfd, &ehdr) == NULL) {
-		ERRMSG("Can't find file header of %s.\n",
-		    info->name_memory);
-		goto out;
+	if (ehdr->e_ident[EI_CLASS] != ELFCLASS64) {
+		ERRMSG("Can't get valid e_ident.\n");
+		return FALSE;
 	}
+	return TRUE;
+}
+
+int
+get_elf64_phdr(struct DumpInfo *info, int num, Elf64_Phdr *phdr)
+{
+	off_t offset;
+	const off_t failed = (off_t)-1;
+
+	offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) * num;
+
+	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (read(info->fd_memory, phdr, sizeof(Elf64_Phdr))
+	    != sizeof(Elf64_Phdr)) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+dump_Elf32_load(struct DumpInfo *info, Elf32_Phdr *prog, int num_load)
+{
+	struct pt_load_segment *pls;
+
+	if (prog->p_type != PT_LOAD) {
+		ERRMSG("%s isn't the dump memory.\n", info->name_memory);
+		return FALSE;
+	}
+
+	pls = &info->pt_load_segments[num_load];
+	pls->phys_start  = prog->p_paddr;
+	pls->phys_end    = pls->phys_start + prog->p_filesz;
+	pls->virt_start  = prog->p_vaddr;
+	pls->virt_end    = pls->virt_start + prog->p_filesz;
+	pls->file_offset = prog->p_offset;
+	return TRUE;
+}
+
+int
+get_elf32_ehdr(struct DumpInfo *info, Elf32_Ehdr *ehdr)
+{
+	const off_t failed = (off_t)-1;
+
+	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (read(info->fd_memory, ehdr, sizeof(Elf32_Ehdr))
+	    != sizeof(Elf32_Ehdr)) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (ehdr->e_ident[EI_CLASS] != ELFCLASS32) {
+		ERRMSG("Can't get valid e_ident.\n");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+get_elf32_phdr(struct DumpInfo *info, int num, Elf32_Phdr *phdr)
+{
+	off_t offset;
+	const off_t failed = (off_t)-1;
+
+	offset = sizeof(Elf32_Ehdr) + sizeof(Elf32_Phdr) * num;
+
+	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (read(info->fd_memory, phdr, sizeof(Elf32_Phdr))
+	    != sizeof(Elf32_Phdr)) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+get_elf_info(struct DumpInfo *info)
+{
+	int i, j;
+	unsigned long tmp;
+	Elf64_Ehdr ehdr64;
+	Elf64_Phdr load64;
+	Elf32_Ehdr ehdr32;
+	Elf32_Phdr load32;
+	const off_t failed = (off_t)-1;
+
+	int ret = FALSE;
 
 	/*
-	 * get the ident string
+	 * Check ELF64 or ELF32.
 	 */
-	if (ehdr.e_ident[EI_CLASS] == ELFCLASSNONE) {
-		ERRMSG("Elf File has no class.\n");
+	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if (read(info->fd_memory, &ehdr64, sizeof(Elf64_Ehdr))
+	    != sizeof(Elf64_Ehdr)) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if (read(info->fd_memory, &ehdr32, sizeof(Elf32_Ehdr))
+	    != sizeof(Elf32_Ehdr)) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if ((ehdr64.e_ident[EI_CLASS] == ELFCLASS64)
+	    && (ehdr32.e_ident[EI_CLASS] != ELFCLASS32)) {
+		info->flag_elf64 = TRUE;
+		info->num_load_memory = ehdr64.e_phnum - 1;
+	} else if ((ehdr64.e_ident[EI_CLASS] != ELFCLASS64)
+            && (ehdr32.e_ident[EI_CLASS] == ELFCLASS32)) {
+		info->flag_elf64 = FALSE;
+		info->num_load_memory = ehdr32.e_phnum - 1;
+	} else {
+		ERRMSG("Can't get valid ehdr.\n");
 		goto out;
 	}
 
-	info->num_load_memory = ehdr.e_phnum - 1;
 	if (!info->num_load_memory) {
 		ERRMSG("Can't get the number of PT_LOAD.\n");
 		goto out;
 	}
-
 	if ((info->pt_load_segments = (struct pt_load_segment *)
 	    calloc(1, sizeof(struct pt_load_segment) *
 	    info->num_load_memory)) == NULL) {
@@ -548,16 +670,17 @@ get_elf_info(struct DumpInfo *info)
 		    strerror(errno));
 		goto out;
 	}
+	if (info->flag_elf64) { /* ELF64 */
+		for (i = 0, j = 0; i < ehdr64.e_phnum; i++) {
+			if (!get_elf64_phdr(info, i, &load64)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (load64.p_type != PT_LOAD)
+				continue;
 
-	for (i = 0, j = 0; i < ehdr.e_phnum; i++) {
-		if (gelf_getphdr(elfd, i, &load) == NULL) {
-			ERRMSG("Can't find Phdr %d.\n", i);
-			goto out;
-		}
-
-		if (load.p_type == PT_LOAD) {
 			if (j == 0) {
-				info->offset_load_memory = load.p_offset;
+				info->offset_load_memory = load64.p_offset;
 				if (!info->offset_load_memory) {
 					ERRMSG("Can't get the offset of page data.\n");
 					goto out;
@@ -565,8 +688,29 @@ get_elf_info(struct DumpInfo *info)
 			}
 			if (j >= info->num_load_memory)
 				goto out;
+			if(!dump_Elf64_load(info, &load64, j))
+				goto out;
+			j++;
+		}
+	} else {                /* ELF32 */
+		for (i = 0, j = 0; i < ehdr32.e_phnum; i++) {
+			if (!get_elf32_phdr(info, i, &load32)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (load32.p_type != PT_LOAD)
+				continue;
 
-			if(!dump_Elf_pt_load(info, &load, j))
+			if (j == 0) {
+				info->offset_load_memory = load32.p_offset;
+				if (!info->offset_load_memory) {
+					ERRMSG("Can't get the offset of page data.\n");
+					goto out;
+				}
+			}
+			if (j >= info->num_load_memory)
+				goto out;
+			if(!dump_Elf32_load(info, &load32, j))
 				goto out;
 			j++;
 		}
@@ -587,9 +731,6 @@ get_elf_info(struct DumpInfo *info)
 
 	ret = TRUE;
 out:
-	if (elfd != NULL)
-		elf_end(elfd);
-
 	return ret;
 }
 
@@ -2220,14 +2361,15 @@ out:
 int
 get_loads_dumpfile(struct DumpInfo *info)
 {
-	int i, num_new_load = 0;
+	int i, phnum, num_new_load = 0;
+	long page_size = info->page_size;
 	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
 	unsigned long frac_head, frac_tail;
-	Elf *elfd = NULL;
-	GElf_Ehdr ehdr;
-	GElf_Phdr load;
+	Elf64_Ehdr ehdr64;
+	Elf64_Phdr load64;
+	Elf32_Ehdr ehdr32;
+	Elf32_Phdr load32;
 	struct dump_bitmap bitmap2;
-	const off_t failed = (off_t)-1;
 
 	bitmap2.fd        = info->fd_bitmap;
 	bitmap2.file_name = info->name_bitmap;
@@ -2240,37 +2382,47 @@ get_loads_dumpfile(struct DumpInfo *info)
 		    strerror(errno));
 		goto out;
 	}
-	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto out;
-	}
-	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
-		ERRMSG("Can't get first elf header of %s.\n",
-		    info->name_memory);
-		goto out;
-	}
-	if (gelf_getehdr(elfd, &ehdr) == NULL) {
-		ERRMSG("Can't find file header of %s.\n",
-		    info->name_memory);
-		goto out;
-	}
-	for (i = 0; i < ehdr.e_phnum; i++) {
-		if (gelf_getphdr(elfd, i, &load) == NULL) {
-			ERRMSG("Can't find Phdr %d.\n", i);
+	if (info->flag_elf64) { /* ELF64 */
+		if (!get_elf64_ehdr(info, &ehdr64)) {
+			ERRMSG("Can't get ehdr64.\n");
 			goto out;
 		}
-		if (load.p_type != PT_LOAD)
-			continue;
-
-		num_excluded = 0;
+		phnum = ehdr64.e_phnum;
+	} else {                /* ELF32 */
+		if (!get_elf32_ehdr(info, &ehdr32)) {
+			ERRMSG("Can't get ehdr32.\n");
+			goto out;
+		}
+		phnum = ehdr32.e_phnum;
+	}
+	for (i = 0; i < phnum; i++) {
+		if (info->flag_elf64) { /* ELF64 */
+			if (!get_elf64_phdr(info, i, &load64)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (load64.p_type != PT_LOAD)
+				continue;
+			pfn_start = load64.p_paddr / page_size;
+			pfn_end   = (load64.p_paddr+load64.p_memsz)/page_size;
+			frac_head = page_size - (load64.p_paddr % page_size);
+			frac_tail = (load64.p_paddr+load64.p_memsz)%page_size;
+		} else {                /* ELF32 */
+			if (!get_elf32_phdr(info, i, &load32)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (load32.p_type != PT_LOAD)
+				continue;
+			pfn_start = load32.p_paddr / page_size;
+			pfn_end   = (load32.p_paddr+load32.p_memsz)/page_size;
+			frac_head = page_size - (load32.p_paddr % page_size);
+			frac_tail = (load32.p_paddr+load32.p_memsz)%page_size;
+		}
 		num_new_load++;
-		pfn_start = load.p_paddr / info->page_size;
-		pfn_end   = (load.p_paddr + load.p_memsz) / info->page_size;
-		frac_head = info->page_size - (load.p_paddr % info->page_size);
-		frac_tail = (load.p_paddr + load.p_memsz) % info->page_size;
+		num_excluded = 0;
 
-		if (frac_head && (frac_head != info->page_size))
+		if (frac_head && (frac_head != page_size))
 			pfn_start++;
 		if (frac_tail)
 			pfn_end++;
@@ -2295,8 +2447,6 @@ get_loads_dumpfile(struct DumpInfo *info)
 out:
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
-	if (elfd != NULL)
-		elf_end(elfd);
 	return num_new_load;
 }
 
@@ -2304,10 +2454,12 @@ int
 write_elf_header(struct DumpInfo *info)
 {
 	int i, num_loads_dumpfile;
-	off_t offset_note_memory;
-	Elf *elfd = NULL;
-	GElf_Ehdr ehdr;
-	GElf_Phdr note;
+	off_t offset_note_memory, offset_note_dumpfile;
+	size_t size_note;
+	Elf64_Ehdr ehdr64;
+	Elf64_Phdr note64;
+	Elf32_Ehdr ehdr32;
+	Elf32_Phdr note32;
 
 	char *buf = NULL;
 	const off_t failed = (off_t)-1;
@@ -2325,25 +2477,25 @@ write_elf_header(struct DumpInfo *info)
 		goto out;
 	}
 
-	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto out;
+	if (info->flag_elf64) { /* ELF64 */
+		if (!get_elf64_ehdr(info, &ehdr64)) {
+			ERRMSG("Can't get ehdr64.\n");
+			goto out;
+		}
+		/*
+		 * PT_NOTE(1) + PT_LOAD(1+)
+		 */
+		ehdr64.e_phnum = 1 + num_loads_dumpfile; 
+	} else {                /* ELF32 */
+		if (!get_elf32_ehdr(info, &ehdr32)) {
+			ERRMSG("Can't get ehdr32.\n");
+			goto out;
+		}
+		/*
+		 * PT_NOTE(1) + PT_LOAD(1+)
+		 */
+		ehdr32.e_phnum = 1 + num_loads_dumpfile; 
 	}
-	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
-		ERRMSG("Can't get first elf header of %s.\n",
-		    info->name_memory);
-		goto out;
-	}
-	if (gelf_getehdr(elfd, &ehdr) == NULL) {
-		ERRMSG("Can't find file header of %s.\n",
-		    info->name_memory);
-		goto out;
-	}
-	/*
-	 * PT_NOTE(1) + PT_LOAD(1+)
-	 */
-	ehdr.e_phnum = 1 + num_loads_dumpfile; 
 
 	/*
 	 * Write a ELF header.
@@ -2353,38 +2505,84 @@ write_elf_header(struct DumpInfo *info)
 		    info->name_dumpfile, strerror(errno));
 		goto out;
 	}
-	if (write(info->fd_dumpfile, &ehdr, sizeof(ehdr)) != sizeof(ehdr)) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		goto out;
+	if (info->flag_elf64) { /* ELF64 */
+		if (write(info->fd_dumpfile, &ehdr64, sizeof(ehdr64))
+		    != sizeof(ehdr64)) {
+			ERRMSG("Can't write the dump file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
+	} else {                /* ELF32 */
+		if (write(info->fd_dumpfile, &ehdr32, sizeof(ehdr32))
+		    != sizeof(ehdr32)) {
+			ERRMSG("Can't write the dump file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
 	}
+
 	/*
 	 * Write a PT_NOTE header.
 	 */
-	for (i = 0; i < ehdr.e_phnum; i++) {
-		if (gelf_getphdr(elfd, i, &note) == NULL) {
-			ERRMSG("Can't find Phdr %d.\n", i);
+	if (info->flag_elf64) { /* ELF64 */
+		for (i = 0; i < ehdr64.e_phnum; i++) {
+			if (!get_elf64_phdr(info, i, &note64)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (note64.p_type == PT_NOTE)
+				break;
+		}
+		if (note64.p_type != PT_NOTE) {
+			ERRMSG("Can't get a PT_NOTE header.\n");
 			goto out;
 		}
-		if (note.p_type == PT_NOTE)
-			break;
+
+		offset_note_memory   = note64.p_offset;
+		offset_note_dumpfile = sizeof(ehdr64)
+		    + sizeof(Elf64_Phdr) * ehdr64.e_phnum;
+		note64.p_offset      = offset_note_dumpfile; 
+		size_note            = note64.p_filesz;
+
+		if (write(info->fd_dumpfile, &note64, sizeof(note64))
+		    != sizeof(note64)) {
+			ERRMSG("Can't write the dump file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
+	} else {                /* ELF32 */
+		for (i = 0; i < ehdr32.e_phnum; i++) {
+			if (!get_elf32_phdr(info, i, &note32)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (note32.p_type == PT_NOTE)
+				break;
+		}
+		if (note32.p_type != PT_NOTE) {
+			ERRMSG("Can't get a PT_NOTE header.\n");
+			goto out;
+		}
+
+		offset_note_memory   = note32.p_offset;
+		offset_note_dumpfile = sizeof(ehdr32)
+		    + sizeof(Elf32_Phdr) * ehdr32.e_phnum;
+		note32.p_offset      = offset_note_dumpfile; 
+		size_note            = note32.p_filesz;
+
+		if (write(info->fd_dumpfile, &note32, sizeof(note32))
+		    != sizeof(note32)) {
+			ERRMSG("Can't write the dump file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
 	}
-	if (note.p_type != PT_NOTE) {
-		ERRMSG("Can't get a PT_NOTE header.\n");
-		goto out;
-	}
-	offset_note_memory = note.p_offset;
-	note.p_offset = sizeof(ehdr) + sizeof(GElf_Phdr)*ehdr.e_phnum;
-	if (write(info->fd_dumpfile, &note, sizeof(note)) != sizeof(note)) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		goto out;
-	}
+
 	/*
 	 * Write a PT_NOTE segment.
 	 * PT_LOAD header will be written later.
 	 */
-	if ((buf = malloc(note.p_filesz)) == NULL) {
+	if ((buf = malloc(size_note)) == NULL) {
 		ERRMSG("Can't allocate memory for PT_NOTE segment. %s\n",
 		    strerror(errno));
 		goto out;
@@ -2394,16 +2592,16 @@ write_elf_header(struct DumpInfo *info)
 		    info->name_memory, strerror(errno));
 		goto out;
 	}
-	if (read(info->fd_memory, buf, note.p_filesz) != note.p_filesz) {
+	if (read(info->fd_memory, buf, size_note) != size_note) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 		goto out;
 	}
-	if (lseek(info->fd_dumpfile, note.p_offset, SEEK_SET) == failed) {
+	if (lseek(info->fd_dumpfile, offset_note_dumpfile, SEEK_SET) == failed){
 		ERRMSG("Can't seek the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 	}
-	if (write(info->fd_dumpfile, buf, note.p_filesz) != note.p_filesz) {
+	if (write(info->fd_dumpfile, buf, size_note) != size_note) {
 		ERRMSG("Can't write the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 		goto out;
@@ -2412,7 +2610,7 @@ write_elf_header(struct DumpInfo *info)
 	/*
 	 * Set a offset of PT_LOAD segment.
 	 */
-	info->offset_load_dumpfile = note.p_offset + note.p_filesz;
+	info->offset_load_dumpfile = offset_note_dumpfile + size_note;
 
 	ret = TRUE;
 out:
@@ -2501,16 +2699,18 @@ print_progress(unsigned long current, unsigned long end)
 int
 write_elf_pages(struct DumpInfo *info)
 {
-	int i;
+	int i, phnum;
+	long page_size = info->page_size;
 	long long bufsz_write, bufsz_remain;
-	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
+	unsigned long long pfn, pfn_start, pfn_end, paddr, num_excluded;
 	unsigned long long num_dumpable = 0, num_dumped = 0, per;
 	unsigned long long memsz, filesz;
 	unsigned long frac_head, frac_tail;
 	off_t off_hdr_load, off_seg_load, off_memory;
-	Elf *elfd = NULL;
-	GElf_Ehdr ehdr;
-	GElf_Phdr load;
+	Elf64_Ehdr ehdr64;
+	Elf64_Phdr load64;
+	Elf32_Ehdr ehdr32;
+	Elf32_Phdr load32;
 	char *buf = NULL;
 	struct dump_bitmap bitmap2;
 	const off_t failed = (off_t)-1;
@@ -2545,41 +2745,56 @@ write_elf_pages(struct DumpInfo *info)
 	per = num_dumpable / 100;
 
 	off_seg_load = info->offset_load_dumpfile;
-	off_hdr_load = sizeof(GElf_Ehdr) + sizeof(GElf_Phdr);
 	off_memory = 0;
-	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto out;
-	}
-	if (!(elfd = elf_begin(info->fd_memory, ELF_C_READ, NULL))) {
-		ERRMSG("Can't get first elf header of %s.\n",
-		    info->name_memory);
-		goto out;
-	}
-	if (gelf_getehdr(elfd, &ehdr) == NULL) {
-		ERRMSG("Can't find file header of %s.\n",
-		    info->name_memory);
-		goto out;
-	}
 
-	for (i = 0; i < ehdr.e_phnum; i++) {
-		if (gelf_getphdr(elfd, i, &load) == NULL) {
-			ERRMSG("Can't find Phdr %d.\n", i);
+	if (info->flag_elf64) { /* ELF64 */
+		off_hdr_load = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr);
+		if (!get_elf64_ehdr(info, &ehdr64)) {
+			ERRMSG("Can't get ehdr64.\n");
 			goto out;
 		}
-		if (load.p_type != PT_LOAD)
-			continue;
+		phnum = ehdr64.e_phnum;
+	} else {                /* ELF32 */
+		off_hdr_load = sizeof(Elf32_Ehdr) + sizeof(Elf32_Phdr);
+		if (!get_elf32_ehdr(info, &ehdr32)) {
+			ERRMSG("Can't get ehdr32.\n");
+			goto out;
+		}
+		phnum = ehdr32.e_phnum;
+	}
+
+	for (i = 0; i < phnum; i++) {
+		if (info->flag_elf64) { /* ELF64 */
+			if (!get_elf64_phdr(info, i, &load64)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (load64.p_type != PT_LOAD)
+				continue;
+
+			paddr     = load64.p_paddr;
+			pfn_start = load64.p_paddr / page_size;
+			pfn_end   = (load64.p_paddr+ load64.p_memsz)/page_size;
+			frac_head = page_size - (load64.p_paddr % page_size);
+			frac_tail = (load64.p_paddr+ load64.p_memsz)%page_size;
+		} else {                /* ELF32 */
+			if (!get_elf32_phdr(info, i, &load32)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				goto out;
+			}
+			if (load32.p_type != PT_LOAD)
+				continue;
+			paddr     = load32.p_paddr;
+			pfn_start = load32.p_paddr / page_size;
+			pfn_end   = (load32.p_paddr+ load32.p_memsz)/page_size;
+			frac_head = page_size - (load32.p_paddr % page_size);
+			frac_tail = (load32.p_paddr+ load32.p_memsz)%page_size;
+		}
 
 		num_excluded = 0;
 		memsz  = 0;
 		filesz = 0;
-		pfn_start = load.p_paddr / info->page_size;
-		pfn_end   = (load.p_paddr + load.p_memsz) / info->page_size;
-		frac_head = info->page_size - (load.p_paddr % info->page_size);
-		frac_tail = (load.p_paddr + load.p_memsz) % info->page_size;
-
-		if (frac_head && (frac_head != info->page_size)) {
+		if (frac_head && (frac_head != page_size)) {
 			memsz  = frac_head;
 			filesz = frac_head;
 			pfn_start++;
@@ -2593,7 +2808,7 @@ write_elf_pages(struct DumpInfo *info)
 				if ((pfn == pfn_end - 1) && frac_tail)
 					memsz += frac_tail;
 				else
-					memsz += info->page_size;
+					memsz += page_size;
 				continue;
 			}
 
@@ -2605,8 +2820,8 @@ write_elf_pages(struct DumpInfo *info)
 					memsz  += frac_tail;
 					filesz += frac_tail;
 				} else {
-					memsz  += info->page_size;
-					filesz += info->page_size;
+					memsz  += page_size;
+					filesz += page_size;
 				}
 				continue;
 			/*
@@ -2616,12 +2831,12 @@ write_elf_pages(struct DumpInfo *info)
 			} else if (num_excluded < PFN_EXCLUDED) {
 				if ((pfn == pfn_end - 1) && frac_tail) {
 					memsz  += frac_tail;
-					filesz += (info->page_size*num_excluded
+					filesz += (page_size*num_excluded
 					    + frac_tail);
 				}else {
-					memsz  += info->page_size;
-					filesz += (info->page_size*num_excluded
-					    + info->page_size);
+					memsz  += page_size;
+					filesz += (page_size*num_excluded
+					    + page_size);
 				}
 				num_excluded = 0;
 				continue;
@@ -2632,9 +2847,15 @@ write_elf_pages(struct DumpInfo *info)
 			 * is 256 or more, those pages are excluded really.
 			 * And a new PT_LOAD segment is created. 
 			 */
-			load.p_memsz  = memsz;
-			load.p_filesz = filesz;
-			load.p_offset = off_seg_load;
+			if (info->flag_elf64) { /* ELF64 */
+				load64.p_memsz  = memsz;
+				load64.p_filesz = filesz;
+				load64.p_offset = off_seg_load;
+			} else {                /* ELF32 */
+				load32.p_memsz  = memsz;
+				load32.p_filesz = filesz;
+				load32.p_offset = off_seg_load;
+			}
 
 			/*
 			 * Write a PT_LOAD header.
@@ -2645,19 +2866,28 @@ write_elf_pages(struct DumpInfo *info)
 				    info->name_dumpfile, strerror(errno));
 				goto out;
 			}
-			if (write(info->fd_dumpfile, &load, sizeof(load))
-			    != sizeof(load)) {
-				ERRMSG("Can't write the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
-				goto out;
+			if (info->flag_elf64) { /* ELF64 */
+				if (write(info->fd_dumpfile, &load64,
+				    sizeof(load64)) != sizeof(load64)) {
+					ERRMSG("Can't write the dump file(%s). %s\n",
+					    info->name_dumpfile, strerror(errno));
+					goto out;
+				}
+			} else {                /* ELF32 */
+				if (write(info->fd_dumpfile, &load32,
+				    sizeof(load32)) != sizeof(load32)) {
+					ERRMSG("Can't write the dump file(%s). %s\n",
+					    info->name_dumpfile, strerror(errno));
+					goto out;
+				}
 			}
 			/*
 			 * Write a PT_LOAD segment.
 			 */
-			off_memory = paddr_to_offset(info, load.p_paddr);
+			off_memory = paddr_to_offset(info, paddr);
 			if (!off_memory) {
-				ERRMSG("Can't convert physaddr(%lx) to a offset.\n",
-				    (unsigned long)load.p_paddr);
+				ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
+				    paddr);
 				goto out;
 			}
 			if (lseek(info->fd_memory, off_memory, SEEK_SET)
@@ -2673,13 +2903,17 @@ write_elf_pages(struct DumpInfo *info)
 				goto out;
 			}
 
-			bufsz_remain = load.p_filesz;
+			if (info->flag_elf64) /* ELF64 */
+				bufsz_remain = load64.p_filesz;
+			else                  /* ELF32 */
+				bufsz_remain = load32.p_filesz;
+
 			while (bufsz_remain > 0) {
 				if ((num_dumped % per) == 0)
 					print_progress(num_dumped, num_dumpable);
 
-				if (bufsz_remain >= info->page_size)
-					bufsz_write = info->page_size;
+				if (bufsz_remain >= page_size)
+					bufsz_write = page_size;
 				else
 					bufsz_write = bufsz_remain;
 
@@ -2695,24 +2929,48 @@ write_elf_pages(struct DumpInfo *info)
 					    info->name_dumpfile, strerror(errno));
 					goto out;
 				}
-				bufsz_remain -= info->page_size;
+				bufsz_remain -= page_size;
 				num_dumped++;
 			}
-			load.p_paddr += load.p_memsz;
-			if (load.p_paddr < MAXMEM)
-				load.p_vaddr += load.p_memsz;
-			memsz  = info->page_size;
-			filesz = info->page_size;
-			off_hdr_load += sizeof(load);
-			off_seg_load += load.p_filesz;
+			if (info->flag_elf64) { /* ELF64 */
+				load64.p_paddr += load64.p_memsz;
+#ifdef __x86__
+				if (load64.p_paddr < MAXMEM)
+					load64.p_vaddr += load64.p_memsz;
+#else
+				load64.p_vaddr += load64.p_memsz;
+#endif /* x86 */
+				paddr  = load64.p_paddr;
+				off_hdr_load += sizeof(load64);
+				off_seg_load += load64.p_filesz;
+			} else {                /* ELF32 */
+				load32.p_paddr += load32.p_memsz;
+#ifdef __x86__
+				if (load32.p_paddr < MAXMEM)
+					load32.p_vaddr += load32.p_memsz;
+#else
+				load32.p_vaddr += load32.p_memsz;
+#endif /* x86 */
+				paddr  = load32.p_paddr;
+				off_hdr_load += sizeof(load32);
+				off_seg_load += load32.p_filesz;
+			}
 			num_excluded = 0;
+			memsz  = page_size;
+			filesz = page_size;
 		}
 		/*
 		 * Write the last PT_LOAD.
 		 */
-		load.p_memsz  = memsz;
-		load.p_filesz = filesz;
-		load.p_offset = off_seg_load;
+		if (info->flag_elf64) { /* ELF64 */
+			load64.p_memsz  = memsz;
+			load64.p_filesz = filesz;
+			load64.p_offset = off_seg_load;
+		} else {                /* ELF32 */
+			load32.p_memsz  = memsz;
+			load32.p_filesz = filesz;
+			load32.p_offset = off_seg_load;
+		}
 
 		/*
 		 * Write a PT_LOAD header.
@@ -2723,19 +2981,29 @@ write_elf_pages(struct DumpInfo *info)
 			    info->name_dumpfile, strerror(errno));
 			goto out;
 		}
-		if (write(info->fd_dumpfile, &load, sizeof(load))
-		    != sizeof(load)) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
-			goto out;
+		if (info->flag_elf64) { /* ELF64 */
+			if (write(info->fd_dumpfile, &load64, sizeof(load64))
+			    != sizeof(load64)) {
+				ERRMSG("Can't write the dump file(%s). %s\n",
+				    info->name_dumpfile, strerror(errno));
+				goto out;
+			}
+		} else {                /* ELF32 */
+			if (write(info->fd_dumpfile, &load32, sizeof(load32))
+			    != sizeof(load32)) {
+				ERRMSG("Can't write the dump file(%s). %s\n",
+				    info->name_dumpfile, strerror(errno));
+				goto out;
+			}
 		}
+
 		/*
 		 * Write a PT_LOAD segment.
 		 */
-		off_memory = paddr_to_offset(info, load.p_paddr);
+		off_memory = paddr_to_offset(info, paddr);
 		if (!off_memory) {
-			ERRMSG("Can't convert physaddr(%lx) to a offset.\n",
-			    (unsigned long)load.p_paddr);
+			ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
+			    paddr);
 			goto out;
 		}
 		if (lseek(info->fd_memory, off_memory, SEEK_SET)
@@ -2750,13 +3018,17 @@ write_elf_pages(struct DumpInfo *info)
 			    info->name_dumpfile, strerror(errno));
 			goto out;
 		}
-		bufsz_remain = load.p_filesz;
+		if (info->flag_elf64) /* ELF64 */
+			bufsz_remain = load64.p_filesz;
+		else                  /* ELF32 */
+			bufsz_remain = load32.p_filesz;
+
 		while (bufsz_remain > 0) {
 			if ((num_dumped % per) == 0)
 				print_progress(num_dumped, num_dumpable);
 
-			if (bufsz_remain >= info->page_size)
-				bufsz_write = info->page_size;
+			if (bufsz_remain >= page_size)
+				bufsz_write = page_size;
 			else
 				bufsz_write = bufsz_remain;
 
@@ -2772,11 +3044,16 @@ write_elf_pages(struct DumpInfo *info)
 				    info->name_dumpfile, strerror(errno));
 				goto out;
 			}
-			bufsz_remain -= info->page_size;
+			bufsz_remain -= page_size;
 			num_dumped++;
 		}
-		off_hdr_load += sizeof(load);
-		off_seg_load += load.p_filesz;
+		if (info->flag_elf64) { /* ELF64 */
+			off_hdr_load += sizeof(load64);
+			off_seg_load += load64.p_filesz;
+		} else {                /* ELF32 */
+			off_hdr_load += sizeof(load32);
+			off_seg_load += load32.p_filesz;
+		}
 	}
 	print_progress(num_dumpable, num_dumpable);
 	ret = TRUE;
@@ -2785,8 +3062,6 @@ out:
 		free(buf);
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
-	if (elfd != NULL)
-		elf_end(elfd);
 
 	return ret;
 }

@@ -288,7 +288,6 @@ do { \
 #define VMALLOC_END		(0xffffe1ffffffffff)
 #define MODULES_VADDR		(0xffffffff88000000)
 #define MODULES_END		(0xfffffffffff00000)
-#define MAXMEM			(0x3fffffffffffUL)
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
 #define SIZEOF_NODE_ONLINE_MAP	(8)
@@ -299,7 +298,6 @@ do { \
 #define PAGE_OFFSET		(0xc000000000000000)
 #define KERNELBASE		PAGE_OFFSET
 #define VMALLOCBASE     	(0xD000000000000000)
-#define MAXMEM			(-KERNELBASE-VMALLOCBASE)
 #define KVBASE			(SYMBOL(_stext))
 #define _SECTION_SIZE_BITS	(24)
 #define SIZEOF_NODE_ONLINE_MAP	(8)
@@ -307,7 +305,6 @@ do { \
 #endif
 
 #ifdef __ia64__ /* ia64 */
-#define MAXMEM			(0xffffffffffffffff)
 #define REGION_SHIFT		(61)
 
 #define KERNEL_CACHED_REGION	(7)
@@ -410,7 +407,8 @@ struct DumpInfo {
 	 */
 	int		dump_level;          /* dump level */
 	int		flag_compress;       /* flag of compression */
-	int		flag_elf_dumpfile;   /* flag of elf dump file */
+	int		flag_elf64;          /* flag of ELF64 memory */
+	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_vmlinux;	     /* flag of vmlinux */
 	int		flag_generate_config;/* flag of generating config file */
 	int		flag_read_config;    /* flag of reading config file */

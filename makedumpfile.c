@@ -3160,6 +3160,7 @@ write_kdump_pages(struct DumpInfo *info)
 	off_t offset_data = 0, offset_memory = 0;
 	struct disk_dump_header *dh = info->dump_header;
 	unsigned char *buf = NULL, *buf_out = NULL;
+	unsigned long len_buf_out;
 	struct cache_data bm2, pdesc, pdata;
 	struct dump_bitmap bitmap1, bitmap2;
 	const off_t failed = (off_t)-1;
@@ -3205,7 +3206,8 @@ write_kdump_pages(struct DumpInfo *info)
 		    strerror(errno));
 		goto out;
 	}
-	if ((buf_out = malloc(info->page_size)) == NULL) {
+	len_buf_out = compressBound(info->page_size);
+	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
 		    strerror(errno));
 		goto out;
@@ -3323,7 +3325,7 @@ write_kdump_pages(struct DumpInfo *info)
 		/*
 		 * Compress the page data.
 		 */
-		size_out = info->page_size;
+		size_out = len_buf_out;
 		if (info->flag_compress
 		    && (compress2(buf_out, &size_out, buf,
 		    info->page_size, Z_BEST_SPEED) == Z_OK)

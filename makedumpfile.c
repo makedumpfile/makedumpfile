@@ -496,6 +496,14 @@ dump_Elf64_load(struct DumpInfo *info, Elf64_Phdr *prog, int num_load)
 	pls->virt_start  = prog->p_vaddr;
 	pls->virt_end    = pls->virt_start + prog->p_filesz;
 	pls->file_offset = prog->p_offset;
+
+	if (info->flag_debug) {
+		MSG("LOAD (%d)\n", num_load);
+		MSG("  phys_start : %llx\n", pls->phys_start);
+		MSG("  phys_end   : %llx\n", pls->phys_end);
+		MSG("  virt_start : %llx\n", pls->virt_start);
+		MSG("  virt_end   : %llx\n", pls->virt_end);
+	}
 	return TRUE;
 }
 
@@ -560,6 +568,14 @@ dump_Elf32_load(struct DumpInfo *info, Elf32_Phdr *prog, int num_load)
 	pls->virt_start  = prog->p_vaddr;
 	pls->virt_end    = pls->virt_start + prog->p_filesz;
 	pls->file_offset = prog->p_offset;
+
+	if (info->flag_debug) {
+		MSG("LOAD (%d)\n", num_load);
+		MSG("  phys_start : %llx\n", pls->phys_start);
+		MSG("  phys_end   : %llx\n", pls->phys_end);
+		MSG("  virt_start : %llx\n", pls->virt_start);
+		MSG("  virt_end   : %llx\n", pls->virt_end);
+	}
 	return TRUE;
 }
 
@@ -724,6 +740,11 @@ get_elf_info(struct DumpInfo *info)
 	info->page_size = sysconf(_SC_PAGE_SIZE);
 
 	info->max_mapnr = get_max_mapnr(info);
+
+	if (info->flag_debug) {
+		MSG("\n");
+		MSG("max_mapnr    : %llx\n", info->max_mapnr);
+	}
 
 	/*
 	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
@@ -1684,6 +1705,12 @@ dump_mem_map(struct DumpInfo *info, unsigned long long pfn_start,
 	mmd->pfn_end   = pfn_end;
 	mmd->mem_map   = mem_map;
 
+	if (info->flag_debug) {
+		MSG("mem_map (%d)\n", num_mm);
+		MSG("  mem_map    : %lx\n", mem_map);
+		MSG("  pfn_start  : %llx\n", pfn_start);
+		MSG("  pfn_end    : %llx\n", pfn_end);
+	}
 	return;
 }
 
@@ -1847,15 +1874,27 @@ get_mem_map(struct DumpInfo *info)
 
 	switch (get_mem_type(info)) {
 	case SPARSEMEM:
-		MSG("Memory type : SPARSEMEM\n");
+		if (info->flag_debug) {
+			MSG("\n");
+			MSG("Memory type  : SPARSEMEM\n");
+			MSG("\n");
+		}
 		ret = get_mm_sparsemem(info);
 		break;
 	case SPARSEMEM_EX:
-		MSG("Memory type : SPARSEMEM_EX\n");
+		if (info->flag_debug) {
+			MSG("\n");
+			MSG("Memory type  : SPARSEMEM_EX\n");
+			MSG("\n");
+		}
 		ret = get_mm_sparsemem(info);
 		break;
 	case FLATMEM:
-		MSG("Memory type : FLATMEM\n");
+		if (info->flag_debug) {
+			MSG("\n");
+			MSG("Memory type  : FLATMEM\n");
+			MSG("\n");
+		}
 		ret = get_mm_flatmem(info);
 		break;
 	default:
@@ -2343,6 +2382,12 @@ _exclude_free_page(struct DumpInfo *info)
 {
 	if (!(vt->numnodes = get_nodes_online(info)))
 		vt->numnodes = 1;
+
+	if (info->flag_debug) {
+		MSG("\n");
+		MSG("num of NODEs : %d\n", vt->numnodes);
+		MSG("\n");
+	}
 
 	if (!dump_memory_nodes(info))
 		return FALSE;
@@ -3779,13 +3824,16 @@ main(int argc, char *argv[])
 	}
 	vt = &info->vm_table;
 
-	while ((opt = getopt(argc, argv, "b:cd:Eg:i:vx:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:cDd:Eg:i:vx:")) != -1) {
 		switch (opt) {
 		case 'b':
 			info->block_order = atoi(optarg);
 			break;
 		case 'c':
 			info->flag_compress = 1;
+			break;
+		case 'D':
+			info->flag_debug = 1;
 			break;
 		case 'd':
 			info->dump_level = atoi(optarg);

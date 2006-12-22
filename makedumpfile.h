@@ -434,6 +434,7 @@ struct DumpInfo {
 	 */
 	int		dump_level;          /* dump level */
 	int		flag_compress;       /* flag of compression */
+	int		flag_debug;          /* flag of debug */
 	int		flag_elf64;          /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_vmlinux;	     /* flag of vmlinux */

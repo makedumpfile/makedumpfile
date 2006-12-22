@@ -724,8 +724,15 @@ get_elf_info(struct DumpInfo *info)
 	info->page_size = sysconf(_SC_PAGE_SIZE);
 
 	info->max_mapnr = get_max_mapnr(info);
+
+	/*
+	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
+	 * The crash utility requires both of them to be aligned to block_size
+	 * boundary.
+	 */
 	tmp = divideup(divideup(info->max_mapnr, BITPERBYTE), info->page_size);
 	info->len_bitmap = tmp*info->page_size*2;
+
 	if (info->flag_exclude_free)
 		info->len_3rd_bitmap = info->len_bitmap / 2;
 

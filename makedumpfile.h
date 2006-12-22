@@ -287,7 +287,6 @@ do { \
 #define FALSE		(0)
 #define MAX(a,b)	((a) > (b) ? (a) : (b))
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
-#define MAX_NR_ZONES	(4)
 #define LONG_MAX	((long)(~0UL>>1))
 #define ULONG_MAX	(~0UL)
 #define ULONGLONG_MAX	(~0ULL)
@@ -547,6 +546,7 @@ struct offset_table {
 	} zone;
 	struct pglist_data {
 		long	node_zones;
+		long	nr_zones;
 	} pglist_data;
 	struct free_area {
 		long	free_list;

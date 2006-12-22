@@ -1378,6 +1378,7 @@ get_structure_info(struct DumpInfo *info)
 	 */
 	SIZE_INIT(pglist_data, "pglist_data");
 	OFFSET_INIT(pglist_data.node_zones, "pglist_data", "node_zones");
+	OFFSET_INIT(pglist_data.nr_zones, "pglist_data", "nr_zones");
 
 	/*
 	 * Get offsets of the zone's members.
@@ -1521,6 +1522,7 @@ generate_config(struct DumpInfo *info)
 	WRITE_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	WRITE_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
+	WRITE_MEMBER_OFFSET("pglist_data.nr_zones", pglist_data.nr_zones);
 	WRITE_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	WRITE_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	WRITE_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
@@ -1679,6 +1681,7 @@ read_config(struct DumpInfo *info)
 	READ_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	READ_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
+	READ_MEMBER_OFFSET("pglist_data.nr_zones", pglist_data.nr_zones);
 	READ_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	READ_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	READ_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
@@ -2328,7 +2331,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 int
 dump_memory_nodes(struct DumpInfo *info)
 {
-	int i, num_nodes, node;
+	int i, nr_zones, num_nodes, node;
 	unsigned long node_zones, zone, spanned_pages, pgdat;
 
 	if ((node = next_online_node(0)) < 0) {
@@ -2343,7 +2346,13 @@ dump_memory_nodes(struct DumpInfo *info)
 
 		node_zones = pgdat + OFFSET(pglist_data.node_zones);
 
-		for (i = 0; i < MAX_NR_ZONES; i++) {
+		if (!readmem(info, pgdat + OFFSET(pglist_data.nr_zones),
+		    &nr_zones, sizeof(nr_zones))) {
+			ERRMSG("Can't get nr_zones.\n");
+			return FALSE;
+		}
+
+		for (i = 0; i < nr_zones; i++) {
 			zone = node_zones + (i * SIZE(zone));
 			if (!readmem(info, zone + OFFSET(zone.spanned_pages),
 			    &spanned_pages, sizeof spanned_pages)) {
@@ -2442,6 +2451,7 @@ exclude_free_page(struct DumpInfo *info, struct cache_data *bm2, struct cache_da
 	    || (OFFSET(zone.free_area) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(zone.spanned_pages) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(pglist_data.node_zones) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(pglist_data.nr_zones) == NOT_FOUND_STRUCTURE)
 	    || (SIZE(free_area) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(free_area.free_list) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(list_head.next) == NOT_FOUND_STRUCTURE)

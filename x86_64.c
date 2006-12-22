@@ -57,6 +57,7 @@ int
 get_machdep_info_x86_64(struct DumpInfo *info)
 {
 	info->section_size_bits = _SECTION_SIZE_BITS;
+	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 
 	return TRUE;
 }

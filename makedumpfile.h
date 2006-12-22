@@ -45,6 +45,7 @@
 enum {
 	NOT_FOUND_MEMTYPE,
 	SPARSEMEM,
+	SPARSEMEM_EX,
 	FLATMEM
 };
 
@@ -87,6 +88,7 @@ isAnon(unsigned long mapping)
  * for SPARSEMEM
  */
 #define SECTION_SIZE_BITS()	(info->section_size_bits)
+#define MAX_PHYSMEM_BITS()	(info->max_physmem_bits)
 #define PAGESHIFT()		(ffs(info->page_size) - 1)
 #define PFN_SECTION_SHIFT()	(SECTION_SIZE_BITS() - PAGESHIFT())
 #define PAGES_PER_SECTION()	(1UL << PFN_SECTION_SHIFT())
@@ -99,6 +101,8 @@ isAnon(unsigned long mapping)
 #define SECTION_MAP_MASK	(~(SECTION_MAP_LAST_BIT-1))
 #define NR_SECTION_ROOTS()	divideup(num_section, SECTIONS_PER_ROOT())
 #define SECTION_NR_TO_PFN(sec)	((sec) << PFN_SECTION_SHIFT())
+#define SECTIONS_SHIFT()	(MAX_PHYSMEM_BITS() - SECTION_SIZE_BITS())
+#define NR_MEM_SECTIONS()	(1UL << SECTIONS_SHIFT())
 
 /*
  * Incorrect address
@@ -299,6 +303,8 @@ do { \
 #define KVBASE			(SYMBOL(_stext) & ~KVBASE_MASK)
 #define _SECTION_SIZE_BITS	(26)
 #define _SECTION_SIZE_BITS_PAE	(30)
+#define _MAX_PHYSMEM_BITS	(32)
+#define _MAX_PHYSMEM_BITS_PAE	(36)
 #define SIZEOF_NODE_ONLINE_MAP	(4)
 #endif /* x86 */
 
@@ -311,6 +317,7 @@ do { \
 #define MODULES_END		(0xfffffffffff00000)
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
+#define _MAX_PHYSMEM_BITS	(40)
 #define SIZEOF_NODE_ONLINE_MAP	(8)
 #endif /* x86_64 */
 
@@ -320,6 +327,7 @@ do { \
 #define VMALLOCBASE     	(0xD000000000000000)
 #define KVBASE			(SYMBOL(_stext))
 #define _SECTION_SIZE_BITS	(24)
+#define _MAX_PHYSMEM_BITS	(44)
 #define SIZEOF_NODE_ONLINE_MAP	(8)
 #endif
 
@@ -345,6 +353,7 @@ do { \
 #define KERNEL_TR_PAGE_MASK	(~(KERNEL_TR_PAGE_SIZE - 1))
 #define DEFAULT_PHYS_START	(KERNEL_TR_PAGE_SIZE * 1)
 #define _SECTION_SIZE_BITS	(30)
+#define _MAX_PHYSMEM_BITS	(50)
 #define SIZEOF_NODE_ONLINE_MAP	(32)
 #endif          /* ia64 */
 
@@ -435,6 +444,7 @@ struct DumpInfo {
 	long		page_size;           /* size of page */
 	unsigned long long	max_mapnr;   /* number of page descriptor */
 	unsigned long   section_size_bits;
+	unsigned long   max_physmem_bits;
 	unsigned long   sections_per_root;
 	unsigned long	phys_base;
 
@@ -550,9 +560,16 @@ struct offset_table {
  * The number of array
  */
 struct array_table {
+	/*
+	 * Symbol
+	 */
 	long	node_data;
 	long	pgdat_list;
+	long	mem_section;
 
+	/*
+	 * Structure
+	 */
 	struct zone_at {
 		long	free_area;
 	} zone;

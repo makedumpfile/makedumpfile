@@ -1314,6 +1314,8 @@ get_symbol_info(struct DumpInfo *info)
 		SYMBOL_ARRAY_LENGTH_INIT(node_data, "node_data");
 	if (SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_LENGTH_INIT(pgdat_list, "pgdat_list");
+	if (SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
+		SYMBOL_ARRAY_LENGTH_INIT(mem_section, "mem_section");
 
 	return TRUE;
 }
@@ -1377,13 +1379,11 @@ get_structure_info(struct DumpInfo *info)
 int
 is_sparsemem_extreme(struct DumpInfo *info)
 {
-	/*
-	 * FIXME
-	 *   This makedumpfile command can not distinguish between SPARSEMEM
-	 *   and SPARSEMEM_EXTREME. Because it can not get the size of the
-	 *   area that starts from symbol "mem_section" yet.
-	 */
-	return TRUE;
+	if (ARRAY_LENGTH(mem_section)
+	     == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
+		return TRUE;
+	else
+		return FALSE;
 }
 
 int
@@ -1394,16 +1394,21 @@ get_mem_type(struct DumpInfo *info)
 	if ((SIZE(page) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page.flags) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page._count) == NOT_FOUND_STRUCTURE)
-	    || (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE))
+	    || (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE)) {
 		ret = NOT_FOUND_MEMTYPE;
-	else if ((SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
+	} else if ((SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
 	    && (SIZE(mem_section) != NOT_FOUND_STRUCTURE)
-	    && (OFFSET(mem_section.section_mem_map) != NOT_FOUND_STRUCTURE))
-		ret = SPARSEMEM;
-	else if (SYMBOL(mem_map) != NOT_FOUND_SYMBOL)
+	    && (OFFSET(mem_section.section_mem_map) != NOT_FOUND_STRUCTURE)
+	    && (ARRAY_LENGTH(mem_section) != NOT_FOUND_STRUCTURE)) {
+		if (is_sparsemem_extreme(info))
+			ret = SPARSEMEM_EX;
+		else
+			ret = SPARSEMEM;
+	} else if (SYMBOL(mem_map) != NOT_FOUND_SYMBOL) {
 		ret = FLATMEM;
-	else
+	} else {
 		ret = NOT_FOUND_MEMTYPE;
+	}
 
 	return ret;
 }
@@ -1499,6 +1504,8 @@ generate_config(struct DumpInfo *info)
 		WRITE_ARRAY_LENGTH("node_data", node_data);
 	if (SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("pgdat_list", pgdat_list);
+	if (SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
+		WRITE_ARRAY_LENGTH("mem_section", mem_section);
 
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
@@ -1653,6 +1660,7 @@ read_config(struct DumpInfo *info)
 
 	READ_ARRAY_LENGTH("node_data", node_data);
 	READ_ARRAY_LENGTH("pgdat_list", pgdat_list);
+	READ_ARRAY_LENGTH("mem_section", mem_section);
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	return TRUE;
@@ -1833,6 +1841,10 @@ get_mem_map(struct DumpInfo *info)
 	switch (get_mem_type(info)) {
 	case SPARSEMEM:
 		MSG("Memory type : SPARSEMEM\n");
+		ret = get_mm_sparsemem(info);
+		break;
+	case SPARSEMEM_EX:
+		MSG("Memory type : SPARSEMEM_EX\n");
 		ret = get_mm_sparsemem(info);
 		break;
 	case FLATMEM:

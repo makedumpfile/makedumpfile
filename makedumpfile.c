@@ -891,27 +891,6 @@ out:
 }
 
 int
-get_symbol_info(struct DumpInfo *info)
-{
-	/*
-	 * Get symbol info.
-	 */
-	SYMBOL_INIT(mem_map, "mem_map");
-	SYMBOL_INIT(mem_section, "mem_section");
-	SYMBOL_INIT(pkmap_count, "pkmap_count");
-	SYMBOL_INIT_NEXT(pkmap_count_next, "pkmap_count");
-	SYMBOL_INIT(system_utsname, "system_utsname");
-	SYMBOL_INIT(_stext, "_stext");
-	SYMBOL_INIT(phys_base, "phys_base");
-	SYMBOL_INIT(node_online_map, "node_online_map");
-	SYMBOL_INIT(node_data, "node_data");
-	SYMBOL_INIT(pgdat_list, "pgdat_list");
-	SYMBOL_INIT(contig_page_data, "contig_page_data");
-
-	return TRUE;
-}
-
-int
 is_kvaddr(unsigned long long addr)
 {
 	return (addr >= (unsigned long long)(KVBASE));
@@ -940,11 +919,14 @@ get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
 {
 	int tag;
 	Dwarf_Attribute attr;
-	Dwarf_Off offset_type;
+	Dwarf_Off offset_type, offset_cu;
 	Dwarf_Die die_type;
+	Dwarf_Word upper_bound;
+
+	offset_cu = dwarf_dieoffset(die) - dwarf_cuoffset(die);
 
 	/*
-	 * Get the offset of DW_AT_type
+	 * Get the offset of DW_AT_type.
 	 */
 	if (dwarf_attr(die, DW_AT_type, &attr) == NULL)
 		return FALSE;
@@ -952,7 +934,7 @@ get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
 	if (dwarf_formref(&attr, &offset_type) < 0)
 		return FALSE;
 
-	if (dwarf_offdie(dwarfd, offset_type, &die_type) == NULL) {
+	if (dwarf_offdie(dwarfd, offset_type + offset_cu, &die_type) == NULL) {
 		ERRMSG("Can't get CU die.\n");
 		return FALSE;
 	}
@@ -981,13 +963,19 @@ get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
 	if (dwarf_attr(&die_type, DW_AT_upper_bound, &attr) == NULL)
 		return FALSE;
 
-	dwarf_info.array_length = (long)(*attr.valp) + 1;
+	if (dwarf_formudata(&attr, &upper_bound) < 0)
+		return FALSE;
+
+	if (upper_bound < 0)
+		return FALSE;
+
+	dwarf_info.array_length = upper_bound + 1;
 
 	return TRUE;
 }
 
 static void
-process_children(Dwarf *dwarfd, Dwarf_Die *die)
+search_member(Dwarf *dwarfd, Dwarf_Die *die)
 {
 	int tag;
 	const char *name;
@@ -1024,7 +1012,7 @@ process_children(Dwarf *dwarfd, Dwarf_Die *die)
 			if (!get_data_member_location(walker))
 				continue;
 			return;
-		case DWARF_INFO_GET_ARRAY_LENGTH:
+		case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
 			if ((!name) || strcmp(name, dwarf_info.member_name))
 				continue;
 			/*
@@ -1042,21 +1030,32 @@ process_children(Dwarf *dwarfd, Dwarf_Die *die)
 	return;
 }
 
-static void
-search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+int
+is_search_structure(int cmd)
 {
-	Dwarf_Die child; 
+	if ((cmd == DWARF_INFO_GET_STRUCT_SIZE)
+	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET)
+	    || (cmd == DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET)
+	    || (cmd == DWARF_INFO_GET_MEMBER_ARRAY_LENGTH))
+		return TRUE;
+	else
+		return FALSE;
+}
+
+int
+is_search_symbol(int cmd)
+{
+	if (cmd == DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+static void
+search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+{
 	int tag;
 	const char *name;
-
-	/* 
-	 * start by looking at the children
-	 */
-	if (dwarf_child(die, &child) == 0)
-		search_die_tree(dwarfd, &child, found);
-
-	if (*found)
-		return;
 
 	/*
 	 * If we get to here then we don't have any more
@@ -1094,10 +1093,70 @@ search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 		break;
 	case DWARF_INFO_GET_MEMBER_OFFSET:
 	case DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET:
-	case DWARF_INFO_GET_ARRAY_LENGTH:
-		process_children(dwarfd, die);
+	case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
+		search_member(dwarfd, die);
 		break;
 	}
+}
+
+static void
+search_symbol(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+{
+	int tag;
+	const char *name;
+
+	/*
+	 * If we get to here then we don't have any more
+	 * children, check to see if this is a relevant tag
+	 */
+	do {
+		tag  = dwarf_tag(die);
+		name = dwarf_diename(die);
+
+		if ((tag == DW_TAG_variable) && (name)
+		    && !strcmp(name, dwarf_info.symbol_name))
+			break;
+
+	} while (!dwarf_siblingof(die, die));
+
+	if ((tag != DW_TAG_variable) || (!name)
+	    || strcmp(name, dwarf_info.symbol_name)) {
+		/*
+		 * Not found the demanded symbol.
+		 */
+		return;
+	}
+
+	/*
+	 * Found the demanded symbol.
+	 */
+	*found = TRUE;
+	switch (dwarf_info.cmd) {
+	case DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH:
+		get_data_array_length(dwarfd, die);
+		break;
+	}
+}
+
+static void
+search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+{
+	Dwarf_Die child; 
+
+	/* 
+	 * start by looking at the children
+	 */
+	if (dwarf_child(die, &child) == 0)
+		search_die_tree(dwarfd, &child, found);
+
+	if (*found)
+		return;
+
+	if (is_search_structure(dwarf_info.cmd))
+		search_structure(dwarfd, die, found);
+
+	else if (is_search_symbol(dwarf_info.cmd))
+		search_symbol(dwarfd, die, found);
 }
 
 int
@@ -1210,22 +1269,53 @@ get_member_offset(char *structname, char *membername, int cmd)
 }
 
 /*
- * Get the length of member.
+ * Get the length of array.
  */
 long
-get_array_length(char *structname, char *membername)
+get_array_length(char *name01, char *name02, int get_symbol)
 {
-	dwarf_info.cmd = DWARF_INFO_GET_ARRAY_LENGTH;
-	dwarf_info.struct_name = structname;
-	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
-	dwarf_info.member_name = membername;
+	if (get_symbol) {
+		dwarf_info.cmd = DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH;
+		dwarf_info.symbol_name = name01;
+	} else {
+		dwarf_info.cmd = DWARF_INFO_GET_MEMBER_ARRAY_LENGTH;
+		dwarf_info.struct_name = name01;
+		dwarf_info.member_name = name02;
+	}
+	dwarf_info.struct_size   = NOT_FOUND_STRUCTURE;
 	dwarf_info.member_offset = NOT_FOUND_STRUCTURE;
-	dwarf_info.array_length = NOT_FOUND_ARRAY;
+	dwarf_info.array_length  = NOT_FOUND_STRUCTURE;
 
 	if (!get_debug_info())
 		return FAILED_DWARFINFO;
 
 	return dwarf_info.array_length;
+}
+
+int
+get_symbol_info(struct DumpInfo *info)
+{
+	/*
+	 * Get symbol info.
+	 */
+	SYMBOL_INIT(mem_map, "mem_map");
+	SYMBOL_INIT(mem_section, "mem_section");
+	SYMBOL_INIT(pkmap_count, "pkmap_count");
+	SYMBOL_INIT_NEXT(pkmap_count_next, "pkmap_count");
+	SYMBOL_INIT(system_utsname, "system_utsname");
+	SYMBOL_INIT(_stext, "_stext");
+	SYMBOL_INIT(phys_base, "phys_base");
+	SYMBOL_INIT(node_online_map, "node_online_map");
+	SYMBOL_INIT(node_data, "node_data");
+	SYMBOL_INIT(pgdat_list, "pgdat_list");
+	SYMBOL_INIT(contig_page_data, "contig_page_data");
+
+	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
+		SYMBOL_ARRAY_LENGTH_INIT(node_data, "node_data");
+	if (SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
+		SYMBOL_ARRAY_LENGTH_INIT(pgdat_list, "pgdat_list");
+
+	return TRUE;
 }
 
 int
@@ -1266,7 +1356,7 @@ get_structure_info(struct DumpInfo *info)
 	OFFSET_INIT(zone.free_pages, "zone", "free_pages");
 	OFFSET_INIT(zone.free_area, "zone", "free_area");
 	OFFSET_INIT(zone.spanned_pages, "zone", "spanned_pages");
-	ARRAY_LENGTH_INIT(zone.free_area, "zone", "free_area");
+	MEMBER_ARRAY_LENGTH_INIT(zone.free_area, "zone", "free_area");
 
 	/*
 	 * Get offsets of the free_area's members.
@@ -1404,6 +1494,11 @@ generate_config(struct DumpInfo *info)
 	WRITE_MEMBER_OFFSET("free_area.free_list", free_area.free_list);
 	WRITE_MEMBER_OFFSET("list_head.next", list_head.next);
 	WRITE_MEMBER_OFFSET("list_head.prev", list_head.prev);
+
+	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
+		WRITE_ARRAY_LENGTH("node_data", node_data);
+	if (SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
+		WRITE_ARRAY_LENGTH("pgdat_list", pgdat_list);
 
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
@@ -1556,6 +1651,8 @@ read_config(struct DumpInfo *info)
 	READ_MEMBER_OFFSET("list_head.next", list_head.next);
 	READ_MEMBER_OFFSET("list_head.prev", list_head.prev);
 
+	READ_ARRAY_LENGTH("node_data", node_data);
+	READ_ARRAY_LENGTH("pgdat_list", pgdat_list);
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	return TRUE;
@@ -1989,36 +2086,64 @@ unsigned long
 next_online_pgdat(struct DumpInfo *info, int node)
 {
 	unsigned long pgdat;
+
 	/*
-	 * node_data must be an array.
+	 * Get the pglist_data structure from symbol "node_data".
 	 */
 	if (SYMBOL(node_data) == NOT_FOUND_SYMBOL)
 		goto pgdat2;
+
+	else if ((0 < node)
+	    && (ARRAY_LENGTH(node_data) == NOT_FOUND_STRUCTURE))
+		goto pgdat2;
+
+	else if ((ARRAY_LENGTH(node_data) != NOT_FOUND_STRUCTURE)
+	    && (ARRAY_LENGTH(node_data) < node))
+		goto pgdat2;
+
 	if (!readmem(info, SYMBOL(node_data) + (node * sizeof(void *)),
 	    &pgdat, sizeof pgdat))
 		goto pgdat2;
-	/*
-	 * FIXME
-	 * Must be able to check whether pgdat is kernel vertual address or not.
-	 */
+
+	if (!is_kvaddr(pgdat))
+		goto pgdat2;
+
 	return pgdat;
 
 pgdat2:
 	/*
-	 * pgdat_list must be an array.
+	 * Get the pglist_data structure from symbol "pgdat_list".
 	 */
 	if (SYMBOL(pgdat_list) == NOT_FOUND_SYMBOL)
 		goto pgdat3;
+
+	else if ((0 < node)
+	    && (ARRAY_LENGTH(pgdat_list) == NOT_FOUND_STRUCTURE))
+		goto pgdat3;
+
+	else if ((ARRAY_LENGTH(pgdat_list) != NOT_FOUND_STRUCTURE)
+	    && (ARRAY_LENGTH(pgdat_list) < node))
+		goto pgdat3;
+
 	if (!readmem(info, SYMBOL(pgdat_list) + (node * sizeof(void *)),
 	    &pgdat, sizeof pgdat))
 		goto pgdat3;
+
+	if (!is_kvaddr(pgdat))
+		goto pgdat3;
+
 	return pgdat;
 
 pgdat3:
+	/*
+	 * Get the pglist_data structure from symbol "contig_page_data".
+	 */
 	if (SYMBOL(contig_page_data) == NOT_FOUND_SYMBOL)
 		return FALSE;
+
 	if (node != 0)
 		return FALSE;
+
 	return SYMBOL(contig_page_data);
 }
 
@@ -2148,9 +2273,6 @@ dump_memory_nodes(struct DumpInfo *info)
 	int i, num_nodes, node;
 	unsigned long node_zones, zone, spanned_pages, pgdat;
 
-	/*
-	 * In case that (vt->flags & NODES_ONLINE) is 1.
-	 */
 	if ((node = next_online_node(0)) < 0) {
 		ERRMSG("Can't get next online node.\n");
 		return FALSE;
@@ -2159,12 +2281,10 @@ dump_memory_nodes(struct DumpInfo *info)
 		ERRMSG("Can't get pgdat list.\n");
 		return FALSE;
 	}
-	for (num_nodes = 1;; num_nodes++) {
-		if (num_nodes > vt->numnodes) {
-			ERRMSG("numnodes out of sync with pgdat_list\n");
-			return FALSE;
-		}
+	for (num_nodes = 1; num_nodes <= vt->numnodes; num_nodes++) {
+
 		node_zones = pgdat + OFFSET(pglist_data.node_zones);
+
 		for (i = 0; i < MAX_NR_ZONES; i++) {
 			zone = node_zones + (i * SIZE(zone));
 			if (!readmem(info, zone + OFFSET(zone.spanned_pages),
@@ -2177,20 +2297,18 @@ dump_memory_nodes(struct DumpInfo *info)
 			if (!reset_bitmap_of_free_pages(info, zone))
 				return FALSE;
 		}
-		if (vt->flags & NODES_ONLINE) {
-			if ((node = next_online_node(node + 1)) < 0)
-				break;
-			else if (!(pgdat = next_online_pgdat(info, node))) {
+		if (num_nodes < vt->numnodes) {
+			if ((node = next_online_node(node + 1)) < 0) {
+				ERRMSG("Can't get next online node.\n");
+				return FALSE;
+			} else if (!(pgdat = next_online_pgdat(info, node))) {
 				ERRMSG("Can't determine pgdat list (node %d).\n",
 				    node);
 				return FALSE;
 			}
 		}
 	}
-	if (num_nodes != vt->numnodes) {
-		ERRMSG("numnodes out of sync with pgdat_list\n");
-		return FALSE;
-	}
+
 	/*
 	 * Flush the 3rd bit map.
 	 * info->bm3->buf_size is set at reset_3rd_bitmap().
@@ -2204,13 +2322,12 @@ dump_memory_nodes(struct DumpInfo *info)
 int
 _exclude_free_page(struct DumpInfo *info)
 {
-	if ((vt->numnodes = get_nodes_online(info))) {
-		vt->flags |= NODES_ONLINE;
-	} else {
+	if (!(vt->numnodes = get_nodes_online(info)))
 		vt->numnodes = 1;
-	}
+
 	if (!dump_memory_nodes(info))
 		return FALSE;
+
 	return TRUE;
 }
 
@@ -2266,7 +2383,7 @@ exclude_free_page(struct DumpInfo *info, struct cache_data *bm2, struct cache_da
 	    || (OFFSET(list_head.next) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(list_head.prev) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page.lru) == NOT_FOUND_STRUCTURE)
-	    || (ARRAY_LENGTH(zone.free_area) == NOT_FOUND_ARRAY)) {
+	    || (ARRAY_LENGTH(zone.free_area) == NOT_FOUND_STRUCTURE)) {
 		ERRMSG("Can't get necessary structures for excluding free pages.\n");
 		return FALSE;
 	}

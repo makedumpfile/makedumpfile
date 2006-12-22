@@ -184,7 +184,6 @@ do { \
 #define NOT_FOUND_STRUCTURE	(-1)
 #define FAILED_DWARFINFO	(-2)
 #define INVALID_STRUCTURE_DATA	(-3)
-#define NOT_FOUND_ARRAY		(-4)
 
 #define SIZE(X)			(size_table.X)
 #define OFFSET(X)		(offset_table.X)
@@ -208,9 +207,14 @@ do { \
 	     == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
-#define ARRAY_LENGTH_INIT(X, Y, Z) \
+#define SYMBOL_ARRAY_LENGTH_INIT(X, Y) \
 do { \
-	if ((ARRAY_LENGTH(X) = get_array_length(Y, Z)) == FAILED_DWARFINFO) \
+	if ((ARRAY_LENGTH(X) = get_array_length(Y, NULL, TRUE)) == FAILED_DWARFINFO) \
+		return FALSE; \
+} while (0)
+#define MEMBER_ARRAY_LENGTH_INIT(X, Y, Z) \
+do { \
+	if ((ARRAY_LENGTH(X) = get_array_length(Y, Z, FALSE)) == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
 
@@ -230,7 +234,7 @@ do { \
 } while (0)
 #define WRITE_ARRAY_LENGTH(str_array, array) \
 do { \
-	if (ARRAY_LENGTH(array) != NOT_FOUND_ARRAY) { \
+	if (ARRAY_LENGTH(array) != NOT_FOUND_STRUCTURE) { \
 		fprintf(info->file_configfile, "%s%ld\n", \
 		    STR_LENGTH(str_array), ARRAY_LENGTH(array)); \
 	} \
@@ -271,11 +275,6 @@ do { \
 #define STR_SIZE(X)	"SIZE("X")="
 #define STR_OFFSET(X)	"OFFSET("X")="
 #define STR_LENGTH(X)	"LENGTH("X")="
-
-/*
- * vm_table
- */
-#define NODES_ONLINE	(1)
 
 /*
  * common value
@@ -484,7 +483,6 @@ struct DumpInfo {
 	char			*name_3rd_bitmap;
 	struct cache_data	*bm3;
 	struct vm_table {                /* kernel VM-related data */
-		ulong flags;
 		int numnodes;
 		ulong *node_online_map;
 		int node_online_map_len;
@@ -552,6 +550,9 @@ struct offset_table {
  * The number of array
  */
 struct array_table {
+	long	node_data;
+	long	pgdat_list;
+
 	struct zone_at {
 		long	free_area;
 	} zone;
@@ -568,22 +569,19 @@ extern struct array_table	array_table;
 #define DWARF_INFO_GET_STRUCT_SIZE		1
 #define DWARF_INFO_GET_MEMBER_OFFSET		2
 #define DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET	3
-#define DWARF_INFO_GET_ARRAY_LENGTH		4
+#define DWARF_INFO_GET_MEMBER_ARRAY_LENGTH	4
+#define DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH	5
 
 struct dwarf_info {
 	unsigned int	cmd;		/* IN */
+	int	vmlinux_fd;		/* IN */
 	char	*vmlinux_name;		/* IN */
 	char	*struct_name;		/* IN */
-	int	vmlinux_fd;		/* IN */
-	int	struct_size;		/* OUT */
+	char	*symbol_name;		/* IN */
 	char	*member_name;		/* IN */
-	int	member_offset;		/* OUT */
-	int	array_length;		/* OUT */
-};
-
-struct dwarf_values {
-	Dwarf_Die *die;
-	uint32_t *found_map;
+	long	struct_size;		/* OUT */
+	long	member_offset;		/* OUT */
+	long	array_length;		/* OUT */
 };
 
 extern struct dwarf_info	dwarf_info;

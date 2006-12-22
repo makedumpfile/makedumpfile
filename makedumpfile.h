@@ -158,11 +158,11 @@ isAnon(unsigned long mapping)
 #define SYMBOL(X)		(symbol_table.X)
 #define SYMBOL_INIT(symbol, str_symbol) \
 do { \
-	SYMBOL(symbol) = get_symbol_addr(info, str_symbol, 0); \
+	SYMBOL(symbol) = get_symbol_addr(info, str_symbol); \
 } while (0)
 #define SYMBOL_INIT_NEXT(symbol, str_symbol) \
 do { \
-	SYMBOL(symbol) = get_symbol_addr(info, str_symbol, 1); \
+	SYMBOL(symbol) = get_next_symbol_addr(info, str_symbol); \
 } while (0)
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \

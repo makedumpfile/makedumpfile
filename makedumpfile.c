@@ -735,9 +735,9 @@ out:
 }
 
 unsigned long
-get_symbol_addr(struct DumpInfo *info, char *symname, int get_next_symbol)
+get_symbol_addr(struct DumpInfo *info, char *symname)
 {
-	int i, got_symbol = FALSE;
+	int i;
 	unsigned long symbol = NOT_FOUND_SYMBOL;
 	Elf *elfd = NULL;
 	GElf_Shdr shdr;
@@ -787,18 +787,9 @@ get_symbol_addr(struct DumpInfo *info, char *symname, int get_next_symbol)
 		if (sym_name == NULL)
 			continue;
 
-		if (got_symbol) {
+		if (!strcmp(sym_name, symname)) {
 			symbol = sym.st_value;
 			break;
-		}
-		if (!strcmp(sym_name, symname)) {
-			if (get_next_symbol) {
-				got_symbol = TRUE;
-				continue;
-			} else {
-				symbol = sym.st_value;
-				break;
-			}
 		}
 	}
 out:
@@ -806,6 +797,97 @@ out:
 		elf_end(elfd);
 
 	return symbol;
+}
+
+unsigned long
+get_next_symbol_addr(struct DumpInfo *info, char *symname)
+{
+	int i;
+	unsigned long symbol = NOT_FOUND_SYMBOL;
+	unsigned long next_symbol = NOT_FOUND_SYMBOL;
+	Elf *elfd = NULL;
+	GElf_Shdr shdr;
+	GElf_Sym sym;
+	Elf_Data *data = NULL;
+	Elf_Scn *scn = NULL;
+	char *sym_name = NULL;
+	const off_t failed = (off_t)-1;
+
+	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the kernel file(%s). %s\n",
+		    dwarf_info.vmlinux_name, strerror(errno));
+		return FALSE;
+	}
+	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ, NULL))) {
+		ERRMSG("Can't get first elf header of %s.\n",
+		    dwarf_info.vmlinux_name);
+		return FALSE;
+	}
+	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
+		if (gelf_getshdr(scn, &shdr) == NULL) {
+			ERRMSG("Can't get section header.\n");
+			goto out;
+		}
+		if (shdr.sh_type == SHT_SYMTAB)
+			break;
+	}
+	if (!scn) {
+		ERRMSG("Can't find symbol table.\n");
+		goto out;
+	}
+
+	data = elf_getdata(scn, data);
+
+	if ((!data) || (data->d_size == 0)) {
+		ERRMSG("No data in symbol table.\n");
+		goto out;
+	}
+
+	for (i = 0; i < (shdr.sh_size/shdr.sh_entsize); i++) {
+		if (gelf_getsym(data, i, &sym) == NULL) {
+			ERRMSG("Can't get symbol at index %d.\n", i);
+			goto out;
+		}
+		sym_name = elf_strptr(elfd, shdr.sh_link, sym.st_name);
+
+		if (sym_name == NULL)
+			continue;
+
+		if (!strcmp(sym_name, symname)) {
+			symbol = sym.st_value;
+			break;
+		}
+	}
+
+	if (symbol == NOT_FOUND_SYMBOL)
+		goto out;
+
+	/*
+	 * Search for next symbol.
+	 */
+	for (i = 0; i < (shdr.sh_size/shdr.sh_entsize); i++) {
+		if (gelf_getsym(data, i, &sym) == NULL) {
+			ERRMSG("Can't get symbol at index %d.\n", i);
+			goto out;
+		}
+		sym_name = elf_strptr(elfd, shdr.sh_link, sym.st_name);
+
+		if (sym_name == NULL)
+			continue;
+
+		if (symbol < sym.st_value) {
+			if (next_symbol == NOT_FOUND_SYMBOL)
+				next_symbol = sym.st_value;
+
+			else if (sym.st_value < next_symbol)
+				next_symbol = sym.st_value;
+		}
+	}
+out:
+	if (elfd != NULL)
+		elf_end(elfd);
+
+	return next_symbol;
 }
 
 int

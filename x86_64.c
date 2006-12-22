@@ -67,28 +67,29 @@ vaddr_to_offset_x86_64(struct DumpInfo *info,  unsigned long vaddr)
 {
 	int i;
 	off_t offset;
-	unsigned long paddr;
+	unsigned long paddr, phys_base;
 	struct pt_load_segment *pls;
+
+	/*
+	 * Check the relocatable kernel.
+	 */
+	if (SYMBOL(phys_base) != NOT_FOUND_SYMBOL)
+		phys_base = info->phys_base;
+	else
+		phys_base = 0;
+
+	if (vaddr >= __START_KERNEL_map)
+		paddr = vaddr - __START_KERNEL_map + phys_base;
+	else
+		paddr = vaddr - PAGE_OFFSET;
 
 	for (i = offset = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
-		if ((vaddr >= pls->virt_start)
-		    && (vaddr < pls->virt_end)) {
-			offset = (off_t)(vaddr - pls->virt_start) +
+		if ((paddr >= pls->phys_start)
+		    && (paddr < pls->phys_end)) {
+			offset = (off_t)(paddr - pls->phys_start) +
 				pls->file_offset;
 				break;
-		}
-	}
-	if (!offset && (vaddr < __START_KERNEL_map)) {
-		paddr = vaddr - PAGE_OFFSET;
-		for (i = offset = 0; i < info->num_load_memory; i++) {
-			pls = &info->pt_load_segments[i];
-			if ((paddr >= pls->phys_start)
-			    && (paddr < pls->phys_end)) {
-				offset = (off_t)(paddr - pls->phys_start) +
-					pls->file_offset;
-					break;
-			}
 		}
 	}
 	return offset;

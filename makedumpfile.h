@@ -269,6 +269,7 @@ do { \
 #define VERSION_2_6_16		(16)
 #define VERSION_2_6_17		(17)
 #define VERSION_2_6_18		(18)
+#define VERSION_2_6_19		(19)
 
 /*
  * field name of config file
@@ -512,6 +513,7 @@ struct symbol_table {
 	unsigned long	pkmap_count;
 	unsigned long	pkmap_count_next;
 	unsigned long	system_utsname;
+	unsigned long	init_uts_ns;
 	unsigned long	_stext;
 	unsigned long	phys_base;
 	unsigned long	node_online_map;

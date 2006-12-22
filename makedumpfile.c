@@ -122,7 +122,6 @@ readmem(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
 		    vaddr);
 		return FALSE;
 	}
-
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
@@ -149,6 +148,8 @@ get_kernel_version(char *release)
 		return VERSION_2_6_17;
 	} else if (!strncmp(release, "2.6.18", strlen("2.6.18"))) {
 		return VERSION_2_6_18;
+	} else if (!strncmp(release, "2.6.19", strlen("2.6.19"))) {
+		return VERSION_2_6_19;
 	} else {
 		return FALSE;
 	}
@@ -175,16 +176,20 @@ int
 check_release(struct DumpInfo *info)
 {
 	struct utsname system_utsname;
+	unsigned long utsname;
 
 	/*
-	 * Get the kernel version from the symbol "system_utsname".
+	 * Get the kernel version.
 	 */
-	if (SYMBOL(system_utsname) == NOT_FOUND_SYMBOL) {
+	if (SYMBOL(system_utsname) != NOT_FOUND_SYMBOL) {
+		utsname = SYMBOL(system_utsname);
+	} else if (SYMBOL(init_uts_ns) != NOT_FOUND_SYMBOL) {
+		utsname = SYMBOL(init_uts_ns) + sizeof(int);
+	} else {
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
-	if (!readmem(info, SYMBOL(system_utsname), &system_utsname,
-	    sizeof(struct utsname))) {
+	if (!readmem(info, utsname, &system_utsname, sizeof(struct utsname))) {
 		ERRMSG("Can't get the address of system_utsname.\n");
 		return FALSE;
 	}
@@ -1331,6 +1336,7 @@ get_symbol_info(struct DumpInfo *info)
 	SYMBOL_INIT(pkmap_count, "pkmap_count");
 	SYMBOL_INIT_NEXT(pkmap_count_next, "pkmap_count");
 	SYMBOL_INIT(system_utsname, "system_utsname");
+	SYMBOL_INIT(init_uts_ns, "init_uts_ns");
 	SYMBOL_INIT(_stext, "_stext");
 	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
@@ -1466,7 +1472,8 @@ generate_config(struct DumpInfo *info)
 	if (!get_structure_info(info))
 		return FALSE;
 
-	if (SYMBOL(system_utsname) == NOT_FOUND_SYMBOL) {
+	if ((SYMBOL(system_utsname) == NOT_FOUND_SYMBOL)
+	    && (SYMBOL(init_uts_ns) == NOT_FOUND_SYMBOL)) {
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
@@ -1495,6 +1502,7 @@ generate_config(struct DumpInfo *info)
 	WRITE_SYMBOL("pkmap_count", pkmap_count);
 	WRITE_SYMBOL("pkmap_count_next", pkmap_count_next);
 	WRITE_SYMBOL("system_utsname", system_utsname);
+	WRITE_SYMBOL("init_uts_ns", init_uts_ns);
 	WRITE_SYMBOL("_stext", _stext);
 	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
@@ -1660,6 +1668,7 @@ read_config(struct DumpInfo *info)
 	READ_SYMBOL("pkmap_count", pkmap_count);
 	READ_SYMBOL("pkmap_count_next", pkmap_count_next);
 	READ_SYMBOL("system_utsname", system_utsname);
+	READ_SYMBOL("init_uts_ns", init_uts_ns);
 	READ_SYMBOL("_stext", _stext);
 	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
@@ -1917,7 +1926,16 @@ initial(struct DumpInfo *info)
 	if (!get_phys_base(info))
 		return FALSE;
 
-	if (!info->flag_read_config) {
+	/*
+	 * Get the debug information for analysis from the config file 
+	 */
+	if (info->flag_read_config) {
+		if (!read_config(info))
+			return FALSE;
+	/*
+	 * Get the debug information for analysis from the kernel file 
+	 */
+	} else {
 		if (info->dump_level <= DL_EXCLUDE_ZERO) {
 			if (!get_mem_map_without_mm(info))
 				return FALSE;
@@ -1927,16 +1945,12 @@ initial(struct DumpInfo *info)
 			if (!get_symbol_info(info))
 				return FALSE;
 		}
-		if (!check_release(info))
-			return FALSE;
 		if (!get_structure_info(info))
 			return FALSE;
-	} else {
-		if (!read_config(info))
-			return FALSE;
-		if (!check_release(info))
-			return FALSE;
 	}
+	if (!check_release(info))
+		return FALSE;
+
 	if (!get_machdep_info(info))
 		return FALSE;
 

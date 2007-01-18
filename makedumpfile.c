@@ -158,18 +158,13 @@ get_kernel_version(char *release)
 int
 is_page_size(long page_size)
 {
-	long bitbuf = page_size;
-	unsigned int i, sum = 0;
+	/*
+	 * Page size is restricted to a hamming weight of 1.
+	 */
+	if (page_size > 0 && !(page_size & (page_size - 1)))
+		return TRUE;
 
-	/* Only 1 bit is set because of page size. */
-	for (i = 0; i < sizeof(bitbuf) * 8; i++) {
-		sum += bitbuf & 1;
-		bitbuf = bitbuf >> 1;
-	}
-	if (sum != 1) {
-		return FALSE;
-	}
-	return TRUE;
+	return FALSE;
 }
 
 int

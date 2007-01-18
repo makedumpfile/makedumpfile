@@ -1548,7 +1548,7 @@ generate_config(struct DumpInfo *info)
 int
 read_config_basic_info(struct DumpInfo *info)
 {
-	long page_size;
+	long page_size = FALSE;
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int get_release = FALSE, i;
 
@@ -1579,11 +1579,12 @@ read_config_basic_info(struct DumpInfo *info)
 				    info->name_configfile, buf);
 				return FALSE;
 			}
-			info->page_size = page_size;
 		}
-		if (get_release && info->page_size)
+		if (get_release && page_size)
 			break;
 	}
+	info->page_size = page_size;
+
 	if (!get_release || !info->page_size) {
 		ERRMSG("Invalid format in %s", info->name_configfile);
 		return FALSE;

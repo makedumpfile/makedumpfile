@@ -392,7 +392,7 @@ int get_machdep_info_ia64();
 #define VADDR_REGION(X)		((X) >> REGION_SHIFT)
 #endif          /* ia64 */
 
-#define MSG(x...)	fprintf(stdout, x)
+#define MSG(x...)	fprintf(stderr, x)
 #define ERRMSG(x...)	fprintf(stderr, x)
 
 struct pt_load_segment {

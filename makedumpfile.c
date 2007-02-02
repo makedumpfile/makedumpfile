@@ -3073,13 +3073,14 @@ write_elf_pages(struct DumpInfo *info)
 	unsigned long long num_dumpable = 0, num_dumped = 0, per;
 	unsigned long long memsz, filesz;
 	unsigned long frac_head, frac_tail;
-	off_t off_hdr_load, off_seg_load, off_memory;
+	off_t off_seg_load, off_memory;
 	Elf64_Ehdr ehdr64;
 	Elf64_Phdr load64;
 	Elf32_Ehdr ehdr32;
 	Elf32_Phdr load32;
 	char *buf = NULL;
 	struct dump_bitmap bitmap2;
+	struct cache_data cd_hdr, cd_seg;
 	const off_t failed = (off_t)-1;
 	int ret = FALSE;
 
@@ -3092,6 +3093,18 @@ write_elf_pages(struct DumpInfo *info)
 	bitmap2.buf       = NULL;
 	bitmap2.offset    = info->len_bitmap/2;
 
+	cd_hdr.fd         = info->fd_dumpfile;
+	cd_hdr.file_name  = info->name_dumpfile;
+	cd_hdr.cache_size = info->page_size<<info->block_order;
+	cd_hdr.buf_size   = 0;
+	cd_hdr.buf        = NULL;
+
+	cd_seg.fd         = info->fd_dumpfile;
+	cd_seg.file_name  = info->name_dumpfile;
+	cd_seg.cache_size = info->page_size<<info->block_order;
+	cd_seg.buf_size   = 0;
+	cd_seg.buf        = NULL;
+
 	if ((buf = malloc(info->page_size)) == NULL) {
 		ERRMSG("Can't allocate memory for buffer. %s\n",
 		    strerror(errno));
@@ -3102,6 +3115,19 @@ write_elf_pages(struct DumpInfo *info)
 		    strerror(errno));
 		goto out;
 	}
+	if ((cd_hdr.buf = malloc(cd_hdr.cache_size + info->page_size))
+	    == NULL) {
+		ERRMSG("Can't allocate memory for the page data buffer. %s\n",
+		    strerror(errno));
+		goto out;
+	}
+	if ((cd_seg.buf = malloc(cd_seg.cache_size + info->page_size))
+	    == NULL) {
+		ERRMSG("Can't allocate memory for the page data buffer. %s\n",
+		    strerror(errno));
+		goto out;
+	}
+
 	/*
 	 * Count the number of dumpable pages.
 	 */
@@ -3111,18 +3137,19 @@ write_elf_pages(struct DumpInfo *info)
 	}
 	per = num_dumpable / 100;
 
-	off_seg_load = info->offset_load_dumpfile;
+	off_seg_load  = info->offset_load_dumpfile;
+	cd_seg.offset = info->offset_load_dumpfile;
 	off_memory = 0;
 
 	if (info->flag_elf64) { /* ELF64 */
-		off_hdr_load = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr);
+		cd_hdr.offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr);
 		if (!get_elf64_ehdr(info, &ehdr64)) {
 			ERRMSG("Can't get ehdr64.\n");
 			goto out;
 		}
 		phnum = ehdr64.e_phnum;
 	} else {                /* ELF32 */
-		off_hdr_load = sizeof(Elf32_Ehdr) + sizeof(Elf32_Phdr);
+		cd_hdr.offset = sizeof(Elf32_Ehdr) + sizeof(Elf32_Phdr);
 		if (!get_elf32_ehdr(info, &ehdr32)) {
 			ERRMSG("Can't get ehdr32.\n");
 			goto out;
@@ -3227,26 +3254,13 @@ write_elf_pages(struct DumpInfo *info)
 			/*
 			 * Write a PT_LOAD header.
 			 */
-			if (lseek(info->fd_dumpfile, off_hdr_load, SEEK_SET)
-			    == failed) {
-				ERRMSG("Can't seek the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
-				goto out;
-			}
 			if (info->flag_elf64) { /* ELF64 */
-				if (write(info->fd_dumpfile, &load64,
-				    sizeof(load64)) != sizeof(load64)) {
-					ERRMSG("Can't write the dump file(%s). %s\n",
-					    info->name_dumpfile, strerror(errno));
+				if (!write_cache(&cd_hdr, &load64, sizeof(load64)))
 					goto out;
-				}
+
 			} else {                /* ELF32 */
-				if (write(info->fd_dumpfile, &load32,
-				    sizeof(load32)) != sizeof(load32)) {
-					ERRMSG("Can't write the dump file(%s). %s\n",
-					    info->name_dumpfile, strerror(errno));
+				if (!write_cache(&cd_hdr, &load32, sizeof(load32)))
 					goto out;
-				}
 			}
 			/*
 			 * Write a PT_LOAD segment.
@@ -3263,13 +3277,6 @@ write_elf_pages(struct DumpInfo *info)
 				    info->name_memory, strerror(errno));
 				goto out;
 			}
-			if (lseek(info->fd_dumpfile, off_seg_load, SEEK_SET)
-			    == failed) {
-				ERRMSG("Can't seek the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
-				goto out;
-			}
-
 			if (info->flag_elf64) /* ELF64 */
 				bufsz_remain = load64.p_filesz;
 			else                  /* ELF32 */
@@ -3290,15 +3297,13 @@ write_elf_pages(struct DumpInfo *info)
 					    info->name_memory, strerror(errno));
 					goto out;
 				}
-				if (write(info->fd_dumpfile, buf, bufsz_write)
-				    != bufsz_write) {
-					ERRMSG("Can't write the dump file(%s). %s\n",
-					    info->name_dumpfile, strerror(errno));
+				if (!write_cache(&cd_seg, buf, bufsz_write))
 					goto out;
-				}
+
 				bufsz_remain -= page_size;
 				num_dumped++;
 			}
+
 			if (info->flag_elf64) { /* ELF64 */
 				load64.p_paddr += load64.p_memsz;
 #ifdef __x86__
@@ -3308,7 +3313,6 @@ write_elf_pages(struct DumpInfo *info)
 				load64.p_vaddr += load64.p_memsz;
 #endif /* x86 */
 				paddr  = load64.p_paddr;
-				off_hdr_load += sizeof(load64);
 				off_seg_load += load64.p_filesz;
 			} else {                /* ELF32 */
 				load32.p_paddr += load32.p_memsz;
@@ -3319,7 +3323,6 @@ write_elf_pages(struct DumpInfo *info)
 				load32.p_vaddr += load32.p_memsz;
 #endif /* x86 */
 				paddr  = load32.p_paddr;
-				off_hdr_load += sizeof(load32);
 				off_seg_load += load32.p_filesz;
 			}
 			num_excluded = 0;
@@ -3342,26 +3345,13 @@ write_elf_pages(struct DumpInfo *info)
 		/*
 		 * Write a PT_LOAD header.
 		 */
-		if (lseek(info->fd_dumpfile, off_hdr_load, SEEK_SET)
-		    == failed) {
-			ERRMSG("Can't seek the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
-			goto out;
-		}
 		if (info->flag_elf64) { /* ELF64 */
-			if (write(info->fd_dumpfile, &load64, sizeof(load64))
-			    != sizeof(load64)) {
-				ERRMSG("Can't write the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
+			if (!write_cache(&cd_hdr, &load64, sizeof(load64)))
 				goto out;
-			}
+
 		} else {                /* ELF32 */
-			if (write(info->fd_dumpfile, &load32, sizeof(load32))
-			    != sizeof(load32)) {
-				ERRMSG("Can't write the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
+			if (!write_cache(&cd_hdr, &load32, sizeof(load32)))
 				goto out;
-			}
 		}
 
 		/*
@@ -3377,12 +3367,6 @@ write_elf_pages(struct DumpInfo *info)
 		    == failed) {
 			ERRMSG("Can't seek the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
-			goto out;
-		}
-		if (lseek(info->fd_dumpfile, off_seg_load, SEEK_SET)
-		    == failed) {
-			ERRMSG("Can't seek the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
 			goto out;
 		}
 		if (info->flag_elf64) /* ELF64 */
@@ -3405,23 +3389,22 @@ write_elf_pages(struct DumpInfo *info)
 				    info->name_memory, strerror(errno));
 				goto out;
 			}
-			if (write(info->fd_dumpfile, buf, bufsz_write)
-			    != bufsz_write) {
-				ERRMSG("Can't write the dump file(%s). %s\n",
-				    info->name_dumpfile, strerror(errno));
+			if (!write_cache(&cd_seg, buf, bufsz_write))
 				goto out;
-			}
+
 			bufsz_remain -= page_size;
 			num_dumped++;
 		}
-		if (info->flag_elf64) { /* ELF64 */
-			off_hdr_load += sizeof(load64);
+		if (info->flag_elf64) /* ELF64 */
 			off_seg_load += load64.p_filesz;
-		} else {                /* ELF32 */
-			off_hdr_load += sizeof(load32);
+		else                  /* ELF32 */
 			off_seg_load += load32.p_filesz;
-		}
 	}
+	if (!write_cache_bufsz(&cd_hdr))
+		goto out;
+	if (!write_cache_bufsz(&cd_seg))
+		goto out;
+
 	print_progress(num_dumpable, num_dumpable);
 	ret = TRUE;
 out:
@@ -3429,6 +3412,10 @@ out:
 		free(buf);
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
+	if (cd_hdr.buf != NULL)
+		free(cd_hdr.buf);
+	if (cd_seg.buf != NULL)
+		free(cd_seg.buf);
 
 	return ret;
 }

@@ -325,6 +325,11 @@ print_usage()
 	MSG("      makedumpfile -R dumpfile < dumpfile.tmp\n");
 	MSG("      makedumpfile -F -d8 -x vmlinux /proc/vmcore | ssh user@host \"makedumpfile -R dumpfile\"\n");
 	MSG("\n");
+	MSG("      Instead of using -R option, a perl script \"makedumpfile-R.pl\" re-arranges\n");
+	MSG("      dump data of flattened format to a normal dumpfile too.\n");
+	MSG("      Ex:\n");
+	MSG("      makedumpfile -F -d8 -x vmlinux /proc/vmcore | ssh user@host \"makedumpfile-R.pl dumpfile\"\n");
+	MSG("\n");
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile\n");
 	MSG("\n");

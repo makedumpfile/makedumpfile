@@ -37,3 +37,5 @@ clean:
 
 install:
 	cp ./makedumpfile /bin
+	cp ./makedumpfile-R.pl /bin
+

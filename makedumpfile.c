@@ -4116,6 +4116,7 @@ main(int argc, char *argv[])
 	}
 	vt = &info->vm_table;
 
+	info->block_order = DEFAULT_ORDER;
 	while ((opt = getopt(argc, argv, "b:cDd:EFg:i:Rvx:")) != -1) {
 		switch (opt) {
 		case 'b':

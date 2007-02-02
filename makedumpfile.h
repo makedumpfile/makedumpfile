@@ -293,6 +293,7 @@ do { \
 #define LONG_MAX	((long)(~0UL>>1))
 #define ULONG_MAX	(~0UL)
 #define ULONGLONG_MAX	(~0ULL)
+#define DEFAULT_ORDER	(4)
 #define TIMEOUT_STDIN	(600)
 #define SIZE_BUF_STDIN	(4096)
 

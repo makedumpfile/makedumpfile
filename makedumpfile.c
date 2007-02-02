@@ -3890,7 +3890,7 @@ main(int argc, char *argv[])
 	}
 	if (info->flag_generate_config) {
 		/*
-		 * generate the configuration file
+		 * Check parameters to generate the configuration file.
 		 */
 		if (argc != optind) {
 			ERRMSG("Commandline parameter is invalid.\n");
@@ -3904,9 +3904,9 @@ main(int argc, char *argv[])
 			print_usage();
 			goto out;
 		}
-	} else if (info->flag_read_config) {
+	} else {
 		/*
-		 * check parameters to read the configuration file
+		 * Check parameters to create the dump file.
 		 */
 		if ((info->dump_level < MIN_DUMP_LEVEL)
 		    || (MAX_DUMP_LEVEL < info->dump_level)) {
@@ -3916,22 +3916,7 @@ main(int argc, char *argv[])
 		}
 		if ((argc != optind + 2)
 		    || (info->flag_compress && info->flag_elf_dumpfile)
-		    || info->flag_vmlinux) {
-			ERRMSG("Commandline parameter is invalid.\n");
-			print_usage();
-			goto out;
-		}
-		info->name_memory   = argv[optind];
-		info->name_dumpfile = argv[optind+1];
-	} else {
-		if ((info->dump_level < MIN_DUMP_LEVEL)
-		    || (MAX_DUMP_LEVEL < info->dump_level)) {
-			ERRMSG("Dump_level is invalid.\n");
-			print_usage();
-			goto out;
-		}
-		if ((argc != optind + 2)
-		    || (info->flag_compress && info->flag_elf_dumpfile)) {
+		    || (info->flag_vmlinux && info->flag_read_config)) {
 			ERRMSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;

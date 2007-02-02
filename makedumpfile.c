@@ -307,6 +307,17 @@ print_usage()
 	MSG("      the system under operation(Capture kernel) as the one of dump_mem\n");
 	MSG("      (First-kernel).\n");
 	MSG("\n");
+	MSG("  [-F]:\n");
+	MSG("      Output dump data of flattened format to a standard output for\n");
+	MSG("      transporting dump data by ssh. Both kdump-compressed dumpfile\n");
+	MSG("      (-c/none) and ELF dumpfile(-E) can be transported in flattened format.\n");
+	MSG("      Ex:\n");
+	MSG("      makedumpfile -F -d8 -x vmlinux /proc/vmcore | ssh user@host \"cat > dumpfile.tmp\"\n");
+	MSG("\n");
+	MSG("      Analysis tools(ex. crash) cannot read flattened format directly.\n");
+	MSG("      For analysis, dump data of flattened format should be re-arranged to\n");
+	MSG("      a normal dumpfile(readable by analysis tools) by -R option.\n");
+	MSG("\n");
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile\n");
 	MSG("\n");
@@ -372,7 +383,17 @@ open_dump_file(struct DumpInfo *info)
 {
 	int fd;
 
-	if ((fd = open(info->name_dumpfile, O_RDWR|O_CREAT|O_EXCL,
+	if (info->flag_flatten) {
+		if ((info->name_dumpfile
+		    = (char *)malloc(sizeof(FILENAME_STDOUT))) == NULL) {
+			ERRMSG("Can't allocate memory for the filename. %s\n",
+			    strerror(errno));
+			return FALSE;
+		}
+		fd = STDOUT_FILENO;
+		strcpy(info->name_dumpfile, FILENAME_STDOUT);
+
+	} else if ((fd = open(info->name_dumpfile, O_RDWR|O_CREAT|O_EXCL,
 	    S_IRUSR|S_IWUSR)) < 0) {
 		ERRMSG("Can't open the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
@@ -2038,15 +2059,47 @@ read_cache(struct cache_data *cd)
 }
 
 int
+is_bigendian()
+{
+	int i = 0x12345678;
+
+	if (*(char *)&i == 0x12)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+int
 write_buffer(int fd, off_t offset, void *buf, size_t buf_size,
     char *file_name)
 {
+	struct makedumpfile_data_header fdh;
 	const off_t failed = (off_t)-1;
 
-	if (lseek(fd, offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    file_name, strerror(errno));
-		return FALSE;
+	if (fd == STDOUT_FILENO) {
+		/*
+		 * Output a header of flattened format instead of
+		 * lseek(). For sending dump data to a different
+		 * architecture, change the values to big endian.
+		 */
+		if (is_bigendian()){
+			fdh.offset   = offset;
+			fdh.buf_size = buf_size;
+		} else {
+			fdh.offset   = bswap_64(offset);
+			fdh.buf_size = bswap_64(buf_size);
+		}
+		if (write(fd, &fdh, sizeof(fdh)) != sizeof(fdh)) {
+			ERRMSG("Can't write the dump file(%s). %s\n",
+			    file_name, strerror(errno));
+			return FALSE;
+		}
+	} else {
+		if (lseek(fd, offset, SEEK_SET) == failed) {
+			ERRMSG("Can't seek the dump file(%s). %s\n",
+			    file_name, strerror(errno));
+			return FALSE;
+		}
 	}
 	if (write(fd, buf, buf_size) != buf_size) {
 		ERRMSG("Can't write the dump file(%s). %s\n",
@@ -2817,6 +2870,70 @@ out:
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
 	return num_new_load;
+}
+
+int
+write_start_flat_header(struct DumpInfo *info)
+{
+	char *buf = NULL;
+	struct makedumpfile_header fh;
+
+	int ret = FALSE;
+
+	if (!info->flag_flatten)
+		return FALSE;
+
+	strcpy(fh.signature, MAKEDUMPFILE_SIGNATURE);
+
+	/*
+	 * For sending dump data to a different architecture, change the values
+	 * to big endian.
+	 */
+	if (is_bigendian()){
+		fh.type    = TYPE_FLAT_HEADER;
+		fh.version = VERSION_FLAT_HEADER;
+	} else {
+		fh.type    = bswap_64(TYPE_FLAT_HEADER);
+		fh.version = bswap_64(VERSION_FLAT_HEADER);
+	}
+
+	if ((buf = calloc(1, MAX_SIZE_MDF_HEADER)) == NULL) {
+		ERRMSG("Can't allocate memory for header of flattened format. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	memcpy(buf, &fh, sizeof(fh));
+	if (write(info->fd_dumpfile, buf, MAX_SIZE_MDF_HEADER)
+	    != MAX_SIZE_MDF_HEADER) {
+		ERRMSG("Can't write the dump file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		goto out;
+	}
+	ret = TRUE;
+out:
+	if (buf != NULL)
+		free(buf);
+
+	return ret;
+}
+
+int
+write_end_flat_header(struct DumpInfo *info)
+{
+	struct makedumpfile_data_header fdh;
+
+	if (!info->flag_flatten)
+		return FALSE;
+
+	fdh.offset   = END_FLAG_FLAT_HEADER;
+	fdh.buf_size = END_FLAG_FLAT_HEADER;
+
+	if (write(info->fd_dumpfile, &fdh, sizeof(fdh)) != sizeof(fdh)) {
+		ERRMSG("Can't write the dump file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
 }
 
 int
@@ -3695,6 +3812,9 @@ close_dump_memory(struct DumpInfo *info)
 void
 close_dump_file(struct DumpInfo *info)
 {
+	if (info->flag_flatten)
+		return;
+
 	if ((info->fd_dumpfile = close(info->fd_dumpfile)) < 0)
 		ERRMSG("Can't close the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
@@ -3790,7 +3910,7 @@ main(int argc, char *argv[])
 	}
 	vt = &info->vm_table;
 
-	while ((opt = getopt(argc, argv, "b:cDd:Eg:i:vx:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:cDd:EFg:i:vx:")) != -1) {
 		switch (opt) {
 		case 'b':
 			info->block_order = atoi(optarg);
@@ -3808,6 +3928,9 @@ main(int argc, char *argv[])
 			break;
 		case 'E':
 			info->flag_elf_dumpfile = 1;
+			break;
+		case 'F':
+			info->flag_flatten = 1;
 			break;
 		case 'g':
 			info->flag_generate_config = 1;
@@ -3845,7 +3968,7 @@ main(int argc, char *argv[])
 		}
 		if (info->flag_compress || info->dump_level
 		    || info->flag_elf_dumpfile || info->flag_read_config
-		    || !info->flag_vmlinux) {
+		    || !info->flag_vmlinux || info->flag_flatten) {
 			ERRMSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
@@ -3860,15 +3983,31 @@ main(int argc, char *argv[])
 			print_usage();
 			goto out;
 		}
-		if ((argc != optind + 2)
-		    || (info->flag_compress && info->flag_elf_dumpfile)
+		if ((info->flag_compress && info->flag_elf_dumpfile)
 		    || (info->flag_vmlinux && info->flag_read_config)) {
 			ERRMSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
 		}
-		info->name_memory   = argv[optind];
-		info->name_dumpfile = argv[optind+1];
+		if ((argc == optind + 2) && !info->flag_flatten) {
+			/*
+			 * Parameters for creating the dumpfile from vmcore.
+			 */
+			info->name_memory   = argv[optind];
+			info->name_dumpfile = argv[optind+1];
+
+		} else if ((argc == optind + 1) && info->flag_flatten) {
+			/*
+			 * Parameters for outputting the dump data of the
+			 * flattened format to STDOUT.
+			 */
+			info->name_memory   = argv[optind];
+
+		} else {
+			ERRMSG("Commandline parameter is invalid.\n");
+			print_usage();
+			goto out;
+		}
 	}
 
 	if (elf_version(EV_CURRENT) == EV_NONE ) {
@@ -3900,6 +4039,10 @@ main(int argc, char *argv[])
 		if (!create_dump_bitmap(info))
 			goto out;
 
+		if (info->flag_flatten) {
+			if (!write_start_flat_header(info))
+				goto out;
+		}
 		if (info->flag_elf_dumpfile) {
 			if (!write_elf_header(info))
 				goto out;
@@ -3913,6 +4056,11 @@ main(int argc, char *argv[])
 			if (!write_kdump_bitmap(info))
 				goto out;
 		}
+		if (info->flag_flatten) {
+			if (!write_end_flat_header(info))
+				goto out;
+		}
+
 		if (!close_files_for_creating_dumpfile(info))
 			goto out;
 

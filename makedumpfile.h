@@ -28,6 +28,7 @@
 #include <elfutils/libdw.h>
 #include <libelf.h>
 #include <dwarf.h>
+#include <byteswap.h>
 #include "diskdump_mod.h"
 
 /*
@@ -138,6 +139,7 @@ isAnon(unsigned long mapping)
 #define PFN_BUFBITMAP		(BITPERBYTE*BUFSIZE_BITMAP)
 #define FILENAME_BITMAP		"/tmp/kdump_bitmap.tmp"
 #define FILENAME_3RD_BITMAP	"/tmp/kdump_3rd_bitmap.tmp"
+#define FILENAME_STDOUT		"STDOUT"
 
 /*
  * Minimam vmcore has 2 ProgramHeaderTables(PT_NOTE and PT_LOAD).
@@ -426,6 +428,32 @@ struct cache_data {
 	off_t	offset;
 };
 
+/*
+ * makedumpfile header
+ *   For re-arranging the dump data on different architecture, all the
+ *   variables are defined by 64bits. The size of signature is aligned
+ *   to 64bits, and change the values to big endian.
+ */
+#define MAKEDUMPFILE_SIGNATURE	"makedumpfile"
+#define NUM_SIG_MDF		(sizeof(MAKEDUMPFILE_SIGNATURE) - 1)
+#define SIZE_SIG_MDF		roundup(sizeof(char) * NUM_SIG_MDF, 8)
+#define SIG_LEN_MDF		(SIZE_SIG_MDF / sizeof(char))
+#define MAX_SIZE_MDF_HEADER	(4096) /* max size of makedumpfile_header */
+#define TYPE_FLAT_HEADER	(1)    /* type of flattened format */
+#define VERSION_FLAT_HEADER	(1)    /* current version of flattened format */
+#define END_FLAG_FLAT_HEADER	(-1)
+
+struct makedumpfile_header {
+	char	signature[SIG_LEN_MDF];	/* = "makedumpfile" */
+	int64_t	type;
+	int64_t	version;
+};
+
+struct makedumpfile_data_header {
+	int64_t	offset;
+	int64_t	buf_size;
+};
+
 struct DumpInfo {
 	int		kernel_version;      /* version of first kernel */
 
@@ -442,6 +470,8 @@ struct DumpInfo {
 	int		flag_read_config;    /* flag of reading config file */
 	int		flag_exclude_free;   /* flag of excluding free page */
 	int		flag_show_version;   /* flag of showing version */
+	int		flag_flatten;        /* flag of outputting flattened
+						format to a standard out */
 	long		page_size;           /* size of page */
 	unsigned long long	max_mapnr;   /* number of page descriptor */
 	unsigned long   section_size_bits;

@@ -2038,26 +2038,36 @@ read_cache(struct cache_data *cd)
 }
 
 int
-write_cache(struct cache_data *cd, void *buf, size_t size)
+write_buffer(int fd, off_t offset, void *buf, size_t buf_size,
+    char *file_name)
 {
 	const off_t failed = (off_t)-1;
 
+	if (lseek(fd, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump file(%s). %s\n",
+		    file_name, strerror(errno));
+		return FALSE;
+	}
+	if (write(fd, buf, buf_size) != buf_size) {
+		ERRMSG("Can't write the dump file(%s). %s\n",
+		    file_name, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+write_cache(struct cache_data *cd, void *buf, size_t size)
+{
 	memcpy(cd->buf + cd->buf_size, buf, size);
 	cd->buf_size += size;
 
 	if (cd->buf_size < cd->cache_size)
 		return TRUE;
 
-	if (lseek(cd->fd, cd->offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    cd->file_name, strerror(errno));
+	if (!write_buffer(cd->fd, cd->offset, cd->buf, cd->cache_size,
+	    cd->file_name))
 		return FALSE;
-	}
-	if (write(cd->fd, cd->buf, cd->cache_size) != cd->cache_size) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    cd->file_name, strerror(errno));
-		return FALSE;
-	}
 
 	cd->buf_size -= cd->cache_size;
 	memcpy(cd->buf, cd->buf + cd->cache_size, cd->buf_size);
@@ -2068,21 +2078,13 @@ write_cache(struct cache_data *cd, void *buf, size_t size)
 int
 write_cache_bufsz(struct cache_data *cd)
 {
-	const off_t failed = (off_t)-1;
-
 	if (!cd->buf_size)
 		return TRUE;
 
-	if (lseek(cd->fd, cd->offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    cd->file_name, strerror(errno));
+	if (!write_buffer(cd->fd, cd->offset, cd->buf, cd->buf_size,
+	    cd->file_name))
 		return FALSE;
-	}
-	if (write(cd->fd, cd->buf, cd->buf_size) != cd->buf_size) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    cd->file_name, strerror(errno));
-		return FALSE;
-	}
+
 	cd->offset  += cd->buf_size;
 	cd->buf_size = 0;
 	return TRUE;
@@ -2867,25 +2869,15 @@ write_elf_header(struct DumpInfo *info)
 	/*
 	 * Write a ELF header.
 	 */
-	if (lseek(info->fd_dumpfile, 0, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		goto out;
-	}
 	if (info->flag_elf64) { /* ELF64 */
-		if (write(info->fd_dumpfile, &ehdr64, sizeof(ehdr64))
-		    != sizeof(ehdr64)) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
+		if (!write_buffer(info->fd_dumpfile, 0, &ehdr64, sizeof(ehdr64),
+		    info->name_dumpfile))
 			goto out;
-		}
+
 	} else {                /* ELF32 */
-		if (write(info->fd_dumpfile, &ehdr32, sizeof(ehdr32))
-		    != sizeof(ehdr32)) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
+		if (!write_buffer(info->fd_dumpfile, 0, &ehdr32, sizeof(ehdr32),
+		    info->name_dumpfile))
 			goto out;
-		}
 	}
 
 	/*
@@ -2911,12 +2903,10 @@ write_elf_header(struct DumpInfo *info)
 		note64.p_offset      = offset_note_dumpfile; 
 		size_note            = note64.p_filesz;
 
-		if (write(info->fd_dumpfile, &note64, sizeof(note64))
-		    != sizeof(note64)) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
+		if (!write_buffer(info->fd_dumpfile, sizeof(ehdr64), &note64,
+		    sizeof(note64), info->name_dumpfile))
 			goto out;
-		}
+
 	} else {                /* ELF32 */
 		for (i = 0; i < ehdr32.e_phnum; i++) {
 			if (!get_elf32_phdr(info, i, &note32)) {
@@ -2937,12 +2927,9 @@ write_elf_header(struct DumpInfo *info)
 		note32.p_offset      = offset_note_dumpfile; 
 		size_note            = note32.p_filesz;
 
-		if (write(info->fd_dumpfile, &note32, sizeof(note32))
-		    != sizeof(note32)) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
+		if (!write_buffer(info->fd_dumpfile, sizeof(ehdr32), &note32,
+		    sizeof(note32), info->name_dumpfile))
 			goto out;
-		}
 	}
 
 	/*
@@ -2964,15 +2951,9 @@ write_elf_header(struct DumpInfo *info)
 		    info->name_memory, strerror(errno));
 		goto out;
 	}
-	if (lseek(info->fd_dumpfile, offset_note_dumpfile, SEEK_SET) == failed){
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-	}
-	if (write(info->fd_dumpfile, buf, size_note) != size_note) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
+	if (!write_buffer(info->fd_dumpfile, offset_note_dumpfile, buf,
+	    size_note, info->name_dumpfile))
 		goto out;
-	}
 
 	/*
 	 * Set a offset of PT_LOAD segment.
@@ -2993,7 +2974,6 @@ write_kdump_header(struct DumpInfo *info)
 	size_t size;
 	struct disk_dump_header *dh = info->dump_header;
 	struct kdump_sub_header sub_dump_header;
-	const off_t failed = (off_t)-1;
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
@@ -3009,33 +2989,18 @@ write_kdump_header(struct DumpInfo *info)
 	dh->bitmap_blocks
 	    = divideup(info->len_bitmap, dh->block_size);
 
-	if (lseek(info->fd_dumpfile, 0, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		return FALSE;
-	}
 	size = sizeof(struct disk_dump_header);
-	if (write(info->fd_dumpfile, dh, size) != size) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
+	if (!write_buffer(info->fd_dumpfile, 0, dh, size, info->name_dumpfile))
 		return FALSE;
-	}
 
 	/*
 	 * Write sub header
 	 */
 	sub_dump_header.phys_base = info->phys_base;
-	if (lseek(info->fd_dumpfile, dh->block_size, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		return FALSE;
-	}
 	size = sizeof(struct kdump_sub_header);
-	if (write(info->fd_dumpfile, &sub_dump_header, size) != size) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
+	if (!write_buffer(info->fd_dumpfile, dh->block_size, &sub_dump_header,
+	    size, info->name_dumpfile))
 		return FALSE;
-	}
 
 	info->offset_bitmap1
 	    = (1 + dh->sub_hdr_size) * dh->block_size;
@@ -3667,7 +3632,7 @@ write_kdump_bitmap(struct DumpInfo *info)
 {
 	struct cache_data bm;
 	long buf_size;
-	const off_t failed = (off_t)-1;
+	off_t offset;
 
 	int ret = FALSE;
 
@@ -3684,12 +3649,7 @@ write_kdump_bitmap(struct DumpInfo *info)
 		    strerror(errno));
 		goto out;
 	}
-	if (lseek(info->fd_dumpfile, info->offset_bitmap1, SEEK_SET)
-	    == failed) {
-		ERRMSG("Can't seek the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		goto out;
-	}
+	offset = info->offset_bitmap1;
 	buf_size = info->len_bitmap;
 
 	while (buf_size > 0) {
@@ -3701,12 +3661,11 @@ write_kdump_bitmap(struct DumpInfo *info)
 		if(!read_cache(&bm))
 			goto out;
 
-		if (write(info->fd_dumpfile, bm.buf, bm.cache_size)
-		    != bm.cache_size) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    info->name_dumpfile, strerror(errno));
+		if (!write_buffer(info->fd_dumpfile, offset,
+		    bm.buf, bm.cache_size, info->name_dumpfile))
 			goto out;
-		}
+
+		offset += bm.cache_size;
 		buf_size -= BUFSIZE_BITMAP;
 	}
 	ret = TRUE;

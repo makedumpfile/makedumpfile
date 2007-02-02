@@ -293,6 +293,8 @@ do { \
 #define LONG_MAX	((long)(~0UL>>1))
 #define ULONG_MAX	(~0UL)
 #define ULONGLONG_MAX	(~0ULL)
+#define TIMEOUT_STDIN	(600)
+#define SIZE_BUF_STDIN	(4096)
 
 /*
  * The value of dependence on machine
@@ -472,6 +474,8 @@ struct DumpInfo {
 	int		flag_show_version;   /* flag of showing version */
 	int		flag_flatten;        /* flag of outputting flattened
 						format to a standard out */
+	int		flag_rearrange;      /* flag of creating dumpfile from
+						flattened format */
 	long		page_size;           /* size of page */
 	unsigned long long	max_mapnr;   /* number of page descriptor */
 	unsigned long   section_size_bits;

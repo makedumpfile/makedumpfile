@@ -318,6 +318,13 @@ print_usage()
 	MSG("      For analysis, dump data of flattened format should be re-arranged to\n");
 	MSG("      a normal dumpfile(readable by analysis tools) by -R option.\n");
 	MSG("\n");
+	MSG("  [-R]:\n");
+	MSG("      Re-arrange dump data of flattened format to a normal dumpfile (readable by\n");
+	MSG("      analysis tools) from a standard input.\n");
+	MSG("      Ex:\n");
+	MSG("      makedumpfile -R dumpfile < dumpfile.tmp\n");
+	MSG("      makedumpfile -F -d8 -x vmlinux /proc/vmcore | ssh user@host \"makedumpfile -R dumpfile\"\n");
+	MSG("\n");
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile\n");
 	MSG("\n");
@@ -461,6 +468,19 @@ open_files_for_generating_configfile(struct DumpInfo *info)
 		return FALSE;
 
 	if (!open_config_file(info, "w"))
+		return FALSE;
+
+	return TRUE;
+}
+
+/*
+ * Open the following file when it re-arranges the dump data.
+ * - dump file
+ */
+int
+open_files_for_rearranging_dumpdata(struct DumpInfo *info)
+{
+	if (!open_dump_file(info))
 		return FALSE;
 
 	return TRUE;
@@ -2141,6 +2161,180 @@ write_cache_bufsz(struct cache_data *cd)
 	cd->offset  += cd->buf_size;
 	cd->buf_size = 0;
 	return TRUE;
+}
+
+int
+read_buf_from_stdin(void *buf, int buf_size)
+{
+	int read_size = 0, tmp_read_size = 0;
+	time_t last_time, tm;
+
+	last_time = time(NULL);
+
+	while (read_size != buf_size) {
+
+		tmp_read_size = read(STDIN_FILENO, buf + read_size,
+		    buf_size - read_size); 
+
+		if (tmp_read_size < 0) {
+			ERRMSG("Can't read STDIN. %s\n", strerror(errno));
+			return FALSE;
+
+		} else if (0 == tmp_read_size) {
+			/*
+			 * If it cannot get any data from a standard input
+			 * while long time, break this loop.
+			 */
+			tm = time(NULL);
+			if (TIMEOUT_STDIN < (tm - last_time)) {
+				ERRMSG("Can't get any data from STDIN.\n");
+				return FALSE;
+			}
+		} else {
+			read_size += tmp_read_size;
+			last_time = time(NULL);
+		}
+	}
+	return TRUE;
+}
+
+int
+read_start_flat_header(struct DumpInfo *info)
+{
+	char *buf = NULL;
+	struct makedumpfile_header fh;
+
+	int ret = FALSE;
+
+	if ((buf = malloc(MAX_SIZE_MDF_HEADER)) == NULL) {
+		ERRMSG("Can't allocate memory for buffer of flat header. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Get flat header.
+	 */
+	if (!read_buf_from_stdin(buf, MAX_SIZE_MDF_HEADER)) {
+		ERRMSG("Can't get header of flattened format.\n");
+		goto out;
+	}
+	memcpy(&fh, buf, sizeof(fh));
+
+	if (!is_bigendian()){
+		fh.type    = bswap_64(fh.type);
+		fh.version = bswap_64(fh.version);
+	}
+
+	/*
+	 * Check flat header.
+	 */
+	if (strcmp(fh.signature, MAKEDUMPFILE_SIGNATURE)) {
+		ERRMSG("Can't get signature of flattened format.\n");
+		goto out;
+	}
+	if (fh.type != TYPE_FLAT_HEADER) {
+		ERRMSG("Can't get type of flattened format.\n");
+		goto out;
+	}
+
+	ret = TRUE;
+out:
+	if (buf != NULL)
+		free(buf);
+
+	return ret;
+}
+
+int
+read_flat_data_header(struct makedumpfile_data_header *fdh)
+{
+	if (!read_buf_from_stdin(fdh,
+	    sizeof(struct makedumpfile_data_header))) {
+		ERRMSG("Can't get header of flattened format.\n");
+		return FALSE;
+	}
+	if (!is_bigendian()){
+		fdh->offset   = bswap_64(fdh->offset);
+		fdh->buf_size = bswap_64(fdh->buf_size);
+	}
+	return TRUE;
+}
+
+int
+rearrange_dumpdata(struct DumpInfo *info)
+{
+	int buf_size, read_size, tmp_read_size;
+	char *buf = NULL;
+	struct makedumpfile_data_header fdh;
+
+	int ret = FALSE;
+
+	buf_size = SIZE_BUF_STDIN;
+
+	/*
+	 * Get flat header.
+	 */
+	if (!read_start_flat_header(info)) {
+		ERRMSG("Can't get header of flattened format.\n");
+		goto out;
+	}
+
+	if ((buf = malloc(buf_size)) == NULL) {
+		ERRMSG("Can't allocate memory for buffer of flattend format. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Read the first data header.
+	 */
+	if (!read_flat_data_header(&fdh)) {
+		ERRMSG("Can't get header of flattened format.\n");
+		goto out;
+	}
+
+	do {
+		read_size = 0;
+		while (read_size < fdh.buf_size) {
+			if (buf_size < (fdh.buf_size - read_size))
+				tmp_read_size = buf_size;
+			else
+				tmp_read_size = fdh.buf_size - read_size;
+
+			if (!read_buf_from_stdin(buf, tmp_read_size)) {
+				ERRMSG("Can't get data of flattened format.\n");
+				goto out;
+			}
+			if (!write_buffer(info->fd_dumpfile,
+			    fdh.offset + read_size, buf, tmp_read_size,
+			    info->name_dumpfile))
+				goto out;
+
+			read_size += tmp_read_size;
+		} 
+		/*
+		 * Read the next header.
+		 */
+		if (!read_flat_data_header(&fdh)) {
+			ERRMSG("Can't get data header of flattened format.\n");
+			goto out;
+		}
+
+	} while ((0 <= fdh.offset) && (0 < fdh.buf_size)); 
+
+	if ((fdh.offset != END_FLAG_FLAT_HEADER)
+	    || (fdh.buf_size != END_FLAG_FLAT_HEADER)) {
+		ERRMSG("Can't get valid end header of flattened format.\n");
+		goto out;
+	}
+
+	ret = TRUE;
+out:
+	if (buf != NULL)
+		free(buf);
+
+	return ret;
 }
 
 /*
@@ -3862,6 +4056,18 @@ close_files_for_generating_configfile(struct DumpInfo *info)
 }
 
 /*
+ * Close the following file when it re-arranges the dump data.
+ * - dump file
+ */
+int
+close_files_for_rearranging_dumpdata(struct DumpInfo *info)
+{
+	close_dump_file(info);
+
+	return TRUE;
+}
+
+/*
  * Close the following files when it creates the dump file.
  * - dump mem
  * - dump file
@@ -3910,7 +4116,7 @@ main(int argc, char *argv[])
 	}
 	vt = &info->vm_table;
 
-	while ((opt = getopt(argc, argv, "b:cDd:EFg:i:vx:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:cDd:EFg:i:Rvx:")) != -1) {
 		switch (opt) {
 		case 'b':
 			info->block_order = atoi(optarg);
@@ -3940,6 +4146,9 @@ main(int argc, char *argv[])
 			info->flag_read_config = 1;
 			info->name_configfile = optarg;
 			break;
+		case 'R':
+			info->flag_rearrange = 1;
+			break;
 		case 'v':
 			info->flag_show_version = 1;
 			break;
@@ -3968,7 +4177,8 @@ main(int argc, char *argv[])
 		}
 		if (info->flag_compress || info->dump_level
 		    || info->flag_elf_dumpfile || info->flag_read_config
-		    || !info->flag_vmlinux || info->flag_flatten) {
+		    || !info->flag_vmlinux || info->flag_flatten
+		    || info->flag_rearrange) {
 			ERRMSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
@@ -3989,19 +4199,32 @@ main(int argc, char *argv[])
 			print_usage();
 			goto out;
 		}
-		if ((argc == optind + 2) && !info->flag_flatten) {
+		if ((argc == optind + 2)
+		    && !info->flag_flatten && !info->flag_rearrange) {
 			/*
 			 * Parameters for creating the dumpfile from vmcore.
 			 */
 			info->name_memory   = argv[optind];
 			info->name_dumpfile = argv[optind+1];
 
-		} else if ((argc == optind + 1) && info->flag_flatten) {
+		} else if ((argc == optind + 1)
+		    && info->flag_flatten && !info->flag_rearrange) {
 			/*
 			 * Parameters for outputting the dump data of the
 			 * flattened format to STDOUT.
 			 */
 			info->name_memory   = argv[optind];
+
+		} else if ((argc == optind + 1)
+		    && !info->flag_flatten && info->flag_rearrange
+		    && !info->dump_level   && !info->flag_compress
+		    && !info->flag_vmlinux && !info->flag_read_config
+		    && !info->flag_elf_dumpfile) {
+			/*
+			 * Parameters for creating dumpfile from the dump data
+			 * of flattened format by re-arranging the dump data.
+			 */
+			info->name_dumpfile = argv[optind];
 
 		} else {
 			ERRMSG("Commandline parameter is invalid.\n");
@@ -4029,6 +4252,19 @@ main(int argc, char *argv[])
 
 		MSG("\n");
 		MSG("The configfile is saved to %s.\n", info->name_configfile);
+
+	} else if (info->flag_rearrange) {
+		if (!open_files_for_rearranging_dumpdata(info))
+			goto out;
+
+		if (!rearrange_dumpdata(info))
+			goto out;
+
+		if (!close_files_for_rearranging_dumpdata(info))
+			goto out;
+
+		MSG("\n");
+		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
 	} else {
 		if (!open_files_for_creating_dumpfile(info))
 			goto out;

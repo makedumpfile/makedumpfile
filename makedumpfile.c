@@ -2757,7 +2757,7 @@ create_dump_bitmap(struct DumpInfo *info)
 	int val, not_found_mem_map;
 	unsigned int i, mm, remain_size;
 	unsigned long mem_map;
-	unsigned long long pfn, paddr;
+	unsigned long long pfn, paddr, pfn_mm;
 	unsigned char *page_cache = NULL, *buf = NULL, *pcache;
 	unsigned int _count;
 	unsigned long flags, mapping;
@@ -2907,8 +2907,12 @@ create_dump_bitmap(struct DumpInfo *info)
 			}
 
 			if ((pfn % PGMM_CACHED) == 0) {
+				if (pfn + PGMM_CACHED < mmd->pfn_end)
+					pfn_mm = PGMM_CACHED;
+				else
+					pfn_mm = mmd->pfn_end - pfn;
 				if (!readmem(info, mem_map, page_cache,
-				    SIZE(page) * PGMM_CACHED))
+				    SIZE(page) * pfn_mm))
 					goto out;
 			}
 			pcache  = page_cache + ((pfn%PGMM_CACHED) * SIZE(page));

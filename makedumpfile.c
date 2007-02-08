@@ -989,13 +989,10 @@ get_data_member_location(Dwarf_Die *die)
 }
 
 static int
-get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
+get_die_type(Dwarf *dwarfd, Dwarf_Die *die, Dwarf_Die *die_type)
 {
-	int tag;
 	Dwarf_Attribute attr;
 	Dwarf_Off offset_type, offset_cu;
-	Dwarf_Die die_type;
-	Dwarf_Word upper_bound;
 
 	offset_cu = dwarf_dieoffset(die) - dwarf_cuoffset(die);
 
@@ -1008,11 +1005,25 @@ get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
 	if (dwarf_formref(&attr, &offset_type) < 0)
 		return FALSE;
 
-	if (dwarf_offdie(dwarfd, offset_type + offset_cu, &die_type) == NULL) {
+	if (dwarf_offdie(dwarfd, offset_type + offset_cu, die_type) == NULL) {
 		ERRMSG("Can't get CU die.\n");
 		return FALSE;
 	}
+	return TRUE;
+}
 
+static int
+get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
+{
+	int tag;
+	Dwarf_Attribute attr;
+	Dwarf_Die die_type;
+	Dwarf_Word upper_bound;
+
+	if (!get_die_type(dwarfd, die, &die_type)) {
+		ERRMSG("Can't get CU die of DW_AT_type.\n");
+		return FALSE;
+	}
 	tag = dwarf_tag(&die_type);
 	if (tag != DW_TAG_array_type) {
 		/*
@@ -1044,6 +1055,23 @@ get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
 		return FALSE;
 
 	dwarf_info.array_length = upper_bound + 1;
+
+	return TRUE;
+}
+
+static int
+check_array_type(Dwarf *dwarfd, Dwarf_Die *die)
+{
+	int tag;
+	Dwarf_Die die_type;
+
+	if (!get_die_type(dwarfd, die, &die_type)) {
+		ERRMSG("Can't get CU die of DW_AT_type.\n");
+		return FALSE;
+	}
+	tag = dwarf_tag(&die_type);
+	if (tag == DW_TAG_array_type)
+		dwarf_info.array_length = FOUND_ARRAY_TYPE;
 
 	return TRUE;
 }
@@ -1119,7 +1147,8 @@ is_search_structure(int cmd)
 int
 is_search_symbol(int cmd)
 {
-	if (cmd == DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)
+	if ((cmd == DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)
+	    || (cmd == DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE))
 		return TRUE;
 	else
 		return FALSE;
@@ -1208,6 +1237,9 @@ search_symbol(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	switch (dwarf_info.cmd) {
 	case DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH:
 		get_data_array_length(dwarfd, die);
+		break;
+	case DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE:
+		check_array_type(dwarfd, die);
 		break;
 	}
 }
@@ -1346,16 +1378,21 @@ get_member_offset(char *structname, char *membername, int cmd)
  * Get the length of array.
  */
 long
-get_array_length(char *name01, char *name02, int get_symbol)
+get_array_length(char *name01, char *name02, unsigned int cmd)
 {
-	if (get_symbol) {
-		dwarf_info.cmd = DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH;
+	switch (cmd) {
+	case DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH:
 		dwarf_info.symbol_name = name01;
-	} else {
-		dwarf_info.cmd = DWARF_INFO_GET_MEMBER_ARRAY_LENGTH;
+		break;
+	case DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE:
+		dwarf_info.symbol_name = name01;
+		break;
+	case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
 		dwarf_info.struct_name = name01;
 		dwarf_info.member_name = name02;
+		break;
 	}
+	dwarf_info.cmd           = cmd;
 	dwarf_info.struct_size   = NOT_FOUND_STRUCTURE;
 	dwarf_info.member_offset = NOT_FOUND_STRUCTURE;
 	dwarf_info.array_length  = NOT_FOUND_STRUCTURE;
@@ -1386,7 +1423,7 @@ get_symbol_info(struct DumpInfo *info)
 	SYMBOL_INIT(contig_page_data, "contig_page_data");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
-		SYMBOL_ARRAY_LENGTH_INIT(node_data, "node_data");
+		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
 	if (SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_LENGTH_INIT(pgdat_list, "pgdat_list");
 	if (SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
@@ -2414,16 +2451,11 @@ next_online_pgdat(struct DumpInfo *info, int node)
 
 	/*
 	 * Get the pglist_data structure from symbol "node_data".
+	 *     The array number of symbol "node_data" cannot be gotten
+	 *     from vmlinux. Instead, check it is DW_TAG_array_type.
 	 */
-	if (SYMBOL(node_data) == NOT_FOUND_SYMBOL)
-		goto pgdat2;
-
-	else if ((0 < node)
-	    && (ARRAY_LENGTH(node_data) == NOT_FOUND_STRUCTURE))
-		goto pgdat2;
-
-	else if ((ARRAY_LENGTH(node_data) != NOT_FOUND_STRUCTURE)
-	    && (ARRAY_LENGTH(node_data) < node))
+	if ((SYMBOL(node_data) == NOT_FOUND_SYMBOL)
+	    || (ARRAY_LENGTH(node_data) == NOT_FOUND_STRUCTURE))
 		goto pgdat2;
 
 	if (!readmem(info, SYMBOL(node_data) + (node * sizeof(void *)),

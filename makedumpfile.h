@@ -190,6 +190,7 @@ do { \
 #define NOT_FOUND_STRUCTURE	(-1)
 #define FAILED_DWARFINFO	(-2)
 #define INVALID_STRUCTURE_DATA	(-3)
+#define FOUND_ARRAY_TYPE	(LONG_MAX - 1)
 
 #define SIZE(X)			(size_table.X)
 #define OFFSET(X)		(offset_table.X)
@@ -215,12 +216,17 @@ do { \
 } while (0)
 #define SYMBOL_ARRAY_LENGTH_INIT(X, Y) \
 do { \
-	if ((ARRAY_LENGTH(X) = get_array_length(Y, NULL, TRUE)) == FAILED_DWARFINFO) \
+	if ((ARRAY_LENGTH(X) = get_array_length(Y, NULL, DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)) == FAILED_DWARFINFO) \
+		return FALSE; \
+} while (0)
+#define SYMBOL_ARRAY_TYPE_INIT(X, Y) \
+do { \
+	if ((ARRAY_LENGTH(X) = get_array_length(Y, NULL, DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE)) == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
 #define MEMBER_ARRAY_LENGTH_INIT(X, Y, Z) \
 do { \
-	if ((ARRAY_LENGTH(X) = get_array_length(Y, Z, FALSE)) == FAILED_DWARFINFO) \
+	if ((ARRAY_LENGTH(X) = get_array_length(Y, Z, DWARF_INFO_GET_MEMBER_ARRAY_LENGTH)) == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
 
@@ -621,11 +627,12 @@ extern struct array_table	array_table;
 /*
  * Debugging information
  */
-#define DWARF_INFO_GET_STRUCT_SIZE		1
-#define DWARF_INFO_GET_MEMBER_OFFSET		2
-#define DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET	3
-#define DWARF_INFO_GET_MEMBER_ARRAY_LENGTH	4
-#define DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH	5
+#define DWARF_INFO_GET_STRUCT_SIZE		(1)
+#define DWARF_INFO_GET_MEMBER_OFFSET		(2)
+#define DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET	(3)
+#define DWARF_INFO_GET_MEMBER_ARRAY_LENGTH	(4)
+#define DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH	(5)
+#define DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE	(6)
 
 struct dwarf_info {
 	unsigned int	cmd;		/* IN */

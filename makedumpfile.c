@@ -16,7 +16,7 @@
 
 /*
  * TODO
- * 1. get the memory management information from the symbol "pgdat_list".
+ * 1. (ia64) DISCONTIGMEM support.
  * 2. (i386) fill PT_LOAD headers with appropriate virtual addresses.
  */
 
@@ -1463,6 +1463,10 @@ get_structure_info(struct DumpInfo *info)
 	SIZE_INIT(pglist_data, "pglist_data");
 	OFFSET_INIT(pglist_data.node_zones, "pglist_data", "node_zones");
 	OFFSET_INIT(pglist_data.nr_zones, "pglist_data", "nr_zones");
+	OFFSET_INIT(pglist_data.node_mem_map, "pglist_data", "node_mem_map");
+	OFFSET_INIT(pglist_data.node_start_pfn, "pglist_data","node_start_pfn");
+	OFFSET_INIT(pglist_data.node_spanned_pages, "pglist_data",
+	    "node_spanned_pages");
 
 	/*
 	 * Get offsets of the zone's members.
@@ -1509,6 +1513,12 @@ get_mem_type(struct DumpInfo *info)
 	    || (OFFSET(page._count) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE)) {
 		ret = NOT_FOUND_MEMTYPE;
+	} else if ((SYMBOL(node_data) != NOT_FOUND_SYMBOL)
+	    && (SIZE(pglist_data) != NOT_FOUND_STRUCTURE)
+	    && (OFFSET(pglist_data.node_mem_map) != NOT_FOUND_STRUCTURE)
+	    && (OFFSET(pglist_data.node_start_pfn) != NOT_FOUND_STRUCTURE)
+	    && (OFFSET(pglist_data.node_spanned_pages) !=NOT_FOUND_STRUCTURE)){
+		ret = DISCONTIGMEM;
 	} else if ((SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
 	    && (SIZE(mem_section) != NOT_FOUND_STRUCTURE)
 	    && (OFFSET(mem_section.section_mem_map) != NOT_FOUND_STRUCTURE)
@@ -1609,6 +1619,12 @@ generate_config(struct DumpInfo *info)
 	    mem_section.section_mem_map);
 	WRITE_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
 	WRITE_MEMBER_OFFSET("pglist_data.nr_zones", pglist_data.nr_zones);
+	WRITE_MEMBER_OFFSET("pglist_data.node_mem_map",
+	    pglist_data.node_mem_map);
+	WRITE_MEMBER_OFFSET("pglist_data.node_start_pfn",
+	    pglist_data.node_start_pfn);
+	WRITE_MEMBER_OFFSET("pglist_data.node_spanned_pages",
+	    pglist_data.node_spanned_pages);
 	WRITE_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	WRITE_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	WRITE_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
@@ -1770,6 +1786,11 @@ read_config(struct DumpInfo *info)
 	    mem_section.section_mem_map);
 	READ_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
 	READ_MEMBER_OFFSET("pglist_data.nr_zones", pglist_data.nr_zones);
+	READ_MEMBER_OFFSET("pglist_data.node_mem_map",pglist_data.node_mem_map);
+	READ_MEMBER_OFFSET("pglist_data.node_start_pfn",
+	    pglist_data.node_start_pfn);
+	READ_MEMBER_OFFSET("pglist_data.node_spanned_pages",
+	    pglist_data.node_spanned_pages);
 	READ_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	READ_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	READ_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
@@ -1783,6 +1804,145 @@ read_config(struct DumpInfo *info)
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	return TRUE;
+}
+
+/*
+ * Get the number of online nodes.
+ */
+int
+get_nodes_online(struct DumpInfo *info)
+{
+	int len, i, j, online;
+	unsigned long bitbuf, *maskptr;
+
+	if (SYMBOL(node_online_map) == NOT_FOUND_SYMBOL)
+		return 0;
+	/*
+	 * FIXME
+	 * Size of node_online_map must be dynamically got from debugging
+	 * information each architecture or each config.
+	 */
+	len = SIZEOF_NODE_ONLINE_MAP;
+	if (!(vt->node_online_map = (unsigned long *)malloc(len))) {
+		ERRMSG("Can't allocate memory for the node online map. %s\n",
+		    strerror(errno));
+		return 0;
+	}
+	if (!readmem(info, SYMBOL(node_online_map), vt->node_online_map, len)) {
+		ERRMSG("Can't get the node online map.\n");
+		return 0;
+	}
+	vt->node_online_map_len = len/sizeof(unsigned long);
+	online = 0;
+	maskptr = (unsigned long *)vt->node_online_map;
+	for (i = 0; i < vt->node_online_map_len; i++, maskptr++) {
+		bitbuf = *maskptr;
+		for (j = 0; j < sizeof(bitbuf) * 8; j++) {
+			online += bitbuf & 1;
+			bitbuf = bitbuf >> 1;
+		}
+	}
+	return online;
+}
+
+int
+get_numnodes(struct DumpInfo *info)
+{
+	if (!(vt->numnodes = get_nodes_online(info))) {
+		vt->numnodes = 1;
+	}
+	if (info->flag_debug) {
+		MSG("\n");
+		MSG("num of NODEs : %d\n", vt->numnodes);
+		MSG("\n");
+	}
+	return TRUE;
+}
+
+int
+next_online_node(int first)
+{
+	int i, j, node;
+	unsigned long mask, *maskptr;
+
+	/* It cannot occur */
+	if ((first/(sizeof(unsigned long) * 8)) >= vt->node_online_map_len) {
+		ERRMSG("next_online_node: %d is too large!\n", first);
+		return -1;
+	}
+
+	maskptr = (unsigned long *)vt->node_online_map;
+	for (i = node = 0; i <  vt->node_online_map_len; i++, maskptr++) {
+		mask = *maskptr;
+		for (j = 0; j < (sizeof(unsigned long) * 8); j++, node++) {
+			if (mask & 1) {
+				if (node >= first)
+					return node;
+			}
+			mask >>= 1;
+		}
+	}
+	return -1;
+}
+
+unsigned long
+next_online_pgdat(struct DumpInfo *info, int node)
+{
+	unsigned long pgdat;
+
+	/*
+	 * Get the pglist_data structure from symbol "node_data".
+	 *     The array number of symbol "node_data" cannot be gotten
+	 *     from vmlinux. Instead, check it is DW_TAG_array_type.
+	 */
+	if ((SYMBOL(node_data) == NOT_FOUND_SYMBOL)
+	    || (ARRAY_LENGTH(node_data) == NOT_FOUND_STRUCTURE))
+		goto pgdat2;
+
+	if (!readmem(info, SYMBOL(node_data) + (node * sizeof(void *)),
+	    &pgdat, sizeof pgdat))
+		goto pgdat2;
+
+	if (!is_kvaddr(pgdat))
+		goto pgdat2;
+
+	return pgdat;
+
+pgdat2:
+	/*
+	 * Get the pglist_data structure from symbol "pgdat_list".
+	 */
+	if (SYMBOL(pgdat_list) == NOT_FOUND_SYMBOL)
+		goto pgdat3;
+
+	else if ((0 < node)
+	    && (ARRAY_LENGTH(pgdat_list) == NOT_FOUND_STRUCTURE))
+		goto pgdat3;
+
+	else if ((ARRAY_LENGTH(pgdat_list) != NOT_FOUND_STRUCTURE)
+	    && (ARRAY_LENGTH(pgdat_list) < node))
+		goto pgdat3;
+
+	if (!readmem(info, SYMBOL(pgdat_list) + (node * sizeof(void *)),
+	    &pgdat, sizeof pgdat))
+		goto pgdat3;
+
+	if (!is_kvaddr(pgdat))
+		goto pgdat3;
+
+	return pgdat;
+
+pgdat3:
+	/*
+	 * Get the pglist_data structure from symbol "contig_page_data".
+	 */
+	if (SYMBOL(contig_page_data) == NOT_FOUND_SYMBOL)
+		return FALSE;
+
+	if (node != 0)
+		return FALSE;
+
+	return SYMBOL(contig_page_data);
 }
 
 void
@@ -1827,6 +1987,68 @@ get_mm_flatmem(struct DumpInfo *info)
 	}
 	dump_mem_map(info, 0, info->max_mapnr, mem_map, 0);
 
+	return TRUE;
+}
+
+int
+get_mm_discontigmem(struct DumpInfo *info)
+{
+	int num_nodes, node;
+	unsigned long pgdat, mem_map, pfn_start, pfn_end, node_spanned_pages;
+
+	info->num_mem_map = vt->numnodes;
+
+	if ((info->mem_map_data = (struct mem_map_data *)
+	    malloc(sizeof(struct mem_map_data)*info->num_mem_map)) == NULL) {
+		ERRMSG("Can't allocate memory for the mem_map_data. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Get the first node_id.
+	 */
+	if ((node = next_online_node(0)) < 0) {
+		ERRMSG("Can't get next online node.\n");
+		return FALSE;
+	}
+	if (!(pgdat = next_online_pgdat(info, node))) {
+		ERRMSG("Can't get pgdat list.\n");
+		return FALSE;
+	}
+	for (num_nodes = 1; num_nodes <= vt->numnodes; num_nodes++) {
+		if (!readmem(info, pgdat + OFFSET(pglist_data.node_mem_map),
+		    &mem_map, sizeof mem_map)) {
+			ERRMSG("Can't get mem_map.\n");
+			return FALSE;
+		}
+		if (!readmem(info, pgdat + OFFSET(pglist_data.node_start_pfn),
+		    &pfn_start, sizeof pfn_start)) {
+			ERRMSG("Can't get node_start_pfn.\n");
+			return FALSE;
+		}
+		if (!readmem(info,pgdat+OFFSET(pglist_data.node_spanned_pages),
+		    &node_spanned_pages, sizeof node_spanned_pages)) {
+			ERRMSG("Can't get node_spanned_pages.\n");
+			return FALSE;
+		}
+		pfn_end = pfn_start + node_spanned_pages;
+		dump_mem_map(info, pfn_start, pfn_end, mem_map, num_nodes - 1);
+
+		/*
+		 * Get pglist_data of the next node.
+		 */
+		if (num_nodes < vt->numnodes) {
+			if ((node = next_online_node(node + 1)) < 0) {
+				ERRMSG("Can't get next online node.\n");
+				return FALSE;
+			} else if (!(pgdat = next_online_pgdat(info, node))) {
+				ERRMSG("Can't determine pgdat list (node %d).\n",
+				    node);
+				return FALSE;
+			}
+		}
+	}
 	return TRUE;
 }
 
@@ -1980,6 +2202,14 @@ get_mem_map(struct DumpInfo *info)
 		}
 		ret = get_mm_sparsemem(info);
 		break;
+	case DISCONTIGMEM:
+		if (info->flag_debug) {
+			MSG("\n");
+			MSG("Memory type  : DISCONTIGMEM\n");
+			MSG("\n");
+		}
+		ret = get_mm_discontigmem(info);
+		break;
 	case FLATMEM:
 		if (info->flag_debug) {
 			MSG("\n");
@@ -2031,6 +2261,9 @@ initial(struct DumpInfo *info)
 		return FALSE;
 
 	if (!get_machdep_info(info))
+		return FALSE;
+
+	if (!get_numnodes(info))
 		return FALSE;
 
 	if (!get_mem_map(info))
@@ -2379,131 +2612,6 @@ out:
 	return ret;
 }
 
-/*
- * Get the number of online nodes.
- */
-int
-get_nodes_online(struct DumpInfo *info)
-{
-	int len, i, j, online;
-	unsigned long bitbuf, *maskptr;
-
-	if (SYMBOL(node_online_map) == NOT_FOUND_SYMBOL)
-		return 0;
-	/*
-	 * FIXME
-	 * Size of node_online_map must be dynamically got from debugging
-	 * information each architecture or each config.
-	 */
-	len = SIZEOF_NODE_ONLINE_MAP;
-	if (!(vt->node_online_map = (unsigned long *)malloc(len))) {
-		ERRMSG("Can't allocate memory for the node online map. %s\n",
-		    strerror(errno));
-		return 0;
-	}
-	if (!readmem(info, SYMBOL(node_online_map), vt->node_online_map, len)) {
-		ERRMSG("Can't get the node online map.\n");
-		return 0;
-	}
-	vt->node_online_map_len = len/sizeof(unsigned long);
-	online = 0;
-	maskptr = (unsigned long *)vt->node_online_map;
-	for (i = 0; i < vt->node_online_map_len; i++, maskptr++) {
-		bitbuf = *maskptr;
-		for (j = 0; j < sizeof(bitbuf) * 8; j++) {
-			online += bitbuf & 1;
-			bitbuf = bitbuf >> 1;
-		}
-	}
-	return online;
-}
-
-int
-next_online_node(first)
-{
-	int i, j, node;
-	unsigned long mask, *maskptr;
-
-	/* It cannot occur */
-	if ((first/(sizeof(unsigned long) * 8)) >= vt->node_online_map_len) {
-		ERRMSG("next_online_node: %d is too large!\n", first);
-		return -1;
-	}
-
-	maskptr = (unsigned long *)vt->node_online_map;
-	for (i = node = 0; i <  vt->node_online_map_len; i++, maskptr++) {
-		mask = *maskptr;
-		for (j = 0; j < (sizeof(unsigned long) * 8); j++, node++) {
-			if (mask & 1) {
-				if (node >= first)
-					return node;
-			}
-			mask >>= 1;
-		}
-	}
-	return -1;
-}
-
-unsigned long
-next_online_pgdat(struct DumpInfo *info, int node)
-{
-	unsigned long pgdat;
-
-	/*
-	 * Get the pglist_data structure from symbol "node_data".
-	 *     The array number of symbol "node_data" cannot be gotten
-	 *     from vmlinux. Instead, check it is DW_TAG_array_type.
-	 */
-	if ((SYMBOL(node_data) == NOT_FOUND_SYMBOL)
-	    || (ARRAY_LENGTH(node_data) == NOT_FOUND_STRUCTURE))
-		goto pgdat2;
-
-	if (!readmem(info, SYMBOL(node_data) + (node * sizeof(void *)),
-	    &pgdat, sizeof pgdat))
-		goto pgdat2;
-
-	if (!is_kvaddr(pgdat))
-		goto pgdat2;
-
-	return pgdat;
-
-pgdat2:
-	/*
-	 * Get the pglist_data structure from symbol "pgdat_list".
-	 */
-	if (SYMBOL(pgdat_list) == NOT_FOUND_SYMBOL)
-		goto pgdat3;
-
-	else if ((0 < node)
-	    && (ARRAY_LENGTH(pgdat_list) == NOT_FOUND_STRUCTURE))
-		goto pgdat3;
-
-	else if ((ARRAY_LENGTH(pgdat_list) != NOT_FOUND_STRUCTURE)
-	    && (ARRAY_LENGTH(pgdat_list) < node))
-		goto pgdat3;
-
-	if (!readmem(info, SYMBOL(pgdat_list) + (node * sizeof(void *)),
-	    &pgdat, sizeof pgdat))
-		goto pgdat3;
-
-	if (!is_kvaddr(pgdat))
-		goto pgdat3;
-
-	return pgdat;
-
-pgdat3:
-	/*
-	 * Get the pglist_data structure from symbol "contig_page_data".
-	 */
-	if (SYMBOL(contig_page_data) == NOT_FOUND_SYMBOL)
-		return FALSE;
-
-	if (node != 0)
-		return FALSE;
-
-	return SYMBOL(contig_page_data);
-}
-
 unsigned long long
 page_to_pfn(struct DumpInfo *info, unsigned long page)
 {
@@ -2685,15 +2793,6 @@ dump_memory_nodes(struct DumpInfo *info)
 int
 _exclude_free_page(struct DumpInfo *info)
 {
-	if (!(vt->numnodes = get_nodes_online(info)))
-		vt->numnodes = 1;
-
-	if (info->flag_debug) {
-		MSG("\n");
-		MSG("num of NODEs : %d\n", vt->numnodes);
-		MSG("\n");
-	}
-
 	if (!dump_memory_nodes(info))
 		return FALSE;
 

@@ -47,6 +47,7 @@ enum {
 	NOT_FOUND_MEMTYPE,
 	SPARSEMEM,
 	SPARSEMEM_EX,
+	DISCONTIGMEM,
 	FLATMEM
 };
 
@@ -590,6 +591,9 @@ struct offset_table {
 	struct pglist_data {
 		long	node_zones;
 		long	nr_zones;
+		long	node_mem_map;
+		long	node_start_pfn;
+		long	node_spanned_pages;
 	} pglist_data;
 	struct free_area {
 		long	free_list;

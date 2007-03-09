@@ -279,6 +279,8 @@ do { \
 #define VERSION_2_6_17		(17)
 #define VERSION_2_6_18		(18)
 #define VERSION_2_6_19		(19)
+#define LATEST_VERSION		VERSION_2_6_19
+#define STR_LATEST_VERSION	"linux-2.6.19"
 
 /*
  * field name of config file

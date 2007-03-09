@@ -140,6 +140,14 @@ readmem(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
 int
 get_kernel_version(char *release)
 {
+	/*
+	 * This method checks that vmlinux and vmcore are same kernel version.
+	 */
+	if (strncmp(release, "2.6.", strlen("2.6."))) {
+		ERRMSG("The kernel version is not supported.\n");
+		return FALSE;
+	}
+
 	if (!strncmp(release, "2.6.15", strlen("2.6.15"))) {
 		return VERSION_2_6_15;
 	} else if (!strncmp(release, "2.6.16", strlen("2.6.16"))) {
@@ -151,7 +159,11 @@ get_kernel_version(char *release)
 	} else if (!strncmp(release, "2.6.19", strlen("2.6.19"))) {
 		return VERSION_2_6_19;
 	} else {
-		return FALSE;
+		ERRMSG("The kernel version is not supported.\n");
+		ERRMSG("makedumpfile considers %s as the kernel version.\n",
+		    STR_LATEST_VERSION);
+		ERRMSG("The created dumpfile may be incomplete.\n");
+		return LATEST_VERSION;
 	}
 }
 
@@ -200,11 +212,8 @@ check_release(struct DumpInfo *info)
 
 	info->kernel_version = get_kernel_version(system_utsname.release);
 	if (info->kernel_version == FALSE) {
-		if (info->flag_read_config)
-			ERRMSG("%s and %s don't match, or the kernel version is not supported.\n",
-			    info->name_configfile, info->name_memory);
-		else
-			ERRMSG("%s and %s don't match, or the kernel version is not supported.\n",
+		if (!info->flag_read_config)
+			ERRMSG("Or %s and %s don't match.\n",
 			    dwarf_info.vmlinux_name, info->name_memory);
 		return FALSE;
 	}
@@ -1549,10 +1558,8 @@ generate_config(struct DumpInfo *info)
 		ERRMSG("Can't get the size of page.\n");
 		return FALSE;
 	}
-	if (!(info->kernel_version = get_kernel_version(utsname_buf.release))) {
-		ERRMSG("The kernel version is not supported.\n");
+	if (!(info->kernel_version = get_kernel_version(utsname_buf.release)))
 		return FALSE;
-	}
 
 	if (!get_symbol_info(info))
 		return FALSE;

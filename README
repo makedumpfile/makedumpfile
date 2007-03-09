@@ -1,0 +1,50 @@
+
+======================
+ makdumpfile's README
+======================
+
+* BUILD & INSTALL
+  1.Get the latest makedumpfile from the following site:
+    https://sourceforge.net/projects/makedumpfile/
+  2.Uncompress the tar file:
+    # tar -zxvf makedumpfile-x.y.z.tar.gz
+  3.Enter the makedumpfile subdirectory:
+    # cd makedumpfile
+  4.Build, and install:
+    # make; make install
+
+* SUPPORTED KERNELS
+  makedumpfile (version 1.1.2) supports the following kernels.
+
+         |      FLATMEM      |   DISCONTIGMEM    |     SPARSEMEM
+         |-------------------+-------------------+-------------------
+   Kernel|    | x86|    | PPC|    | x86|    | PPC|    | x86|    | PPC
+  Version| x86| _64|ia64|  64| x86| _64|ia64|  64| x86| _64|ia64|  64
+  -------+----+----+----+----+----+----+----+----+----+----+----+----
+  2.6.15 | OK | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | --
+  2.6.16 | OK | OK | -- |    | -- | OK | -- | -- | -- |    | -- |
+  2.6.17 | OK | OK | -- |    | -- | OK | -- | -- | -- | OK | -- |
+  2.6.18 | OK | OK | -- | OK | -- | OK |TODO| -- | -- | OK | OK | OK
+  2.6.19 |TODO| OK | -- | OK | OK | OK |TODO| -- | OK | OK | OK | OK
+  2.6.20 |TODO| OK | -- | KP |TODO| OK |TODO| -- |TODO| OK | OK | KP
+
+  OK    : Support.
+  --    : Not support.
+  Empty : Not test yet.
+  TODO  : TODO.
+  KP    : Both kexec/kdump does not work with PPC64 2.6.20 kernels. This is a
+          known problem and a patch is being worked out.
+
+* USAGE
+  Please see "man makedumpfile" or "makedumpfile -h".
+
+* REFERENCES
+  https://sourceforge.net/projects/makedumpfile/
+  http://lists.osdl.org/pipermail/fastboot/
+
+* BUG REPORT
+  If finding some bugs, please send the information to the following:
+  Ken'ichi Ohmichi <oomichi@mxs.nes.nec.co.jp>
+  Masaki Tachibana <tachibana@mxm.nes.nec.co.jp>
+  Fastboot-ml <fastboot@lists.osdl.org>
+

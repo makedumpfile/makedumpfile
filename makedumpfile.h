@@ -481,6 +481,7 @@ struct DumpInfo {
 	int		flag_generate_config;/* flag of generating config file */
 	int		flag_read_config;    /* flag of reading config file */
 	int		flag_exclude_free;   /* flag of excluding free page */
+	int		flag_show_usage;     /* flag of showing usage */
 	int		flag_show_version;   /* flag of showing version */
 	int		flag_flatten;        /* flag of outputting flattened
 						format to a standard out */

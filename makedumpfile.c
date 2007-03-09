@@ -824,12 +824,12 @@ get_symbol_addr(struct DumpInfo *info, char *symname)
 	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the kernel file(%s). %s\n",
 		    dwarf_info.vmlinux_name, strerror(errno));
-		return FALSE;
+		return NOT_FOUND_SYMBOL;
 	}
 	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
 		    dwarf_info.vmlinux_name);
-		return FALSE;
+		return NOT_FOUND_SYMBOL;
 	}
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
 		if (gelf_getshdr(scn, &shdr) == NULL) {
@@ -890,12 +890,12 @@ get_next_symbol_addr(struct DumpInfo *info, char *symname)
 	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the kernel file(%s). %s\n",
 		    dwarf_info.vmlinux_name, strerror(errno));
-		return FALSE;
+		return NOT_FOUND_SYMBOL;
 	}
 	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
 		    dwarf_info.vmlinux_name);
-		return FALSE;
+		return NOT_FOUND_SYMBOL;
 	}
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
 		if (gelf_getshdr(scn, &shdr) == NULL) {

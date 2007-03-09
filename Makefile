@@ -33,9 +33,11 @@ makedumpfile: $(SRC) $(OBJ_ARCH)
 	$(CC) $(CFLAGS) $(OBJ_ARCH) -o $@ $< -static -ldw -lelf -lz
 
 clean:
-	rm -f $(OBJ) $(OBJ_ARCH) makedumpfile
+	rm -f $(OBJ) $(OBJ_ARCH) makedumpfile makedumpfile.8.gz
 
 install:
+	zip ./makedumpfile.8.gz ./makedumpfile.8
 	cp ./makedumpfile /bin
 	cp ./makedumpfile-R.pl /bin
+	cp ./makedumpfile.8.gz /usr/share/man/man8
 

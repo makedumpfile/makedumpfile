@@ -33,7 +33,7 @@ makedumpfile: $(SRC) $(OBJ_ARCH)
 	$(CC) $(CFLAGS) $(OBJ_ARCH) -o $@ $< -static -ldw -lelf -lz
 
 clean:
-	rm $(OBJ) $(OBJ_ARCH) makedumpfile
+	rm -f $(OBJ) $(OBJ_ARCH) makedumpfile
 
 install:
 	cp ./makedumpfile /bin

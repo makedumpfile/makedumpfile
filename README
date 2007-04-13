@@ -14,7 +14,7 @@
     # make; make install
 
 * SUPPORTED KERNELS
-  makedumpfile (version 1.1.2) supports the following kernels.
+  makedumpfile (version 1.1.3) supports the following kernels.
 
          |      FLATMEM      |   DISCONTIGMEM    |     SPARSEMEM
          |-------------------+-------------------+-------------------
@@ -25,15 +25,16 @@
   2.6.16 | OK | OK | -- |    | -- | OK | -- | -- | -- |    | -- |
   2.6.17 | OK | OK | -- |    | -- | OK | -- | -- | -- | OK | -- |
   2.6.18 | OK | OK | -- | OK | -- | OK |TODO| -- | -- | OK | OK | OK
-  2.6.19 |TODO| OK | -- | OK | OK | OK |TODO| -- | OK | OK | OK | OK
-  2.6.20 |TODO| OK | -- | KP |TODO| OK |TODO| -- |TODO| OK | OK | KP
+  2.6.19 | OK | OK | -- | OK | OK | OK |TODO| -- | OK | OK | OK | OK
+  2.6.20 | OK | OK | -- | KP | OK | OK |TODO| -- | OK | OK | OK | KP
+  21-rc5 | OK | OK | -- | OK | OK | OK |TODO| -- | OK | OK | OK | OK
 
   OK    : Support.
   --    : Not support.
   Empty : Not test yet.
   TODO  : TODO.
-  KP    : Both kexec/kdump does not work with PPC64 2.6.20 kernels. This is a
-          known problem and a patch is being worked out.
+  KP    : Both kexec/kdump does not work with PPC64 2.6.20 kernels. 
+          This is a known problem fixed with later kernels.
 
 * USAGE
   Please see "man makedumpfile" or "makedumpfile -h".

@@ -158,6 +158,10 @@ get_kernel_version(char *release)
 		return VERSION_2_6_18;
 	} else if (!strncmp(release, "2.6.19", strlen("2.6.19"))) {
 		return VERSION_2_6_19;
+	} else if (!strncmp(release, "2.6.20", strlen("2.6.20"))) {
+		return VERSION_2_6_20;
+	} else if (!strncmp(release, "2.6.21", strlen("2.6.21"))) {
+		return VERSION_2_6_21;
 	} else {
 		ERRMSG("The kernel version is not supported.\n");
 		ERRMSG("makedumpfile considers %s as the kernel version.\n",
@@ -1418,6 +1422,7 @@ get_structure_info(struct DumpInfo *info)
 	SIZE_INIT(zone, "zone");
 	OFFSET_INIT(zone.free_pages, "zone", "free_pages");
 	OFFSET_INIT(zone.free_area, "zone", "free_area");
+	OFFSET_INIT(zone.vm_stat, "zone", "vm_stat");
 	OFFSET_INIT(zone.spanned_pages, "zone", "spanned_pages");
 	MEMBER_ARRAY_LENGTH_INIT(zone.free_area, "zone", "free_area");
 
@@ -1569,6 +1574,7 @@ generate_config(struct DumpInfo *info)
 	    pglist_data.node_spanned_pages);
 	WRITE_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	WRITE_MEMBER_OFFSET("zone.free_area", zone.free_area);
+	WRITE_MEMBER_OFFSET("zone.vm_stat", zone.vm_stat);
 	WRITE_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
 	WRITE_MEMBER_OFFSET("free_area.free_list", free_area.free_list);
 	WRITE_MEMBER_OFFSET("list_head.next", list_head.next);
@@ -1735,6 +1741,7 @@ read_config(struct DumpInfo *info)
 	    pglist_data.node_spanned_pages);
 	READ_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	READ_MEMBER_OFFSET("zone.free_area", zone.free_area);
+	READ_MEMBER_OFFSET("zone.vm_stat", zone.vm_stat);
 	READ_MEMBER_OFFSET("zone.spanned_pages", zone.spanned_pages);
 	READ_MEMBER_OFFSET("free_area.free_list", free_area.free_list);
 	READ_MEMBER_OFFSET("list_head.next", list_head.next);
@@ -2615,7 +2622,8 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 {
 
 	int order, free_page_cnt = 0, i;
-	unsigned long curr, previous, head, curr_page, curr_prev, free_pages;
+	unsigned long curr, previous, head, curr_page, curr_prev;
+	unsigned long free_pages = 0;
 	unsigned long long pfn, start_pfn;
 
 	for (order = (ARRAY_LENGTH(zone.free_area) - 1); order >= 0; --order) {
@@ -2661,10 +2669,23 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 	/*
 	 * Check the number of free pages.
 	 */
-	if (!readmem(info, node_zones + OFFSET(zone.free_pages), &free_pages,
-	    sizeof free_pages)) {
-		ERRMSG("Can't get free_pages.\n");
-		return FALSE;
+	if (OFFSET(zone.free_pages) != NOT_FOUND_STRUCTURE) {
+		if (!readmem(info, node_zones + OFFSET(zone.free_pages), 
+		    &free_pages, sizeof free_pages)) {
+			ERRMSG("Can't get free_pages.\n");
+			return FALSE;
+		}
+	} else if (OFFSET(zone.vm_stat) != NOT_FOUND_STRUCTURE) {
+		/*
+		 * FIXME
+		 * This code expects the NR_FREE_PAGES of zone_stat_item is 0.
+		 * The NR_FREE_PAGES should be checked. 
+		 */
+		if (!readmem(info, node_zones + OFFSET(zone.vm_stat), 
+		    &free_pages, sizeof free_pages)) {
+			ERRMSG("Can't get free_pages.\n");
+			return FALSE;
+		}
 	}
 	if (free_pages != free_page_cnt) {
 		ERRMSG("The number of free_pages is invalid.\n");
@@ -2746,7 +2767,8 @@ exclude_free_page(struct DumpInfo *info, struct cache_data *bm2)
 		return FALSE;
 	}
 	if ((SIZE(zone) == NOT_FOUND_STRUCTURE)
-	    || (OFFSET(zone.free_pages) == NOT_FOUND_STRUCTURE)
+	    || ((OFFSET(zone.free_pages) == NOT_FOUND_STRUCTURE)
+	        && (OFFSET(zone.vm_stat) == NOT_FOUND_STRUCTURE))
 	    || (OFFSET(zone.free_area) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(zone.spanned_pages) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(pglist_data.node_zones) == NOT_FOUND_STRUCTURE)

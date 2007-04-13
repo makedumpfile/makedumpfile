@@ -275,8 +275,10 @@ do { \
 #define VERSION_2_6_17		(17)
 #define VERSION_2_6_18		(18)
 #define VERSION_2_6_19		(19)
-#define LATEST_VERSION		VERSION_2_6_19
-#define STR_LATEST_VERSION	"linux-2.6.19"
+#define VERSION_2_6_20		(20)
+#define VERSION_2_6_21		(21)
+#define LATEST_VERSION		VERSION_2_6_21
+#define STR_LATEST_VERSION	"linux-2.6.21"
 
 /*
  * field name of config file
@@ -582,6 +584,7 @@ struct offset_table {
 	struct zone {
 		long	free_pages;
 		long	free_area;
+		long	vm_stat;
 		long	spanned_pages;
 	} zone;
 	struct pglist_data {

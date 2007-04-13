@@ -74,10 +74,7 @@ test_bit(int nr, unsigned long addr)
 }
 
 #define isLRU(flags)		test_bit(PG_lru, flags)
-#define isReserved(flags)	test_bit(PG_reserved, flags)
 #define isPrivate(flags)	test_bit(PG_private, flags)
-#define isNosave(flags)		test_bit(PG_nosave, flags)
-#define isCompound(flags)	test_bit(PG_compound, flags)
 #define isSwapCache(flags)	test_bit(PG_swapcache, flags)
 
 static inline int

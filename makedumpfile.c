@@ -2974,12 +2974,20 @@ create_dump_bitmap(struct DumpInfo *info)
 			 */
 			set_bitmap(bm1.buf, pfn%PFN_BUFBITMAP, val);
 
+			if (val == 0) {
+				/*
+				 * If the bit of 1st-bitmap is 0,
+				 * also 2nd-bitmap's must be 0.
+				 */
+				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, val);
+				continue;
+			}
+
 			/*
 			 * Exclude the page filled with zero in case of creating
 			 * the elf dumpfile.
 			 */
 			if (info->flag_elf_dumpfile
-			    && (val != 0)
 			    && (info->dump_level & DL_EXCLUDE_ZERO)) {
 				offset_page = paddr_to_offset(info, paddr);
 				if (!offset_page) {

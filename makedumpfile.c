@@ -3338,6 +3338,7 @@ write_kdump_header(struct DumpInfo *info)
 	 * Write common header
 	 */
 	strcpy(dh->signature, KDUMP_SIGNATURE);
+	dh->header_version = 1;
 	dh->block_size   = info->page_size;
 	dh->sub_hdr_size = 1;
 	dh->max_mapnr    = info->max_mapnr;
@@ -3352,7 +3353,8 @@ write_kdump_header(struct DumpInfo *info)
 	/*
 	 * Write sub header
 	 */
-	sub_dump_header.phys_base = info->phys_base;
+	sub_dump_header.phys_base  = info->phys_base;
+	sub_dump_header.dump_level = info->dump_level;
 	size = sizeof(struct kdump_sub_header);
 	if (!write_buffer(info->fd_dumpfile, dh->block_size, &sub_dump_header,
 	    size, info->name_dumpfile))
@@ -3744,10 +3746,9 @@ out:
 int
 write_kdump_pages(struct DumpInfo *info)
 {
-	unsigned int flag_change_bitmap = 0;
  	unsigned long long pfn, per, num_dumpable = 0, num_dumped = 0;
 	unsigned long size_out;
-	struct page_desc pd;
+	struct page_desc pd, pd_zero;
 	off_t offset_data = 0, offset_memory = 0;
 	struct disk_dump_header *dh = info->dump_header;
 	unsigned char *buf = NULL, *buf_out = NULL;
@@ -3858,23 +3859,29 @@ write_kdump_pages(struct DumpInfo *info)
 		goto out;
 	}
 
+	/*
+	 * Write the data of zero-filled page.
+	 */
+	if (info->dump_level & DL_EXCLUDE_ZERO) {
+		pd_zero.size = info->page_size;
+		pd_zero.flags = 0;
+		pd_zero.offset = offset_data;
+		pd_zero.page_flags = 0;
+		memset(buf, 0, pd_zero.size);
+		if (!write_cache(&pdata, buf, pd_zero.size))
+			goto out;
+		offset_data  += pd_zero.size;
+	}
 	for (pfn = 0; pfn < info->max_mapnr; pfn++) {
 
 		if ((num_dumped % per) == 0)
 			print_progress(num_dumped, num_dumpable);
 
 		if ((pfn % PFN_BUFBITMAP) == 0) {
-			if (flag_change_bitmap) {
-				bm2.buf_size = BUFSIZE_BITMAP;
-				bm2.offset  -= BUFSIZE_BITMAP;
-				if (!write_cache_bufsz(&bm2))
-					goto out;
-			}
 			if (info->len_bitmap - bm2.offset < BUFSIZE_BITMAP)
 				bm2.cache_size = info->len_bitmap - bm2.offset;
 			if (!read_cache(&bm2))
 				goto out;
-			flag_change_bitmap = 0;
 		}
 
 		/*
@@ -3909,8 +3916,8 @@ write_kdump_pages(struct DumpInfo *info)
 		 */
 		if ((info->dump_level & DL_EXCLUDE_ZERO)
 		    && is_zero_page(buf, info->page_size)) {
-			set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 0);
-			flag_change_bitmap = 1;
+			if (!write_cache(&pdesc, &pd_zero, sizeof(page_desc_t)))
+				goto out;
 			continue;
 		}
 		/*
@@ -3952,12 +3959,7 @@ write_kdump_pages(struct DumpInfo *info)
 		goto out;
 	if (!write_cache_bufsz(&pdesc))
 		goto out;
-	if (flag_change_bitmap) {
-		bm2.buf_size = BUFSIZE_BITMAP;
-		bm2.offset  -= BUFSIZE_BITMAP;
-		if (!write_cache_bufsz(&bm2))
-			goto out;
-	}
+
 	/*
 	 * Print the progress of the end.
 	 */

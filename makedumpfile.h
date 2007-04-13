@@ -136,7 +136,6 @@ isAnon(unsigned long mapping)
 #define BUFSIZE_BITMAP		(4096)
 #define PFN_BUFBITMAP		(BITPERBYTE*BUFSIZE_BITMAP)
 #define FILENAME_BITMAP		"/tmp/kdump_bitmap.tmp"
-#define FILENAME_3RD_BITMAP	"/tmp/kdump_3rd_bitmap.tmp"
 #define FILENAME_STDOUT		"STDOUT"
 
 /*
@@ -497,7 +496,6 @@ struct DumpInfo {
 	int		block_order;
 	off_t		offset_bitmap1;
 	unsigned long	len_bitmap;          /* size of bitmap(1st and 2nd) */
-	unsigned long	len_3rd_bitmap;      /* size of bitmap(3rd) */
 	struct disk_dump_header		*dump_header; 
 
 	/*
@@ -531,10 +529,8 @@ struct DumpInfo {
 	 * bitmap info:
 	 */
 	int			fd_bitmap;
-	int			fd_3rd_bitmap;
 	char			*name_bitmap;
-	char			*name_3rd_bitmap;
-	struct cache_data	*bm3;
+	struct cache_data	*bm2;
 	struct vm_table {                /* kernel VM-related data */
 		int numnodes;
 		ulong *node_online_map;

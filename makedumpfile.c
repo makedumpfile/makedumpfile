@@ -389,29 +389,6 @@ open_dump_file(struct DumpInfo *info)
 }
 
 int
-open_3rd_bitmap(struct DumpInfo *info)
-{
-	int fd;
-
-	if ((info->name_3rd_bitmap
-	    = (char *)malloc(sizeof(FILENAME_3RD_BITMAP))) == NULL) {
-		ERRMSG("Can't allocate memory for the filename. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
-	strcpy(info->name_3rd_bitmap, FILENAME_3RD_BITMAP);
-	if ((fd = open(info->name_3rd_bitmap, O_RDWR|O_CREAT,
-	    S_IRUSR|S_IWUSR)) < 0) {
-		ERRMSG("Can't open the dump file(%s). %s\n",
-		    FILENAME_3RD_BITMAP, strerror(errno));
-		return FALSE;
-	}
-	unlink(info->name_3rd_bitmap);
-	info->fd_3rd_bitmap = fd;
-	return TRUE;
-}
-
-int
 open_dump_bitmap(struct DumpInfo *info)
 {
 	int fd;
@@ -491,9 +468,6 @@ open_files_for_creating_dumpfile(struct DumpInfo *info)
 		return FALSE;
 
 	if (!open_dump_bitmap(info))
-		return FALSE;
-
-	if (!open_3rd_bitmap(info))
 		return FALSE;
 
 	return TRUE;
@@ -772,9 +746,6 @@ get_elf_info(struct DumpInfo *info)
 	 */
 	tmp = divideup(divideup(info->max_mapnr, BITPERBYTE), info->page_size);
 	info->len_bitmap = tmp*info->page_size*2;
-
-	if (info->flag_exclude_free)
-		info->len_3rd_bitmap = info->len_bitmap / 2;
 
 	ret = TRUE;
 out:
@@ -2610,30 +2581,30 @@ page_to_pfn(struct DumpInfo *info, unsigned long page)
 }
 
 int
-reset_3rd_bitmap(struct DumpInfo *info, unsigned long long pfn)
+reset_2nd_bitmap(struct DumpInfo *info, unsigned long long pfn)
 {
 	off_t offset_pfn;
 	unsigned int buf_size;
-	struct cache_data *bm3 = info->bm3;
+	struct cache_data *bm2 = info->bm2;
 
-	offset_pfn  = (pfn / PFN_BUFBITMAP) * BUFSIZE_BITMAP;
-	bm3->offset = offset_pfn;
-	buf_size    = info->len_3rd_bitmap - bm3->offset;
+	offset_pfn  = (info->len_bitmap/2) + (pfn/PFN_BUFBITMAP)*BUFSIZE_BITMAP;
+	bm2->offset = offset_pfn;
+	buf_size    = info->len_bitmap - bm2->offset;
 	if (buf_size >= BUFSIZE_BITMAP) {
-		bm3->cache_size = BUFSIZE_BITMAP;
-		bm3->buf_size   = BUFSIZE_BITMAP;
+		bm2->cache_size = BUFSIZE_BITMAP;
+		bm2->buf_size   = BUFSIZE_BITMAP;
 	} else {
-		bm3->cache_size = buf_size;
-		bm3->buf_size   = buf_size;
+		bm2->cache_size = buf_size;
+		bm2->buf_size   = buf_size;
 	}
 
-	if (!read_cache(bm3))
+	if (!read_cache(bm2))
 		return FALSE;
 
-	set_bitmap(bm3->buf, pfn%PFN_BUFBITMAP, 0);
+	set_bitmap(bm2->buf, pfn%PFN_BUFBITMAP, 0);
 
-	bm3->offset = offset_pfn;
-	if (!write_cache_bufsz(bm3))
+	bm2->offset = offset_pfn;
+	if (!write_cache_bufsz(bm2))
 		return FALSE;
 
 	return TRUE;
@@ -2674,7 +2645,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 			}
 			for (i = 0; i < (1<<order); i++) {
 				pfn = start_pfn + i;
-				reset_3rd_bitmap(info, pfn);
+				reset_2nd_bitmap(info, pfn);
 			}
 			free_page_cnt += i;
 
@@ -2704,7 +2675,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 }
 
 int
-dump_memory_nodes(struct DumpInfo *info)
+_exclude_free_page(struct DumpInfo *info)
 {
 	int i, nr_zones, num_nodes, node;
 	unsigned long node_zones, zone, spanned_pages, pgdat;
@@ -2752,55 +2723,17 @@ dump_memory_nodes(struct DumpInfo *info)
 	}
 
 	/*
-	 * Flush the 3rd bit map.
-	 * info->bm3->buf_size is set at reset_3rd_bitmap().
+	 * Flush 2nd-bitmap.
+	 * info->bm2->buf_size is set at reset_2nd_bitmap().
 	 */
-	info->bm3->offset  -= info->bm3->buf_size;
-	if (!write_cache_bufsz(info->bm3))
+	info->bm2->offset  -= info->bm2->buf_size;
+	if (!write_cache_bufsz(info->bm2))
 		return FALSE;
 	return TRUE;
 }
 
 int
-_exclude_free_page(struct DumpInfo *info)
-{
-	if (!dump_memory_nodes(info))
-		return FALSE;
-
-	return TRUE;
-}
-
-int
-cp_cache(struct cache_data *source, struct cache_data *dest, int size)
-{
-	while (size > 0) {
-		if (size >= BUFSIZE_BITMAP) {
-			source->cache_size = BUFSIZE_BITMAP;
-			dest->cache_size = BUFSIZE_BITMAP;
-		} else {
-			source->cache_size = size;
-			dest->cache_size = size;
-		}
-		dest->buf_size = 0;
-
-		if(!read_cache(source)) {
-			ERRMSG("Can't read the dump cache file(%s). %s\n",
-			    source->file_name, strerror(errno));
-			return FALSE;
-		}
-		if(!write_cache(dest, source->buf, source->cache_size)) {
-			ERRMSG("Can't write the dump cache file(%s). %s\n",
-			    dest->file_name, strerror(errno));
-			return FALSE;
-		}
-
-		size -= BUFSIZE_BITMAP;
-	}
-	return TRUE;
-}
-
-int
-exclude_free_page(struct DumpInfo *info, struct cache_data *bm2, struct cache_data *bm3)
+exclude_free_page(struct DumpInfo *info, struct cache_data *bm2)
 {
 
 	/*
@@ -2828,28 +2761,14 @@ exclude_free_page(struct DumpInfo *info, struct cache_data *bm2, struct cache_da
 		return FALSE;
 	}
 
-	/*
-	 * Copy bitmap2 to bitmap3.
-	 */
-	info->bm3 = bm3;
-	bm2->offset = info->len_bitmap / 2;
-	bm3->offset = 0;
-	if (!cp_cache(bm2, bm3, info->len_bitmap / 2))
-		return FALSE;
+	info->bm2 = bm2;
 
 	/*
-	 * Update bitmap3.
+	 * Detect free pages and update 2nd-bitmap.
 	 */
 	if (!_exclude_free_page(info))
 		return FALSE;
 
-	/*
-	 * Write back bitmap3 to bitmap2.
-	 */
-	bm2->offset = info->len_bitmap / 2;
-	bm3->offset = 0;
-	if (!cp_cache(bm3, bm2, info->len_bitmap / 2))
-		return FALSE;
 	return TRUE;
 }
 
@@ -2863,7 +2782,7 @@ create_dump_bitmap(struct DumpInfo *info)
 	unsigned char *page_cache = NULL, *buf = NULL, *pcache;
 	unsigned int _count;
 	unsigned long flags, mapping;
-	struct cache_data bm1, bm2, bm3;
+	struct cache_data bm1, bm2;
 	struct mem_map_data *mmd;
 	off_t offset_page;
 	const off_t failed = (off_t)-1;
@@ -2884,13 +2803,6 @@ create_dump_bitmap(struct DumpInfo *info)
 	bm2.offset     = info->len_bitmap/2;
 	bm2.buf        = NULL;
 
-	bm3.fd         = info->fd_3rd_bitmap;
-	bm3.file_name  = info->name_3rd_bitmap;
-	bm3.cache_size = BUFSIZE_BITMAP;
-	bm3.buf_size   = 0;
-	bm3.offset     = 0;
-	bm3.buf        = NULL;
-
 	if ((bm1.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
 		ERRMSG("Can't allocate memory for 1st-bitmap buffer. %s\n",
 		    strerror(errno));
@@ -2898,12 +2810,6 @@ create_dump_bitmap(struct DumpInfo *info)
 	}
 	if ((bm2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
 		ERRMSG("Can't allocate memory for 2nd-bitmap buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if (info->flag_exclude_free
-	    && (bm3.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for 3rd-bitmap buffer. %s\n",
 		    strerror(errno));
 		goto out;
 	}
@@ -3074,7 +2980,7 @@ create_dump_bitmap(struct DumpInfo *info)
 		goto out;
 
 	if (info->flag_exclude_free)
-		if (!exclude_free_page(info, &bm2, &bm3))
+		if (!exclude_free_page(info, &bm2))
 			goto out;
 
 	ret = TRUE;
@@ -3087,8 +2993,6 @@ out:
 		free(bm1.buf);
 	if (bm2.buf != NULL)
 		free(bm2.buf);
-	if (bm3.buf != NULL)
-		free(bm3.buf);
 
 	return ret;
 }
@@ -4134,15 +4038,6 @@ close_dump_file(struct DumpInfo *info)
 }
 
 void
-close_3rd_bitmap(struct DumpInfo *info)
-{
-	if ((info->fd_3rd_bitmap = close(info->fd_3rd_bitmap)) < 0)
-		ERRMSG("Can't close the bitmap file(%s). %s\n",
-		    info->name_3rd_bitmap, strerror(errno));
-	free(info->name_3rd_bitmap);
-}
-
-void
 close_dump_bitmap(struct DumpInfo *info)
 {
 	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)
@@ -4209,9 +4104,6 @@ close_files_for_creating_dumpfile(struct DumpInfo *info)
 	close_dump_file(info);
 
 	close_dump_bitmap(info);
-
-	if (info->flag_exclude_free)
-		close_3rd_bitmap(info);
 
 	return TRUE;
 }
@@ -4444,8 +4336,6 @@ out:
 		close(info->fd_dumpfile);
 	if (info->fd_bitmap)
 		close(info->fd_bitmap);
-	if (info->fd_3rd_bitmap)
-		close(info->fd_3rd_bitmap);
 	if (info->pt_load_segments != NULL)
 		free(info->pt_load_segments);
 	if (info->mem_map_data != NULL)

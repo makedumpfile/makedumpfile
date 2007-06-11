@@ -1942,17 +1942,9 @@ get_mm_flatmem(struct DumpInfo *info)
 int
 get_mm_discontigmem(struct DumpInfo *info)
 {
-	int num_nodes, node;
+	int i, j, num_nodes, node, num_mem_map;
 	unsigned long pgdat, mem_map, pfn_start, pfn_end, node_spanned_pages;
-
-	info->num_mem_map = vt->numnodes;
-
-	if ((info->mem_map_data = (struct mem_map_data *)
-	    malloc(sizeof(struct mem_map_data)*info->num_mem_map)) == NULL) {
-		ERRMSG("Can't allocate memory for the mem_map_data. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
+	struct mem_map_data temp_mmd, mmd[vt->numnodes];
 
 	/*
 	 * Get the first node_id.
@@ -1982,7 +1974,20 @@ get_mm_discontigmem(struct DumpInfo *info)
 			return FALSE;
 		}
 		pfn_end = pfn_start + node_spanned_pages;
-		dump_mem_map(info, pfn_start, pfn_end, mem_map, num_nodes - 1);
+
+		if (info->max_mapnr < pfn_end) {
+			if (info->flag_debug) {
+				MSG("pfn_end of node (%d) is over max_mapnr.\n", num_nodes - 1);
+				MSG("  pfn_start: %lx\n", pfn_start);
+				MSG("  pfn_end  : %lx\n", pfn_end);
+				MSG("  max_mapnr: %llx\n", info->max_mapnr);
+			}
+			pfn_end = info->max_mapnr;
+		}
+
+		mmd[num_nodes - 1].pfn_start = pfn_start;
+		mmd[num_nodes - 1].pfn_end   = pfn_end;
+		mmd[num_nodes - 1].mem_map   = mem_map;
 
 		/*
 		 * Get pglist_data of the next node.
@@ -1998,6 +2003,79 @@ get_mm_discontigmem(struct DumpInfo *info)
 			}
 		}
 	}
+
+	/*
+	 * Sort mem_map by pfn_start.
+	 */
+	for (i = 0; i < vt->numnodes - 1; i++) {
+		for (j = i + 1; j < vt->numnodes; j++) {
+			if (mmd[j].pfn_start < mmd[i].pfn_start) {
+				temp_mmd = mmd[j];
+				mmd[j] = mmd[i];
+				mmd[i] = temp_mmd;
+			}
+		}
+	}
+
+	/*
+	 * Calculate the number of mem_map.
+	 */
+	info->num_mem_map = vt->numnodes;
+	if (mmd[0].pfn_start != 0)
+		info->num_mem_map++;
+
+	for (i = 0; i < vt->numnodes - 1; i++) {
+		if (mmd[i].pfn_end > mmd[i + 1].pfn_start) {
+			ERRMSG("The mem_map overlapped.\n");
+			ERRMSG("mmd[%d].pfn_end   = %llx\n", i, mmd[i].pfn_end);
+			ERRMSG("mmd[%d].pfn_start = %llx\n", i + 1, mmd[i + 1].pfn_start);
+			return FALSE;
+		} else if (mmd[i].pfn_end == mmd[i + 1].pfn_start)
+			/*
+			 * Continuous mem_map
+			 */
+			continue;
+
+		/*
+		 * Discontinuous mem_map
+		 */
+		info->num_mem_map++;
+	}
+	if (mmd[vt->numnodes - 1].pfn_end < info->max_mapnr)
+		info->num_mem_map++;
+
+	if ((info->mem_map_data = (struct mem_map_data *)
+	    malloc(sizeof(struct mem_map_data)*info->num_mem_map)) == NULL) {
+		ERRMSG("Can't allocate memory for the mem_map_data. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Create mem_map data.
+	 */
+	num_mem_map = 0;
+	if (mmd[0].pfn_start != 0) {
+		dump_mem_map(info, 0, mmd[0].pfn_start, NOT_MEMMAP_ADDR,
+		    num_mem_map);
+		num_mem_map++;
+	}
+	for (i = 0; i < vt->numnodes; i++) {
+		dump_mem_map(info, mmd[i].pfn_start, mmd[i].pfn_end,
+		    mmd[i].mem_map, num_mem_map);
+		num_mem_map++;
+		if ((i < vt->numnodes - 1)
+		    && (mmd[i].pfn_end != mmd[i + 1].pfn_start)) {
+			dump_mem_map(info, mmd[i].pfn_end, mmd[i +1].pfn_start,
+			    NOT_MEMMAP_ADDR, num_mem_map);
+			num_mem_map++;
+		}
+	}
+	i = vt->numnodes - 1;
+	if (mmd[i].pfn_end < info->max_mapnr)
+		dump_mem_map(info, mmd[i].pfn_end, info->max_mapnr,
+		    NOT_MEMMAP_ADDR, num_mem_map);
+
 	return TRUE;
 }
 

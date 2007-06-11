@@ -2639,6 +2639,33 @@ out:
 	return ret;
 }
 
+/*
+ * Sames as paddr_to_offset() but makes sure that the specified offset (hint)
+ * in the segment.
+ */
+off_t
+paddr_to_offset2(struct DumpInfo *info, unsigned long long paddr, off_t hint)
+{
+	int i;
+	off_t offset;
+	unsigned long long len;
+	struct pt_load_segment *pls;
+
+	for (i = offset = 0; i < info->num_load_memory; i++) {
+		pls = &info->pt_load_segments[i];
+		len = pls->phys_end - pls->phys_start;
+		if ((paddr >= pls->phys_start)
+		    && (paddr < pls->phys_end)
+		    && (hint >= pls->file_offset)
+		    && (hint < pls->file_offset + len)) {
+			offset = (off_t)(paddr - pls->phys_start) +
+				pls->file_offset;
+				break;
+		}
+	}
+	return offset;
+}
+
 unsigned long long
 page_to_pfn(struct DumpInfo *info, unsigned long page)
 {
@@ -3540,7 +3567,6 @@ write_elf_pages(struct DumpInfo *info)
 
 	off_seg_load  = info->offset_load_dumpfile;
 	cd_seg.offset = info->offset_load_dumpfile;
-	off_memory = 0;
 
 	if (info->flag_elf64) { /* ELF64 */
 		cd_hdr.offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr);
@@ -3566,7 +3592,7 @@ write_elf_pages(struct DumpInfo *info)
 			}
 			if (load64.p_type != PT_LOAD)
 				continue;
-
+			off_memory= load64.p_offset;
 			paddr     = load64.p_paddr;
 			pfn_start = load64.p_paddr / page_size;
 			pfn_end   = (load64.p_paddr+ load64.p_memsz)/page_size;
@@ -3579,6 +3605,7 @@ write_elf_pages(struct DumpInfo *info)
 			}
 			if (load32.p_type != PT_LOAD)
 				continue;
+			off_memory= load32.p_offset;
 			paddr     = load32.p_paddr;
 			pfn_start = load32.p_paddr / page_size;
 			pfn_end   = (load32.p_paddr+ load32.p_memsz)/page_size;
@@ -3666,7 +3693,7 @@ write_elf_pages(struct DumpInfo *info)
 			/*
 			 * Write a PT_LOAD segment.
 			 */
-			off_memory = paddr_to_offset(info, paddr);
+			off_memory = paddr_to_offset2(info, paddr, off_memory);
 			if (!off_memory) {
 				ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
 				    paddr);
@@ -3758,7 +3785,7 @@ write_elf_pages(struct DumpInfo *info)
 		/*
 		 * Write a PT_LOAD segment.
 		 */
-		off_memory = paddr_to_offset(info, paddr);
+		off_memory = paddr_to_offset2(info, paddr, off_memory);
 		if (!off_memory) {
 			ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
 			    paddr);

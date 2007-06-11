@@ -3,6 +3,10 @@
  makdumpfile's README
 ======================
 
+* REQUIREMENTS
+  Please download the following library file and install it:
+  - elfutils-0.125.tar.gz
+
 * BUILD & INSTALL
   1.Get the latest makedumpfile from the following site:
     https://sourceforge.net/projects/makedumpfile/
@@ -41,11 +45,12 @@
 
 * REFERENCES
   https://sourceforge.net/projects/makedumpfile/
-  http://lists.osdl.org/pipermail/fastboot/
+  http://lists.infradead.org/pipermail/kexec/
+  https://lists.linux-foundation.org/pipermail/fastboot/
 
 * BUG REPORT
   If finding some bugs, please send the information to the following:
   Ken'ichi Ohmichi <oomichi@mxs.nes.nec.co.jp>
   Masaki Tachibana <tachibana@mxm.nes.nec.co.jp>
-  Fastboot-ml <fastboot@lists.osdl.org>
+  kexec-ml <kexec@lists.infradead.org>
 

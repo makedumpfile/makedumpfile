@@ -405,7 +405,12 @@ int get_machdep_info_ia64();
 #endif          /* ia64 */
 
 #define MSG(x...)	fprintf(stderr, x)
-#define ERRMSG(x...)	fprintf(stderr, x)
+#define ERRMSG(x...) \
+do { \
+	fprintf(stderr, __FUNCTION__); \
+	fprintf(stderr, ": "); \
+	fprintf(stderr, x); \
+} while (0)
 
 struct pt_load_segment {
 	loff_t			file_offset;

@@ -3382,8 +3382,8 @@ print_progress(unsigned long current, unsigned long end)
 	} else
 		progress = 100;
 
-	ERRMSG("\r");
-	ERRMSG("[%3d %%]", progress);
+	MSG("\r");
+	MSG("[%3d %%]", progress);
 }
 
 int
@@ -4196,7 +4196,7 @@ main(int argc, char *argv[])
 			dwarf_info.vmlinux_name = optarg;
 			break;
 		case '?':
-			ERRMSG("Commandline parameter is invalid.\n");
+			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
 		}
@@ -4214,7 +4214,7 @@ main(int argc, char *argv[])
 		 * Check parameters to generate the configuration file.
 		 */
 		if (argc != optind) {
-			ERRMSG("Commandline parameter is invalid.\n");
+			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
 		}
@@ -4222,7 +4222,7 @@ main(int argc, char *argv[])
 		    || info->flag_elf_dumpfile || info->flag_read_config
 		    || !info->flag_vmlinux || info->flag_flatten
 		    || info->flag_rearrange) {
-			ERRMSG("Commandline parameter is invalid.\n");
+			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
 		}
@@ -4232,13 +4232,13 @@ main(int argc, char *argv[])
 		 */
 		if ((info->dump_level < MIN_DUMP_LEVEL)
 		    || (MAX_DUMP_LEVEL < info->dump_level)) {
-			ERRMSG("Dump_level is invalid.\n");
+			MSG("Dump_level is invalid.\n");
 			print_usage();
 			goto out;
 		}
 		if ((info->flag_compress && info->flag_elf_dumpfile)
 		    || (info->flag_vmlinux && info->flag_read_config)) {
-			ERRMSG("Commandline parameter is invalid.\n");
+			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
 		}
@@ -4270,7 +4270,7 @@ main(int argc, char *argv[])
 			info->name_dumpfile = argv[optind];
 
 		} else {
-			ERRMSG("Commandline parameter is invalid.\n");
+			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
 		}
@@ -4348,11 +4348,11 @@ main(int argc, char *argv[])
 	}
 	retcd = COMPLETED;
 out:
-	ERRMSG("\n");
+	MSG("\n");
 	if (retcd == COMPLETED)
 		MSG("makedumpfile Completed.\n");
 	else
-		ERRMSG("makedumpfile Failed.\n");
+		MSG("makedumpfile Failed.\n");
 
 	if (info->fd_memory)
 		close(info->fd_memory);

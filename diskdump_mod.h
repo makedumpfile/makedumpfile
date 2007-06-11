@@ -18,6 +18,7 @@
 
 #define divideup(x, y)	(((x) + ((y) - 1)) / (y))
 #define round(x, y)	(((x) / (y)) * (y))
+#define roundup(x, y)	((((x) + ((y) - 1)) / (y)) * (y))
 
 #define DUMP_PARTITION_SIGNATURE	"diskdump"
 #define DISK_DUMP_SIGNATURE		"DISKDUMP"
@@ -65,6 +66,7 @@ struct disk_dump_header {
  */
 struct kdump_sub_header {
 	unsigned long	phys_base;
+	int		dump_level;	/* header_version 1 and later */
 };
 
 /* page flags */

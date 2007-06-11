@@ -1,0 +1,267 @@
+.TH MAKEDUMPFILE 8 "March 2007" "makedumpfile v1.1.2" "Linux System Administrator's Manual"
+.SH NAME
+makedumpfile \- make a small dumpfile of kdump
+.SH SYNOPSIS
+\fBmakedumpfile\fR    [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fICONFIGFILE\fR] \fIVMCORE\fR \fIDUMPFILE\fR
+.br
+\fBmakedumpfile\fR \-F [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fICONFIGFILE\fR] \fIVMCORE\fR
+.br
+\fBmakedumpfile\fR \-R \fIDUMPFILE\fR
+.br
+\fBmakedumpfile\fR \-g \fICONFIGFILE\fR \-x \fIVMLINUX\fR
+.br
+.B makedumpfile
+\-h
+.br
+.B makedumpfile
+\-v
+.br
+.SH DESCRIPTION
+.PP
+With kdump, the memory image of the first kernel (called "panicked kernel") can
+be taken as /proc/vmcore while the second kernel (called "kdump kernel" or
+"capture kernel") is running. This document represents /proc/vmcore as
+\fIVMCORE\fR. makedumpfile makes a small \fIDUMPFILE\fR by compressing dump
+data or by excluding unnecessary pages for analysis, or both. makedumpfile
+needs the first kernel's \fIVMLINUX\fR with debug information, so that it can
+distinguish unnecessary pages by analyzing how the first kernel uses the memory.
+.PP
+makedumpfile can exclude the following types of pages while copying
+\fIVMCORE\fR to \fIDUMPFILE\fR, and a user can choose which type of pages will
+be excluded.
+.br
+.B \- Pages filled with zero
+.br
+.B \- Cache pages
+.br
+.B \- User process data pages
+.br
+.B \- Free pages
+.PP
+makedumpfile provides two \fIDUMPFILE\fR formats (the ELF format and the
+kdump\-compressed format). By default, makedumpfile makes a \fIDUMPFILE\fR in
+the kdump\-compressed format. The kdump\-compressed format is readable only with
+the crash utility, and it can be smaller than the ELF format because of the
+compression support. The ELF format is readable with GDB and the crash utility.
+If a user wants to use GDB, \fIDUMPFILE\fR format has to be explicitly
+specified to be the ELF format.
+.PP
+To analyze the first kernel's memory usage, makedumpfile can refer to
+\fICONFIGFILE\fR instead of \fIVMLINUX\fR. \fICONFIGFILE\fR contains the first
+kernel's information (structure size, field offset, etc.), and \fICONFIGFILE\fR
+is small enough to be included into the second kernel's initrd.
+.br
+If the second kernel is running on its initrd without mounting a root file
+system, makedumpfile cannot refer to \fIVMLINUX\fR because the second kernel's
+initrd cannot include a large file like \fIVMLINUX\fR. To solve the problem,
+makedumpfile makes \fICONFIGFILE\fR beforehand, and it refers to
+\fICONFIGFILE\fR instead of \fIVMLINUX\fR while the second kernel is running.
+.PP
+If the second kernel is running on its initrd without mounting any file system,
+a user needs to transport the dump data to a remote host. To transport the dump
+data by SSH, makedumpfile outputs the dump data in the intermediate format (the
+flattened format) to the standard output. By piping the output data to SSH,
+a user can transport the dump data to a remote host. Note that analysis tools
+cannot read the flattened format directly, so on a remote host the received
+data in the flattened format needs to be re\-arranged to a readable
+\fIDUMPFILE\fR format by makedumpfile (or makedumpfile\-R.pl).
+
+
+.PP
+.SH OPTIONS
+
+.TP
+\fB\-c\fR
+Compress dump data by each page.
+.br
+A user cannot specify this option with \-E option, because the ELF format does
+not support compressed data.
+.br
+.B Example:
+.br
+# makedumpfile \-c \-d 31 \-x vmlinux /proc/vmcore dumpfile
+
+.TP
+.BI \-d \ dump_level
+Specify the type of unnecessary page for analysis.
+.br
+Pages of the specified type are not copied to \fIDUMPFILE\fR. The page type
+marked in the following table is excluded. A user can specify multiple page
+types by setting the sum of each page type for dump_level. The maximum of
+dump_level is 31.
+.br
+.B Example:
+.br
+# makedumpfile \-d 11 \-x vmlinux /proc/vmcore dumpfile
+
+  dump | zero | cache|cache  | user | free
+ level | page | page |private| data | page
+.br
+\-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-
+     0 |      |      |       |      |
+     1 |  X   |      |       |      |
+     2 |      |  X   |       |      |
+     3 |  X   |  X   |       |      |
+     4 |      |  X   |  X    |      |
+     5 |  X   |  X   |  X    |      |
+     6 |      |  X   |  X    |      |
+     7 |  X   |  X   |  X    |      |
+     8 |      |      |       |  X   |
+     9 |  X   |      |       |  X   |
+    10 |      |  X   |       |  X   |
+    11 |  X   |  X   |       |  X   |
+    12 |      |  X   |  X    |  X   |
+    13 |  X   |  X   |  X    |  X   |
+    14 |      |  X   |  X    |  X   |
+    15 |  X   |  X   |  X    |  X   |
+    16 |      |      |       |      |  X
+    17 |  X   |      |       |      |  X
+    18 |      |  X   |       |      |  X
+    19 |  X   |  X   |       |      |  X
+    20 |      |  X   |  X    |      |  X
+    21 |  X   |  X   |  X    |      |  X
+    22 |      |  X   |  X    |      |  X
+    23 |  X   |  X   |  X    |      |  X
+    24 |      |      |       |  X   |  X
+    25 |  X   |      |       |  X   |  X
+    26 |      |  X   |       |  X   |  X
+    27 |  X   |  X   |       |  X   |  X
+    28 |      |  X   |  X    |  X   |  X
+    29 |  X   |  X   |  X    |  X   |  X
+    30 |      |  X   |  X    |  X   |  X
+    31 |  X   |  X   |  X    |  X   |  X
+
+
+.TP
+\fB\-E\fR
+Create \fIDUMPFILE\fR in the ELF format.
+.br
+This option cannot be specified with \-c option, because the ELF format does not
+support compressed data.
+.br
+.B Example:
+.br
+# makedumpfile \-E \-d 31 \-x vmlinux /proc/vmcore dumpfile
+
+.TP
+\fB\-x\fR \fIVMLINUX\fR
+Specify the first kernel's \fIVMLINUX\fR with debug information to analyze the
+first kernel's memory usage.
+.br
+The page size of the first kernel and the second kernel should match.
+.br
+.B Example:
+.br
+# makedumpfile \-d 31 \-x vmlinux /proc/vmcore dumpfile
+
+.TP
+\fB\-i\fR \fICONFIGFILE\fR
+Specify \fICONFIGFILE\fR instead of \fIVMLINUX\fR for analyzing the first kernel's memory usage.
+.br
+\fICONFIGFILE\fR should be made beforehand by makedumpfile with \-g option, and
+it contains the first kernel's information. If dump_level is 2 or more and
+[\-x \fIVMLINUX\fR] is not specified, this option is necessary.
+.br
+.B Example:
+.br
+# makedumpfile \-d 31 \-i config /proc/vmcore dumpfile
+
+.TP
+\fB\-g\fR \fICONFIGFILE\fR
+Generate \fICONFIGFILE\fR from the first kernel's \fIVMLINUX\fR with debug
+information.
+.br
+\fICONFIGFILE\fR must be generated on the system that is running the first
+kernel. With \-i option, a user can specify \fICONFIGFILE\fR generated on the
+other system that is running the same first kernel. [\-x \fIVMLINUX\fR] must be
+specified.
+.br
+.B Example:
+.br
+# makedumpfile \-g config \-x vmlinux
+
+.TP
+\fB\-F\fR
+Output the dump data in the flattened format to the standard output for
+transporting the dump data by SSH.
+.br
+Analysis tools cannot read the flattened format directly. For analysis, the
+dump data in the flattened format should be re\-arranged to a normal
+\fIDUMPFILE\fR (readable with analysis tools) by \-R option. By which option is
+specified with \-F option, the format of the re\-arranged \fIDUMPFILE\fR is fixed.
+In other words, it is impossible to specify the \fIDUMPFILE\fR format when the
+dump data is re\-arranged with \-R option. If specifying \-E option with \-F option,
+the format of the re\-arranged \fIDUMPFILE\fR is the ELF format. Otherwise, it
+is the kdump\-compressed format.
+.br
+.B Example:
+.br
+# makedumpfile \-F \-c \-d 31 \-x vmlinux /proc/vmcore \e
+.br
+| ssh user@host "cat > dumpfile.tmp"
+.br
+# makedumpfile \-F \-c \-d 31 \-x vmlinux /proc/vmcore \e
+.br
+| ssh user@host "makedumpfile \-R dumpfile"
+.br
+# makedumpfile \-F \-E \-d 31 \-i config  /proc/vmcore \e
+.br
+| ssh user@host "makedumpfile \-R dumpfile"
+
+.TP
+\fB\-R\fR
+Re\-arrange the dump data in the flattened format from the standard input to a
+normal \fIDUMPFILE\fR (readable with analysis tools).
+.br
+.B Example:
+.br
+# makedumpfile \-R dumpfile < dumpfile.tmp
+.br
+# makedumpfile \-F \-d 31 \-x vmlinux /proc/vmcore \e
+.br
+| ssh user@host "makedumpfile \-R dumpfile"
+
+Instead of using \-R option, a perl script "makedumpfile\-R.pl" re\-arranges the
+dump data in the flattened format to a normal \fIDUMPFILE\fR, too. The perl
+script does not depend on architecture, and most systems have perl command.
+Even if a remote host does not have makedumpfile, it is possible to re\-arrange
+the dump data in the flattened format to a readable \fIDUMPFILE\fR on a remote
+host by running this script.
+.br
+.B Example:
+.br
+# makedumpfile \-F \-d 31 \-x vmlinux /proc/vmcore \e
+.br
+| ssh user@host "makedumpfile\-R.pl dumpfile"
+
+.TP
+\fB\-D\fR
+Print the debug information.
+
+.TP
+\fB\-h\fR
+Show the help message.
+
+.TP
+\fB\-v\fR
+Show the version of makedumpfile.
+
+.SH DIAGNOSTICS
+makedumpfile exits with the following value.
+.TP
+\fB0\fR : makedumpfile succeeded.
+.TP
+\fB1\fR : makedumpfile failed without the following reasons.
+.TP
+\fB2\fR : makedumpfile failed due to the different version between  \fIVMLINUX\fR and \fIVMCORE\fR.
+.TP
+\fB3\fR : makedumpfile failed due to the analysis error of the memory.
+
+.SH AUTHORS
+.PP
+Written by Masaki Tachibana, and Ken'ichi Ohmichi.
+
+.SH SEE ALSO
+.PP
+crash(8), gdb(1), kexec(8)
+

@@ -16,8 +16,7 @@
 
 /*
  * TODO
- * 1. (ia64) DISCONTIGMEM support.
- * 2. (i386) fill PT_LOAD headers with appropriate virtual addresses.
+ * 1. (i386) fill PT_LOAD headers with appropriate virtual addresses.
  */
 
 #include "makedumpfile.h"
@@ -1528,6 +1527,7 @@ get_structure_info(struct DumpInfo *info)
 	OFFSET_INIT(pglist_data.node_start_pfn, "pglist_data","node_start_pfn");
 	OFFSET_INIT(pglist_data.node_spanned_pages, "pglist_data",
 	    "node_spanned_pages");
+	OFFSET_INIT(pglist_data.pgdat_next, "pglist_data", "pgdat_next");
 
 	/*
 	 * Get offsets of the zone's members.
@@ -1583,7 +1583,12 @@ get_mem_type(struct DumpInfo *info)
 	    || (OFFSET(page._count) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE)) {
 		ret = NOT_FOUND_MEMTYPE;
-	} else if ((SYMBOL(node_data) != NOT_FOUND_SYMBOL)
+	} else if ((((SYMBOL(node_data) != NOT_FOUND_SYMBOL)
+	        && (ARRAY_LENGTH(node_data) != NOT_FOUND_STRUCTURE))
+	    || ((SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
+	        && (OFFSET(pglist_data.pgdat_next) != NOT_FOUND_STRUCTURE))
+	    || ((SYMBOL(pgdat_list) != NOT_FOUND_SYMBOL)
+	        && (ARRAY_LENGTH(pgdat_list) != NOT_FOUND_STRUCTURE)))
 	    && (SIZE(pglist_data) != NOT_FOUND_STRUCTURE)
 	    && (OFFSET(pglist_data.node_mem_map) != NOT_FOUND_STRUCTURE)
 	    && (OFFSET(pglist_data.node_start_pfn) != NOT_FOUND_STRUCTURE)
@@ -1697,6 +1702,7 @@ generate_config(struct DumpInfo *info)
 	    pglist_data.node_start_pfn);
 	WRITE_MEMBER_OFFSET("pglist_data.node_spanned_pages",
 	    pglist_data.node_spanned_pages);
+	WRITE_MEMBER_OFFSET("pglist_data.pgdat_next", pglist_data.pgdat_next);
 	WRITE_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	WRITE_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	WRITE_MEMBER_OFFSET("zone.vm_stat", zone.vm_stat);
@@ -1895,6 +1901,7 @@ read_config(struct DumpInfo *info)
 	    pglist_data.node_start_pfn);
 	READ_MEMBER_OFFSET("pglist_data.node_spanned_pages",
 	    pglist_data.node_spanned_pages);
+	READ_MEMBER_OFFSET("pglist_data.pgdat_next", pglist_data.pgdat_next);
 	READ_MEMBER_OFFSET("zone.free_pages", zone.free_pages);
 	READ_MEMBER_OFFSET("zone.free_area", zone.free_area);
 	READ_MEMBER_OFFSET("zone.vm_stat", zone.vm_stat);
@@ -1995,6 +2002,7 @@ next_online_node(int first)
 unsigned long
 next_online_pgdat(struct DumpInfo *info, int node)
 {
+	int i;
 	unsigned long pgdat;
 
 	/*
@@ -2040,6 +2048,33 @@ pgdat2:
 	return pgdat;
 
 pgdat3:
+	/*
+	 * linux-2.6.16 or former
+	 */
+	if ((SYMBOL(pgdat_list) == NOT_FOUND_SYMBOL)
+	    || (OFFSET(pglist_data.pgdat_next) == NOT_FOUND_STRUCTURE))
+		goto pgdat4;
+
+	if (!readmem(info, SYMBOL(pgdat_list), &pgdat, sizeof pgdat))
+		goto pgdat4;
+
+	if (!is_kvaddr(pgdat))
+		goto pgdat4;
+
+	if (node == 0)
+		return pgdat;
+
+	for (i = 1; i <= node; i++) {
+		if (!readmem(info, pgdat + OFFSET(pglist_data.pgdat_next),
+		    &pgdat, sizeof pgdat))
+			goto pgdat4;
+
+		if (!is_kvaddr(pgdat))
+			goto pgdat4;
+	}
+	return pgdat;
+
+pgdat4:
 	/*
 	 * Get the pglist_data structure from symbol "contig_page_data".
 	 */

@@ -665,6 +665,7 @@ struct offset_table {
 		long	node_mem_map;
 		long	node_start_pfn;
 		long	node_spanned_pages;
+		long	pgdat_next;
 	} pglist_data;
 	struct free_area {
 		long	free_list;

@@ -64,6 +64,12 @@ enum {
 #define LSEEKED_PDESC	(2)
 #define LSEEKED_PDATA	(3)
 
+/*
+ * Memory flags
+ */
+#define MEMORY_PAGETABLE_4L	(1 << 0)
+#define MEMORY_PAGETABLE_3L	(1 << 1)
+
 static inline int
 test_bit(int nr, unsigned long addr)
 {
@@ -268,6 +274,29 @@ do { \
 } while (0)
 
 /*
+ * for source file name
+ */
+#define SRCFILE(X)		(srcfile_table.X)
+#define	TYPEDEF_SRCFILE_INIT(decl_name, str_decl_name) \
+do { \
+	get_source_filename(str_decl_name, SRCFILE(decl_name), DWARF_INFO_GET_TYPEDEF_SRCNAME); \
+} while (0)
+
+#define WRITE_SRCFILE(str_decl_name, decl_name) \
+do { \
+	if (strlen(SRCFILE(decl_name))) { \
+		fprintf(info->file_configfile, "%s%s\n", \
+		    STR_SRCFILE(str_decl_name), SRCFILE(decl_name)); \
+	} \
+} while (0)
+
+#define READ_SRCFILE(str_decl_name, decl_name) \
+do { \
+	if (!read_config_string(info, STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
+		return FALSE; \
+} while (0)
+
+/*
  * kernel version
  */
 #define VERSION_2_6_15		(15)
@@ -289,6 +318,7 @@ do { \
 #define STR_SIZE(X)	"SIZE("X")="
 #define STR_OFFSET(X)	"OFFSET("X")="
 #define STR_LENGTH(X)	"LENGTH("X")="
+#define STR_SRCFILE(X)	"SRCFILE("X")="
 
 /*
  * common value
@@ -367,6 +397,37 @@ do { \
 #define _SECTION_SIZE_BITS	(30)
 #define _MAX_PHYSMEM_BITS	(50)
 #define SIZEOF_NODE_ONLINE_MAP	(32)
+
+/*
+ * 3 Levels paging
+ */
+#define _PAGE_PPN_MASK		(((1UL << _MAX_PHYSMEM_BITS) - 1) & ~0xfffUL)
+#define PAGE_SHIFT		(info->page_shift)
+#define PTRS_PER_PTD_SHIFT	(PAGE_SHIFT - 3)
+
+#define PMD_SHIFT		(PAGE_SHIFT + PTRS_PER_PTD_SHIFT)
+#define PGDIR_SHIFT_3L		(PMD_SHIFT  + PTRS_PER_PTD_SHIFT)
+
+#define MASK_POFFSET	((1UL << PAGE_SHIFT) - 1)
+#define MASK_PTE	((1UL << PMD_SHIFT) - 1) &~((1UL << PAGE_SHIFT) - 1)
+#define MASK_PMD	((1UL << PGDIR_SHIFT_3L) - 1) &~((1UL << PMD_SHIFT) - 1)
+#define MASK_PGD_3L	((1UL << REGION_SHIFT) - 1) & (~((1UL << PGDIR_SHIFT_3L) - 1))
+
+/*
+ * 4 Levels paging
+ */
+#define PUD_SHIFT		(PMD_SHIFT + PTRS_PER_PTD_SHIFT)
+#define PGDIR_SHIFT_4L		(PUD_SHIFT + PTRS_PER_PTD_SHIFT)
+
+#define MASK_PUD   	((1UL << REGION_SHIFT) - 1) & (~((1UL << PUD_SHIFT) - 1))
+#define MASK_PGD_4L	((1UL << REGION_SHIFT) - 1) & (~((1UL << PGDIR_SHIFT_4L) - 1))
+
+/*
+ * Key for distinguishing PGTABLE_3L or PGTABLE_4L.
+ */
+#define STR_PUD_T_3L	"include/asm-generic/pgtable-nopud.h"
+#define STR_PUD_T_4L	"include/asm/page.h"
+
 #endif          /* ia64 */
 
 /*
@@ -398,10 +459,11 @@ int get_machdep_info_ppc64();
 #ifdef __ia64__ /* ia64 */
 int get_phys_base_ia64();
 int get_machdep_info_ia64();
+off_t vaddr_to_offset_ia64();
 #define get_machdep_info(X)	get_machdep_info_ia64(X)
 #define get_phys_base(X)	get_phys_base_ia64(X)
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_general(X, Y)
-#define VADDR_REGION(X)		((X) >> REGION_SHIFT)
+#define vaddr_to_offset(X, Y)	vaddr_to_offset_ia64(X, Y)
+#define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
 
 #define MSG(x...)	fprintf(stderr, x)
@@ -491,11 +553,14 @@ struct DumpInfo {
 	int		flag_rearrange;      /* flag of creating dumpfile from
 						flattened format */
 	long		page_size;           /* size of page */
+	long		page_shift;
 	unsigned long long	max_mapnr;   /* number of page descriptor */
 	unsigned long   section_size_bits;
 	unsigned long   max_physmem_bits;
 	unsigned long   sections_per_root;
 	unsigned long	phys_base;
+	unsigned long   kernel_start;
+	unsigned long   vmalloc_start;
 
 	/*
 	 * diskdimp info:
@@ -519,6 +584,7 @@ struct DumpInfo {
 	 */
 	unsigned int		num_mem_map;
 	struct mem_map_data	*mem_map_data;
+	unsigned int		mem_flags;
 
 	/*
 	 * Dump memory image info:
@@ -560,6 +626,7 @@ struct symbol_table {
 	unsigned long	system_utsname;
 	unsigned long	init_uts_ns;
 	unsigned long	_stext;
+	unsigned long	swapper_pg_dir;
 	unsigned long	phys_base;
 	unsigned long	node_online_map;
 	unsigned long	node_data;
@@ -627,10 +694,19 @@ struct array_table {
 	} zone;
 };
 
+#define LEN_SRCFILE				(100)
+struct srcfile_table {
+	/*
+	 * typedef
+	 */
+	char	pud_t[LEN_SRCFILE];
+};
+
 extern struct symbol_table	symbol_table;
 extern struct size_table	size_table;
 extern struct offset_table	offset_table;
 extern struct array_table	array_table;
+extern struct srcfile_table	srcfile_table;
 
 /*
  * Debugging information
@@ -641,6 +717,7 @@ extern struct array_table	array_table;
 #define DWARF_INFO_GET_MEMBER_ARRAY_LENGTH	(4)
 #define DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH	(5)
 #define DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE	(6)
+#define DWARF_INFO_GET_TYPEDEF_SRCNAME		(7)
 
 struct dwarf_info {
 	unsigned int	cmd;		/* IN */
@@ -649,10 +726,17 @@ struct dwarf_info {
 	char	*struct_name;		/* IN */
 	char	*symbol_name;		/* IN */
 	char	*member_name;		/* IN */
+	char	*decl_name;		/* IN */
 	long	struct_size;		/* OUT */
 	long	member_offset;		/* OUT */
 	long	array_length;		/* OUT */
+	char	src_name[LEN_SRCFILE];	/* OUT */
 };
 
 extern struct dwarf_info	dwarf_info;
+
+int readmem();
+off_t paddr_to_offset();
+unsigned long long vaddr_to_paddr();
+unsigned long long paddr_to_vaddr();
 

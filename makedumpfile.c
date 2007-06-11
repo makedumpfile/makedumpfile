@@ -26,6 +26,7 @@ struct symbol_table	symbol_table;
 struct size_table	size_table;
 struct offset_table	offset_table;
 struct array_table	array_table;
+struct srcfile_table	srcfile_table;
 
 struct dwarf_info	dwarf_info;
 struct vm_table		*vt = 0;
@@ -62,6 +63,44 @@ paddr_to_offset(struct DumpInfo *info, unsigned long long paddr)
 		}
 	}
 	return offset;
+}
+
+unsigned long long
+vaddr_to_paddr(struct DumpInfo *info, unsigned long long vaddr)
+{
+	int i;
+	unsigned long long paddr;
+	struct pt_load_segment *pls;
+
+	for (i = paddr = 0; i < info->num_load_memory; i++) {
+		pls = &info->pt_load_segments[i];
+		if ((vaddr >= pls->virt_start)
+		    && (vaddr < pls->virt_end)) {
+			paddr = (off_t)(vaddr - pls->virt_start) +
+				pls->phys_start;
+				break;
+		}
+	}
+	return paddr;
+}
+
+unsigned long long
+paddr_to_vaddr(struct DumpInfo *info, unsigned long long paddr)
+{
+	int i;
+	unsigned long long vaddr;
+	struct pt_load_segment *pls;
+
+	for (i = vaddr = 0; i < info->num_load_memory; i++) {
+		pls = &info->pt_load_segments[i];
+		if ((paddr >= pls->phys_start)
+		    && (paddr < pls->phys_end)) {
+			vaddr = (off_t)(paddr - pls->phys_start) +
+				pls->virt_start;
+				break;
+		}
+	}
+	return vaddr;
 }
 
 /*
@@ -735,6 +774,7 @@ get_elf_info(struct DumpInfo *info)
 	 *   capture(2nd)-kernel, the problem will happen.
 	 */
 	info->page_size = sysconf(_SC_PAGE_SIZE);
+	info->page_shift = ffs(info->page_size) - 1;
 
 	info->max_mapnr = get_max_mapnr(info);
 
@@ -1102,6 +1142,15 @@ is_search_symbol(int cmd)
 		return FALSE;
 }
 
+int
+is_search_srcfile(int cmd)
+{
+	if (cmd == DWARF_INFO_GET_TYPEDEF_SRCNAME)
+		return TRUE;
+	else
+		return FALSE;
+}
+
 static void
 search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 {
@@ -1148,6 +1197,49 @@ search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 		search_member(dwarfd, die);
 		break;
 	}
+}
+
+static void
+search_srcfile(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+{
+	int tag = 0, rtag = 0;
+	char *src_name = NULL;
+	const char *name;
+
+	switch (dwarf_info.cmd) {
+	case DWARF_INFO_GET_TYPEDEF_SRCNAME:
+		rtag = DW_TAG_typedef;
+		break;
+	}
+
+	/*
+	 * If we get to here then we don't have any more
+	 * children, check to see if this is a relevant tag
+	 */
+	do {
+		tag  = dwarf_tag(die);
+		name = dwarf_diename(die);
+
+		if ((tag != rtag) || (!name)
+		    || strcmp(name, dwarf_info.decl_name))
+			continue;
+
+		src_name = (char *)dwarf_decl_file(die);
+
+		if (!src_name)
+			break;
+
+	} while (!dwarf_siblingof(die, die));
+
+	if (!src_name)
+		return;
+
+	/*
+	 * Found the demanded one.
+	 */
+	strncpy(dwarf_info.src_name, src_name, LEN_SRCFILE);
+
+	*found = TRUE;
 }
 
 static void
@@ -1211,6 +1303,9 @@ search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 
 	else if (is_search_symbol(dwarf_info.cmd))
 		search_symbol(dwarfd, die, found);
+
+	else if (is_search_srcfile(dwarf_info.cmd))
+		search_srcfile(dwarfd, die, found);
 }
 
 int
@@ -1351,6 +1446,23 @@ get_array_length(char *name01, char *name02, unsigned int cmd)
 	return dwarf_info.array_length;
 }
 
+/*
+ * Get the source filename.
+ */
+int
+get_source_filename(char *decl_name, char *src_name, int cmd)
+{
+	dwarf_info.cmd = cmd;
+	dwarf_info.decl_name = decl_name;
+
+	if (!get_debug_info())
+		return FALSE;
+
+	strncpy(src_name, dwarf_info.src_name, LEN_SRCFILE);
+
+	return TRUE;
+}
+
 int
 get_symbol_info(struct DumpInfo *info)
 {
@@ -1364,6 +1476,7 @@ get_symbol_info(struct DumpInfo *info)
 	SYMBOL_INIT(system_utsname, "system_utsname");
 	SYMBOL_INIT(init_uts_ns, "init_uts_ns");
 	SYMBOL_INIT(_stext, "_stext");
+	SYMBOL_INIT(swapper_pg_dir, "swapper_pg_dir");
 	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
 	SYMBOL_INIT(node_data, "node_data");
@@ -1443,6 +1556,14 @@ get_structure_info(struct DumpInfo *info)
 }
 
 int
+get_srcfile_info(struct DumpInfo *info)
+{
+	TYPEDEF_SRCFILE_INIT(pud_t, "pud_t");
+
+	return TRUE;
+}
+
+int
 is_sparsemem_extreme(struct DumpInfo *info)
 {
 	if (ARRAY_LENGTH(mem_section)
@@ -1507,6 +1628,9 @@ generate_config(struct DumpInfo *info)
 	if (!get_structure_info(info))
 		return FALSE;
 
+	if (!get_srcfile_info(info))
+		return FALSE;
+
 	if ((SYMBOL(system_utsname) == NOT_FOUND_SYMBOL)
 	    && (SYMBOL(init_uts_ns) == NOT_FOUND_SYMBOL)) {
 		ERRMSG("Can't get the symbol of system_utsname.\n");
@@ -1539,6 +1663,7 @@ generate_config(struct DumpInfo *info)
 	WRITE_SYMBOL("system_utsname", system_utsname);
 	WRITE_SYMBOL("init_uts_ns", init_uts_ns);
 	WRITE_SYMBOL("_stext", _stext);
+	WRITE_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
 	WRITE_SYMBOL("node_data", node_data);
@@ -1589,6 +1714,11 @@ generate_config(struct DumpInfo *info)
 
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
+	/*
+	 * write the source file of 1st kernel
+	 */
+	WRITE_SRCFILE("pud_t", pud_t);
+
 	return TRUE;
 }
 
@@ -1631,6 +1761,7 @@ read_config_basic_info(struct DumpInfo *info)
 			break;
 	}
 	info->page_size = page_size;
+	info->page_shift = ffs(info->page_size) - 1;
 
 	if (!get_release || !info->page_size) {
 		ERRMSG("Invalid format in %s", info->name_configfile);
@@ -1701,6 +1832,30 @@ read_config_structure(struct DumpInfo *info, char *str_structure)
 }
 
 int
+read_config_string(struct DumpInfo *info, char *str_in, char *str_out)
+{
+	char buf[BUFSIZE_FGETS];
+	unsigned int i;
+
+	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the config file(%s). %s\n",
+		    info->name_configfile, strerror(errno));
+		return FALSE;
+	}
+
+	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
+		i = strlen(buf);
+		if (buf[i - 1] == '\n')
+			buf[i - 1] = '\0';
+		if (strncmp(buf, str_in, strlen(str_in)) == 0) {
+			strncpy(str_out, buf + strlen(str_in), BUFSIZE_FGETS - strlen(str_in));
+			break;
+		}
+	}
+	return TRUE;
+}
+
+int
 read_config(struct DumpInfo *info)
 {
 	if (!read_config_basic_info(info))
@@ -1713,6 +1868,7 @@ read_config(struct DumpInfo *info)
 	READ_SYMBOL("system_utsname", system_utsname);
 	READ_SYMBOL("init_uts_ns", init_uts_ns);
 	READ_SYMBOL("_stext", _stext);
+	READ_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
 	READ_SYMBOL("node_data", node_data);
@@ -1751,6 +1907,8 @@ read_config(struct DumpInfo *info)
 	READ_ARRAY_LENGTH("pgdat_list", pgdat_list);
 	READ_ARRAY_LENGTH("mem_section", mem_section);
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
+
+	READ_SRCFILE("pud_t", pud_t);
 
 	return TRUE;
 }
@@ -2283,11 +2441,14 @@ initial(struct DumpInfo *info)
 		}
 		if (!get_structure_info(info))
 			return FALSE;
+
+		if (!get_srcfile_info(info))
+			return FALSE;
 	}
-	if (!check_release(info))
+	if (!get_machdep_info(info))
 		return FALSE;
 
-	if (!get_machdep_info(info))
+	if (!check_release(info))
 		return FALSE;
 
 	if (!get_numnodes(info))

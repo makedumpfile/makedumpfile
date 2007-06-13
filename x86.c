@@ -59,14 +59,14 @@ kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr)
 
 	dirp = kvtop_xen_x86(info, SYMBOL(pgd_l3));
 	dirp += ((kvaddr >> PGDIR_SHIFT_3LEVEL) & (PTRS_PER_PGD_3LEVEL - 1)) * sizeof(unsigned long long);
-	if (!readpmem(info, dirp, &entry, sizeof(entry)))
+	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
  
 	if (!(entry & _PAGE_PRESENT))
 		return 0;
 	dirp = entry & ENTRY_MASK;
 	dirp += ((kvaddr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)) * sizeof(unsigned long long);
-	if (!readpmem(info, dirp, &entry, sizeof(entry)))
+	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -77,7 +77,7 @@ kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr)
 	}
 	dirp = entry & ENTRY_MASK;
 	dirp += ((kvaddr >> PTE_SHIFT) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
-	if (!readpmem(info, dirp, &entry, sizeof(entry)))
+	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
 
 	if (!(entry & _PAGE_PRESENT)) {

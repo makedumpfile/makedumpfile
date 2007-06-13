@@ -83,25 +83,6 @@ vaddr_to_paddr(struct DumpInfo *info, unsigned long long vaddr)
 	return paddr;
 }
 
-unsigned long long
-paddr_to_vaddr(struct DumpInfo *info, unsigned long long paddr)
-{
-	int i;
-	unsigned long long vaddr;
-	struct pt_load_segment *pls;
-
-	for (i = vaddr = 0; i < info->num_load_memory; i++) {
-		pls = &info->pt_load_segments[i];
-		if ((paddr >= pls->phys_start)
-		    && (paddr < pls->phys_end)) {
-			vaddr = (off_t)(paddr - pls->phys_start) +
-				pls->virt_start;
-				break;
-		}
-	}
-	return vaddr;
-}
-
 /*
  * Convert Virtual Address to File Offest.
  *  If this function returns 0x0, File Offset isn't found.
@@ -146,48 +127,35 @@ get_max_mapnr(struct DumpInfo *info)
 }
 
 int
-readpmem(struct DumpInfo *info, unsigned long long paddr, void *bufptr,
-    size_t size)
+readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
+    void *bufptr, size_t size)
 {
 	off_t offset;
 	const off_t failed = (off_t)-1;
 
-	/*
-	 * Convert Physical Address to File Offset.
-	 */
-	if (!(offset = paddr_to_offset(info, paddr))) {
-		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
-		    paddr);
-		return FALSE;
-	}
-	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		return FALSE;
-	}
-
-	if (read(info->fd_memory, bufptr, size) != size) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		return FALSE;
-	}
-
-	return size;
-}
-
-int
-readmem(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
-    size_t size)
-{
-	off_t offset;
-	const off_t failed = (off_t)-1;
-
-	/*
-	 * Convert Virtual Address to File Offset.
-	 */
-	if (!(offset = vaddr_to_offset(info, vaddr))) {
-		ERRMSG("Can't convert a virtual address(%llx) to offset.\n",
-		    vaddr);
+	switch (type_addr) {
+	case VADDR:
+		/*
+		 * Convert Virtual Address to File Offset.
+		 */
+		if (!(offset = vaddr_to_offset(info, addr))) {
+			ERRMSG("Can't convert a virtual address(%llx) to offset.\n",
+			    addr);
+			return FALSE;
+		}
+		break;
+	case PADDR:
+		/*
+		 * Convert Physical Address to File Offset.
+		 */
+		if (!(offset = paddr_to_offset(info, addr))) {
+			ERRMSG("Can't convert a physical address(%llx) to offset.\n",
+			    addr);
+			return FALSE;
+		}
+		break;
+	default:
+		ERRMSG("Invalid address type (%d).\n", type_addr);
 		return FALSE;
 	}
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
@@ -268,7 +236,8 @@ check_release(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
-	if (!readmem(info, utsname, &system_utsname, sizeof(struct utsname))) {
+	if (!readmem(info, VADDR, utsname, &system_utsname,
+	    sizeof(struct utsname))) {
 		ERRMSG("Can't get the address of system_utsname.\n");
 		return FALSE;
 	}
@@ -1972,7 +1941,8 @@ get_nodes_online(struct DumpInfo *info)
 		    strerror(errno));
 		return 0;
 	}
-	if (!readmem(info, SYMBOL(node_online_map), vt->node_online_map, len)) {
+	if (!readmem(info, VADDR, SYMBOL(node_online_map), vt->node_online_map,
+	    len)) {
 		ERRMSG("Can't get the node online map.\n");
 		return 0;
 	}
@@ -2044,7 +2014,7 @@ next_online_pgdat(struct DumpInfo *info, int node)
 	    || (ARRAY_LENGTH(node_data) == NOT_FOUND_STRUCTURE))
 		goto pgdat2;
 
-	if (!readmem(info, SYMBOL(node_data) + (node * sizeof(void *)),
+	if (!readmem(info, VADDR, SYMBOL(node_data) + (node * sizeof(void *)),
 	    &pgdat, sizeof pgdat))
 		goto pgdat2;
 
@@ -2068,7 +2038,7 @@ pgdat2:
 	    && (ARRAY_LENGTH(pgdat_list) < node))
 		goto pgdat3;
 
-	if (!readmem(info, SYMBOL(pgdat_list) + (node * sizeof(void *)),
+	if (!readmem(info, VADDR, SYMBOL(pgdat_list) + (node * sizeof(void *)),
 	    &pgdat, sizeof pgdat))
 		goto pgdat3;
 
@@ -2085,7 +2055,7 @@ pgdat3:
 	    || (OFFSET(pglist_data.pgdat_next) == NOT_FOUND_STRUCTURE))
 		goto pgdat4;
 
-	if (!readmem(info, SYMBOL(pgdat_list), &pgdat, sizeof pgdat))
+	if (!readmem(info, VADDR, SYMBOL(pgdat_list), &pgdat, sizeof pgdat))
 		goto pgdat4;
 
 	if (!is_kvaddr(pgdat))
@@ -2095,7 +2065,7 @@ pgdat3:
 		return pgdat;
 
 	for (i = 1; i <= node; i++) {
-		if (!readmem(info, pgdat + OFFSET(pglist_data.pgdat_next),
+		if (!readmem(info, VADDR, pgdat+OFFSET(pglist_data.pgdat_next),
 		    &pgdat, sizeof pgdat))
 			goto pgdat4;
 
@@ -2145,7 +2115,7 @@ get_mm_flatmem(struct DumpInfo *info)
 	/*
 	 * Get the address of the symbol "mem_map".
 	 */
-	if (!readmem(info, SYMBOL(mem_map), &mem_map, sizeof mem_map)
+	if (!readmem(info, VADDR, SYMBOL(mem_map), &mem_map, sizeof mem_map)
 	    || !mem_map) {
 		ERRMSG("Can't get the address of mem_map.\n");
 		return FALSE;
@@ -2181,17 +2151,17 @@ get_mm_discontigmem(struct DumpInfo *info)
 		return FALSE;
 	}
 	for (num_nodes = 1; num_nodes <= vt->numnodes; num_nodes++) {
-		if (!readmem(info, pgdat + OFFSET(pglist_data.node_mem_map),
+		if (!readmem(info, VADDR, pgdat+OFFSET(pglist_data.node_mem_map),
 		    &mem_map, sizeof mem_map)) {
 			ERRMSG("Can't get mem_map.\n");
 			return FALSE;
 		}
-		if (!readmem(info, pgdat + OFFSET(pglist_data.node_start_pfn),
+		if (!readmem(info, VADDR, pgdat + OFFSET(pglist_data.node_start_pfn),
 		    &pfn_start, sizeof pfn_start)) {
 			ERRMSG("Can't get node_start_pfn.\n");
 			return FALSE;
 		}
-		if (!readmem(info,pgdat+OFFSET(pglist_data.node_spanned_pages),
+		if (!readmem(info, VADDR, pgdat+OFFSET(pglist_data.node_spanned_pages),
 		    &node_spanned_pages, sizeof node_spanned_pages)) {
 			ERRMSG("Can't get node_spanned_pages.\n");
 			return FALSE;
@@ -2336,7 +2306,7 @@ section_mem_map_addr(struct DumpInfo *info, unsigned long addr)
 		    strerror(errno));
 		return NOT_KV_ADDR;
 	}
-	if (!readmem(info, addr, mem_section, SIZE(mem_section))) {
+	if (!readmem(info, VADDR, addr, mem_section, SIZE(mem_section))) {
 		ERRMSG("Can't get a struct mem_section.\n");
 		return NOT_KV_ADDR;
 	}
@@ -2384,7 +2354,7 @@ get_mm_sparsemem(struct DumpInfo *info)
 		    strerror(errno));
 		return FALSE;
 	}
-	if (!readmem(info, SYMBOL(mem_section), mem_sec, mem_section_size)) {
+	if (!readmem(info, VADDR, SYMBOL(mem_section), mem_sec, mem_section_size)) {
 		ERRMSG("Can't get the address of mem_section.\n");
 		goto out;
 	}
@@ -2961,7 +2931,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 		head = node_zones + OFFSET(zone.free_area)
 			+ SIZE(free_area) * order + OFFSET(free_area.free_list);
 		previous = head;
-		if (!readmem(info, head + OFFSET(list_head.next), &curr,
+		if (!readmem(info, VADDR, head + OFFSET(list_head.next), &curr,
 		    sizeof curr)) {
 			ERRMSG("Can't get next list_head.\n");
 			return FALSE;
@@ -2972,7 +2942,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 			if (start_pfn == ULONGLONG_MAX)
 				return FALSE;
 
-			if (!readmem(info, curr + OFFSET(list_head.prev),
+			if (!readmem(info, VADDR, curr + OFFSET(list_head.prev),
 			    &curr_prev, sizeof curr_prev)) {
 				ERRMSG("Can't get prev list_head.\n");
 				return FALSE;
@@ -2989,7 +2959,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 			free_page_cnt += i;
 
 			previous=curr;
-			if (!readmem(info, curr + OFFSET(list_head.next), &curr,
+			if (!readmem(info, VADDR, curr + OFFSET(list_head.next), &curr,
 			    sizeof curr)) {
 				ERRMSG("Can't get next list_head.\n");
 				return FALSE;
@@ -3001,7 +2971,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 	 * Check the number of free pages.
 	 */
 	if (OFFSET(zone.free_pages) != NOT_FOUND_STRUCTURE) {
-		if (!readmem(info, node_zones + OFFSET(zone.free_pages), 
+		if (!readmem(info, VADDR, node_zones + OFFSET(zone.free_pages), 
 		    &free_pages, sizeof free_pages)) {
 			ERRMSG("Can't get free_pages.\n");
 			return FALSE;
@@ -3012,7 +2982,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 		 * This code expects the NR_FREE_PAGES of zone_stat_item is 0.
 		 * The NR_FREE_PAGES should be checked. 
 		 */
-		if (!readmem(info, node_zones + OFFSET(zone.vm_stat), 
+		if (!readmem(info, VADDR, node_zones + OFFSET(zone.vm_stat), 
 		    &free_pages, sizeof free_pages)) {
 			ERRMSG("Can't get free_pages.\n");
 			return FALSE;
@@ -3044,7 +3014,7 @@ _exclude_free_page(struct DumpInfo *info)
 
 		node_zones = pgdat + OFFSET(pglist_data.node_zones);
 
-		if (!readmem(info, pgdat + OFFSET(pglist_data.nr_zones),
+		if (!readmem(info, VADDR, pgdat + OFFSET(pglist_data.nr_zones),
 		    &nr_zones, sizeof(nr_zones))) {
 			ERRMSG("Can't get nr_zones.\n");
 			return FALSE;
@@ -3052,7 +3022,7 @@ _exclude_free_page(struct DumpInfo *info)
 
 		for (i = 0; i < nr_zones; i++) {
 			zone = node_zones + (i * SIZE(zone));
-			if (!readmem(info, zone + OFFSET(zone.spanned_pages),
+			if (!readmem(info, VADDR, zone + OFFSET(zone.spanned_pages),
 			    &spanned_pages, sizeof spanned_pages)) {
 				ERRMSG("Can't get spanned_pages.\n");
 				return FALSE;
@@ -3280,7 +3250,7 @@ create_dump_bitmap(struct DumpInfo *info)
 					pfn_mm = PGMM_CACHED;
 				else
 					pfn_mm = mmd->pfn_end - pfn;
-				if (!readmem(info, mem_map, page_cache,
+				if (!readmem(info, VADDR, mem_map, page_cache,
 				    SIZE(page) * pfn_mm))
 					goto out;
 			}
@@ -4513,7 +4483,7 @@ readmem_xen(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
 	if (!(paddr = kvtop_xen(info, vaddr)))
 		goto out;
 
-	if (!readpmem(info, paddr, bufptr, size))
+	if (!readmem(info, PADDR, paddr, bufptr, size))
 		goto out;
 
 	return size;

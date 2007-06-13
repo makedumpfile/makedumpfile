@@ -28,6 +28,7 @@ struct array_table	array_table;
 struct srcfile_table	srcfile_table;
 
 struct dwarf_info	dwarf_info;
+struct xen_info		xen_info;
 struct vm_table		*vt = 0;
 
 int retcd = FAILED;	/* return code */
@@ -4505,16 +4506,16 @@ get_xen_info(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of alloc_bitmap.\n");
 		return FALSE;
 	}
-        if (!readmem_xen(info, SYMBOL(alloc_bitmap), &info->alloc_bitmap,
-	      sizeof(info->alloc_bitmap), "Can't get the value of alloc_bitmap.\n"))
+        if (!readmem_xen(info, SYMBOL(alloc_bitmap), &xen_info.alloc_bitmap,
+	      sizeof(xen_info.alloc_bitmap), "Can't get the value of alloc_bitmap.\n"))
 		return FALSE;
 
 	if (SYMBOL(max_page) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of max_page.\n");
 		return FALSE;
 	}
-        if (!readmem_xen(info, SYMBOL(max_page), &info->max_page,
-	      sizeof(info->max_page), "Can't get the value of max_page.\n"))
+        if (!readmem_xen(info, SYMBOL(max_page), &xen_info.max_page,
+	      sizeof(xen_info.max_page), "Can't get the value of max_page.\n"))
 		return FALSE;
 
 	/* walk through domain_list */
@@ -4536,13 +4537,13 @@ get_xen_info(struct DumpInfo *info)
 			return FALSE;
 	}
 
-	if ((info->domain_list = (struct domain_list *)
+	if ((xen_info.domain_list = (struct domain_list *)
 	      malloc(sizeof(struct domain_list) * (num_domain + 2))) == NULL) {
 		ERRMSG("Can't allcate memory for domain_list.\n");
 		return FALSE;
 	}
 
-	info->num_domain = num_domain + 2;
+	xen_info.num_domain = num_domain + 2;
 
 	if (!readmem_xen(info, SYMBOL(domain_list), &domain,
 	      sizeof(domain), "Can't get the value of domain_list.\n"))
@@ -4554,8 +4555,8 @@ get_xen_info(struct DumpInfo *info)
 		      &domain_id, sizeof(domain_id),
 		      "Can't get the domain_id.\n"))
 			return FALSE;
-		info->domain_list[num_domain].domain_addr = domain;
-		info->domain_list[num_domain].domain_id = domain_id;
+		xen_info.domain_list[num_domain].domain_addr = domain;
+		xen_info.domain_list[num_domain].domain_id = domain_id;
 		/* pickled_id is set by architecture specific */
 		num_domain++;
 
@@ -4576,8 +4577,8 @@ get_xen_info(struct DumpInfo *info)
 	if (!readmem_xen(info, domain + OFFSET(domain.domain_id), &domain_id,
 	      sizeof(domain_id), "Can't get the value of dom_xen domain_id.\n"))
 		return FALSE;
-	info->domain_list[num_domain].domain_addr = domain;
-	info->domain_list[num_domain].domain_id = domain_id;
+	xen_info.domain_list[num_domain].domain_addr = domain;
+	xen_info.domain_list[num_domain].domain_id = domain_id;
 	num_domain++;
 
 	if (SYMBOL(dom_io) == NOT_FOUND_SYMBOL) {
@@ -4590,8 +4591,8 @@ get_xen_info(struct DumpInfo *info)
 	if (!readmem_xen(info, domain + OFFSET(domain.domain_id), &domain_id,
 	      sizeof(domain_id), "Can't get the value of dom_io domain_id.\n"))
 		return FALSE;
-	info->domain_list[num_domain].domain_addr = domain;
-	info->domain_list[num_domain].domain_id = domain_id;
+	xen_info.domain_list[num_domain].domain_addr = domain;
+	xen_info.domain_list[num_domain].domain_id = domain_id;
 	
 	/* get architecture specific data */
 	if (!get_xen_info_arch(info))
@@ -4629,16 +4630,16 @@ show_data_xen(struct DumpInfo *info)
 	MSG("OFFSET(domain.next_in_list): %ld\n", OFFSET(domain.next_in_list));
 
 	MSG("\n");
-	MSG("frame_table_vaddr: %lx\n", info->frame_table_vaddr);
-	MSG("xen_heap_start: %lx\n", info->xen_heap_start);
-	MSG("xen_heap_end:%lx\n", info->xen_heap_end);
-	MSG("alloc_bitmap: %lx\n", info->alloc_bitmap);
-	MSG("max_page: %lx\n", info->max_page);
-	MSG("num_domain: %d\n", info->num_domain);
-	for (i = 0; i < info->num_domain; i++) {
-		MSG(" %u: %x: %lx\n", info->domain_list[i].domain_id,
-			info->domain_list[i].pickled_id,
-			info->domain_list[i].domain_addr);
+	MSG("frame_table_vaddr: %lx\n", xen_info.frame_table_vaddr);
+	MSG("xen_heap_start: %lx\n", xen_info.xen_heap_start);
+	MSG("xen_heap_end:%lx\n", xen_info.xen_heap_end);
+	MSG("alloc_bitmap: %lx\n", xen_info.alloc_bitmap);
+	MSG("max_page: %lx\n", xen_info.max_page);
+	MSG("num_domain: %d\n", xen_info.num_domain);
+	for (i = 0; i < xen_info.num_domain; i++) {
+		MSG(" %u: %x: %lx\n", xen_info.domain_list[i].domain_id,
+			xen_info.domain_list[i].pickled_id,
+			xen_info.domain_list[i].domain_addr);
 	}
 }
 
@@ -4651,7 +4652,7 @@ allocated_in_map(struct DumpInfo *info, unsigned long pfn)
 
 	idx = pfn / PAGES_PER_MAPWORD;
 	if (idx != cur_idx) {
-		if (!readmem_xen(info, info->alloc_bitmap + idx * sizeof(unsigned long),
+		if (!readmem_xen(info, xen_info.alloc_bitmap + idx * sizeof(unsigned long),
 			&cur_word, sizeof(cur_word), "Can't access alloc_bitmap.\n"))
 			return 0;
 		cur_idx = idx;
@@ -4669,9 +4670,9 @@ is_select_domain(struct DumpInfo *info, unsigned int id)
 	   (yes... domain_list is not necessary right now, 
 		   it can get from "dom0" directly) */
 
-	for (i = 0; i < info->num_domain; i++) {
-		if (info->domain_list[i].domain_id == 0 &&
-		    info->domain_list[i].pickled_id == id)
+	for (i = 0; i < xen_info.num_domain; i++) {
+		if (xen_info.domain_list[i].domain_id == 0 &&
+		    xen_info.domain_list[i].pickled_id == id)
 			return TRUE;
 	}
 
@@ -4730,7 +4731,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 			if (!allocated_in_map(info, pfn))
 				continue;
 
-			page_info_addr = info->frame_table_vaddr + pfn * SIZE(page_info);
+			page_info_addr = xen_info.frame_table_vaddr + pfn * SIZE(page_info);
 			if (!readmem_xen(info,
 			      page_info_addr + OFFSET(page_info.count_info),
 		 	      &count_info, sizeof(count_info), NULL)) {
@@ -4750,7 +4751,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 			 *  - selected domain page
 			 */
 			if (_domain == 0 ||
-				(info->xen_heap_start <= pfn && pfn < info->xen_heap_end) ||
+				(xen_info.xen_heap_start <= pfn && pfn < xen_info.xen_heap_end) ||
 				((count_info & 0xffff) && is_select_domain(info, _domain))) {
 				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 1);
 			}

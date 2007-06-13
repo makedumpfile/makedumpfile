@@ -313,7 +313,7 @@ get_xen_info_ia64(struct DumpInfo *info)
 	unsigned long xen_start, xen_end, xen_heap_start;
 	int i;
 
-	info->frame_table_vaddr = VIRT_FRAME_TABLE_ADDR; /* "frame_table" is same value */
+	xen_info.frame_table_vaddr = VIRT_FRAME_TABLE_ADDR; /* "frame_table" is same value */
 
 	if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
@@ -331,8 +331,8 @@ get_xen_info_ia64(struct DumpInfo *info)
 	      sizeof(xen_start), "Can't get the value of xen_pstart.\n"))
 		return FALSE;
 
-	info->xen_heap_end = (xen_end >> PAGESHIFT());
-	info->xen_heap_start = (xen_start >> PAGESHIFT());
+	xen_info.xen_heap_end = (xen_end >> PAGESHIFT());
+	xen_info.xen_heap_start = (xen_start >> PAGESHIFT());
 
 	if (SYMBOL(xen_heap_start) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xen_heap_start.\n");
@@ -342,9 +342,9 @@ get_xen_info_ia64(struct DumpInfo *info)
 	      sizeof(xen_heap_start), "Can't get the value of xen_heap_start.\n"))
 		return FALSE;
 
-	for (i = 0; i < info->num_domain; i++) {
-		info->domain_list[i].pickled_id = (unsigned int)
-			(info->domain_list[i].domain_addr - xen_heap_start);
+	for (i = 0; i < xen_info.num_domain; i++) {
+		xen_info.domain_list[i].pickled_id = (unsigned int)
+			(xen_info.domain_list[i].domain_addr - xen_heap_start);
 	}
 
 	return TRUE;

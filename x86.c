@@ -115,7 +115,7 @@ int get_xen_info_x86(struct DumpInfo *info)
 	      "Can't get the value of frame_table.\n"))
 		return FALSE;
 
-	info->frame_table_vaddr = frame_table_vaddr;
+	xen_info.frame_table_vaddr = frame_table_vaddr;
 
 	if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
@@ -125,13 +125,13 @@ int get_xen_info_x86(struct DumpInfo *info)
 	      sizeof(xen_end), "Can't get the value of xenheap_phys_end.\n"))
 		return FALSE;
 
-	info->xen_heap_end = (xen_end >> PAGESHIFT());
-	info->xen_heap_start = 0;
+	xen_info.xen_heap_end = (xen_end >> PAGESHIFT());
+	xen_info.xen_heap_start = 0;
 
 	/* pickled_id == domain addr for x86 */
-	for (i = 0; i < info->num_domain; i++) {
-		info->domain_list[i].pickled_id =
-			info->domain_list[i].domain_addr;
+	for (i = 0; i < xen_info.num_domain; i++) {
+		xen_info.domain_list[i].pickled_id =
+			xen_info.domain_list[i].domain_addr;
 	}
 
 	return TRUE;

@@ -627,15 +627,17 @@ struct DumpInfo {
 	char			*name_configfile;	     /* config file */
 	char			release[65]; /*Can I define 65 automatically?*/
 
-	/*
-	 * for Xen extraction
-	 */
+};
+
+/*
+ * for Xen extraction
+ */
+struct xen_info {
 	unsigned long xen_heap_start;	/* start mfn of xen heap area */
 	unsigned long xen_heap_end;	/* end mfn(+1) of xen heap area */
 	unsigned long frame_table_vaddr;
 	unsigned long max_page;
 	unsigned long alloc_bitmap;
-	unsigned long dom0;
 	int	num_domain;
 	struct domain_list *domain_list;
 };
@@ -655,7 +657,9 @@ struct symbol_table {
 	unsigned long	pgdat_list;
 	unsigned long	contig_page_data;
 
-	/* for Xen extraction */
+	/*
+	 * for Xen extraction
+	 */
 	unsigned long	dom_xen;
 	unsigned long	dom_io;
 	unsigned long	domain_list;
@@ -679,7 +683,9 @@ struct size_table {
 	long	free_area;
 	long	list_head;
 
-	/* for Xen extraction */
+	/*
+	 * for Xen extraction
+	 */
 	long	page_info;
 	long	domain;
 };
@@ -716,7 +722,9 @@ struct offset_table {
 		long	prev;
 	} list_head;
 
-	/* for Xen extraction */
+	/*
+	 * for Xen extraction
+	 */
 	struct page_info {
 		long	count_info;
 		long	_domain;
@@ -754,6 +762,7 @@ struct srcfile_table {
 	char	pud_t[LEN_SRCFILE];
 };
 
+extern struct xen_info		xen_info;
 extern struct symbol_table	symbol_table;
 extern struct size_table	size_table;
 extern struct offset_table	offset_table;

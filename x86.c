@@ -110,9 +110,9 @@ int get_xen_info_x86(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of frame_table.\n");
 		return FALSE;
 	}
-	if (!readmem_xen(info, SYMBOL(frame_table), &frame_table_vaddr,
-	      sizeof(frame_table_vaddr),
-	      "Can't get the value of frame_table.\n"))
+	if (!readmem(info, VADDR_XEN, SYMBOL(frame_table), &frame_table_vaddr,
+	      sizeof(frame_table_vaddr)))
+		ERRMSG("Can't get the value of frame_table.\n");
 		return FALSE;
 
 	xen_info.frame_table_vaddr = frame_table_vaddr;
@@ -121,8 +121,9 @@ int get_xen_info_x86(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	if (!readmem_xen(info, SYMBOL(xenheap_phys_end), &xen_end,
-	      sizeof(xen_end), "Can't get the value of xenheap_phys_end.\n"))
+	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+	      sizeof(xen_end)))
+		ERRMSG("Can't get the value of xenheap_phys_end.\n");
 		return FALSE;
 
 	xen_info.xen_heap_end = (xen_end >> PAGE_SHIFT);

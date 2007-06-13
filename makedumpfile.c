@@ -4710,7 +4710,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 	for (i = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
 
-		for (; pfn < (unsigned long)(pls->phys_start >> PAGESHIFT()); pfn++) { /* memory hole */
+		for (; pfn < (unsigned long)(pls->phys_start >> PAGE_SHIFT); pfn++) { /* memory hole */
 			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
 				bm2.buf_size = BUFSIZE_BITMAP;
 				if (!write_cache_bufsz(&bm2))
@@ -4719,7 +4719,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 			}
 		}
 
-		for (; pfn < (unsigned long)(pls->phys_end >> PAGESHIFT()); pfn++) {
+		for (; pfn < (unsigned long)(pls->phys_end >> PAGE_SHIFT); pfn++) {
 
 			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
 				bm2.buf_size = BUFSIZE_BITMAP;

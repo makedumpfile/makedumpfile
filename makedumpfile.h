@@ -101,10 +101,10 @@ isAnon(unsigned long mapping)
 /*
  * for SPARSEMEM
  */
+#define PAGE_SHIFT		(info->page_shift)
 #define SECTION_SIZE_BITS()	(info->section_size_bits)
 #define MAX_PHYSMEM_BITS()	(info->max_physmem_bits)
-#define PAGESHIFT()		(ffs(info->page_size) - 1)
-#define PFN_SECTION_SHIFT()	(SECTION_SIZE_BITS() - PAGESHIFT())
+#define PFN_SECTION_SHIFT()	(SECTION_SIZE_BITS() - PAGE_SHIFT)
 #define PAGES_PER_SECTION()	(1UL << PFN_SECTION_SHIFT())
 #define _SECTIONS_PER_ROOT()	(1)
 #define _SECTIONS_PER_ROOT_EXTREME()	(info->page_size / SIZE(mem_section))
@@ -411,7 +411,6 @@ do { \
  * 3 Levels paging
  */
 #define _PAGE_PPN_MASK		(((1UL << _MAX_PHYSMEM_BITS) - 1) & ~0xfffUL)
-#define PAGE_SHIFT		(info->page_shift)
 #define PTRS_PER_PTD_SHIFT	(PAGE_SHIFT - 3)
 
 #define PMD_SHIFT		(PAGE_SHIFT + PTRS_PER_PTD_SHIFT)
@@ -867,11 +866,11 @@ int get_xen_info_x86(struct DumpInfo *info);
 #define is_frame_table_vaddr(x) \
 	((x) >= VIRT_FRAME_TABLE_ADDR && (x) < VIRT_FRAME_TABLE_END)
 
-#define PGDIR_SHIFT	(PAGESHIFT() + 2 * (PAGESHIFT() - 3))
-#define PTRS_PER_PGD	(1UL << (PAGESHIFT() - 3))
-#define PMD_SHIFT	(PAGESHIFT() + (PAGESHIFT() - 3))
-#define PTRS_PER_PMD	(1UL << (PAGESHIFT() - 3))
-#define PTRS_PER_PTE	(1UL << (PAGESHIFT() - 3))
+#define PGDIR_SHIFT	(PAGE_SHIFT + 2 * (PAGE_SHIFT - 3))
+#define PTRS_PER_PGD	(1UL << (PAGE_SHIFT - 3))
+#define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT - 3))
+#define PTRS_PER_PMD	(1UL << (PAGE_SHIFT - 3))
+#define PTRS_PER_PTE	(1UL << (PAGE_SHIFT - 3))
 
 #define IA64_MAX_PHYS_BITS	50
 #define _PAGE_P		(1)

@@ -125,7 +125,7 @@ int get_xen_info_x86(struct DumpInfo *info)
 	      sizeof(xen_end), "Can't get the value of xenheap_phys_end.\n"))
 		return FALSE;
 
-	xen_info.xen_heap_end = (xen_end >> PAGESHIFT());
+	xen_info.xen_heap_end = (xen_end >> PAGE_SHIFT);
 	xen_info.xen_heap_start = 0;
 
 	/* pickled_id == domain addr for x86 */

@@ -295,14 +295,14 @@ kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr)
 	dirp = entry & _PFN_MASK;
 	if (!dirp)
 		return 0;
-	dirp += ((addr >> PAGESHIFT()) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
+	dirp += ((addr >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
 	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
 		return FALSE;
 
 	if (!(entry & _PAGE_P))
 		return 0;
 
-	entry = (entry & _PFN_MASK) + (addr & ((1UL << PAGESHIFT()) - 1));
+	entry = (entry & _PFN_MASK) + (addr & ((1UL << PAGE_SHIFT) - 1));
 
 	return entry;
 }
@@ -331,8 +331,8 @@ get_xen_info_ia64(struct DumpInfo *info)
 	      sizeof(xen_start), "Can't get the value of xen_pstart.\n"))
 		return FALSE;
 
-	xen_info.xen_heap_end = (xen_end >> PAGESHIFT());
-	xen_info.xen_heap_start = (xen_start >> PAGESHIFT());
+	xen_info.xen_heap_end = (xen_end >> PAGE_SHIFT);
+	xen_info.xen_heap_start = (xen_start >> PAGE_SHIFT);
 
 	if (SYMBOL(xen_heap_start) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xen_heap_start.\n");

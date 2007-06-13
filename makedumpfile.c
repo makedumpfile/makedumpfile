@@ -146,6 +146,36 @@ get_max_mapnr(struct DumpInfo *info)
 }
 
 int
+readpmem(struct DumpInfo *info, unsigned long long paddr, void *bufptr,
+    size_t size)
+{
+	off_t offset;
+	const off_t failed = (off_t)-1;
+
+	/*
+	 * Convert Physical Address to File Offset.
+	 */
+	if (!(offset = paddr_to_offset(info, paddr))) {
+		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
+		    paddr);
+		return FALSE;
+	}
+	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	if (read(info->fd_memory, bufptr, size) != size) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	return size;
+}
+
+int
 readmem(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
     size_t size)
 {
@@ -4433,6 +4463,395 @@ close_files_for_creating_dumpfile(struct DumpInfo *info)
 	return TRUE;
 }
 
+/*
+ * for Xen extraction
+ */
+int
+get_symbol_info_xen(struct DumpInfo *info)
+{
+	/* common symbol */
+	SYMBOL_INIT(dom_xen, "dom_xen");
+	SYMBOL_INIT(dom_io, "dom_io");
+	SYMBOL_INIT(domain_list, "domain_list");
+	SYMBOL_INIT(frame_table, "frame_table");
+	SYMBOL_INIT(alloc_bitmap, "alloc_bitmap");
+	SYMBOL_INIT(max_page, "max_page");
+	SYMBOL_INIT(xenheap_phys_end, "xenheap_phys_end");
+
+	/* architecture specific */
+	SYMBOL_INIT(pgd_l2, "idle_pg_table_l2");	/* x86 */
+	SYMBOL_INIT(pgd_l3, "idle_pg_table_l3");	/* x86-PAE */
+	SYMBOL_INIT(pgd_l4, "idle_pg_table_4");		/* x86_64 */
+	SYMBOL_INIT(xen_heap_start, "xen_heap_start");	/* ia64 */
+	SYMBOL_INIT(xen_pstart, "xen_pstart");		/* ia64 */
+	SYMBOL_INIT(frametable_pg_dir, "frametable_pg_dir");	/* ia64 */
+
+	return TRUE;
+}
+
+int
+get_structure_info_xen(struct DumpInfo *info)
+{
+	SIZE_INIT(page_info, "page_info");
+	OFFSET_INIT(page_info.count_info, "page_info", "count_info");
+	/* _domain is the first member of union u */
+	OFFSET_INIT(page_info._domain, "page_info", "u");
+
+	SIZE_INIT(domain, "domain");
+	OFFSET_INIT(domain.domain_id, "domain", "domain_id");
+	OFFSET_INIT(domain.next_in_list, "domain", "next_in_list");
+
+	return TRUE;
+}
+
+int
+readmem_xen(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
+    size_t size, char *errmsg)
+{
+	unsigned long long paddr;
+
+	if (!(paddr = kvtop_xen(info, vaddr)))
+		goto out;
+
+	if (!readpmem(info, paddr, bufptr, size))
+		goto out;
+
+	return size;
+out:
+	if (errmsg)
+		ERRMSG(errmsg);
+
+	return 0;
+}
+
+int
+get_xen_info(struct DumpInfo *info)
+{
+	unsigned long domain;
+	unsigned int domain_id;
+	int num_domain;
+
+	if (SYMBOL(alloc_bitmap) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of alloc_bitmap.\n");
+		return FALSE;
+	}
+        if (!readmem_xen(info, SYMBOL(alloc_bitmap), &info->alloc_bitmap,
+	      sizeof(info->alloc_bitmap), "Can't get the value of alloc_bitmap.\n"))
+		return FALSE;
+
+	if (SYMBOL(max_page) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of max_page.\n");
+		return FALSE;
+	}
+        if (!readmem_xen(info, SYMBOL(max_page), &info->max_page,
+	      sizeof(info->max_page), "Can't get the value of max_page.\n"))
+		return FALSE;
+
+	/* walk through domain_list */
+	if (SYMBOL(domain_list) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of domain_list.\n");
+		return FALSE;
+	}
+	if (!readmem_xen(info, SYMBOL(domain_list), &domain,
+	      sizeof(domain), "Can't get the value of domain_list.\n"))
+		return FALSE;
+
+	/* get numbers of domain first */
+	num_domain = 0;
+	while (domain) {
+		num_domain++;
+		if (!readmem_xen(info, domain + OFFSET(domain.next_in_list),
+		      &domain, sizeof(domain),
+		      "Can't get through the domain_list.\n"))
+			return FALSE;
+	}
+
+	if ((info->domain_list = (struct domain_list *)
+	      malloc(sizeof(struct domain_list) * (num_domain + 2))) == NULL) {
+		ERRMSG("Can't allcate memory for domain_list.\n");
+		return FALSE;
+	}
+
+	info->num_domain = num_domain + 2;
+
+	if (!readmem_xen(info, SYMBOL(domain_list), &domain,
+	      sizeof(domain), "Can't get the value of domain_list.\n"))
+		return FALSE;
+
+	num_domain = 0;
+	while (domain) {
+		if (!readmem_xen(info, domain + OFFSET(domain.domain_id),
+		      &domain_id, sizeof(domain_id),
+		      "Can't get the domain_id.\n"))
+			return FALSE;
+		info->domain_list[num_domain].domain_addr = domain;
+		info->domain_list[num_domain].domain_id = domain_id;
+		/* pickled_id is set by architecture specific */
+		num_domain++;
+
+		if (!readmem_xen(info, domain + OFFSET(domain.next_in_list),
+		      &domain, sizeof(domain),
+		      "Can't get through the domain_list.\n"))
+			return FALSE;
+	}
+
+	/* special domains */
+	if (SYMBOL(dom_xen) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of dom_xen.\n");
+		return FALSE;
+	}
+	if (!readmem_xen(info, SYMBOL(dom_xen), &domain, sizeof(domain),
+	      "Can't get the value of dom_xen.\n"))
+		return FALSE;
+	if (!readmem_xen(info, domain + OFFSET(domain.domain_id), &domain_id,
+	      sizeof(domain_id), "Can't get the value of dom_xen domain_id.\n"))
+		return FALSE;
+	info->domain_list[num_domain].domain_addr = domain;
+	info->domain_list[num_domain].domain_id = domain_id;
+	num_domain++;
+
+	if (SYMBOL(dom_io) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of dom_io.\n");
+		return FALSE;
+	}
+	if (!readmem_xen(info, SYMBOL(dom_io), &domain, sizeof(domain),
+	      "Can't get the value of dom_io.\n"))
+		return FALSE;
+	if (!readmem_xen(info, domain + OFFSET(domain.domain_id), &domain_id,
+	      sizeof(domain_id), "Can't get the value of dom_io domain_id.\n"))
+		return FALSE;
+	info->domain_list[num_domain].domain_addr = domain;
+	info->domain_list[num_domain].domain_id = domain_id;
+	
+	/* get architecture specific data */
+	if (!get_xen_info_arch(info))
+		return FALSE;
+
+	return TRUE;
+}
+
+void
+show_data_xen(struct DumpInfo *info)
+{
+	int i;
+
+	/* show data for debug */
+	MSG("\n");
+	MSG("SYMBOL(dom_xen): %lx\n", SYMBOL(dom_xen));
+	MSG("SYMBOL(dom_io): %lx\n", SYMBOL(dom_io));
+	MSG("SYMBOL(domain_list): %lx\n", SYMBOL(domain_list));
+	MSG("SYMBOL(xen_heap_start): %lx\n", SYMBOL(xen_heap_start));
+	MSG("SYMBOL(frame_table): %lx\n", SYMBOL(frame_table));
+	MSG("SYMBOL(alloc_bitmap): %lx\n", SYMBOL(alloc_bitmap));
+	MSG("SYMBOL(max_page): %lx\n", SYMBOL(max_page));
+	MSG("SYMBOL(pgd_l2): %lx\n", SYMBOL(pgd_l2));
+	MSG("SYMBOL(pgd_l3): %lx\n", SYMBOL(pgd_l3));
+	MSG("SYMBOL(pgd_l4): %lx\n", SYMBOL(pgd_l4));
+	MSG("SYMBOL(xenheap_phys_end): %lx\n", SYMBOL(xenheap_phys_end));
+	MSG("SYMBOL(xen_pstart): %lx\n", SYMBOL(xen_pstart));
+	MSG("SYMBOL(frametable_pg_dir): %lx\n", SYMBOL(frametable_pg_dir));
+
+	MSG("SIZE(page_info): %ld\n", SIZE(page_info));
+	MSG("OFFSET(page_info.count_info): %ld\n", OFFSET(page_info.count_info));
+	MSG("OFFSET(page_info._domain): %ld\n", OFFSET(page_info._domain));
+	MSG("SIZE(domain): %ld\n", SIZE(domain));
+	MSG("OFFSET(domain.domain_id): %ld\n", OFFSET(domain.domain_id));
+	MSG("OFFSET(domain.next_in_list): %ld\n", OFFSET(domain.next_in_list));
+
+	MSG("\n");
+	MSG("frame_table_vaddr: %lx\n", info->frame_table_vaddr);
+	MSG("xen_heap_start: %lx\n", info->xen_heap_start);
+	MSG("xen_heap_end:%lx\n", info->xen_heap_end);
+	MSG("alloc_bitmap: %lx\n", info->alloc_bitmap);
+	MSG("max_page: %lx\n", info->max_page);
+	MSG("num_domain: %d\n", info->num_domain);
+	for (i = 0; i < info->num_domain; i++) {
+		MSG(" %u: %x: %lx\n", info->domain_list[i].domain_id,
+			info->domain_list[i].pickled_id,
+			info->domain_list[i].domain_addr);
+	}
+}
+
+int
+allocated_in_map(struct DumpInfo *info, unsigned long pfn)
+{
+	static int cur_idx = -1;
+	static unsigned long cur_word;
+	int idx;
+
+	idx = pfn / PAGES_PER_MAPWORD;
+	if (idx != cur_idx) {
+		if (!readmem_xen(info, info->alloc_bitmap + idx * sizeof(unsigned long),
+			&cur_word, sizeof(cur_word), "Can't access alloc_bitmap.\n"))
+			return 0;
+		cur_idx = idx;
+	}
+
+	return !!(cur_word & (1UL << (pfn & (PAGES_PER_MAPWORD - 1))));
+}
+
+int
+is_select_domain(struct DumpInfo *info, unsigned int id)
+{
+	int i;
+
+	/* selected domain is fix to dom0 only now !!
+	   (yes... domain_list is not necessary right now, 
+		   it can get from "dom0" directly) */
+
+	for (i = 0; i < info->num_domain; i++) {
+		if (info->domain_list[i].domain_id == 0 &&
+		    info->domain_list[i].pickled_id == id)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+int
+create_dump_bitmap_xen(struct DumpInfo *info)
+{
+	unsigned int remain_size;
+	struct cache_data bm2;
+	unsigned long page_info_addr;
+	unsigned long pfn;
+	unsigned int count_info;
+	unsigned int _domain;
+	int i;
+	struct pt_load_segment *pls;
+	int ret = FALSE;
+
+	/* note: the first half of bitmap is not used for Xen extraction */
+	bm2.fd         = info->fd_bitmap;
+	bm2.file_name  = info->name_bitmap;
+	bm2.cache_size = BUFSIZE_BITMAP;
+	bm2.buf_size   = 0;
+	bm2.offset     = info->len_bitmap/2;
+	bm2.buf        = NULL;
+
+	if ((bm2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
+		ERRMSG("Can't allocate memory for 2nd-bitmap buffer. %s\n",
+		    strerror(errno));
+		goto out;
+	}
+
+	pfn = 0;
+	for (i = 0; i < info->num_load_memory; i++) {
+		pls = &info->pt_load_segments[i];
+
+		for (; pfn < (unsigned long)(pls->phys_start >> PAGESHIFT()); pfn++) { /* memory hole */
+			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
+				bm2.buf_size = BUFSIZE_BITMAP;
+				if (!write_cache_bufsz(&bm2))
+					goto out;
+				memset(bm2.buf, 0, BUFSIZE_BITMAP);
+			}
+		}
+
+		for (; pfn < (unsigned long)(pls->phys_end >> PAGESHIFT()); pfn++) {
+
+			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
+				bm2.buf_size = BUFSIZE_BITMAP;
+				if (!write_cache_bufsz(&bm2))
+					goto out;
+				memset(bm2.buf, 0, BUFSIZE_BITMAP);
+			}
+
+			if (!allocated_in_map(info, pfn))
+				continue;
+
+			page_info_addr = info->frame_table_vaddr + pfn * SIZE(page_info);
+			if (!readmem_xen(info,
+			      page_info_addr + OFFSET(page_info.count_info),
+		 	      &count_info, sizeof(count_info), NULL)) {
+				continue;	/* page_info may not exist */
+			}
+			if (!readmem_xen(info,
+			      page_info_addr + OFFSET(page_info._domain),
+			      &_domain, sizeof(_domain),
+			      "Can't get page_info._domain.\n"))
+				goto out;
+
+//			fprintf(stderr, "pfn: %lx\t%lx\t%lx\n", pfn, count_info, _domain);
+			/*
+			 * select:
+			 *  - anonymous (_domain == 0), or
+			 *  - xen heap area, or
+			 *  - selected domain page
+			 */
+			if (_domain == 0 ||
+				(info->xen_heap_start <= pfn && pfn < info->xen_heap_end) ||
+				((count_info & 0xffff) && is_select_domain(info, _domain))) {
+				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 1);
+			}
+		}
+	}
+
+	/*
+	 * Write the remainder of the bitmap.
+	 */
+	remain_size = info->len_bitmap - bm2.offset;
+	bm2.buf_size = remain_size;
+	if (!write_cache_bufsz(&bm2))
+		goto out;
+
+	ret = TRUE;
+out:
+	if (bm2.buf != NULL)
+		free(bm2.buf);
+
+	return ret;
+}
+
+int
+initial_xen(struct DumpInfo *info)
+{
+	if (!get_elf_info(info))
+		return FALSE;
+
+	if (!get_symbol_info_xen(info))
+		return FALSE;
+
+	if (!get_structure_info_xen(info))
+		return FALSE;
+
+	if (!get_xen_info(info))
+		return FALSE;
+
+	if (info->flag_debug)
+		show_data_xen(info);
+
+	return TRUE;
+}
+
+int
+handle_xen(struct DumpInfo *info)
+{
+	if (!open_files_for_creating_dumpfile(info))
+		goto out;
+
+	if (!initial_xen(info))
+		goto out;
+
+	if (!create_dump_bitmap_xen(info))
+		goto out;
+
+	if (!write_elf_header(info))
+		goto out;
+	if (!write_elf_pages(info))
+		goto out;
+
+	if (!close_files_for_creating_dumpfile(info))
+		goto out;
+
+	MSG("\n");
+	MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
+
+	return COMPLETED;
+out:
+	return FALSE;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -4453,7 +4872,7 @@ main(int argc, char *argv[])
 	vt = &info->vm_table;
 
 	info->block_order = DEFAULT_ORDER;
-	while ((opt = getopt(argc, argv, "b:cDd:EFg:hi:Rvx:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:cDd:EFg:hi:RvXx:")) != -1) {
 		switch (opt) {
 		case 'b':
 			info->block_order = atoi(optarg);
@@ -4491,6 +4910,9 @@ main(int argc, char *argv[])
 			break;
 		case 'v':
 			info->flag_show_version = 1;
+			break;
+		case 'X':
+			info->flag_xen = 1;
 			break;
 		case 'x':
 			info->flag_vmlinux = 1;
@@ -4583,6 +5005,18 @@ main(int argc, char *argv[])
 		 */
 		ERRMSG("Elf library out of date!\n");
 		goto out;
+	}
+	if (info->flag_xen) {
+		if (!info->flag_elf_dumpfile) {
+			ERRMSG("-E must be specified with -X.\n");
+			goto out;
+		}
+		if (!info->flag_vmlinux) {
+			ERRMSG("-x xen-syms must be specified with -X.\n");
+			goto out;
+		}
+		info->dump_level = DL_EXCLUDE_XEN;
+		return handle_xen(info);
 	}
 	if (info->flag_generate_config) {
 		if (!open_files_for_generating_configfile(info))

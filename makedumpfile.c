@@ -4500,18 +4500,19 @@ get_xen_info(struct DumpInfo *info)
 		return FALSE;
 	}
         if (!readmem(info, VADDR_XEN, SYMBOL(alloc_bitmap), &xen_info.alloc_bitmap,
-	    sizeof(xen_info.alloc_bitmap)))
+	    sizeof(xen_info.alloc_bitmap))) {
 		ERRMSG("Can't get the value of alloc_bitmap.\n");
 		return FALSE;
-
+	}
 	if (SYMBOL(max_page) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of max_page.\n");
 		return FALSE;
 	}
         if (!readmem(info, VADDR_XEN, SYMBOL(max_page), &xen_info.max_page,
-	      sizeof(xen_info.max_page)))
+	      sizeof(xen_info.max_page))) {
 		ERRMSG("Can't get the value of max_page.\n");
 		return FALSE;
+	}
 
 	/* walk through domain_list */
 	if (SYMBOL(domain_list) == NOT_FOUND_SYMBOL) {
@@ -4519,18 +4520,20 @@ get_xen_info(struct DumpInfo *info)
 		return FALSE;
 	}
 	if (!readmem(info, VADDR_XEN, SYMBOL(domain_list), &domain,
-	      sizeof(domain)))
+	      sizeof(domain))) {
 		ERRMSG("Can't get the value of domain_list.\n");
 		return FALSE;
+	}
 
 	/* get numbers of domain first */
 	num_domain = 0;
 	while (domain) {
 		num_domain++;
 		if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.next_in_list),
-		      &domain, sizeof(domain)))
+		      &domain, sizeof(domain))) {
 			ERRMSG("Can't get through the domain_list.\n");
 			return FALSE;
+		}
 	}
 
 	if ((xen_info.domain_list = (struct domain_list *)
@@ -4542,25 +4545,28 @@ get_xen_info(struct DumpInfo *info)
 	xen_info.num_domain = num_domain + 2;
 
 	if (!readmem(info, VADDR_XEN, SYMBOL(domain_list), &domain,
-	      sizeof(domain)))
+	      sizeof(domain))) {
 		ERRMSG("Can't get the value of domain_list.\n");
 		return FALSE;
+	}
 
 	num_domain = 0;
 	while (domain) {
 		if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id),
-		      &domain_id, sizeof(domain_id)))
+		      &domain_id, sizeof(domain_id))) {
 			ERRMSG("Can't get the domain_id.\n");
 			return FALSE;
+		}
 		xen_info.domain_list[num_domain].domain_addr = domain;
 		xen_info.domain_list[num_domain].domain_id = domain_id;
 		/* pickled_id is set by architecture specific */
 		num_domain++;
 
 		if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.next_in_list),
-		      &domain, sizeof(domain)))
+		      &domain, sizeof(domain))) {
 			ERRMSG("Can't get through the domain_list.\n");
 			return FALSE;
+		}
 	}
 
 	/* special domains */
@@ -4568,15 +4574,16 @@ get_xen_info(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of dom_xen.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(dom_xen), &domain, sizeof(domain)))
+	if (!readmem(info, VADDR_XEN, SYMBOL(dom_xen), &domain, sizeof(domain))) {
 		ERRMSG("Can't get the value of dom_xen.\n");
 		return FALSE;
+	}
 
 	if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id), &domain_id,
-	      sizeof(domain_id)))
+	      sizeof(domain_id))) {
 		ERRMSG("Can't get the value of dom_xen domain_id.\n");
 		return FALSE;
-
+	}
 	xen_info.domain_list[num_domain].domain_addr = domain;
 	xen_info.domain_list[num_domain].domain_id = domain_id;
 	num_domain++;
@@ -4585,15 +4592,15 @@ get_xen_info(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of dom_io.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(dom_io), &domain, sizeof(domain)))
+	if (!readmem(info, VADDR_XEN, SYMBOL(dom_io), &domain, sizeof(domain))) {
 		ERRMSG("Can't get the value of dom_io.\n");
 		return FALSE;
-
+	}
 	if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id), &domain_id,
-	      sizeof(domain_id)))
+	      sizeof(domain_id))) {
 		ERRMSG("Can't get the value of dom_io domain_id.\n");
 		return FALSE;
-
+	}
 	xen_info.domain_list[num_domain].domain_addr = domain;
 	xen_info.domain_list[num_domain].domain_id = domain_id;
 	
@@ -4656,9 +4663,10 @@ allocated_in_map(struct DumpInfo *info, unsigned long pfn)
 	idx = pfn / PAGES_PER_MAPWORD;
 	if (idx != cur_idx) {
 		if (!readmem(info, VADDR_XEN, xen_info.alloc_bitmap + idx * sizeof(unsigned long),
-			&cur_word, sizeof(cur_word)))
+			&cur_word, sizeof(cur_word))) {
 			ERRMSG("Can't access alloc_bitmap.\n");
 			return 0;
+		}
 		cur_idx = idx;
 	}
 
@@ -4743,9 +4751,10 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 			}
 			if (!readmem(info, VADDR_XEN,
 			      page_info_addr + OFFSET(page_info._domain),
-			      &_domain, sizeof(_domain)))
+			      &_domain, sizeof(_domain))) {
 				ERRMSG("Can't get page_info._domain.\n");
 				goto out;
+			}
 
 //			fprintf(stderr, "pfn: %lx\t%lx\t%lx\n", pfn, count_info, _domain);
 			/*

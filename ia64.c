@@ -319,20 +319,18 @@ get_xen_info_ia64(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
-	      sizeof(xen_end))) {
-		ERRMSG("Can't get the value of xenheap_phys_end.\n");
+	if (!readmem_xen(info, SYMBOL(xenheap_phys_end), &xen_end,
+	      sizeof(xen_end), "Can't get the value of xenheap_phys_end.\n"))
 		return FALSE;
-	}
+
 	if (SYMBOL(xen_pstart) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xen_pstart.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xen_pstart), &xen_start,
-	      sizeof(xen_start))) {
-		ERRMSG("Can't get the value of xen_pstart.\n");
+	if (!readmem_xen(info, SYMBOL(xen_pstart), &xen_start,
+	      sizeof(xen_start), "Can't get the value of xen_pstart.\n"))
 		return FALSE;
-	}
+
 	xen_info.xen_heap_end = (xen_end >> PAGE_SHIFT);
 	xen_info.xen_heap_start = (xen_start >> PAGE_SHIFT);
 
@@ -340,11 +338,10 @@ get_xen_info_ia64(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xen_heap_start.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xen_heap_start), &xen_heap_start,
-	      sizeof(xen_heap_start))) {
-		ERRMSG("Can't get the value of xen_heap_start.\n");
+	if (!readmem_xen(info, SYMBOL(xen_heap_start), &xen_heap_start,
+	      sizeof(xen_heap_start), "Can't get the value of xen_heap_start.\n"))
 		return FALSE;
-	}
+
 	for (i = 0; i < xen_info.num_domain; i++) {
 		xen_info.domain_list[i].pickled_id = (unsigned int)
 			(xen_info.domain_list[i].domain_addr - xen_heap_start);

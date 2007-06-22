@@ -4809,34 +4809,6 @@ initial_xen(struct DumpInfo *info)
 }
 
 int
-handle_xen(struct DumpInfo *info)
-{
-	if (!open_files_for_creating_dumpfile(info))
-		goto out;
-
-	if (!initial_xen(info))
-		goto out;
-
-	if (!create_dump_bitmap_xen(info))
-		goto out;
-
-	if (!write_elf_header(info))
-		goto out;
-	if (!write_elf_pages(info))
-		goto out;
-
-	if (!close_files_for_creating_dumpfile(info))
-		goto out;
-
-	MSG("\n");
-	MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
-
-	return COMPLETED;
-out:
-	return FALSE;
-}
-
-int
 main(int argc, char *argv[])
 {
 	int opt;
@@ -5000,7 +4972,6 @@ main(int argc, char *argv[])
 			goto out;
 		}
 		info->dump_level = DL_EXCLUDE_XEN;
-		return handle_xen(info);
 	}
 	if (info->flag_generate_config) {
 		if (!open_files_for_generating_configfile(info))
@@ -5031,11 +5002,19 @@ main(int argc, char *argv[])
 		if (!open_files_for_creating_dumpfile(info))
 			goto out;
 
-		if (!initial(info))
-			goto out;
+		if (info->flag_xen) {
+			if (!initial_xen(info))
+				goto out;
 
-		if (!create_dump_bitmap(info))
-			goto out;
+			if (!create_dump_bitmap_xen(info))
+				goto out;
+		} else {
+			if (!initial(info))
+				goto out;
+
+			if (!create_dump_bitmap(info))
+				goto out;
+		}
 
 		if (info->flag_flatten) {
 			if (!write_start_flat_header(info))

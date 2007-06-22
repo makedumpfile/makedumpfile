@@ -4,8 +4,26 @@
 ======================
 
 * REQUIREMENTS
-  Please download the following library file and install it:
+  Please download the following library file and install it by the
+  following method because some commands (ld, readelf, etc.) are
+  installed by "make install":
   - elfutils-0.125.tar.gz
+    # tar -zxvf elfutils-0.125.tar.gz
+    # cd elfutils-0.125
+    # ./configure
+    # make
+    #
+    # mkdir /usr/local/include/elfutils/
+    # cp ./libdw/libdw.h   /usr/local/include/elfutils/libdw.h
+    # cp ./libdw/dwarf.h   /usr/local/include/dwarf.h
+    # cp ./libelf/libelf.h /usr/local/include/libelf.h
+    # cp ./libelf/gelf.h   /usr/local/include/gelf.h
+    #
+    # cp ./libelf/libelf.a /usr/local/lib/libelf.a
+    # cp ./libdw/libdw.a   /usr/local/lib/libdw.a
+    # cp ./libasm/libasm.a /usr/local/lib/libasm.a
+    # cp ./libebl/libebl.a /usr/local/lib/libebl.a
+    #
 
 * BUILD & INSTALL
   1.Get the latest makedumpfile from the following site:

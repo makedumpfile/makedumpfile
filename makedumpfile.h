@@ -75,7 +75,8 @@ enum {
  */
 enum {
 	PADDR,
-	VADDR
+	VADDR,
+	VADDR_XEN
 };
 
 
@@ -795,7 +796,8 @@ struct dwarf_info {
 
 extern struct dwarf_info	dwarf_info;
 
-int readmem();
+int readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
+    void *bufptr, size_t size);
 off_t paddr_to_offset();
 unsigned long long vaddr_to_paddr();
 
@@ -810,10 +812,6 @@ struct domain_list {
 
 #define DL_EXCLUDE_XEN	DL_EXCLUDE_FREE
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
-
-extern int
-readmem_xen(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
-	size_t size, char *errmsg);
 
 #ifdef __x86__
 #define HYPERVISOR_VIRT_START_PAE	(0xF5800000UL)

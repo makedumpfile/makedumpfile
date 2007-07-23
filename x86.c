@@ -89,8 +89,7 @@ kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr)
 	return entry;
 }
 
-int
-get_xen_info_x86(struct DumpInfo *info)
+int get_xen_info_x86(struct DumpInfo *info)
 {
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;
@@ -116,24 +115,26 @@ get_xen_info_x86(struct DumpInfo *info)
 		ERRMSG("Can't get the value of frame_table.\n");
 		return FALSE;
 	}
-	xen_info.frame_table_vaddr = frame_table_vaddr;
+	info->frame_table_vaddr = frame_table_vaddr;
 
 	if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end
 	      sizeof(xen_end))) {
 		ERRMSG("Can't get the value of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	xen_info.xen_heap_end = (xen_end >> PAGE_SHIFT);
-	xen_info.xen_heap_start = 0;
+	info->xen_heap_end = (xen_end >> PAGESHIFT());
+	info->xen_heap_start = 0;
 
-	/* pickled_id == domain addr for x86 */
-	for (i = 0; i < xen_info.num_domain; i++) {
-		xen_info.domain_list[i].pickled_id =
-			xen_info.domain_list[i].domain_addr;
+	/*
+	 * pickled_id == domain addr for x86
+	 */
+	for (i = 0; i < info->num_domain; i++) {
+		info->domain_list[i].pickled_id =
+			info->domain_list[i].domain_addr;
 	}
 
 	return TRUE;

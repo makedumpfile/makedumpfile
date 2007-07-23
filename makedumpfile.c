@@ -13,11 +13,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
-/*
- * TODO
- * 1. (i386) fill PT_LOAD headers with appropriate virtual addresses.
- */
 #include <stdlib.h>
 #include "makedumpfile.h"
 
@@ -28,7 +23,6 @@ struct array_table	array_table;
 struct srcfile_table	srcfile_table;
 
 struct dwarf_info	dwarf_info;
-struct xen_info		xen_info;
 struct vm_table		*vt = 0;
 
 int retcd = FAILED;	/* return code */
@@ -187,7 +181,7 @@ int
 readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
     void *bufptr, size_t size)
 {
-	off_t offset;
+	off_t offset = 0;
 	unsigned long long paddr;
 	const off_t failed = (off_t)-1;
 
@@ -213,21 +207,19 @@ readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
 		}
 		break;
 	case VADDR_XEN:
-		if (!(paddr = kvtop_xen(info, addr))) {
-			ERRMSG("Can't convert a virtual address(%llx) to physical address.\n",
-			    addr);
+		if (!(paddr = kvtop_xen(info, addr)))
 			return FALSE;
-		}
+
 		if (!(offset = paddr_to_offset(info, paddr))) {
-			ERRMSG("Can't convert a virtual address(%llx) to offset.\n",
-			    addr);
+			ERRMSG("Can't convert a physical address(%llx) to offset.\n",
+			    paddr);
 			return FALSE;
 		}
 		break;
 	default:
 		ERRMSG("Invalid address type (%d).\n", type_addr);
-		return FALSE;
 	}
+
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
@@ -325,8 +317,8 @@ check_release(struct DumpInfo *info)
 	 */
 	if (strcmp(system_utsname.release, info->release)) {
 		if (info->flag_read_config)
-  			ERRMSG("%s and %s don't match.\n",
-  			    info->name_configfile, info->name_memory);
+			ERRMSG("%s and %s don't match.\n",
+			    info->name_configfile, info->name_memory);
 		else
 			ERRMSG("%s and %s don't match.\n",
 			    dwarf_info.vmlinux_name, info->name_memory);
@@ -334,7 +326,7 @@ check_release(struct DumpInfo *info)
 		retcd = WRONG_RELEASE;
 		return FALSE;
 	}
-  	info->kernel_version = get_kernel_version(system_utsname.release);
+	info->kernel_version = get_kernel_version(system_utsname.release);
 	if (!info->kernel_version) {
 		ERRMSG("Can't convert the string of kernel version.\n");
 		return FALSE;
@@ -359,6 +351,14 @@ print_usage()
 	MSG("\n");
 	MSG("  Generating CONFIGFILE:\n");
 	MSG("  # makedumpfile -g CONFIGFILE -x VMLINUX\n");
+	MSG("\n");
+	MSG("\n");
+	MSG("  Creating DUMPFILE of Xen:\n");
+	MSG("  # makedumpfile -E [--xen-syms XEN-SYMS|--xen-config CONFIGFILE] VMCORE DUMPFILE\n");
+	MSG("\n");
+	MSG("  Generating CONFIGFILE of Xen:\n");
+	MSG("  # makedumpfile -g CONFIGFILE --xen-syms XEN-SYMS\n");
+	MSG("\n");
 	MSG("\n");
 	MSG("Available options:\n");
 	MSG("  [-c]:\n");
@@ -432,6 +432,12 @@ print_usage()
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile.\n");
 	MSG("\n");
+	MSG("  [--xen-syms XEN-SYMS]:\n");
+	MSG("      Specify the XEN-SYMS to analyze the xen's memory usage.\n");
+	MSG("\n");
+	MSG("  [--xen-config CONFIGFILE]:\n");
+	MSG("      Specify the CONFIGFILE of xen to analyze the xen's memory usage.\n");
+	MSG("\n");
 	MSG("  VMLINUX:\n");
 	MSG("      This is a pathname to the first kernel's vmlinux.\n");
 	MSG("      This file must have the debug information of the first kernel to analyze\n");
@@ -443,6 +449,11 @@ print_usage()
 	MSG("\n");
 	MSG("  DUMPFILE:\n");
 	MSG("      This is a pathname to a file created by this command.\n");
+	MSG("\n");
+	MSG("  XEN-SYMS:\n");
+	MSG("      This is a pathname to the xen-syms.\n");
+	MSG("      This file must have the debug information of the xen to analyze the\n");
+	MSG("      xen's memory usage.\n");
 	MSG("\n");
 }
 
@@ -2324,17 +2335,17 @@ get_node_memblk(struct DumpInfo *info, int num_memblk,
 		return FALSE;
 	}
 	node_memblk = SYMBOL(node_memblk) + SIZE(node_memblk_s) * num_memblk;
-	if (!readmem(info, node_memblk + OFFSET(node_memblk_s.start_paddr),
+	if (!readmem(info, VADDR, node_memblk+OFFSET(node_memblk_s.start_paddr),
 	    start_paddr, sizeof(unsigned long))) {
 		ERRMSG("Can't get node_memblk_s.start_paddr.\n");
 		return FALSE;
 	}
-	if (!readmem(info, node_memblk + OFFSET(node_memblk_s.size),
+	if (!readmem(info, VADDR, node_memblk + OFFSET(node_memblk_s.size),
 	    size, sizeof(unsigned long))) {
 		ERRMSG("Can't get node_memblk_s.size.\n");
 		return FALSE;
 	}
-	if (!readmem(info, node_memblk + OFFSET(node_memblk_s.nid),
+	if (!readmem(info, VADDR, node_memblk + OFFSET(node_memblk_s.nid),
 	    nid, sizeof(int))) {
 		ERRMSG("Can't get node_memblk_s.nid.\n");
 		return FALSE;
@@ -2463,17 +2474,20 @@ get_mm_discontigmem(struct DumpInfo *info)
 	}
 	id_mm = 0;
 	for (i = 0; i < vt->numnodes; i++) {
-		if (!readmem(info, VADDR, pgdat+OFFSET(pglist_data.node_mem_map),
+		if (!readmem(info, VADDR,
+		    pgdat + OFFSET(pglist_data.node_mem_map),
 		    &mem_map, sizeof mem_map)) {
 			ERRMSG("Can't get mem_map.\n");
 			return FALSE;
 		}
-		if (!readmem(info, VADDR, pgdat + OFFSET(pglist_data.node_start_pfn),
+		if (!readmem(info, VADDR,
+		    pgdat + OFFSET(pglist_data.node_start_pfn),
 		    &pfn_start, sizeof pfn_start)) {
 			ERRMSG("Can't get node_start_pfn.\n");
 			return FALSE;
 		}
-		if (!readmem(info, VADDR, pgdat+OFFSET(pglist_data.node_spanned_pages),
+		if (!readmem(info, VADDR,
+		    pgdat + OFFSET(pglist_data.node_spanned_pages),
 		    &node_spanned_pages, sizeof node_spanned_pages)) {
 			ERRMSG("Can't get node_spanned_pages.\n");
 			return FALSE;
@@ -2696,7 +2710,8 @@ get_mm_sparsemem(struct DumpInfo *info)
 		    strerror(errno));
 		return FALSE;
 	}
-	if (!readmem(info, VADDR, SYMBOL(mem_section), mem_sec, mem_section_size)) {
+	if (!readmem(info, VADDR, SYMBOL(mem_section), mem_sec,
+	    mem_section_size)) {
 		ERRMSG("Can't get the address of mem_section.\n");
 		goto out;
 	}
@@ -3301,8 +3316,8 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 			found_free_pages += i;
 
 			previous=curr;
-			if (!readmem(info, VADDR, curr + OFFSET(list_head.next), &curr,
-			    sizeof curr)) {
+			if (!readmem(info, VADDR, curr + OFFSET(list_head.next),
+			    &curr, sizeof curr)) {
 				ERRMSG("Can't get next list_head.\n");
 				return FALSE;
 			}
@@ -3366,7 +3381,8 @@ _exclude_free_page(struct DumpInfo *info)
 
 		for (i = 0; i < nr_zones; i++) {
 			zone = node_zones + (i * SIZE(zone));
-			if (!readmem(info, VADDR, zone + OFFSET(zone.spanned_pages),
+			if (!readmem(info, VADDR,
+			    zone + OFFSET(zone.spanned_pages),
 			    &spanned_pages, sizeof spanned_pages)) {
 				ERRMSG("Can't get spanned_pages.\n");
 				return FALSE;
@@ -4281,6 +4297,11 @@ write_elf_pages(struct DumpInfo *info)
 			if (info->flag_elf64) { /* ELF64 */
 				load64.p_paddr += load64.p_memsz;
 #ifdef __x86__
+				/*
+				 * FIXME:
+				 *  (x86) Fill PT_LOAD headers with appropriate
+				 *        virtual addresses.
+				 */
 				if (load64.p_paddr < MAXMEM)
 					load64.p_vaddr += load64.p_memsz;
 #else
@@ -4835,8 +4856,8 @@ get_xen_info(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of alloc_bitmap.\n");
 		return FALSE;
 	}
-        if (!readmem(info, VADDR_XEN, SYMBOL(alloc_bitmap), &xen_info.alloc_bitmap,
-	    sizeof(xen_info.alloc_bitmap))) {
+        if (!readmem(info, VADDR_XEN, SYMBOL(alloc_bitmap), &info->alloc_bitmap,
+	      sizeof(info->alloc_bitmap))) {
 		ERRMSG("Can't get the value of alloc_bitmap.\n");
 		return FALSE;
 	}
@@ -4844,48 +4865,52 @@ get_xen_info(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of max_page.\n");
 		return FALSE;
 	}
-        if (!readmem(info, VADDR_XEN, SYMBOL(max_page), &xen_info.max_page,
-	      sizeof(xen_info.max_page))) {
+        if (!readmem(info, VADDR_XEN, SYMBOL(max_page), &info->max_page,
+	      sizeof(info->max_page))) {
 		ERRMSG("Can't get the value of max_page.\n");
 		return FALSE;
 	}
 
-	/* walk through domain_list */
+	/*
+	 * Walk through domain_list
+	 */
 	if (SYMBOL(domain_list) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of domain_list.\n");
 		return FALSE;
 	}
 	if (!readmem(info, VADDR_XEN, SYMBOL(domain_list), &domain,
-	      sizeof(domain))) {
+	    sizeof(domain))) {
 		ERRMSG("Can't get the value of domain_list.\n");
 		return FALSE;
 	}
 
-	/* get numbers of domain first */
+	/*
+	 * Get numbers of domain first
+	 */
 	num_domain = 0;
 	while (domain) {
 		num_domain++;
-		if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.next_in_list),
-		      &domain, sizeof(domain))) {
+		if (!readmem(info, VADDR_XEN,
+		    domain + OFFSET(domain.next_in_list), &domain,
+		    sizeof(domain))) {
 			ERRMSG("Can't get through the domain_list.\n");
 			return FALSE;
 		}
 	}
 
-	if ((xen_info.domain_list = (struct domain_list *)
+	if ((info->domain_list = (struct domain_list *)
 	      malloc(sizeof(struct domain_list) * (num_domain + 2))) == NULL) {
 		ERRMSG("Can't allcate memory for domain_list.\n");
 		return FALSE;
 	}
 
-	xen_info.num_domain = num_domain + 2;
+	info->num_domain = num_domain + 2;
 
 	if (!readmem(info, VADDR_XEN, SYMBOL(domain_list), &domain,
 	      sizeof(domain))) {
 		ERRMSG("Can't get the value of domain_list.\n");
 		return FALSE;
 	}
-
 	num_domain = 0;
 	while (domain) {
 		if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id),
@@ -4893,54 +4918,62 @@ get_xen_info(struct DumpInfo *info)
 			ERRMSG("Can't get the domain_id.\n");
 			return FALSE;
 		}
-		xen_info.domain_list[num_domain].domain_addr = domain;
-		xen_info.domain_list[num_domain].domain_id = domain_id;
-		/* pickled_id is set by architecture specific */
+		info->domain_list[num_domain].domain_addr = domain;
+		info->domain_list[num_domain].domain_id = domain_id;
+		/*
+		 * pickled_id is set by architecture specific
+		 */
 		num_domain++;
 
-		if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.next_in_list),
-		      &domain, sizeof(domain))) {
+		if (!readmem(info, VADDR_XEN,
+		     domain + OFFSET(domain.next_in_list),
+		     &domain, sizeof(domain))) {
 			ERRMSG("Can't get through the domain_list.\n");
 			return FALSE;
 		}
 	}
 
-	/* special domains */
+	/*
+	 * special domains
+	 */
 	if (SYMBOL(dom_xen) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of dom_xen.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(dom_xen), &domain, sizeof(domain))) {
+	if (!readmem(info, VADDR_XEN, SYMBOL(dom_xen), &domain,
+	    sizeof(domain))) {
 		ERRMSG("Can't get the value of dom_xen.\n");
 		return FALSE;
 	}
-
-	if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id), &domain_id,
-	      sizeof(domain_id))) {
-		ERRMSG("Can't get the value of dom_xen domain_id.\n");
+	if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id),
+	    &domain_id, sizeof(domain_id))) {
+		ERRMSG( "Can't get the value of dom_xen domain_id.\n");
 		return FALSE;
 	}
-	xen_info.domain_list[num_domain].domain_addr = domain;
-	xen_info.domain_list[num_domain].domain_id = domain_id;
+	info->domain_list[num_domain].domain_addr = domain;
+	info->domain_list[num_domain].domain_id = domain_id;
 	num_domain++;
 
 	if (SYMBOL(dom_io) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of dom_io.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(dom_io), &domain, sizeof(domain))) {
+	if (!readmem(info, VADDR_XEN, SYMBOL(dom_io), &domain,
+	    sizeof(domain))) {
 		ERRMSG("Can't get the value of dom_io.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id), &domain_id,
-	      sizeof(domain_id))) {
-		ERRMSG("Can't get the value of dom_io domain_id.\n");
+	if (!readmem(info, VADDR_XEN, domain + OFFSET(domain.domain_id),
+	    &domain_id, sizeof(domain_id))) {
+		ERRMSG( "Can't get the value of dom_io domain_id.\n");
 		return FALSE;
 	}
-	xen_info.domain_list[num_domain].domain_addr = domain;
-	xen_info.domain_list[num_domain].domain_id = domain_id;
+	info->domain_list[num_domain].domain_addr = domain;
+	info->domain_list[num_domain].domain_id = domain_id;
 	
-	/* get architecture specific data */
+	/*
+	 * Get architecture specific data
+	 */
 	if (!get_xen_info_arch(info))
 		return FALSE;
 
@@ -4976,17 +5009,144 @@ show_data_xen(struct DumpInfo *info)
 	MSG("OFFSET(domain.next_in_list): %ld\n", OFFSET(domain.next_in_list));
 
 	MSG("\n");
-	MSG("frame_table_vaddr: %lx\n", xen_info.frame_table_vaddr);
-	MSG("xen_heap_start: %lx\n", xen_info.xen_heap_start);
-	MSG("xen_heap_end:%lx\n", xen_info.xen_heap_end);
-	MSG("alloc_bitmap: %lx\n", xen_info.alloc_bitmap);
-	MSG("max_page: %lx\n", xen_info.max_page);
-	MSG("num_domain: %d\n", xen_info.num_domain);
-	for (i = 0; i < xen_info.num_domain; i++) {
-		MSG(" %u: %x: %lx\n", xen_info.domain_list[i].domain_id,
-			xen_info.domain_list[i].pickled_id,
-			xen_info.domain_list[i].domain_addr);
+	MSG("frame_table_vaddr: %lx\n", info->frame_table_vaddr);
+	MSG("xen_heap_start: %lx\n", info->xen_heap_start);
+	MSG("xen_heap_end:%lx\n", info->xen_heap_end);
+	MSG("alloc_bitmap: %lx\n", info->alloc_bitmap);
+	MSG("max_page: %lx\n", info->max_page);
+	MSG("num_domain: %d\n", info->num_domain);
+	for (i = 0; i < info->num_domain; i++) {
+		MSG(" %u: %x: %lx\n", info->domain_list[i].domain_id,
+			info->domain_list[i].pickled_id,
+			info->domain_list[i].domain_addr);
 	}
+}
+
+int
+generate_config_xen(struct DumpInfo *info)
+{
+	if ((info->page_size = sysconf(_SC_PAGE_SIZE)) <= 0) {
+		ERRMSG("Can't get the size of page.\n");
+		return FALSE;
+	}
+
+	if (!get_symbol_info_xen(info))
+		return FALSE;
+
+	if (!get_structure_info_xen(info))
+		return FALSE;
+
+	/*
+	 * write 1st kernel's PAGESIZE
+	 */
+	fprintf(info->file_configfile, "%s%ld\n", STR_PAGESIZE,
+	    info->page_size);
+
+	/*
+	 * write the symbol of 1st kernel
+	 */
+	WRITE_SYMBOL("dom_xen", dom_xen);
+	WRITE_SYMBOL("dom_io", dom_io);
+	WRITE_SYMBOL("domain_list", domain_list);
+	WRITE_SYMBOL("xen_heap_start", xen_heap_start);
+	WRITE_SYMBOL("frame_table", frame_table);
+	WRITE_SYMBOL("alloc_bitmap", alloc_bitmap);
+	WRITE_SYMBOL("max_page", max_page);
+	WRITE_SYMBOL("pgd_l2", pgd_l2);
+	WRITE_SYMBOL("pgd_l3", pgd_l3);
+	WRITE_SYMBOL("pgd_l4", pgd_l4);
+	WRITE_SYMBOL("xenheap_phys_end", xenheap_phys_end);
+	WRITE_SYMBOL("xen_pstart", xen_pstart);
+	WRITE_SYMBOL("frametable_pg_dir", frametable_pg_dir);
+
+	/*
+	 * write the structure size of 1st kernel
+	 */
+	WRITE_STRUCTURE_SIZE("page_info", page_info);
+	WRITE_STRUCTURE_SIZE("domain", domain);
+
+	/*
+	 * write the member offset of 1st kernel
+	 */
+	WRITE_MEMBER_OFFSET("page_info.count_info", page_info.count_info);
+	WRITE_MEMBER_OFFSET("page_info._domain", page_info._domain);
+	WRITE_MEMBER_OFFSET("domain.domain_id", domain.domain_id);
+	WRITE_MEMBER_OFFSET("domain.next_in_list", domain.next_in_list);
+
+	return TRUE;
+}
+
+int
+read_config_basic_info_xen(struct DumpInfo *info)
+{
+	long page_size = FALSE;
+	char buf[BUFSIZE_FGETS], *endp;
+	unsigned int i;
+
+	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the config file(%s). %s\n",
+		    info->name_configfile, strerror(errno));
+		return FALSE;
+	}
+
+	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
+		i = strlen(buf);
+		if (buf[i - 1] == '\n')
+			buf[i - 1] = '\0';
+		if (strncmp(buf, STR_PAGESIZE, strlen(STR_PAGESIZE)) == 0) {
+			page_size = strtol(buf+strlen(STR_PAGESIZE),&endp,10);
+			if ((!page_size || page_size == LONG_MAX)
+			    || strlen(endp) != 0) {
+				ERRMSG("Invalid data in %s: %s",
+				    info->name_configfile, buf);
+				return FALSE;
+			}
+			if (!is_page_size(page_size)) {
+				ERRMSG("Invalid data in %s: %s",
+				    info->name_configfile, buf);
+				return FALSE;
+			}
+			break;
+		}
+	}
+	info->page_size = page_size;
+
+	if (!info->page_size) {
+		ERRMSG("Invalid format in %s", info->name_configfile);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+read_config_xen(struct DumpInfo *info)
+{
+	if (!read_config_basic_info_xen(info))
+		return FALSE;
+
+	READ_SYMBOL("dom_xen", dom_xen);
+	READ_SYMBOL("dom_io", dom_io);
+	READ_SYMBOL("domain_list", domain_list);
+	READ_SYMBOL("xen_heap_start", xen_heap_start);
+	READ_SYMBOL("frame_table", frame_table);
+	READ_SYMBOL("alloc_bitmap", alloc_bitmap);
+	READ_SYMBOL("max_page", max_page);
+	READ_SYMBOL("pgd_l2", pgd_l2);
+	READ_SYMBOL("pgd_l3", pgd_l3);
+	READ_SYMBOL("pgd_l4", pgd_l4);
+	READ_SYMBOL("xenheap_phys_end", xenheap_phys_end);
+	READ_SYMBOL("xen_pstart", xen_pstart);
+	READ_SYMBOL("frametable_pg_dir", frametable_pg_dir);
+
+	READ_STRUCTURE_SIZE("page_info", page_info);
+	READ_STRUCTURE_SIZE("domain", domain);
+
+	READ_MEMBER_OFFSET("page_info.count_info", page_info.count_info);
+	READ_MEMBER_OFFSET("page_info._domain", page_info._domain);
+	READ_MEMBER_OFFSET("domain.domain_id", domain.domain_id);
+	READ_MEMBER_OFFSET("domain.next_in_list", domain.next_in_list);
+
+	return TRUE;
 }
 
 int
@@ -4998,8 +5158,9 @@ allocated_in_map(struct DumpInfo *info, unsigned long pfn)
 
 	idx = pfn / PAGES_PER_MAPWORD;
 	if (idx != cur_idx) {
-		if (!readmem(info, VADDR_XEN, xen_info.alloc_bitmap + idx * sizeof(unsigned long),
-			&cur_word, sizeof(cur_word))) {
+		if (!readmem(info, VADDR_XEN,
+		    info->alloc_bitmap + idx * sizeof(unsigned long),
+		    &cur_word, sizeof(cur_word))) {
 			ERRMSG("Can't access alloc_bitmap.\n");
 			return 0;
 		}
@@ -5018,9 +5179,9 @@ is_select_domain(struct DumpInfo *info, unsigned int id)
 	   (yes... domain_list is not necessary right now, 
 		   it can get from "dom0" directly) */
 
-	for (i = 0; i < xen_info.num_domain; i++) {
-		if (xen_info.domain_list[i].domain_id == 0 &&
-		    xen_info.domain_list[i].pickled_id == id)
+	for (i = 0; i < info->num_domain; i++) {
+		if (info->domain_list[i].domain_id == 0 &&
+		    info->domain_list[i].pickled_id == id)
 			return TRUE;
 	}
 
@@ -5058,7 +5219,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 	for (i = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
 
-		for (; pfn < (unsigned long)(pls->phys_start >> PAGE_SHIFT); pfn++) { /* memory hole */
+		for (; pfn < (unsigned long)(pls->phys_start >> PAGESHIFT()); pfn++) { /* memory hole */
 			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
 				bm2.buf_size = BUFSIZE_BITMAP;
 				if (!write_cache_bufsz(&bm2))
@@ -5067,7 +5228,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 			}
 		}
 
-		for (; pfn < (unsigned long)(pls->phys_end >> PAGE_SHIFT); pfn++) {
+		for (; pfn < (unsigned long)(pls->phys_end >> PAGESHIFT()); pfn++) {
 
 			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
 				bm2.buf_size = BUFSIZE_BITMAP;
@@ -5079,7 +5240,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 			if (!allocated_in_map(info, pfn))
 				continue;
 
-			page_info_addr = xen_info.frame_table_vaddr + pfn * SIZE(page_info);
+			page_info_addr = info->frame_table_vaddr + pfn * SIZE(page_info);
 			if (!readmem(info, VADDR_XEN,
 			      page_info_addr + OFFSET(page_info.count_info),
 		 	      &count_info, sizeof(count_info))) {
@@ -5091,8 +5252,6 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 				ERRMSG("Can't get page_info._domain.\n");
 				goto out;
 			}
-
-//			fprintf(stderr, "pfn: %lx\t%lx\t%lx\n", pfn, count_info, _domain);
 			/*
 			 * select:
 			 *  - anonymous (_domain == 0), or
@@ -5100,7 +5259,7 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 			 *  - selected domain page
 			 */
 			if (_domain == 0 ||
-				(xen_info.xen_heap_start <= pfn && pfn < xen_info.xen_heap_end) ||
+				(info->xen_heap_start <= pfn && pfn < info->xen_heap_end) ||
 				((count_info & 0xffff) && is_select_domain(info, _domain))) {
 				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 1);
 			}
@@ -5129,11 +5288,15 @@ initial_xen(struct DumpInfo *info)
 	if (!get_elf_info(info))
 		return FALSE;
 
-	if (!get_symbol_info_xen(info))
-		return FALSE;
-
-	if (!get_structure_info_xen(info))
-		return FALSE;
+	if (info->flag_read_config) {
+		if (!read_config_xen(info))
+			return FALSE;
+	} else {
+		if (!get_symbol_info_xen(info))
+			return FALSE;
+		if (!get_structure_info_xen(info))
+			return FALSE;
+	}
 
 	if (!get_xen_info(info))
 		return FALSE;
@@ -5143,6 +5306,40 @@ initial_xen(struct DumpInfo *info)
 
 	return TRUE;
 }
+
+int
+handle_xen(struct DumpInfo *info)
+{
+	if (!open_files_for_creating_dumpfile(info))
+		goto out;
+
+	if (!initial_xen(info))
+		goto out;
+
+	if (!create_dump_bitmap_xen(info))
+		goto out;
+
+	if (!write_elf_header(info))
+		goto out;
+	if (!write_elf_pages(info))
+		goto out;
+
+	if (!close_files_for_creating_dumpfile(info))
+		goto out;
+
+	MSG("\n");
+	MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
+
+	return COMPLETED;
+out:
+	return FALSE;
+}
+
+static struct option longopts[] = {
+	{"xen-syms", required_argument, NULL, 'X'},
+	{"xen-config", required_argument, NULL, 'z'},
+	{0, 0, 0, 0}
+};
 
 int
 main(int argc, char *argv[])
@@ -5164,7 +5361,8 @@ main(int argc, char *argv[])
 	vt = &info->vm_table;
 
 	info->block_order = DEFAULT_ORDER;
-	while ((opt = getopt(argc, argv, "b:cDd:EFfg:hi:RvXx:")) != -1) {
+	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:Rvx:", longopts,
+	    NULL)) != -1) {
 		switch (opt) {
 		case 'b':
 			info->block_order = atoi(optarg);
@@ -5208,10 +5406,16 @@ main(int argc, char *argv[])
 			break;
 		case 'X':
 			info->flag_xen = 1;
+			dwarf_info.vmlinux_name = optarg;
 			break;
 		case 'x':
 			info->flag_vmlinux = 1;
 			dwarf_info.vmlinux_name = optarg;
+			break;
+		case 'z':
+			info->flag_xen = 1;
+			info->flag_read_config = 1;
+			info->name_configfile = optarg;
 			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");
@@ -5238,7 +5442,7 @@ main(int argc, char *argv[])
 		}
 		if (info->flag_compress || info->dump_level
 		    || info->flag_elf_dumpfile || info->flag_read_config
-		    || !info->flag_vmlinux || info->flag_flatten
+		    || !dwarf_info.vmlinux_name || info->flag_flatten
 		    || info->flag_rearrange) {
 			MSG("Commandline parameter is invalid.\n");
 			print_usage();
@@ -5301,29 +5505,31 @@ main(int argc, char *argv[])
 		ERRMSG("Elf library out of date!\n");
 		goto out;
 	}
-	if (info->flag_xen) {
-		if (!info->flag_elf_dumpfile) {
-			ERRMSG("-E must be specified with -X.\n");
-			goto out;
-		}
-		if (!info->flag_vmlinux) {
-			ERRMSG("-x xen-syms must be specified with -X.\n");
-			goto out;
-		}
-		info->dump_level = DL_EXCLUDE_XEN;
-	}
 	if (info->flag_generate_config) {
 		if (!open_files_for_generating_configfile(info))
 			goto out;
 
-		if (!generate_config(info))
-			goto out;
+		if (info->flag_xen) {
+			if (!generate_config_xen(info))
+				goto out;
+		} else {
+			if (!generate_config(info))
+				goto out;
+		}
 
 		if (!close_files_for_generating_configfile(info))
 			goto out;
 
 		MSG("\n");
 		MSG("The configfile is saved to %s.\n", info->name_configfile);
+
+	} else if (info->flag_xen) {
+		if (!info->flag_elf_dumpfile) {
+			MSG("-E must be specified with --xen-syms or --xen-config.\n");
+			goto out;
+		}
+		info->dump_level = DL_EXCLUDE_XEN;
+		return handle_xen(info);
 
 	} else if (info->flag_rearrange) {
 		if (!open_files_for_rearranging_dumpdata(info))
@@ -5341,19 +5547,11 @@ main(int argc, char *argv[])
 		if (!open_files_for_creating_dumpfile(info))
 			goto out;
 
-		if (info->flag_xen) {
-			if (!initial_xen(info))
-				goto out;
+		if (!initial(info))
+			goto out;
 
-			if (!create_dump_bitmap_xen(info))
-				goto out;
-		} else {
-			if (!initial(info))
-				goto out;
-
-			if (!create_dump_bitmap(info))
-				goto out;
-		}
+		if (!create_dump_bitmap(info))
+			goto out;
 
 		if (info->flag_flatten) {
 			if (!write_start_flat_header(info))

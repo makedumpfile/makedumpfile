@@ -1515,9 +1515,13 @@ get_structure_info(struct DumpInfo *info)
 	OFFSET_INIT(page.flags, "page", "flags");
 	OFFSET_INIT(page._count, "page", "_count");
 
-	if (info->kernel_version == VERSION_2_6_15)
-		OFFSET_INIT(page.mapping, "page", "mapping");
-	else
+	OFFSET_INIT(page.mapping, "page", "mapping");
+
+	/*
+	 * On linux-2.6.16 or later, page.mapping is defined
+	 * in anonymous union.
+	 */
+	if (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE)
 		OFFSET_INIT_NONAME(page.mapping, "page",
 		   sizeof(unsigned long));
 

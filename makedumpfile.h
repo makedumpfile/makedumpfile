@@ -348,6 +348,7 @@ do { \
 #define SIZE_BUF_STDIN	(4096)
 #define ELF32		(1)
 #define ELF64		(2)
+#define STRLEN_OSRELEASE (65)	/* same length as diskdump.h */
 
 /*
  * The value of dependence on machine
@@ -630,8 +631,7 @@ struct DumpInfo {
 	 */
 	FILE			*file_configfile;
 	char			*name_configfile;	     /* config file */
-	char			release[65]; /*Can I define 65 automatically?*/
-
+	char			release[STRLEN_OSRELEASE];
 };
 
 /*
@@ -816,6 +816,7 @@ unsigned long long vaddr_to_paddr();
 int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
+int get_str_osrelease_from_vmlinux(struct DumpInfo *info);
 
 /*
  * for Xen extraction

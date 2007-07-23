@@ -61,6 +61,36 @@
 * USAGE
   Please see "man makedumpfile" or "makedumpfile -h".
 
+* TODO
+  1. Extending the supported kernels.
+
+* FAQ
+  001: It cannot be compiled with the following messages:
+    # make
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./x86.o ./x86.c
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./x86_64.o ./x86_64.c
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./ia64.o ./ia64.c
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./ppc64.o ./ppc64.c
+    gcc -g -O2 -Wall -D_FILE_OFFSET_BITS=64 -DVERSION='"1.1.4"'
+    -DRELEASE_DATE='"08 June 2007"' -D__x86_64__ x86.o x86_64.o ia64.o
+    ppc64.o-o makedumpfile
+    makedumpfile.c -static -ldw -lelf -lz
+    /tmp/ccYv3cGF.o: In function `get_debug_info':
+    /tmp/makedumpfile/makedumpfile.c:1341: undefined reference to
+    `elf_getshstrndx'
+    collect2: ld returned 1 exit status
+    make: *** [makedumpfile] Error 1
+    #
+
+    The compiler cannot find out elf_getshstrndx() because it tries
+    searching it only from /usr/lib/libelf.a though elf_getshstrndx()
+    is defined in /usr/local/lib/libelf.a.
+    To solve the problem, the option (-L/usr/local/lib/) is added to
+    CFLAGS of Makefile like the following:
+
+    CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 -L/usr/local/lib/ \
+        -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
+
 * REFERENCES
   https://sourceforge.net/projects/makedumpfile/
   http://lists.infradead.org/pipermail/kexec/

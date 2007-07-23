@@ -567,6 +567,7 @@ struct DumpInfo {
 						format to a standard out */
 	int		flag_rearrange;      /* flag of creating dumpfile from
 						flattened format */
+	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_xen;
 	long		page_size;           /* size of page */
 	long		page_shift;

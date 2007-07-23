@@ -423,6 +423,9 @@ print_usage()
 	MSG("  [-D]:\n");
 	MSG("      Print the debug information.\n");
 	MSG("\n");
+	MSG("  [-f]:\n");
+	MSG("      Overwrite DUMPFILE even if it already exists.\n");
+	MSG("\n");
 	MSG("  [-h]:\n");
 	MSG("      Show the help message.\n");
 	MSG("\n");
@@ -489,6 +492,10 @@ int
 open_dump_file(struct DumpInfo *info)
 {
 	int fd;
+	int open_flags = O_RDWR|O_CREAT;
+
+	if (!info->flag_force)
+		open_flags |= O_EXCL;
 
 	if (info->flag_flatten) {
 		if ((info->name_dumpfile
@@ -500,7 +507,7 @@ open_dump_file(struct DumpInfo *info)
 		fd = STDOUT_FILENO;
 		strcpy(info->name_dumpfile, FILENAME_STDOUT);
 
-	} else if ((fd = open(info->name_dumpfile, O_RDWR|O_CREAT|O_EXCL,
+	} else if ((fd = open(info->name_dumpfile, open_flags,
 	    S_IRUSR|S_IWUSR)) < 0) {
 		ERRMSG("Can't open the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
@@ -5155,7 +5162,7 @@ main(int argc, char *argv[])
 	vt = &info->vm_table;
 
 	info->block_order = DEFAULT_ORDER;
-	while ((opt = getopt(argc, argv, "b:cDd:EFg:hi:RvXx:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:cDd:EFfg:hi:RvXx:")) != -1) {
 		switch (opt) {
 		case 'b':
 			info->block_order = atoi(optarg);
@@ -5176,6 +5183,9 @@ main(int argc, char *argv[])
 			break;
 		case 'F':
 			info->flag_flatten = 1;
+			break;
+		case 'f':
+			info->flag_force = 1;
 			break;
 		case 'g':
 			info->flag_generate_config = 1;

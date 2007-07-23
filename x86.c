@@ -121,7 +121,7 @@ int get_xen_info_x86(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end
+	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
 	      sizeof(xen_end))) {
 		ERRMSG("Can't get the value of xenheap_phys_end.\n");
 		return FALSE;

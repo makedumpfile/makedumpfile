@@ -308,16 +308,19 @@ do { \
 
 /*
  * kernel version
+ *
+ * NOTE: the format of kernel_version is as follows
+ *   8 bits major version
+ *   8 bits minor version
+ *  16 bits release
+ * so version 2.6.18 would be encoded as 0x02060012
+ * These macros will let us decode that easier
  */
-#define VERSION_2_6_15		(15)
-#define VERSION_2_6_16		(16)
-#define VERSION_2_6_17		(17)
-#define VERSION_2_6_18		(18)
-#define VERSION_2_6_19		(19)
-#define VERSION_2_6_20		(20)
-#define VERSION_2_6_21		(21)
-#define LATEST_VERSION		VERSION_2_6_21
-#define STR_LATEST_VERSION	"linux-2.6.21"
+#define KVER_MAJ_SHIFT 24
+#define KVER_MIN_SHIFT 16
+#define KERNEL_VERSION(x,y,z) (((x) << KVER_MAJ_SHIFT) | ((y) << KVER_MIN_SHIFT) | (z))
+#define OLDEST_VERSION		(0x0206000f)	/* linux-2.6.15 */
+#define LATEST_VERSION		(0x02060015)	/* linux-2.6.21 */
 
 /*
  * field name of config file
@@ -541,7 +544,7 @@ struct makedumpfile_data_header {
 };
 
 struct DumpInfo {
-	int		kernel_version;      /* version of first kernel */
+	int32_t		kernel_version;      /* version of first kernel*/
 
 	/*
 	 * General info:

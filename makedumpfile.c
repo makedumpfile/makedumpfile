@@ -1491,6 +1491,7 @@ get_symbol_info(struct DumpInfo *info)
 	SYMBOL_INIT(swapper_pg_dir, "swapper_pg_dir");
 	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
+	SYMBOL_INIT(node_memblk, "node_memblk");
 	SYMBOL_INIT(node_data, "node_data");
 	SYMBOL_INIT(pgdat_list, "pgdat_list");
 	SYMBOL_INIT(contig_page_data, "contig_page_data");
@@ -1501,6 +1502,8 @@ get_symbol_info(struct DumpInfo *info)
 		SYMBOL_ARRAY_LENGTH_INIT(pgdat_list, "pgdat_list");
 	if (SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_LENGTH_INIT(mem_section, "mem_section");
+	if (SYMBOL(node_memblk) != NOT_FOUND_SYMBOL)
+		SYMBOL_ARRAY_LENGTH_INIT(node_memblk, "node_memblk");
 
 	return TRUE;
 }
@@ -1568,6 +1571,14 @@ get_structure_info(struct DumpInfo *info)
 	SIZE_INIT(list_head, "list_head");
 	OFFSET_INIT(list_head.next, "list_head", "next");
 	OFFSET_INIT(list_head.prev, "list_head", "prev");
+
+	/*
+	 * Get offsets of the node_memblk_s's members.
+	 */
+	SIZE_INIT(node_memblk_s, "node_memblk_s");
+	OFFSET_INIT(node_memblk_s.start_paddr, "node_memblk_s", "start_paddr");
+	OFFSET_INIT(node_memblk_s.size, "node_memblk_s", "size");
+	OFFSET_INIT(node_memblk_s.nid, "node_memblk_s", "nid");
 
 	return TRUE;
 }
@@ -1701,6 +1712,7 @@ generate_config(struct DumpInfo *info)
 	WRITE_STRUCTURE_SIZE("zone", zone);
 	WRITE_STRUCTURE_SIZE("free_area", free_area);
 	WRITE_STRUCTURE_SIZE("list_head", list_head);
+	WRITE_STRUCTURE_SIZE("node_memblk_s", node_memblk_s);
 
 	/*
 	 * write the member offset of 1st kernel
@@ -1727,6 +1739,9 @@ generate_config(struct DumpInfo *info)
 	WRITE_MEMBER_OFFSET("free_area.free_list", free_area.free_list);
 	WRITE_MEMBER_OFFSET("list_head.next", list_head.next);
 	WRITE_MEMBER_OFFSET("list_head.prev", list_head.prev);
+	WRITE_MEMBER_OFFSET("node_memblk_s.start_paddr", node_memblk_s.start_paddr);
+	WRITE_MEMBER_OFFSET("node_memblk_s.size", node_memblk_s.size);
+	WRITE_MEMBER_OFFSET("node_memblk_s.nid", node_memblk_s.nid);
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("node_data", node_data);
@@ -1734,6 +1749,8 @@ generate_config(struct DumpInfo *info)
 		WRITE_ARRAY_LENGTH("pgdat_list", pgdat_list);
 	if (SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("mem_section", mem_section);
+	if (SYMBOL(node_memblk) != NOT_FOUND_SYMBOL)
+		WRITE_ARRAY_LENGTH("node_memblk", node_memblk);
 
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
@@ -1904,6 +1921,7 @@ read_config(struct DumpInfo *info)
 	READ_STRUCTURE_SIZE("zone", zone);
 	READ_STRUCTURE_SIZE("free_area", free_area);
 	READ_STRUCTURE_SIZE("list_head", list_head);
+	READ_STRUCTURE_SIZE("node_memblk_s", node_memblk_s);
 
 	READ_MEMBER_OFFSET("page.flags", page.flags);
 	READ_MEMBER_OFFSET("page._count", page._count);
@@ -1926,10 +1944,14 @@ read_config(struct DumpInfo *info)
 	READ_MEMBER_OFFSET("free_area.free_list", free_area.free_list);
 	READ_MEMBER_OFFSET("list_head.next", list_head.next);
 	READ_MEMBER_OFFSET("list_head.prev", list_head.prev);
+	READ_MEMBER_OFFSET("node_memblk_s.start_paddr", node_memblk_s.start_paddr);
+	READ_MEMBER_OFFSET("node_memblk_s.size", node_memblk_s.size);
+	READ_MEMBER_OFFSET("node_memblk_s.nid", node_memblk_s.nid);
 
 	READ_ARRAY_LENGTH("node_data", node_data);
 	READ_ARRAY_LENGTH("pgdat_list", pgdat_list);
 	READ_ARRAY_LENGTH("mem_section", mem_section);
+	READ_ARRAY_LENGTH("node_memblk", node_memblk);
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	READ_SRCFILE("pud_t", pud_t);
@@ -2151,11 +2173,141 @@ get_mm_flatmem(struct DumpInfo *info)
 }
 
 int
+get_node_memblk(struct DumpInfo *info, int num_memblk,
+    unsigned long *start_paddr, unsigned long *size, int *nid)
+{
+	unsigned long node_memblk;
+
+	if (ARRAY_LENGTH(node_memblk) < num_memblk) {
+		ERRMSG("Invalid num_memblk.\n");
+		return FALSE;
+	}
+	node_memblk = SYMBOL(node_memblk) + SIZE(node_memblk_s) * num_memblk;
+	if (!readmem(info, node_memblk + OFFSET(node_memblk_s.start_paddr),
+	    start_paddr, sizeof(unsigned long))) {
+		ERRMSG("Can't get node_memblk_s.start_paddr.\n");
+		return FALSE;
+	}
+	if (!readmem(info, node_memblk + OFFSET(node_memblk_s.size),
+	    size, sizeof(unsigned long))) {
+		ERRMSG("Can't get node_memblk_s.size.\n");
+		return FALSE;
+	}
+	if (!readmem(info, node_memblk + OFFSET(node_memblk_s.nid),
+	    nid, sizeof(int))) {
+		ERRMSG("Can't get node_memblk_s.nid.\n");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+get_num_mm_discontigmem(struct DumpInfo *info)
+{
+	int i, nid;
+	unsigned long start_paddr, size;
+
+	if ((SYMBOL(node_memblk) == NOT_FOUND_SYMBOL)
+	    || (ARRAY_LENGTH(node_memblk) == NOT_FOUND_STRUCTURE)
+            || (SIZE(node_memblk_s) == NOT_FOUND_STRUCTURE)
+            || (OFFSET(node_memblk_s.start_paddr) == NOT_FOUND_STRUCTURE)
+            || (OFFSET(node_memblk_s.size) == NOT_FOUND_STRUCTURE)
+            || (OFFSET(node_memblk_s.nid) == NOT_FOUND_STRUCTURE)) {
+		return vt->numnodes;
+	} else {
+		for (i = 0; i < ARRAY_LENGTH(node_memblk); i++) {
+			if (!get_node_memblk(info, i, &start_paddr, &size, &nid)) {
+				ERRMSG("Can't get the node_memblk (%d)\n", i);
+				return 0;
+			}
+			if (!start_paddr && !size &&!nid)
+				break;
+
+			if (info->flag_debug) {
+				MSG("nid : %d\n", nid);
+				MSG("  start_paddr: %lx\n", start_paddr);
+				MSG("  size       : %lx\n", size);
+			}
+		}
+		if (i == 0) {
+			/*
+			 * On non-NUMA systems, node_memblk_s is not set.
+			 */
+			return vt->numnodes;
+		} else {
+			return i;
+		}
+	}
+}
+
+int
+separate_mem_map(struct DumpInfo *info, struct mem_map_data *mmd,
+    int *id_mm, int nid_pgdat, unsigned long mem_map_pgdat,
+    unsigned long pfn_start_pgdat)
+{
+	int i, nid;
+	unsigned long start_paddr, size, pfn_start, pfn_end, mem_map;
+
+	for (i = 0; i < ARRAY_LENGTH(node_memblk); i++) {
+		if (!get_node_memblk(info, i, &start_paddr, &size, &nid)) {
+			ERRMSG("Can't get the node_memblk (%d)\n", i);
+			return FALSE;
+		}
+		if (!start_paddr && !size && !nid)
+			break;
+
+		/*
+		 * Check pglist_data.node_id and node_memblk_s.nid much.
+		 */
+		if (nid_pgdat != nid)
+			continue;
+
+		pfn_start = start_paddr / info->page_size;
+		pfn_end   = pfn_start + (size / info->page_size);
+
+		if (pfn_start < pfn_start_pgdat) {
+			ERRMSG("node_memblk_s.start_paddr of node (%d) is invalid.\n", nid);
+			return FALSE;
+		}
+		if (info->max_mapnr < pfn_end) {
+			if (info->flag_debug) {
+				MSG("pfn_end of node (%d) is over max_mapnr.\n",
+				    nid);
+				MSG("  pfn_start: %lx\n", pfn_start);
+				MSG("  pfn_end  : %lx\n", pfn_end);
+				MSG("  max_mapnr: %llx\n", info->max_mapnr);
+			}
+			pfn_end = info->max_mapnr;
+		}
+
+		mem_map = mem_map_pgdat+SIZE(page)*(pfn_start-pfn_start_pgdat);
+
+		mmd->pfn_start = pfn_start;
+		mmd->pfn_end   = pfn_end;
+		mmd->mem_map   = mem_map;
+
+		mmd++;
+		(*id_mm)++;
+	}
+	return TRUE;
+}
+
+int
 get_mm_discontigmem(struct DumpInfo *info)
 {
-	int i, j, num_nodes, node, num_mem_map;
+	int i, j, id_mm, node, num_mem_map, separate_mm = FALSE;
 	unsigned long pgdat, mem_map, pfn_start, pfn_end, node_spanned_pages;
-	struct mem_map_data temp_mmd, mmd[vt->numnodes];
+	struct mem_map_data temp_mmd;
+
+	num_mem_map = get_num_mm_discontigmem(info);
+	if (num_mem_map < vt->numnodes) {
+		ERRMSG("Can't get the number of mem_map.\n");
+		return FALSE;
+	}
+	struct mem_map_data mmd[num_mem_map];
+	if (vt->numnodes < num_mem_map) {
+		separate_mm = TRUE;
+	}
 
 	/*
 	 * Get the first node_id.
@@ -2168,7 +2320,8 @@ get_mm_discontigmem(struct DumpInfo *info)
 		ERRMSG("Can't get pgdat list.\n");
 		return FALSE;
 	}
-	for (num_nodes = 1; num_nodes <= vt->numnodes; num_nodes++) {
+	id_mm = 0;
+	for (i = 0; i < vt->numnodes; i++) {
 		if (!readmem(info, VADDR, pgdat+OFFSET(pglist_data.node_mem_map),
 		    &mem_map, sizeof mem_map)) {
 			ERRMSG("Can't get mem_map.\n");
@@ -2186,24 +2339,55 @@ get_mm_discontigmem(struct DumpInfo *info)
 		}
 		pfn_end = pfn_start + node_spanned_pages;
 
-		if (info->max_mapnr < pfn_end) {
-			if (info->flag_debug) {
-				MSG("pfn_end of node (%d) is over max_mapnr.\n", num_nodes - 1);
-				MSG("  pfn_start: %lx\n", pfn_start);
-				MSG("  pfn_end  : %lx\n", pfn_end);
-				MSG("  max_mapnr: %llx\n", info->max_mapnr);
+		if (separate_mm) {
+			/*
+			 * For some ia64 NUMA systems.
+			 * On some systems, a node has the separated memory.
+			 * And pglist_data(s) have the dumplicated memory range
+			 * like following:
+			 *
+			 * Nid:      Physical address
+			 *  0 : 0x1000000000 - 0x2000000000
+			 *  1 : 0x2000000000 - 0x3000000000
+			 *  2 : 0x0000000000 - 0x6020000000 <- Duplicated
+			 *  3 : 0x3000000000 - 0x4000000000
+			 *  4 : 0x4000000000 - 0x5000000000
+			 *  5 : 0x5000000000 - 0x6000000000
+			 *
+			 * Then, mem_map(s) should be separated by
+			 * node_memblk_s info.
+			 */
+			if (!separate_mem_map(info, &mmd[id_mm], &id_mm, node,
+			    mem_map, pfn_start)) {
+				ERRMSG("Can't separate mem_map.\n");
+				return FALSE;
 			}
-			pfn_end = info->max_mapnr;
-		}
+		} else {
+			if (info->max_mapnr < pfn_end) {
+				if (info->flag_debug) {
+					MSG("pfn_end of node (%d) is over max_mapnr.\n",
+					    node);
+					MSG("  pfn_start: %lx\n", pfn_start);
+					MSG("  pfn_end  : %lx\n", pfn_end);
+					MSG("  max_mapnr: %llx\n", info->max_mapnr);
+				}
+				pfn_end = info->max_mapnr;
+			}
 
-		mmd[num_nodes - 1].pfn_start = pfn_start;
-		mmd[num_nodes - 1].pfn_end   = pfn_end;
-		mmd[num_nodes - 1].mem_map   = mem_map;
+			/*
+			 * The number of mem_map is the same as the number
+			 * of nodes.
+			 */
+			mmd[id_mm].pfn_start = pfn_start;
+			mmd[id_mm].pfn_end   = pfn_end;
+			mmd[id_mm].mem_map   = mem_map;
+			id_mm++;
+		}
 
 		/*
 		 * Get pglist_data of the next node.
 		 */
-		if (num_nodes < vt->numnodes) {
+		if (i < (vt->numnodes - 1)) {
 			if ((node = next_online_node(node + 1)) < 0) {
 				ERRMSG("Can't get next online node.\n");
 				return FALSE;
@@ -2218,8 +2402,8 @@ get_mm_discontigmem(struct DumpInfo *info)
 	/*
 	 * Sort mem_map by pfn_start.
 	 */
-	for (i = 0; i < vt->numnodes - 1; i++) {
-		for (j = i + 1; j < vt->numnodes; j++) {
+	for (i = 0; i < (num_mem_map - 1); i++) {
+		for (j = i + 1; j < num_mem_map; j++) {
 			if (mmd[j].pfn_start < mmd[i].pfn_start) {
 				temp_mmd = mmd[j];
 				mmd[j] = mmd[i];
@@ -2231,13 +2415,13 @@ get_mm_discontigmem(struct DumpInfo *info)
 	/*
 	 * Calculate the number of mem_map.
 	 */
-	info->num_mem_map = vt->numnodes;
+	info->num_mem_map = num_mem_map;
 	if (mmd[0].pfn_start != 0)
 		info->num_mem_map++;
 
-	for (i = 0; i < vt->numnodes - 1; i++) {
+	for (i = 0; i < num_mem_map - 1; i++) {
 		if (mmd[i].pfn_end > mmd[i + 1].pfn_start) {
-			ERRMSG("The mem_map overlapped.\n");
+			ERRMSG("The mem_map is overlapped.\n");
 			ERRMSG("mmd[%d].pfn_end   = %llx\n", i, mmd[i].pfn_end);
 			ERRMSG("mmd[%d].pfn_start = %llx\n", i + 1, mmd[i + 1].pfn_start);
 			return FALSE;
@@ -2252,7 +2436,7 @@ get_mm_discontigmem(struct DumpInfo *info)
 		 */
 		info->num_mem_map++;
 	}
-	if (mmd[vt->numnodes - 1].pfn_end < info->max_mapnr)
+	if (mmd[num_mem_map - 1].pfn_end < info->max_mapnr)
 		info->num_mem_map++;
 
 	if ((info->mem_map_data = (struct mem_map_data *)
@@ -2265,27 +2449,26 @@ get_mm_discontigmem(struct DumpInfo *info)
 	/*
 	 * Create mem_map data.
 	 */
-	num_mem_map = 0;
+	id_mm = 0;
 	if (mmd[0].pfn_start != 0) {
-		dump_mem_map(info, 0, mmd[0].pfn_start, NOT_MEMMAP_ADDR,
-		    num_mem_map);
-		num_mem_map++;
+		dump_mem_map(info, 0, mmd[0].pfn_start, NOT_MEMMAP_ADDR, id_mm);
+		id_mm++;
 	}
-	for (i = 0; i < vt->numnodes; i++) {
+	for (i = 0; i < num_mem_map; i++) {
 		dump_mem_map(info, mmd[i].pfn_start, mmd[i].pfn_end,
-		    mmd[i].mem_map, num_mem_map);
-		num_mem_map++;
-		if ((i < vt->numnodes - 1)
+		    mmd[i].mem_map, id_mm);
+		id_mm++;
+		if ((i < num_mem_map - 1)
 		    && (mmd[i].pfn_end != mmd[i + 1].pfn_start)) {
 			dump_mem_map(info, mmd[i].pfn_end, mmd[i +1].pfn_start,
-			    NOT_MEMMAP_ADDR, num_mem_map);
-			num_mem_map++;
+			    NOT_MEMMAP_ADDR, id_mm);
+			id_mm++;
 		}
 	}
-	i = vt->numnodes - 1;
+	i = num_mem_map - 1;
 	if (mmd[i].pfn_end < info->max_mapnr)
 		dump_mem_map(info, mmd[i].pfn_end, info->max_mapnr,
-		    NOT_MEMMAP_ADDR, num_mem_map);
+		    NOT_MEMMAP_ADDR, id_mm);
 
 	return TRUE;
 }

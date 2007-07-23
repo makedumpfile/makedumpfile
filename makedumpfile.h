@@ -935,3 +935,8 @@ int get_xen_info_ia64(struct DumpInfo *info);
 
 #endif	/* __ia64 */
 
+#ifdef __powerpc__ /* powerpc */
+#define kvtop_xen(X, Y)	FALSE
+#define get_xen_info_arch(X) FALSE
+#endif	/* powerpc */
+

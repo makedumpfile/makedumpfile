@@ -4810,7 +4810,9 @@ close_files_for_creating_dumpfile(struct DumpInfo *info)
 int
 get_symbol_info_xen(struct DumpInfo *info)
 {
-	/* common symbol */
+	/*
+	 * Common symbol
+	 */
 	SYMBOL_INIT(dom_xen, "dom_xen");
 	SYMBOL_INIT(dom_io, "dom_io");
 	SYMBOL_INIT(domain_list, "domain_list");
@@ -4819,7 +4821,9 @@ get_symbol_info_xen(struct DumpInfo *info)
 	SYMBOL_INIT(max_page, "max_page");
 	SYMBOL_INIT(xenheap_phys_end, "xenheap_phys_end");
 
-	/* architecture specific */
+	/*
+	 * Architecture specific
+	 */
 	SYMBOL_INIT(pgd_l2, "idle_pg_table_l2");	/* x86 */
 	SYMBOL_INIT(pgd_l3, "idle_pg_table_l3");	/* x86-PAE */
 	SYMBOL_INIT(pgd_l4, "idle_pg_table_4");		/* x86_64 */
@@ -4835,7 +4839,9 @@ get_structure_info_xen(struct DumpInfo *info)
 {
 	SIZE_INIT(page_info, "page_info");
 	OFFSET_INIT(page_info.count_info, "page_info", "count_info");
-	/* _domain is the first member of union u */
+	/*
+	 * _domain is the first member of union u
+	 */
 	OFFSET_INIT(page_info._domain, "page_info", "u");
 
 	SIZE_INIT(domain, "domain");
@@ -5310,6 +5316,12 @@ initial_xen(struct DumpInfo *info)
 int
 handle_xen(struct DumpInfo *info)
 {
+#ifdef __powerpc__
+	MSG("\n");
+	MSG("ppc64 xen is not supported.\n");
+
+	return FALSE;
+#else
 	if (!open_files_for_creating_dumpfile(info))
 		goto out;
 
@@ -5321,6 +5333,7 @@ handle_xen(struct DumpInfo *info)
 
 	if (!write_elf_header(info))
 		goto out;
+
 	if (!write_elf_pages(info))
 		goto out;
 
@@ -5333,6 +5346,7 @@ handle_xen(struct DumpInfo *info)
 	return COMPLETED;
 out:
 	return FALSE;
+#endif
 }
 
 static struct option longopts[] = {

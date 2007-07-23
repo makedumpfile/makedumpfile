@@ -48,6 +48,9 @@ get_phys_base_ia64(struct DumpInfo *info)
 			break;
 		}
 	}
+	return TRUE;
+}
+
 /*
  * for Xen extraction
  */
@@ -128,16 +131,14 @@ get_xen_info_ia64(struct DumpInfo *info)
 		return FALSE;
 	}
 	if (!readmem(info, VADDR_XEN, SYMBOL(xen_heap_start), &xen_heap_start,
-	      sizeof(xen_heap_start), "Can't get the value of xen_heap_start.\n"))
+	      sizeof(xen_heap_start))) {
+		ERRMSG("Can't get the value of xen_heap_start.\n");
 		return FALSE;
-
+	}
 	for (i = 0; i < info->num_domain; i++) {
 		info->domain_list[i].pickled_id = (unsigned int)
 			(info->domain_list[i].domain_addr - xen_heap_start);
 	}
-
-	return TRUE;
-}
 
 	return TRUE;
 }

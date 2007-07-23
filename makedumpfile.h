@@ -920,7 +920,6 @@ int get_xen_info_x86_64(struct DumpInfo *info);
 
 #define PGDIR_SHIFT	(PAGESHIFT() + 2 * (PAGESHIFT() - 3))
 #define PTRS_PER_PGD	(1UL << (PAGESHIFT() - 3))
-#define PMD_SHIFT	(PAGESHIFT() + (PAGESHIFT() - 3))
 #define PTRS_PER_PMD	(1UL << (PAGESHIFT() - 3))
 #define PTRS_PER_PTE	(1UL << (PAGESHIFT() - 3))
 

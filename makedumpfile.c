@@ -579,22 +579,19 @@ get_elf64_ehdr(struct DumpInfo *info, Elf64_Ehdr *ehdr)
 }
 
 int
-get_elf64_phdr(struct DumpInfo *info, int num, Elf64_Phdr *phdr)
+get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr)
 {
 	off_t offset;
 	const off_t failed = (off_t)-1;
 
 	offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) * num;
 
-	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
+	if (lseek(fd, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
 		return FALSE;
 	}
-	if (read(info->fd_memory, phdr, sizeof(Elf64_Phdr))
-	    != sizeof(Elf64_Phdr)) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
+	if (read(fd, phdr, sizeof(Elf64_Phdr)) != sizeof(Elf64_Phdr)) {
+		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
 		return FALSE;
 	}
 	return TRUE;
@@ -651,77 +648,105 @@ get_elf32_ehdr(struct DumpInfo *info, Elf32_Ehdr *ehdr)
 }
 
 int
-get_elf32_phdr(struct DumpInfo *info, int num, Elf32_Phdr *phdr)
+get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr)
 {
 	off_t offset;
 	const off_t failed = (off_t)-1;
 
 	offset = sizeof(Elf32_Ehdr) + sizeof(Elf32_Phdr) * num;
 
-	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
+	if (lseek(fd, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
 		return FALSE;
 	}
-	if (read(info->fd_memory, phdr, sizeof(Elf32_Phdr))
-	    != sizeof(Elf32_Phdr)) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
+	if (read(fd, phdr, sizeof(Elf32_Phdr)) != sizeof(Elf32_Phdr)) {
+		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
 		return FALSE;
 	}
 	return TRUE;
 }
 
 int
-get_elf_info(struct DumpInfo *info)
+check_elf_format(int fd, char *filename, int *phnum, int *num_load)
 {
-	int i, j;
-	unsigned long tmp;
+	int i;
 	Elf64_Ehdr ehdr64;
 	Elf64_Phdr load64;
 	Elf32_Ehdr ehdr32;
 	Elf32_Phdr load32;
 	const off_t failed = (off_t)-1;
 
+	if (lseek(fd, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	if (read(fd, &ehdr64, sizeof(Elf64_Ehdr)) != sizeof(Elf64_Ehdr)) {
+		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	if (lseek(fd, 0, SEEK_SET) == failed) {
+		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	if (read(fd, &ehdr32, sizeof(Elf32_Ehdr)) != sizeof(Elf32_Ehdr)) {
+		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	(*num_load) = 0;
+	if ((ehdr64.e_ident[EI_CLASS] == ELFCLASS64)
+	    && (ehdr32.e_ident[EI_CLASS] != ELFCLASS32)) {
+		(*phnum) = ehdr64.e_phnum;
+		for (i = 0; i < ehdr64.e_phnum; i++) {
+			if (!get_elf64_phdr(fd, filename, i, &load64)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				return FALSE;
+			}
+			if (load64.p_type == PT_LOAD)
+				(*num_load)++;
+		}
+		return ELF64;
+
+	} else if ((ehdr64.e_ident[EI_CLASS] != ELFCLASS64)
+            && (ehdr32.e_ident[EI_CLASS] == ELFCLASS32)) {
+		(*phnum) = ehdr32.e_phnum;
+		for (i = 0; i < ehdr32.e_phnum; i++) {
+			if (!get_elf32_phdr(fd, filename, i, &load32)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				return FALSE;
+			}
+			if (load32.p_type == PT_LOAD)
+				(*num_load)++;
+		}
+		return ELF32;
+	}
+	ERRMSG("Can't get valid ehdr.\n");
+	return FALSE;
+}
+
+int
+get_elf_info(struct DumpInfo *info)
+{
+	int i, j, phnum, num_load, elf_format;
+	unsigned long tmp;
+	Elf64_Phdr load64;
+	Elf32_Phdr load32;
+
 	int ret = FALSE;
 
 	/*
 	 * Check ELF64 or ELF32.
 	 */
-	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto out;
-	}
-	if (read(info->fd_memory, &ehdr64, sizeof(Elf64_Ehdr))
-	    != sizeof(Elf64_Ehdr)) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto out;
-	}
-	if (lseek(info->fd_memory, 0, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto out;
-	}
-	if (read(info->fd_memory, &ehdr32, sizeof(Elf32_Ehdr))
-	    != sizeof(Elf32_Ehdr)) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto out;
-	}
-	if ((ehdr64.e_ident[EI_CLASS] == ELFCLASS64)
-	    && (ehdr32.e_ident[EI_CLASS] != ELFCLASS32)) {
+	elf_format = check_elf_format(info->fd_memory, info->name_memory,
+	    &phnum, &num_load);
+
+	if (elf_format == ELF64)
 		info->flag_elf64 = TRUE;
-		info->num_load_memory = ehdr64.e_phnum - 1;
-	} else if ((ehdr64.e_ident[EI_CLASS] != ELFCLASS64)
-            && (ehdr32.e_ident[EI_CLASS] == ELFCLASS32)) {
+	else if (elf_format == ELF32)
 		info->flag_elf64 = FALSE;
-		info->num_load_memory = ehdr32.e_phnum - 1;
-	} else {
-		ERRMSG("Can't get valid ehdr.\n");
-		goto out;
-	}
+	else
+		return FALSE;
+
+	info->num_load_memory = num_load;
 
 	if (!info->num_load_memory) {
 		ERRMSG("Can't get the number of PT_LOAD.\n");
@@ -734,9 +759,10 @@ get_elf_info(struct DumpInfo *info)
 		    strerror(errno));
 		goto out;
 	}
-	if (info->flag_elf64) { /* ELF64 */
-		for (i = 0, j = 0; i < ehdr64.e_phnum; i++) {
-			if (!get_elf64_phdr(info, i, &load64)) {
+	for (i = 0, j = 0; i < phnum; i++) {
+		if (info->flag_elf64) { /* ELF64 */
+			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
+			    i, &load64)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
@@ -755,10 +781,9 @@ get_elf_info(struct DumpInfo *info)
 			if(!dump_Elf64_load(info, &load64, j))
 				goto out;
 			j++;
-		}
-	} else {                /* ELF32 */
-		for (i = 0, j = 0; i < ehdr32.e_phnum; i++) {
-			if (!get_elf32_phdr(info, i, &load32)) {
+		} else {                /* ELF32 */
+			if (!get_elf32_phdr(info->fd_memory, info->name_memory,
+			    i, &load32)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
@@ -3560,7 +3585,8 @@ get_loads_dumpfile(struct DumpInfo *info)
 	}
 	for (i = 0; i < phnum; i++) {
 		if (info->flag_elf64) { /* ELF64 */
-			if (!get_elf64_phdr(info, i, &load64)) {
+			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
+			    i, &load64)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
@@ -3571,7 +3597,8 @@ get_loads_dumpfile(struct DumpInfo *info)
 			frac_head = page_size - (load64.p_paddr % page_size);
 			frac_tail = (load64.p_paddr+load64.p_memsz)%page_size;
 		} else {                /* ELF32 */
-			if (!get_elf32_phdr(info, i, &load32)) {
+			if (!get_elf32_phdr(info->fd_memory, info->name_memory,
+			    i, &load32)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
@@ -3743,7 +3770,8 @@ write_elf_header(struct DumpInfo *info)
 	 */
 	if (info->flag_elf64) { /* ELF64 */
 		for (i = 0; i < ehdr64.e_phnum; i++) {
-			if (!get_elf64_phdr(info, i, &note64)) {
+			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
+			    i, &note64)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
@@ -3767,7 +3795,8 @@ write_elf_header(struct DumpInfo *info)
 
 	} else {                /* ELF32 */
 		for (i = 0; i < ehdr32.e_phnum; i++) {
-			if (!get_elf32_phdr(info, i, &note32)) {
+			if (!get_elf32_phdr(info->fd_memory, info->name_memory,
+			    i, &note32)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
@@ -3983,7 +4012,8 @@ write_elf_pages(struct DumpInfo *info)
 
 	for (i = 0; i < phnum; i++) {
 		if (info->flag_elf64) { /* ELF64 */
-			if (!get_elf64_phdr(info, i, &load64)) {
+			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
+			    i, &load64)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
@@ -3996,7 +4026,8 @@ write_elf_pages(struct DumpInfo *info)
 			frac_head = page_size - (load64.p_paddr % page_size);
 			frac_tail = (load64.p_paddr+ load64.p_memsz)%page_size;
 		} else {                /* ELF32 */
-			if (!get_elf32_phdr(info, i, &load32)) {
+			if (!get_elf32_phdr(info->fd_memory, info->name_memory,
+			    i, &load32)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}

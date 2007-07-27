@@ -2030,7 +2030,7 @@ read_vmcoreinfo_string(struct DumpInfo *info, char *str_in, char *str_out)
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, str_in, strlen(str_in)) == 0) {
-			strncpy(str_out, buf + strlen(str_in), BUFSIZE_FGETS - strlen(str_in));
+			strncpy(str_out, buf + strlen(str_in), LEN_SRCFILE - strlen(str_in));
 			break;
 		}
 	}

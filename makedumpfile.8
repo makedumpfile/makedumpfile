@@ -144,6 +144,16 @@ support compressed data.
 # makedumpfile \-E \-d 31 \-x vmlinux /proc/vmcore dumpfile
 
 .TP
+\fB\-f\fR
+Force existing DUMPFILE to be overwritten.
+.br
+.B Example:
+.br
+# makedumpfile \-f \-d 31 \-x vmlinux /proc/vmcore dumpfile
+.br
+This command overwrites \fIDUMPFILE\fR even if it already exists.
+
+.TP
 \fB\-x\fR \fIVMLINUX\fR
 Specify the first kernel's \fIVMLINUX\fR with debug information to analyze the
 first kernel's memory usage.

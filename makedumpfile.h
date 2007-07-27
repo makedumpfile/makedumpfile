@@ -187,13 +187,13 @@ do { \
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \
 	if (SYMBOL(symbol) != NOT_FOUND_SYMBOL) { \
-		fprintf(info->file_configfile, "%s%lx\n", \
+		fprintf(info->file_vmcoreinfo, "%s%lx\n", \
 		    STR_SYMBOL(str_symbol), SYMBOL(symbol)); \
 	} \
 } while (0)
 #define READ_SYMBOL(str_symbol, symbol) \
 do { \
-	SYMBOL(symbol) = read_config_symbol(info, STR_SYMBOL(str_symbol)); \
+	SYMBOL(symbol) = read_vmcoreinfo_symbol(info, STR_SYMBOL(str_symbol)); \
 	if (SYMBOL(symbol) == INVALID_SYMBOL_DATA) \
 		return FALSE; \
 } while (0)
@@ -247,39 +247,39 @@ do { \
 #define WRITE_STRUCTURE_SIZE(str_structure, structure) \
 do { \
 	if (SIZE(structure) != NOT_FOUND_STRUCTURE) { \
-		fprintf(info->file_configfile, "%s%ld\n", \
+		fprintf(info->file_vmcoreinfo, "%s%ld\n", \
 		    STR_SIZE(str_structure), SIZE(structure)); \
 	} \
 } while (0)
 #define WRITE_MEMBER_OFFSET(str_member, member) \
 do { \
 	if (OFFSET(member) != NOT_FOUND_STRUCTURE) { \
-		fprintf(info->file_configfile, "%s%ld\n", \
+		fprintf(info->file_vmcoreinfo, "%s%ld\n", \
 		    STR_OFFSET(str_member), OFFSET(member)); \
 	} \
 } while (0)
 #define WRITE_ARRAY_LENGTH(str_array, array) \
 do { \
 	if (ARRAY_LENGTH(array) != NOT_FOUND_STRUCTURE) { \
-		fprintf(info->file_configfile, "%s%ld\n", \
+		fprintf(info->file_vmcoreinfo, "%s%ld\n", \
 		    STR_LENGTH(str_array), ARRAY_LENGTH(array)); \
 	} \
 } while (0)
 #define READ_STRUCTURE_SIZE(str_structure, structure) \
 do { \
-	SIZE(structure) = read_config_structure(info,STR_SIZE(str_structure)); \
+	SIZE(structure) = read_vmcoreinfo_structure(info,STR_SIZE(str_structure)); \
 	if (SIZE(structure) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_MEMBER_OFFSET(str_member, member) \
 do { \
-	OFFSET(member) = read_config_structure(info, STR_OFFSET(str_member)); \
+	OFFSET(member) = read_vmcoreinfo_structure(info, STR_OFFSET(str_member)); \
 	if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_ARRAY_LENGTH(str_array, array) \
 do { \
-	ARRAY_LENGTH(array) = read_config_structure(info, STR_LENGTH(str_array)); \
+	ARRAY_LENGTH(array) = read_vmcoreinfo_structure(info, STR_LENGTH(str_array)); \
 	if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
@@ -296,14 +296,14 @@ do { \
 #define WRITE_SRCFILE(str_decl_name, decl_name) \
 do { \
 	if (strlen(SRCFILE(decl_name))) { \
-		fprintf(info->file_configfile, "%s%s\n", \
+		fprintf(info->file_vmcoreinfo, "%s%s\n", \
 		    STR_SRCFILE(str_decl_name), SRCFILE(decl_name)); \
 	} \
 } while (0)
 
 #define READ_SRCFILE(str_decl_name, decl_name) \
 do { \
-	if (!read_config_string(info, STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
+	if (!read_vmcoreinfo_string(info, STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
 		return FALSE; \
 } while (0)
 
@@ -324,7 +324,7 @@ do { \
 #define LATEST_VERSION		(0x02060015)	/* linux-2.6.21 */
 
 /*
- * field name of config file
+ * field name of vmcoreinfo file
  */
 #define STR_OSRELEASE	"OSRELEASE="
 #define STR_PAGESIZE	"PAGESIZE="
@@ -560,8 +560,8 @@ struct DumpInfo {
 	int		flag_elf64;          /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_vmlinux;	     /* flag of vmlinux */
-	int		flag_generate_config;/* flag of generating config file */
-	int		flag_read_config;    /* flag of reading config file */
+	int		flag_generate_vmcoreinfo;/* flag of generating vmcoreinfo file */
+	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */
 	int		flag_exclude_free;   /* flag of excluding free page */
 	int		flag_show_usage;     /* flag of showing usage */
 	int		flag_show_version;   /* flag of showing version */
@@ -630,10 +630,10 @@ struct DumpInfo {
 	} vm_table;
 
 	/*
-	 * config file info:
+	 * vmcoreinfo file info:
 	 */
-	FILE			*file_configfile;
-	char			*name_configfile;	     /* config file */
+	FILE			*file_vmcoreinfo;
+	char			*name_vmcoreinfo;	     /* vmcoreinfo file */
 	char			release[STRLEN_OSRELEASE];
 
 	/*

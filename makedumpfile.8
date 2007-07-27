@@ -2,15 +2,15 @@
 .SH NAME
 makedumpfile \- make a small dumpfile of kdump
 .SH SYNOPSIS
-\fBmakedumpfile\fR    [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fICONFIGFILE\fR] \fIVMCORE\fR \fIDUMPFILE\fR
+\fBmakedumpfile\fR    [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR \fIDUMPFILE\fR
 .br
-\fBmakedumpfile\fR \-F [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fICONFIGFILE\fR] \fIVMCORE\fR
+\fBmakedumpfile\fR \-F [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR
 .br
 \fBmakedumpfile\fR \-R \fIDUMPFILE\fR
 .br
-\fBmakedumpfile\fR \-g \fICONFIGFILE\fR \-x \fIVMLINUX\fR
+\fBmakedumpfile\fR \-g \fIVMCOREINFO\fR \-x \fIVMLINUX\fR
 .br
-\fBmakedumpfile\fR \-E [\-\-xen-syms \fIXEN-SYMS\fR|\-\-xen-config \fICONFIGFILE\fR] \fIVMCORE\fR \fIDUMPFILE\fR
+\fBmakedumpfile\fR \-E [\-\-xen-syms \fIXEN-SYMS\fR|\-\-xen-vmcoreinfo \fIVMCOREINFO\fR] \fIVMCORE\fR \fIDUMPFILE\fR
 .br
 .B makedumpfile
 \-h
@@ -49,15 +49,15 @@ If a user wants to use GDB, \fIDUMPFILE\fR format has to be explicitly
 specified to be the ELF format.
 .PP
 To analyze the first kernel's memory usage, makedumpfile can refer to
-\fICONFIGFILE\fR instead of \fIVMLINUX\fR. \fICONFIGFILE\fR contains the first
-kernel's information (structure size, field offset, etc.), and \fICONFIGFILE\fR
+\fIVMCOREINFO\fR instead of \fIVMLINUX\fR. \fIVMCOREINFO\fR contains the first
+kernel's information (structure size, field offset, etc.), and \fIVMCOREINFO\fR
 is small enough to be included into the second kernel's initrd.
 .br
 If the second kernel is running on its initrd without mounting a root file
 system, makedumpfile cannot refer to \fIVMLINUX\fR because the second kernel's
 initrd cannot include a large file like \fIVMLINUX\fR. To solve the problem,
-makedumpfile makes \fICONFIGFILE\fR beforehand, and it refers to
-\fICONFIGFILE\fR instead of \fIVMLINUX\fR while the second kernel is running.
+makedumpfile makes \fIVMCOREINFO\fR beforehand, and it refers to
+\fIVMCOREINFO\fR instead of \fIVMLINUX\fR while the second kernel is running.
 .PP
 If the second kernel is running on its initrd without mounting any file system,
 a user needs to transport the dump data to a remote host. To transport the dump
@@ -167,30 +167,30 @@ The page size of the first kernel and the second kernel should match.
 # makedumpfile \-d 31 \-x vmlinux /proc/vmcore dumpfile
 
 .TP
-\fB\-i\fR \fICONFIGFILE\fR
-Specify \fICONFIGFILE\fR instead of \fIVMLINUX\fR for analyzing the first kernel's memory usage.
+\fB\-i\fR \fIVMCOREINFO\fR
+Specify \fIVMCOREINFO\fR instead of \fIVMLINUX\fR for analyzing the first kernel's memory usage.
 .br
-\fICONFIGFILE\fR should be made beforehand by makedumpfile with \-g option, and
+\fIVMCOREINFO\fR should be made beforehand by makedumpfile with \-g option, and
 it contains the first kernel's information. If dump_level is 2 or more and
 [\-x \fIVMLINUX\fR] is not specified, this option is necessary.
 .br
 .B Example:
 .br
-# makedumpfile \-d 31 \-i config /proc/vmcore dumpfile
+# makedumpfile \-d 31 \-i vmcoreinfo /proc/vmcore dumpfile
 
 .TP
-\fB\-g\fR \fICONFIGFILE\fR
-Generate \fICONFIGFILE\fR from the first kernel's \fIVMLINUX\fR with debug
+\fB\-g\fR \fIVMCOREINFO\fR
+Generate \fIVMCOREINFO\fR from the first kernel's \fIVMLINUX\fR with debug
 information.
 .br
-\fICONFIGFILE\fR must be generated on the system that is running the first
-kernel. With \-i option, a user can specify \fICONFIGFILE\fR generated on the
+\fIVMCOREINFO\fR must be generated on the system that is running the first
+kernel. With \-i option, a user can specify \fIVMCOREINFO\fR generated on the
 other system that is running the same first kernel. [\-x \fIVMLINUX\fR] must be
 specified.
 .br
 .B Example:
 .br
-# makedumpfile \-g config \-x vmlinux
+# makedumpfile \-g vmcoreinfo \-x vmlinux
 
 .TP
 \fB\-F\fR
@@ -216,7 +216,7 @@ is the kdump\-compressed format.
 .br
 | ssh user@host "makedumpfile \-R dumpfile"
 .br
-# makedumpfile \-F \-E \-d 31 \-i config  /proc/vmcore \e
+# makedumpfile \-F \-E \-d 31 \-i vmcoreinfo  /proc/vmcore \e
 .br
 | ssh user@host "makedumpfile \-R dumpfile"
 
@@ -257,16 +257,16 @@ This option extracts the part of xen and domain-0.
 # makedumpfile \-E \-\-xen-syms xen-syms /proc/vmcore dumpfile
 
 .TP
-\fB\-\-xen-config\fR \fICONFIGFILE\fR
-Specify \fICONFIGFILE\fR instead of \fIXEN-SYMS\fR for analyzing the xen's memory usage.
+\fB\-\-xen-vmcoreinfo\fR \fIVMCOREINFO\fR
+Specify \fIVMCOREINFO\fR instead of \fIXEN-SYMS\fR for analyzing the xen's memory usage.
 .br
-\fICONFIGFILE\fR should be made beforehand by makedumpfile with \-g option, and
+\fIVMCOREINFO\fR should be made beforehand by makedumpfile with \-g option, and
 it contains the xen's information.
 \-E option must be specified with this option.
 .br
 .B Example:
 .br
-# makedumpfile \-E \-\-xen-config \fICONFIGFILE\fR /proc/vmcore dumpfile
+# makedumpfile \-E \-\-xen-vmcoreinfo \fIVMCOREINFO\fR /proc/vmcore dumpfile
 
 .TP
 \fB\-D\fR

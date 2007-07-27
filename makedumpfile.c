@@ -123,6 +123,62 @@ vaddr_to_offset_general(struct DumpInfo *info, unsigned long long vaddr)
 }
 
 /*
+ * vaddr_to_offset_slow() is almost same as vaddr_to_offset_general().
+ * This function is slow because it doesn't use the memory.
+ * It is useful at few calls like get_str_osrelease_from_vmlinux().
+ */
+off_t
+vaddr_to_offset_slow(int fd, char *filename, unsigned long vaddr)
+{
+	off_t offset = 0;
+	int i, phnum, num_load, flag_elf64, elf_format;
+	Elf64_Phdr load64;
+	Elf32_Phdr load32;
+
+	elf_format = check_elf_format(fd, filename, &phnum, &num_load);
+
+	if (elf_format == ELF64)
+		flag_elf64 = TRUE;
+	else if (elf_format == ELF32)
+		flag_elf64 = FALSE;
+	else
+		return 0;
+
+	for (i = 0; i < phnum; i++) {
+		if (flag_elf64) { /* ELF64 */
+			if (!get_elf64_phdr(fd, filename, i, &load64)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				return 0;
+			}
+			if (load64.p_type != PT_LOAD)
+				continue;
+
+			if ((vaddr < load64.p_vaddr)
+			    || (load64.p_vaddr + load64.p_filesz <= vaddr))
+				continue;
+
+			offset = load64.p_offset + (vaddr - load64.p_vaddr);
+			break;
+		} else {         /* ELF32 */
+			if (!get_elf32_phdr(fd, filename, i, &load32)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				return 0;
+			}
+			if (load32.p_type != PT_LOAD)
+				continue;
+
+			if ((vaddr < load32.p_vaddr)
+			    || (load32.p_vaddr + load32.p_filesz <= vaddr))
+				continue;
+
+			offset = load32.p_offset + (vaddr - load32.p_vaddr);
+			break;
+		}
+	}
+	return offset;
+}
+
+/*
  * Get the number of the page descriptors from the ELF info.
  */
 unsigned long long
@@ -1599,6 +1655,51 @@ get_srcfile_info(struct DumpInfo *info)
 }
 
 int
+get_str_osrelease_from_vmlinux(struct DumpInfo *info)
+{
+	struct utsname system_utsname;
+	unsigned long utsname;
+	off_t offset;
+	const off_t failed = (off_t)-1;
+
+	/*
+	 * Get the kernel version.
+	 */
+	if (SYMBOL(system_utsname) != NOT_FOUND_SYMBOL) {
+		utsname = SYMBOL(system_utsname);
+	} else if (SYMBOL(init_uts_ns) != NOT_FOUND_SYMBOL) {
+		utsname = SYMBOL(init_uts_ns) + sizeof(int);
+	} else {
+		ERRMSG("Can't get the symbol of system_utsname.\n");
+		return FALSE;
+	}
+	offset = vaddr_to_offset_slow(dwarf_info.vmlinux_fd,
+	    dwarf_info.vmlinux_name, utsname);
+
+	if (!offset) {
+		ERRMSG("Can't convert vaddr (%lx) of utsname to an offset.\n",
+		    utsname);
+		return FALSE;
+	}
+	if (lseek(dwarf_info.vmlinux_fd, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek %s. %s\n", dwarf_info.vmlinux_name,
+		    strerror(errno));
+		return FALSE;
+	}
+	if (read(dwarf_info.vmlinux_fd, &system_utsname, sizeof system_utsname)
+	    != sizeof system_utsname) {
+		ERRMSG("Can't read %s. %s\n", dwarf_info.vmlinux_name,
+		    strerror(errno));
+		return FALSE;
+	}
+	if (!strncpy(info->release, system_utsname.release, STRLEN_OSRELEASE)){
+		ERRMSG("Can't do strncpy for osrelease.");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
 is_sparsemem_extreme(struct DumpInfo *info)
 {
 	if (ARRAY_LENGTH(mem_section)
@@ -1649,19 +1750,10 @@ get_mem_type(struct DumpInfo *info)
 int
 generate_config(struct DumpInfo *info)
 {
-	struct utsname utsname_buf;
-
-	if (uname(&utsname_buf)) {
-		ERRMSG("Can't get uname. %s\n", strerror(errno));
-		return FALSE;
-	}
 	if ((info->page_size = sysconf(_SC_PAGE_SIZE)) <= 0) {
 		ERRMSG("Can't get the size of page.\n");
 		return FALSE;
 	}
-	if (!(info->kernel_version = get_kernel_version(utsname_buf.release)))
-		return FALSE;
-
 	if (!get_symbol_info(info))
 		return FALSE;
 
@@ -1676,6 +1768,12 @@ generate_config(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
+	if (!get_str_osrelease_from_vmlinux(info))
+		return FALSE;
+
+	if (!(info->kernel_version = get_kernel_version(info->release)))
+		return FALSE;
+
 	if (get_mem_type(info) == NOT_FOUND_MEMTYPE) {
 		ERRMSG("Can't find the memory type.\n");
 		return FALSE;
@@ -1685,7 +1783,7 @@ generate_config(struct DumpInfo *info)
 	 * write 1st kernel's OSRELEASE
 	 */
 	fprintf(info->file_configfile, "%s%s\n", STR_OSRELEASE,
-	    utsname_buf.release);
+	    info->release);
 
 	/*
 	 * write 1st kernel's PAGESIZE

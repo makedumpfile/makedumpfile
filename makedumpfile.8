@@ -269,12 +269,27 @@ it contains the xen's information.
 # makedumpfile \-E \-\-xen-vmcoreinfo \fIVMCOREINFO\fR /proc/vmcore dumpfile
 
 .TP
+\fB\-\-message-level\fR \fImessage_level\fR
+Specify the message types.
+.br
+All the messages are printed to the standard error.
+A user can specify multiple message types by setting the sum of each message
+type for message_level. The default value is '7' (Print the progress indicator
+common messages, error messages).
+.br
+  0: Print nothing.
+  1: Print the progress indicator.
+  2: Print common messages.
+  4: Print error messages.
+  8: Print debugging messages.
+
+.TP
 \fB\-D\fR
-Print the debug information.
+Print debugging messages.
 
 .TP
 \fB\-h\fR
-Show the help message.
+Show help messages.
 
 .TP
 \fB\-v\fR

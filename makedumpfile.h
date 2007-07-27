@@ -140,6 +140,50 @@ isAnon(unsigned long mapping)
 #define DL_EXCLUDE_FREE		(0x010)	/* Exclude Free Pages */
 
 /*
+ * Message Level
+ */
+#define MIN_MSG_LEVEL		(0)
+#define MAX_MSG_LEVEL		(15)
+#define DEFAULT_MSG_LEVEL	(7)	/* Print the progress indicator, the
+					   common message, the error message */
+#define ML_PRINT_PROGRESS	(0x001) /* Print the progress indicator */
+#define ML_PRINT_COMMON_MSG	(0x002)	/* Print the common message */
+#define ML_PRINT_ERROR_MSG	(0x004)	/* Print the error message */
+#define ML_PRINT_DEBUG_MSG	(0x008) /* Print the debugging message */
+extern int message_level;
+
+#define MSG(x...) \
+do { \
+	if (message_level & ML_PRINT_COMMON_MSG) { \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+#define ERRMSG(x...) \
+do { \
+	if (message_level & ML_PRINT_ERROR_MSG) { \
+		fprintf(stderr, __FUNCTION__); \
+		fprintf(stderr, ": "); \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+#define PROGRESS_MSG(x...) \
+do { \
+	if (message_level & ML_PRINT_PROGRESS) { \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+#define DEBUG_MSG(x...) \
+do { \
+	if (message_level & ML_PRINT_DEBUG_MSG) { \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+
+/*
  * For parse_line()
  */
 #define NULLCHAR	('\0')
@@ -483,14 +527,6 @@ off_t vaddr_to_offset_ia64();
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
 
-#define MSG(x...)	fprintf(stderr, x)
-#define ERRMSG(x...) \
-do { \
-	fprintf(stderr, __FUNCTION__); \
-	fprintf(stderr, ": "); \
-	fprintf(stderr, x); \
-} while (0)
-
 struct pt_load_segment {
 	loff_t			file_offset;
 	unsigned long long	phys_start;
@@ -556,7 +592,6 @@ struct DumpInfo {
 	 */
 	int		dump_level;          /* dump level */
 	int		flag_compress;       /* flag of compression */
-	int		flag_debug;          /* flag of debug */
 	int		flag_elf64;          /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_vmlinux;	     /* flag of vmlinux */

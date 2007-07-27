@@ -26,6 +26,7 @@ struct dwarf_info	dwarf_info;
 struct vm_table		*vt = 0;
 
 int retcd = FAILED;	/* return code */
+int message_level;
 
 void
 show_version()
@@ -416,14 +417,25 @@ print_usage()
 	MSG("  [--xen-vmcoreinfo VMCOREINFO]:\n");
 	MSG("      Specify the VMCOREINFO of xen to analyze the xen's memory usage.\n");
 	MSG("\n");
+	MSG("  [--message-level ML]:\n");
+	MSG("      Specify the message types.\n");
+	MSG("      A user can specify multiple message types by setting the sum of each\n");
+	MSG("      message type for ML. The default ML is '7' (Print the progress indicator,\n");
+	MSG("      common messages, error messages).\n");
+	MSG("        0: Print nothing.\n");
+	MSG("        1: Print progress indicator.\n");
+	MSG("        2: Print common messages.\n");
+	MSG("        4: Print error messages.\n");
+	MSG("        8: Print debugging messages.\n");
+	MSG("\n");
 	MSG("  [-D]:\n");
-	MSG("      Print the debug information.\n");
+	MSG("      Print debugging messages.\n");
 	MSG("\n");
 	MSG("  [-f]:\n");
 	MSG("      Overwrite DUMPFILE even if it already exists.\n");
 	MSG("\n");
 	MSG("  [-h]:\n");
-	MSG("      Show the help message.\n");
+	MSG("      Show help messages.\n");
 	MSG("\n");
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile.\n");
@@ -620,13 +632,12 @@ dump_Elf64_load(struct DumpInfo *info, Elf64_Phdr *prog, int num_load)
 	pls->virt_end    = pls->virt_start + prog->p_filesz;
 	pls->file_offset = prog->p_offset;
 
-	if (info->flag_debug) {
-		MSG("LOAD (%d)\n", num_load);
-		MSG("  phys_start : %llx\n", pls->phys_start);
-		MSG("  phys_end   : %llx\n", pls->phys_end);
-		MSG("  virt_start : %llx\n", pls->virt_start);
-		MSG("  virt_end   : %llx\n", pls->virt_end);
-	}
+	DEBUG_MSG("LOAD (%d)\n", num_load);
+	DEBUG_MSG("  phys_start : %llx\n", pls->phys_start);
+	DEBUG_MSG("  phys_end   : %llx\n", pls->phys_end);
+	DEBUG_MSG("  virt_start : %llx\n", pls->virt_start);
+	DEBUG_MSG("  virt_end   : %llx\n", pls->virt_end);
+
 	return TRUE;
 }
 
@@ -689,13 +700,12 @@ dump_Elf32_load(struct DumpInfo *info, Elf32_Phdr *prog, int num_load)
 	pls->virt_end    = pls->virt_start + prog->p_filesz;
 	pls->file_offset = prog->p_offset;
 
-	if (info->flag_debug) {
-		MSG("LOAD (%d)\n", num_load);
-		MSG("  phys_start : %llx\n", pls->phys_start);
-		MSG("  phys_end   : %llx\n", pls->phys_end);
-		MSG("  virt_start : %llx\n", pls->virt_start);
-		MSG("  virt_end   : %llx\n", pls->virt_end);
-	}
+	DEBUG_MSG("LOAD (%d)\n", num_load);
+	DEBUG_MSG("  phys_start : %llx\n", pls->phys_start);
+	DEBUG_MSG("  phys_end   : %llx\n", pls->phys_end);
+	DEBUG_MSG("  virt_start : %llx\n", pls->virt_start);
+	DEBUG_MSG("  virt_end   : %llx\n", pls->virt_end);
+
 	return TRUE;
 }
 
@@ -890,10 +900,8 @@ get_elf_info(struct DumpInfo *info)
 
 	info->max_mapnr = get_max_mapnr(info);
 
-	if (info->flag_debug) {
-		MSG("\n");
-		MSG("max_mapnr    : %llx\n", info->max_mapnr);
-	}
+	DEBUG_MSG("\n");
+	DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
 
 	/*
 	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
@@ -2147,11 +2155,10 @@ get_numnodes(struct DumpInfo *info)
 	if (!(vt->numnodes = get_nodes_online(info))) {
 		vt->numnodes = 1;
 	}
-	if (info->flag_debug) {
-		MSG("\n");
-		MSG("num of NODEs : %d\n", vt->numnodes);
-		MSG("\n");
-	}
+	DEBUG_MSG("\n");
+	DEBUG_MSG("num of NODEs : %d\n", vt->numnodes);
+	DEBUG_MSG("\n");
+
 	return TRUE;
 }
 
@@ -2280,12 +2287,11 @@ dump_mem_map(struct DumpInfo *info, unsigned long long pfn_start,
 	mmd->pfn_end   = pfn_end;
 	mmd->mem_map   = mem_map;
 
-	if (info->flag_debug) {
-		MSG("mem_map (%d)\n", num_mm);
-		MSG("  mem_map    : %lx\n", mem_map);
-		MSG("  pfn_start  : %llx\n", pfn_start);
-		MSG("  pfn_end    : %llx\n", pfn_end);
-	}
+	DEBUG_MSG("mem_map (%d)\n", num_mm);
+	DEBUG_MSG("  mem_map    : %lx\n", mem_map);
+	DEBUG_MSG("  pfn_start  : %llx\n", pfn_start);
+	DEBUG_MSG("  pfn_end    : %llx\n", pfn_end);
+
 	return;
 }
 
@@ -2365,11 +2371,9 @@ get_num_mm_discontigmem(struct DumpInfo *info)
 			if (!start_paddr && !size &&!nid)
 				break;
 
-			if (info->flag_debug) {
-				MSG("nid : %d\n", nid);
-				MSG("  start_paddr: %lx\n", start_paddr);
-				MSG("  size       : %lx\n", size);
-			}
+			DEBUG_MSG("nid : %d\n", nid);
+			DEBUG_MSG("  start_paddr: %lx\n", start_paddr);
+			DEBUG_MSG("  size       : %lx\n", size);
 		}
 		if (i == 0) {
 			/*
@@ -2412,13 +2416,12 @@ separate_mem_map(struct DumpInfo *info, struct mem_map_data *mmd,
 			return FALSE;
 		}
 		if (info->max_mapnr < pfn_end) {
-			if (info->flag_debug) {
-				MSG("pfn_end of node (%d) is over max_mapnr.\n",
-				    nid);
-				MSG("  pfn_start: %lx\n", pfn_start);
-				MSG("  pfn_end  : %lx\n", pfn_end);
-				MSG("  max_mapnr: %llx\n", info->max_mapnr);
-			}
+			DEBUG_MSG("pfn_end of node (%d) is over max_mapnr.\n",
+			    nid);
+			DEBUG_MSG("  pfn_start: %lx\n", pfn_start);
+			DEBUG_MSG("  pfn_end  : %lx\n", pfn_end);
+			DEBUG_MSG("  max_mapnr: %llx\n", info->max_mapnr);
+
 			pfn_end = info->max_mapnr;
 		}
 
@@ -2509,13 +2512,12 @@ get_mm_discontigmem(struct DumpInfo *info)
 			}
 		} else {
 			if (info->max_mapnr < pfn_end) {
-				if (info->flag_debug) {
-					MSG("pfn_end of node (%d) is over max_mapnr.\n",
-					    node);
-					MSG("  pfn_start: %lx\n", pfn_start);
-					MSG("  pfn_end  : %lx\n", pfn_end);
-					MSG("  max_mapnr: %llx\n", info->max_mapnr);
-				}
+				DEBUG_MSG("pfn_end of node (%d) is over max_mapnr.\n",
+				    node);
+				DEBUG_MSG("  pfn_start: %lx\n", pfn_start);
+				DEBUG_MSG("  pfn_end  : %lx\n", pfn_end);
+				DEBUG_MSG("  max_mapnr: %llx\n", info->max_mapnr);
+
 				pfn_end = info->max_mapnr;
 			}
 
@@ -2754,35 +2756,27 @@ get_mem_map(struct DumpInfo *info)
 
 	switch (get_mem_type(info)) {
 	case SPARSEMEM:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : SPARSEMEM\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : SPARSEMEM\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_sparsemem(info);
 		break;
 	case SPARSEMEM_EX:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : SPARSEMEM_EX\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : SPARSEMEM_EX\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_sparsemem(info);
 		break;
 	case DISCONTIGMEM:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : DISCONTIGMEM\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : DISCONTIGMEM\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_discontigmem(info);
 		break;
 	case FLATMEM:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : FLATMEM\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : FLATMEM\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_flatmem(info);
 		break;
 	default:
@@ -4037,8 +4031,8 @@ print_progress(unsigned long current, unsigned long end)
 	} else
 		progress = 100;
 
-	MSG("\r");
-	MSG("[%3d %%]", progress);
+	PROGRESS_MSG("\r");
+	PROGRESS_MSG("[%3d %%]", progress);
 }
 
 int
@@ -4391,6 +4385,8 @@ write_elf_pages(struct DumpInfo *info)
 		goto out;
 
 	print_progress(num_dumpable, num_dumpable);
+	PROGRESS_MSG("\n");
+
 	ret = TRUE;
 out:
 	if (buf != NULL)
@@ -4626,6 +4622,7 @@ write_kdump_pages(struct DumpInfo *info)
 	 * Print the progress of the end.
 	 */
 	print_progress(num_dumpable, num_dumpable);
+	PROGRESS_MSG("\n");
 
 	ret = TRUE;
 out:
@@ -5300,7 +5297,7 @@ initial_xen(struct DumpInfo *info)
 	if (!get_xen_info(info))
 		return FALSE;
 
-	if (info->flag_debug)
+	if (message_level & ML_PRINT_DEBUG_MSG)
 		show_data_xen(info);
 
 	return TRUE;
@@ -5345,13 +5342,14 @@ out:
 static struct option longopts[] = {
 	{"xen-syms", required_argument, NULL, 'X'},
 	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
+	{"message-level", required_argument, NULL, 'm'},
 	{0, 0, 0, 0}
 };
 
 int
 main(int argc, char *argv[])
 {
-	int opt;
+	int opt, flag_debug = FALSE;
 	struct DumpInfo *info = NULL;
 
 	if ((info = calloc(1, sizeof(struct DumpInfo))) == NULL) {
@@ -5368,6 +5366,7 @@ main(int argc, char *argv[])
 	vt = &info->vm_table;
 
 	info->block_order = DEFAULT_ORDER;
+	message_level = DEFAULT_MSG_LEVEL;
 	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:Rvx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
@@ -5378,7 +5377,7 @@ main(int argc, char *argv[])
 			info->flag_compress = 1;
 			break;
 		case 'D':
-			info->flag_debug = 1;
+			flag_debug = TRUE;
 			break;
 		case 'd':
 			info->dump_level = atoi(optarg);
@@ -5405,6 +5404,9 @@ main(int argc, char *argv[])
 			info->flag_read_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
 			break;
+		case 'm':
+			message_level = atoi(optarg);
+			break;
 		case 'R':
 			info->flag_rearrange = 1;
 			break;
@@ -5430,6 +5432,9 @@ main(int argc, char *argv[])
 			goto out;
 		}
 	}
+	if (flag_debug)
+		message_level |= ML_PRINT_DEBUG_MSG;
+
 	if (info->flag_show_usage) {
 		print_usage();
 		return COMPLETED;
@@ -5462,6 +5467,12 @@ main(int argc, char *argv[])
 		if ((info->dump_level < MIN_DUMP_LEVEL)
 		    || (MAX_DUMP_LEVEL < info->dump_level)) {
 			MSG("Dump_level is invalid.\n");
+			print_usage();
+			goto out;
+		}
+		if ((message_level < MIN_MSG_LEVEL)
+		    || (MAX_MSG_LEVEL < message_level)) {
+			MSG("message_level is invalid.\n");
 			print_usage();
 			goto out;
 		}

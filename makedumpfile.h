@@ -629,6 +629,7 @@ struct symbol_table {
 	unsigned long	swapper_pg_dir;
 	unsigned long	phys_base;
 	unsigned long	node_online_map;
+	unsigned long	node_memblk;
 	unsigned long	node_data;
 	unsigned long	pgdat_list;
 	unsigned long	contig_page_data;
@@ -641,6 +642,7 @@ struct size_table {
 	long	zone;
 	long	free_area;
 	long	list_head;
+	long	node_memblk_s;
 };
 
 struct offset_table {
@@ -674,6 +676,11 @@ struct offset_table {
 		long	next;
 		long	prev;
 	} list_head;
+	struct node_memblk_s {
+		long	start_paddr;
+		long	size;
+		long	nid;
+	} node_memblk_s;
 };
 
 /*
@@ -686,6 +693,7 @@ struct array_table {
 	long	node_data;
 	long	pgdat_list;
 	long	mem_section;
+	long	node_memblk;
 
 	/*
 	 * Structure

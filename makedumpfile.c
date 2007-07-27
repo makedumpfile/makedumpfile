@@ -3234,9 +3234,9 @@ int
 reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 {
 
-	int order, free_page_cnt = 0, i;
+	int order, i;
 	unsigned long curr, previous, head, curr_page, curr_prev;
-	unsigned long free_pages = 0;
+	unsigned long free_pages = 0, found_free_pages = 0;
 	unsigned long long pfn, start_pfn;
 
 	for (order = (ARRAY_LENGTH(zone.free_area) - 1); order >= 0; --order) {
@@ -3268,7 +3268,7 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 				pfn = start_pfn + i;
 				reset_2nd_bitmap(info, pfn);
 			}
-			free_page_cnt += i;
+			found_free_pages += i;
 
 			previous=curr;
 			if (!readmem(info, curr + OFFSET(list_head.next), &curr,
@@ -3300,8 +3300,10 @@ reset_bitmap_of_free_pages(struct DumpInfo *info, unsigned long node_zones)
 			return FALSE;
 		}
 	}
-	if (free_pages != free_page_cnt) {
+	if (free_pages != found_free_pages) {
 		ERRMSG("The number of free_pages is invalid.\n");
+		ERRMSG("  free_pages       = %ld\n", free_pages);
+		ERRMSG("  found_free_pages = %ld\n", found_free_pages);
 		retcd = ANALYSIS_FAILED;
 		return FALSE;
 	}

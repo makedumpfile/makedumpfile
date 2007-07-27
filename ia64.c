@@ -261,5 +261,97 @@ vaddr_to_offset_ia64(struct DumpInfo *info, unsigned long long vaddr)
 	return paddr_to_offset(info, paddr);
 }
 
+/*
+ * for Xen extraction
+ */
+unsigned long long
+kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr)
+{
+	unsigned long long addr, dirp, entry;
+
+	if (!is_xen_vaddr(kvaddr))
+		return 0;
+
+	if (is_direct(kvaddr))
+		return (unsigned long)kvaddr - DIRECTMAP_VIRT_START;
+
+	if (!is_frame_table_vaddr(kvaddr))
+		return 0;
+
+	addr = kvaddr - VIRT_FRAME_TABLE_ADDR;
+
+	dirp = SYMBOL(frametable_pg_dir) - DIRECTMAP_VIRT_START;
+	dirp += ((addr >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)) * sizeof(unsigned long long);
+	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+		return FALSE;
+ 
+	dirp = entry & _PFN_MASK;
+	if (!dirp)
+		return 0;
+	dirp += ((addr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)) * sizeof(unsigned long long);
+	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+		return FALSE;
+
+	dirp = entry & _PFN_MASK;
+	if (!dirp)
+		return 0;
+	dirp += ((addr >> PAGESHIFT()) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
+	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+		return FALSE;
+
+	if (!(entry & _PAGE_P))
+		return 0;
+
+	entry = (entry & _PFN_MASK) + (addr & ((1UL << PAGESHIFT()) - 1));
+
+	return entry;
+}
+
+int
+get_xen_info_ia64(struct DumpInfo *info)
+{
+	unsigned long xen_start, xen_end, xen_heap_start;
+	int i;
+
+	info->frame_table_vaddr = VIRT_FRAME_TABLE_ADDR; /* "frame_table" is same value */
+
+	if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
+		return FALSE;
+	}
+	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+	      sizeof(xen_end))) {
+		ERRMSG("Can't get the value of xenheap_phys_end.\n");
+		return FALSE;
+	}
+	if (SYMBOL(xen_pstart) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of xen_pstart.\n");
+		return FALSE;
+	}
+	if (!readmem(info, VADDR_XEN, SYMBOL(xen_pstart), &xen_start,
+	      sizeof(xen_start))) {
+		ERRMSG("Can't get the value of xen_pstart.\n");
+		return FALSE;
+	}
+	info->xen_heap_end = (xen_end >> PAGESHIFT());
+	info->xen_heap_start = (xen_start >> PAGESHIFT());
+
+	if (SYMBOL(xen_heap_start) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of xen_heap_start.\n");
+		return FALSE;
+	}
+	if (!readmem(info, VADDR_XEN, SYMBOL(xen_heap_start), &xen_heap_start,
+	      sizeof(xen_heap_start))) {
+		ERRMSG("Can't get the value of xen_heap_start.\n");
+		return FALSE;
+	}
+	for (i = 0; i < info->num_domain; i++) {
+		info->domain_list[i].pickled_id = (unsigned int)
+			(info->domain_list[i].domain_addr - xen_heap_start);
+	}
+
+	return TRUE;
+}
+
 #endif /* ia64 */
 

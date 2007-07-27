@@ -29,6 +29,7 @@
 #include <libelf.h>
 #include <dwarf.h>
 #include <byteswap.h>
+#include <getopt.h>
 #include "diskdump_mod.h"
 
 /*
@@ -75,7 +76,8 @@ enum {
  */
 enum {
 	PADDR,
-	VADDR
+	VADDR,
+	VADDR_XEN
 };
 
 
@@ -568,6 +570,7 @@ struct DumpInfo {
 	int		flag_rearrange;      /* flag of creating dumpfile from
 						flattened format */
 	int		flag_force;	     /* overwrite existing stuff */
+	int		flag_xen;
 	long		page_size;           /* size of page */
 	long		page_shift;
 	unsigned long long	max_mapnr;   /* number of page descriptor */
@@ -632,6 +635,19 @@ struct DumpInfo {
 	FILE			*file_configfile;
 	char			*name_configfile;	     /* config file */
 	char			release[STRLEN_OSRELEASE];
+
+	/*
+	 * for Xen extraction
+	 */
+	unsigned long xen_heap_start;	/* start mfn of xen heap area */
+	unsigned long xen_heap_end;	/* end mfn(+1) of xen heap area */
+	unsigned long frame_table_vaddr;
+	unsigned long max_page;
+	unsigned long alloc_bitmap;
+	unsigned long dom0;
+	int	num_domain;
+	struct domain_list *domain_list;
+
 };
 
 struct symbol_table {
@@ -649,6 +665,23 @@ struct symbol_table {
 	unsigned long	node_data;
 	unsigned long	pgdat_list;
 	unsigned long	contig_page_data;
+
+	/*
+	 * for Xen extraction
+	 */
+	unsigned long	dom_xen;
+	unsigned long	dom_io;
+	unsigned long	domain_list;
+	unsigned long	frame_table;
+	unsigned long	xen_heap_start;
+	unsigned long	pgd_l2;
+	unsigned long	pgd_l3;
+	unsigned long	pgd_l4;
+	unsigned long	xenheap_phys_end;
+	unsigned long	xen_pstart;
+	unsigned long	frametable_pg_dir;
+	unsigned long	max_page;
+	unsigned long	alloc_bitmap;
 };
 
 struct size_table {
@@ -659,6 +692,12 @@ struct size_table {
 	long	free_area;
 	long	list_head;
 	long	node_memblk_s;
+
+	/*
+	 * for Xen extraction
+	 */
+	long	page_info;
+	long	domain;
 };
 
 struct offset_table {
@@ -697,6 +736,19 @@ struct offset_table {
 		long	size;
 		long	nid;
 	} node_memblk_s;
+
+	/*
+	 * for Xen extraction
+	 */
+	struct page_info {
+		long	count_info;
+		long	_domain;
+	} page_info;
+	struct domain {
+		long	domain_id;
+		long	next_in_list;
+	} domain;
+
 };
 
 /*
@@ -768,4 +820,128 @@ int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
 int get_str_osrelease_from_vmlinux(struct DumpInfo *info);
+
+/*
+ * for Xen extraction
+ */
+struct domain_list {
+	unsigned long domain_addr;
+	unsigned int  domain_id;
+	unsigned int  pickled_id;
+};
+
+#define DL_EXCLUDE_XEN	DL_EXCLUDE_FREE
+#define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
+
+#ifdef __x86__
+#define HYPERVISOR_VIRT_START_PAE	(0xF5800000UL)
+#define HYPERVISOR_VIRT_START		(0xFC000000UL)
+#define HYPERVISOR_VIRT_END		(0xFFFFFFFFUL)
+#define DIRECTMAP_VIRT_START		(0xFF000000UL)
+#define DIRECTMAP_VIRT_END		(0xFFC00000UL)
+
+#define is_xen_vaddr(x) \
+	((x) >= HYPERVISOR_VIRT_START_PAE && (x) < HYPERVISOR_VIRT_END)
+#define is_direct(x) \
+	((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
+
+#define PGDIR_SHIFT_3LEVEL   (30)
+#define PTRS_PER_PTE_3LEVEL  (512)
+#define PTRS_PER_PGD_3LEVEL  (4)
+#define PMD_SHIFT            (21)    /* only used by PAE translators */
+#define PTRS_PER_PMD         (512)   /* only used by PAE translators */
+#define PTE_SHIFT            (12)    /* only used by PAE translators */
+#define PTRS_PER_PTE         (512)   /* only used by PAE translators */
+
+#define _PAGE_PRESENT   0x001
+#define _PAGE_PSE       0x080
+
+#define ENTRY_MASK	(~0x8000000000000fffULL)
+
+unsigned long long kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr);
+#define kvtop_xen(X, Y)	kvtop_xen_x86(X, Y)
+
+int get_xen_info_x86(struct DumpInfo *info);
+#define get_xen_info_arch(X) get_xen_info_x86(X)
+
+#endif	/* __x86__ */
+
+#ifdef __x86_64__
+
+#define PML4_SHIFT      (39)
+#define PTRS_PER_PML4   (512)
+#define PGDIR_SHIFT     (30)
+#define PTRS_PER_PGD    (512)
+#define PMD_SHIFT       (21)
+#define PTRS_PER_PMD    (512)
+#define PTRS_PER_PTE    (512)
+#define PTE_SHIFT       (12)
+
+#define pml4_index(address) (((address) >> PML4_SHIFT) & (PTRS_PER_PML4 - 1))
+#define pgd_index(address)  (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+#define pmd_index(address)  (((address) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+#define pte_index(address)  (((address) >> PTE_SHIFT) & (PTRS_PER_PTE - 1))
+
+#define _PAGE_PRESENT   0x001
+#define _PAGE_PSE       0x080
+
+#define ENTRY_MASK	(~0x8000000000000fffULL)
+
+#define HYPERVISOR_VIRT_START (0xffff800000000000)
+#define HYPERVISOR_VIRT_END   (0xffff880000000000)
+#define DIRECTMAP_VIRT_START  (0xffff830000000000)
+#define DIRECTMAP_VIRT_END    (0xffff840000000000)
+
+#define is_xen_vaddr(x) \
+        ((x) >= HYPERVISOR_VIRT_START && (x) < HYPERVISOR_VIRT_END)
+#define is_direct(x) \
+        ((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
+
+unsigned long long kvtop_xen_x86_64(struct DumpInfo *info, unsigned long kvaddr);
+#define kvtop_xen(X, Y)	kvtop_xen_x86_64(X, Y)
+
+int get_xen_info_x86_64(struct DumpInfo *info);
+#define get_xen_info_arch(X) get_xen_info_x86_64(X)
+
+#endif	/* __x86_64__ */
+
+#ifdef __ia64__
+#define HYPERVISOR_VIRT_START	(0xe800000000000000)
+#define HYPERVISOR_VIRT_END	(0xf800000000000000)
+#define DEFAULT_SHAREDINFO_ADDR	(0xf100000000000000)
+#define PERCPU_PAGE_SIZE	65536
+#define PERCPU_ADDR		(DEFAULT_SHAREDINFO_ADDR - PERCPU_PAGE_SIZE)
+#define DIRECTMAP_VIRT_START	(0xf000000000000000)
+#define DIRECTMAP_VIRT_END	PERCPU_ADDR
+#define VIRT_FRAME_TABLE_ADDR	(0xf300000000000000)
+#define VIRT_FRAME_TABLE_END	(0xf400000000000000)
+
+#define is_xen_vaddr(x) \
+	((x) >= HYPERVISOR_VIRT_START && (x) < HYPERVISOR_VIRT_END)
+#define is_direct(x) \
+	((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
+#define is_frame_table_vaddr(x) \
+	((x) >= VIRT_FRAME_TABLE_ADDR && (x) < VIRT_FRAME_TABLE_END)
+
+#define PGDIR_SHIFT	(PAGESHIFT() + 2 * (PAGESHIFT() - 3))
+#define PTRS_PER_PGD	(1UL << (PAGESHIFT() - 3))
+#define PTRS_PER_PMD	(1UL << (PAGESHIFT() - 3))
+#define PTRS_PER_PTE	(1UL << (PAGESHIFT() - 3))
+
+#define IA64_MAX_PHYS_BITS	50
+#define _PAGE_P		(1)
+#define _PFN_MASK	(((1UL << IA64_MAX_PHYS_BITS) - 1) & ~0xfffUL)
+
+unsigned long long kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr);
+#define kvtop_xen(X, Y)	kvtop_xen_ia64(X, Y)
+
+int get_xen_info_ia64(struct DumpInfo *info);
+#define get_xen_info_arch(X) get_xen_info_ia64(X)
+
+#endif	/* __ia64 */
+
+#ifdef __powerpc__ /* powerpc */
+#define kvtop_xen(X, Y)	FALSE
+#define get_xen_info_arch(X) FALSE
+#endif	/* powerpc */
 

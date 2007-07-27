@@ -10,6 +10,8 @@ makedumpfile \- make a small dumpfile of kdump
 .br
 \fBmakedumpfile\fR \-g \fICONFIGFILE\fR \-x \fIVMLINUX\fR
 .br
+\fBmakedumpfile\fR \-E [\-\-xen-syms \fIXEN-SYMS\fR|\-\-xen-config \fICONFIGFILE\fR] \fIVMCORE\fR \fIDUMPFILE\fR
+.br
 .B makedumpfile
 \-h
 .br
@@ -243,6 +245,28 @@ host by running this script.
 # makedumpfile \-F \-d 31 \-x vmlinux /proc/vmcore \e
 .br
 | ssh user@host "makedumpfile\-R.pl dumpfile"
+
+.TP
+\fB\-\-xen-syms\fR \fIXEN-SYMS\fR
+Specify the \fIXEN-SYMS\fR with debug information to analyze the xen's memory usage.
+This option extracts the part of xen and domain-0.
+\-E option must be specified with this option.
+.br
+.B Example:
+.br
+# makedumpfile \-E \-\-xen-syms xen-syms /proc/vmcore dumpfile
+
+.TP
+\fB\-\-xen-config\fR \fICONFIGFILE\fR
+Specify \fICONFIGFILE\fR instead of \fIXEN-SYMS\fR for analyzing the xen's memory usage.
+.br
+\fICONFIGFILE\fR should be made beforehand by makedumpfile with \-g option, and
+it contains the xen's information.
+\-E option must be specified with this option.
+.br
+.B Example:
+.br
+# makedumpfile \-E \-\-xen-config \fICONFIGFILE\fR /proc/vmcore dumpfile
 
 .TP
 \fB\-D\fR

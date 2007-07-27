@@ -6,7 +6,7 @@ DATE=08 June 2007
 CC	= gcc
 CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
 	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
-CFLAGS_ARCH	= -g -O2 -Wall
+CFLAGS_ARCH	= -g -O2 -Wall -D_FILE_OFFSET_BITS=64
 
 ARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
 			       -e s/arm.*/arm/ -e s/sa110/arm/ \

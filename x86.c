@@ -25,17 +25,13 @@ get_machdep_info_x86(struct DumpInfo *info)
 	    && (SYMBOL(pkmap_count_next) != NOT_FOUND_SYMBOL)
 	    && ((SYMBOL(pkmap_count_next)-SYMBOL(pkmap_count))/sizeof(int))
 	    == 512) {
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("PAE          : ON\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("PAE          : ON\n");
 		info->section_size_bits = _SECTION_SIZE_BITS_PAE;
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_PAE;
 	} else {
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("PAE          : OFF\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("PAE          : OFF\n");
 		info->section_size_bits = _SECTION_SIZE_BITS;
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 	}

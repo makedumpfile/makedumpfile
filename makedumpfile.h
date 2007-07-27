@@ -140,6 +140,50 @@ isAnon(unsigned long mapping)
 #define DL_EXCLUDE_FREE		(0x010)	/* Exclude Free Pages */
 
 /*
+ * Message Level
+ */
+#define MIN_MSG_LEVEL		(0)
+#define MAX_MSG_LEVEL		(15)
+#define DEFAULT_MSG_LEVEL	(7)	/* Print the progress indicator, the
+					   common message, the error message */
+#define ML_PRINT_PROGRESS	(0x001) /* Print the progress indicator */
+#define ML_PRINT_COMMON_MSG	(0x002)	/* Print the common message */
+#define ML_PRINT_ERROR_MSG	(0x004)	/* Print the error message */
+#define ML_PRINT_DEBUG_MSG	(0x008) /* Print the debugging message */
+extern int message_level;
+
+#define MSG(x...) \
+do { \
+	if (message_level & ML_PRINT_COMMON_MSG) { \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+#define ERRMSG(x...) \
+do { \
+	if (message_level & ML_PRINT_ERROR_MSG) { \
+		fprintf(stderr, __FUNCTION__); \
+		fprintf(stderr, ": "); \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+#define PROGRESS_MSG(x...) \
+do { \
+	if (message_level & ML_PRINT_PROGRESS) { \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+#define DEBUG_MSG(x...) \
+do { \
+	if (message_level & ML_PRINT_DEBUG_MSG) { \
+		fprintf(stderr, x); \
+	} \
+} while (0)
+
+
+/*
  * For parse_line()
  */
 #define NULLCHAR	('\0')
@@ -187,13 +231,13 @@ do { \
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \
 	if (SYMBOL(symbol) != NOT_FOUND_SYMBOL) { \
-		fprintf(info->file_configfile, "%s%lx\n", \
+		fprintf(info->file_vmcoreinfo, "%s%lx\n", \
 		    STR_SYMBOL(str_symbol), SYMBOL(symbol)); \
 	} \
 } while (0)
 #define READ_SYMBOL(str_symbol, symbol) \
 do { \
-	SYMBOL(symbol) = read_config_symbol(info, STR_SYMBOL(str_symbol)); \
+	SYMBOL(symbol) = read_vmcoreinfo_symbol(info, STR_SYMBOL(str_symbol)); \
 	if (SYMBOL(symbol) == INVALID_SYMBOL_DATA) \
 		return FALSE; \
 } while (0)
@@ -247,39 +291,39 @@ do { \
 #define WRITE_STRUCTURE_SIZE(str_structure, structure) \
 do { \
 	if (SIZE(structure) != NOT_FOUND_STRUCTURE) { \
-		fprintf(info->file_configfile, "%s%ld\n", \
+		fprintf(info->file_vmcoreinfo, "%s%ld\n", \
 		    STR_SIZE(str_structure), SIZE(structure)); \
 	} \
 } while (0)
 #define WRITE_MEMBER_OFFSET(str_member, member) \
 do { \
 	if (OFFSET(member) != NOT_FOUND_STRUCTURE) { \
-		fprintf(info->file_configfile, "%s%ld\n", \
+		fprintf(info->file_vmcoreinfo, "%s%ld\n", \
 		    STR_OFFSET(str_member), OFFSET(member)); \
 	} \
 } while (0)
 #define WRITE_ARRAY_LENGTH(str_array, array) \
 do { \
 	if (ARRAY_LENGTH(array) != NOT_FOUND_STRUCTURE) { \
-		fprintf(info->file_configfile, "%s%ld\n", \
+		fprintf(info->file_vmcoreinfo, "%s%ld\n", \
 		    STR_LENGTH(str_array), ARRAY_LENGTH(array)); \
 	} \
 } while (0)
 #define READ_STRUCTURE_SIZE(str_structure, structure) \
 do { \
-	SIZE(structure) = read_config_structure(info,STR_SIZE(str_structure)); \
+	SIZE(structure) = read_vmcoreinfo_structure(info,STR_SIZE(str_structure)); \
 	if (SIZE(structure) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_MEMBER_OFFSET(str_member, member) \
 do { \
-	OFFSET(member) = read_config_structure(info, STR_OFFSET(str_member)); \
+	OFFSET(member) = read_vmcoreinfo_structure(info, STR_OFFSET(str_member)); \
 	if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_ARRAY_LENGTH(str_array, array) \
 do { \
-	ARRAY_LENGTH(array) = read_config_structure(info, STR_LENGTH(str_array)); \
+	ARRAY_LENGTH(array) = read_vmcoreinfo_structure(info, STR_LENGTH(str_array)); \
 	if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
@@ -296,14 +340,14 @@ do { \
 #define WRITE_SRCFILE(str_decl_name, decl_name) \
 do { \
 	if (strlen(SRCFILE(decl_name))) { \
-		fprintf(info->file_configfile, "%s%s\n", \
+		fprintf(info->file_vmcoreinfo, "%s%s\n", \
 		    STR_SRCFILE(str_decl_name), SRCFILE(decl_name)); \
 	} \
 } while (0)
 
 #define READ_SRCFILE(str_decl_name, decl_name) \
 do { \
-	if (!read_config_string(info, STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
+	if (!read_vmcoreinfo_string(info, STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
 		return FALSE; \
 } while (0)
 
@@ -324,7 +368,7 @@ do { \
 #define LATEST_VERSION		(0x02060015)	/* linux-2.6.21 */
 
 /*
- * field name of config file
+ * field name of vmcoreinfo file
  */
 #define STR_OSRELEASE	"OSRELEASE="
 #define STR_PAGESIZE	"PAGESIZE="
@@ -483,14 +527,6 @@ off_t vaddr_to_offset_ia64();
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
 
-#define MSG(x...)	fprintf(stderr, x)
-#define ERRMSG(x...) \
-do { \
-	fprintf(stderr, __FUNCTION__); \
-	fprintf(stderr, ": "); \
-	fprintf(stderr, x); \
-} while (0)
-
 struct pt_load_segment {
 	loff_t			file_offset;
 	unsigned long long	phys_start;
@@ -556,12 +592,11 @@ struct DumpInfo {
 	 */
 	int		dump_level;          /* dump level */
 	int		flag_compress;       /* flag of compression */
-	int		flag_debug;          /* flag of debug */
 	int		flag_elf64;          /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_vmlinux;	     /* flag of vmlinux */
-	int		flag_generate_config;/* flag of generating config file */
-	int		flag_read_config;    /* flag of reading config file */
+	int		flag_generate_vmcoreinfo;/* flag of generating vmcoreinfo file */
+	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */
 	int		flag_exclude_free;   /* flag of excluding free page */
 	int		flag_show_usage;     /* flag of showing usage */
 	int		flag_show_version;   /* flag of showing version */
@@ -630,10 +665,10 @@ struct DumpInfo {
 	} vm_table;
 
 	/*
-	 * config file info:
+	 * vmcoreinfo file info:
 	 */
-	FILE			*file_configfile;
-	char			*name_configfile;	     /* config file */
+	FILE			*file_vmcoreinfo;
+	char			*name_vmcoreinfo;	     /* vmcoreinfo file */
 	char			release[STRLEN_OSRELEASE];
 
 	/*
@@ -666,7 +701,9 @@ struct symbol_table {
 	unsigned long	pgdat_list;
 	unsigned long	contig_page_data;
 
-	/* for Xen extraction */
+	/*
+	 * for Xen extraction
+	 */
 	unsigned long	dom_xen;
 	unsigned long	dom_io;
 	unsigned long	domain_list;
@@ -691,7 +728,9 @@ struct size_table {
 	long	list_head;
 	long	node_memblk_s;
 
-	/* for Xen extraction */
+	/*
+	 * for Xen extraction
+	 */
 	long	page_info;
 	long	domain;
 };
@@ -733,7 +772,9 @@ struct offset_table {
 		long	nid;
 	} node_memblk_s;
 
-	/* for Xen extraction */
+	/*
+	 * for Xen extraction
+	 */
 	struct page_info {
 		long	count_info;
 		long	_domain;
@@ -810,7 +851,6 @@ int readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
     void *bufptr, size_t size);
 off_t paddr_to_offset();
 unsigned long long vaddr_to_paddr();
-unsigned long long paddr_to_vaddr();
 int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);

@@ -4,26 +4,27 @@
 ======================
 
 * REQUIREMENTS
-  Please download the following library file and install it by the
-  following method because some commands (ld, readelf, etc.) are
-  installed by "make install":
+  Please download the following library file and install it:
   - elfutils-0.125.tar.gz
-    # tar -zxvf elfutils-0.125.tar.gz
-    # cd elfutils-0.125
-    # ./configure
-    # make
-    #
-    # mkdir /usr/local/include/elfutils/
-    # cp ./libdw/libdw.h   /usr/local/include/elfutils/libdw.h
-    # cp ./libdw/dwarf.h   /usr/local/include/dwarf.h
-    # cp ./libelf/libelf.h /usr/local/include/libelf.h
-    # cp ./libelf/gelf.h   /usr/local/include/gelf.h
-    #
-    # cp ./libelf/libelf.a /usr/local/lib/libelf.a
-    # cp ./libdw/libdw.a   /usr/local/lib/libdw.a
-    # cp ./libasm/libasm.a /usr/local/lib/libasm.a
-    # cp ./libebl/libebl.a /usr/local/lib/libebl.a
-    #
+    The "make install" of elfutils installs some commands (ld, readelf, etc.),
+    and the compiling problem sometimes happens due to using the installed
+    commands. To install only the library files, do the following method.
+     # tar -zxvf elfutils-0.125.tar.gz
+     # cd elfutils-0.125
+     # ./configure
+     # make
+     #
+     # mkdir /usr/local/include/elfutils/
+     # cp ./libdw/libdw.h   /usr/local/include/elfutils/libdw.h
+     # cp ./libdw/dwarf.h   /usr/local/include/dwarf.h
+     # cp ./libelf/libelf.h /usr/local/include/libelf.h
+     # cp ./libelf/gelf.h   /usr/local/include/gelf.h
+     #
+     # cp ./libelf/libelf.a /usr/local/lib/libelf.a
+     # cp ./libdw/libdw.a   /usr/local/lib/libdw.a
+     # cp ./libasm/libasm.a /usr/local/lib/libasm.a
+     # cp ./libebl/libebl.a /usr/local/lib/libebl.a
+     #
 
 * BUILD & INSTALL
   1.Get the latest makedumpfile from the following site:
@@ -36,7 +37,7 @@
     # make; make install
 
 * SUPPORTED KERNELS
-  makedumpfile (version 1.1.4) supports the following kernels.
+  makedumpfile (version 1.1.5) supports the following kernels.
 
          |      FLATMEM      |   DISCONTIGMEM    |     SPARSEMEM
          |-------------------+-------------------+-------------------
@@ -62,7 +63,7 @@
   Please see "man makedumpfile" or "makedumpfile -h".
 
 * TODO
-  1. Extending the supported kernels.
+  1. Supporting more kernels.
 
 * FAQ
   001: It cannot be compiled with the following messages:
@@ -84,9 +85,9 @@
 
     The compiler cannot find out elf_getshstrndx() because it tries
     searching it only from /usr/lib/libelf.a though elf_getshstrndx()
-    is defined in /usr/local/lib/libelf.a.
-    To solve the problem, the option (-L/usr/local/lib/) is added to
-    CFLAGS of Makefile like the following:
+    is archived in /usr/local/lib/libelf.a.
+    To solve the problem, add the option (-L/usr/local/lib/) to CFLAGS
+    of Makefile like the following:
 
     CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 -L/usr/local/lib/ \
         -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'

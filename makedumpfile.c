@@ -26,6 +26,7 @@ struct dwarf_info	dwarf_info;
 struct vm_table		*vt = 0;
 
 int retcd = FAILED;	/* return code */
+int message_level;
 
 void
 show_version()
@@ -218,6 +219,7 @@ readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
 		break;
 	default:
 		ERRMSG("Invalid address type (%d).\n", type_addr);
+		return FALSE;
 	}
 
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
@@ -287,6 +289,9 @@ check_release(struct DumpInfo *info)
 	struct utsname system_utsname;
 	unsigned long utsname;
 
+	/*
+	 * Get the kernel version.
+	 */
 	if (SYMBOL(system_utsname) != NOT_FOUND_SYMBOL) {
 		utsname = SYMBOL(system_utsname);
 	} else if (SYMBOL(init_uts_ns) != NOT_FOUND_SYMBOL) {
@@ -295,40 +300,26 @@ check_release(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
-
-	/*
-	 * Get the kernel version from /proc/vmcore.
-	 */
 	if (!readmem(info, VADDR, utsname, &system_utsname,
 	    sizeof(struct utsname))) {
 		ERRMSG("Can't get the address of system_utsname.\n");
 		return FALSE;
 	}
-	if (!info->flag_read_config) {
-		/*
-		 * Get the kernel version from vmlinux.
-		 */
-		if (!get_str_osrelease_from_vmlinux(info))
+
+	if (info->flag_read_vmcoreinfo) {
+		if (strcmp(system_utsname.release, info->release)) {
+			ERRMSG("%s and %s don't match.\n",
+			    info->name_vmcoreinfo, info->name_memory);
+			retcd = WRONG_RELEASE;
 			return FALSE;
+		}
 	}
 
-	/*
-	 * Check whether the taken versions much.
-	 */
-	if (strcmp(system_utsname.release, info->release)) {
-		if (info->flag_read_config)
-			ERRMSG("%s and %s don't match.\n",
-			    info->name_configfile, info->name_memory);
-		else
-			ERRMSG("%s and %s don't match.\n",
-			    dwarf_info.vmlinux_name, info->name_memory);
-
-		retcd = WRONG_RELEASE;
-		return FALSE;
-	}
 	info->kernel_version = get_kernel_version(system_utsname.release);
-	if (!info->kernel_version) {
-		ERRMSG("Can't convert the string of kernel version.\n");
+	if (info->kernel_version == FALSE) {
+		if (!info->flag_read_vmcoreinfo)
+			ERRMSG("Or %s and %s don't match.\n",
+			    dwarf_info.vmlinux_name, info->name_memory);
 		return FALSE;
 	}
 
@@ -341,23 +332,23 @@ print_usage()
 	MSG("\n");
 	MSG("Usage:\n");
 	MSG("  Creating DUMPFILE:\n");
-	MSG("  # makedumpfile    [-c|-E] [-d DL] [-x VMLINUX|-i CONFIGFILE] VMCORE DUMPFILE\n");
+	MSG("  # makedumpfile    [-c|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE DUMPFILE\n");
 	MSG("\n");
 	MSG("  Outputting the dump data in the flattened format to the standard output:\n");
-	MSG("  # makedumpfile -F [-c|-E] [-d DL] [-x VMLINUX|-i CONFIGFILE] VMCORE\n");
+	MSG("  # makedumpfile -F [-c|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
 	MSG("\n");
 	MSG("  Re-arranging the dump data in the flattened format to a readable DUMPFILE:\n");
 	MSG("  # makedumpfile -R DUMPFILE\n");
 	MSG("\n");
-	MSG("  Generating CONFIGFILE:\n");
-	MSG("  # makedumpfile -g CONFIGFILE -x VMLINUX\n");
+	MSG("  Generating VMCOREINFO:\n");
+	MSG("  # makedumpfile -g VMCOREINFO -x VMLINUX\n");
 	MSG("\n");
 	MSG("\n");
 	MSG("  Creating DUMPFILE of Xen:\n");
-	MSG("  # makedumpfile -E [--xen-syms XEN-SYMS|--xen-config CONFIGFILE] VMCORE DUMPFILE\n");
+	MSG("  # makedumpfile -E [--xen-syms XEN-SYMS|--xen-vmcoreinfo VMCOREINFO] VMCORE DUMPFILE\n");
 	MSG("\n");
-	MSG("  Generating CONFIGFILE of Xen:\n");
-	MSG("  # makedumpfile -g CONFIGFILE --xen-syms XEN-SYMS\n");
+	MSG("  Generating VMCOREINFO of Xen:\n");
+	MSG("  # makedumpfile -g VMCOREINFO --xen-syms XEN-SYMS\n");
 	MSG("\n");
 	MSG("\n");
 	MSG("Available options:\n");
@@ -395,17 +386,17 @@ print_usage()
 	MSG("      memory usage.\n");
 	MSG("      The page size of the first kernel and the second kernel should match.\n");
 	MSG("\n");
-	MSG("  [-i CONFIGFILE]:\n");
-	MSG("      Specify CONFIGFILE instead of VMLINUX for analyzing the first kernel's\n");
+	MSG("  [-i VMCOREINFO]:\n");
+	MSG("      Specify VMCOREINFO instead of VMLINUX for analyzing the first kernel's\n");
 	MSG("      memory usage.\n");
-	MSG("      CONFIGFILE should be made beforehand by makedumpfile with -g option,\n");
+	MSG("      VMCOREINFO should be made beforehand by makedumpfile with -g option,\n");
 	MSG("      and it containes the first kernel's information. If Dump_Level is 2 or\n");
 	MSG("      more and [-x VMLINUX] is not specified, this option is necessary.\n");
 	MSG("\n");
-	MSG("  [-g CONFIGFILE]:\n");
-	MSG("      Generate CONFIGFILE from the first kernel's VMLINUX.\n");
-	MSG("      CONFIGFILE must be generated on the system that is running the first\n");
-	MSG("      kernel. With -i option, a user can specify CONFIGFILE generated on the\n");
+	MSG("  [-g VMCOREINFO]:\n");
+	MSG("      Generate VMCOREINFO from the first kernel's VMLINUX.\n");
+	MSG("      VMCOREINFO must be generated on the system that is running the first\n");
+	MSG("      kernel. With -i option, a user can specify VMCOREINFO generated on the\n");
 	MSG("      other system that is running the same first kernel. [-x VMLINUX] must\n");
 	MSG("      be specified.\n");
 	MSG("\n");
@@ -420,23 +411,34 @@ print_usage()
 	MSG("      Re-arrange the dump data in the flattened format from the standard input\n");
 	MSG("      to a readable DUMPFILE.\n");
 	MSG("\n");
+	MSG("  [--xen-syms XEN-SYMS]:\n");
+	MSG("      Specify the XEN-SYMS to analyze the xen's memory usage.\n");
+	MSG("\n");
+	MSG("  [--xen-vmcoreinfo VMCOREINFO]:\n");
+	MSG("      Specify the VMCOREINFO of xen to analyze the xen's memory usage.\n");
+	MSG("\n");
+	MSG("  [--message-level ML]:\n");
+	MSG("      Specify the message types.\n");
+	MSG("      A user can specify multiple message types by setting the sum of each\n");
+	MSG("      message type for ML. The default ML is '7' (Print the progress indicator,\n");
+	MSG("      common messages, error messages).\n");
+	MSG("        0: Print nothing.\n");
+	MSG("        1: Print progress indicator.\n");
+	MSG("        2: Print common messages.\n");
+	MSG("        4: Print error messages.\n");
+	MSG("        8: Print debugging messages.\n");
+	MSG("\n");
 	MSG("  [-D]:\n");
-	MSG("      Print the debug information.\n");
+	MSG("      Print debugging messages.\n");
 	MSG("\n");
 	MSG("  [-f]:\n");
 	MSG("      Overwrite DUMPFILE even if it already exists.\n");
 	MSG("\n");
 	MSG("  [-h]:\n");
-	MSG("      Show the help message.\n");
+	MSG("      Show help messages.\n");
 	MSG("\n");
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile.\n");
-	MSG("\n");
-	MSG("  [--xen-syms XEN-SYMS]:\n");
-	MSG("      Specify the XEN-SYMS to analyze the xen's memory usage.\n");
-	MSG("\n");
-	MSG("  [--xen-config CONFIGFILE]:\n");
-	MSG("      Specify the CONFIGFILE of xen to analyze the xen's memory usage.\n");
 	MSG("\n");
 	MSG("  VMLINUX:\n");
 	MSG("      This is a pathname to the first kernel's vmlinux.\n");
@@ -458,16 +460,16 @@ print_usage()
 }
 
 int
-open_config_file(struct DumpInfo *info, char *mode)
+open_vmcoreinfo(struct DumpInfo *info, char *mode)
 {
-	FILE *file_configfile;
+	FILE *file_vmcoreinfo;
 
-	if ((file_configfile = fopen(info->name_configfile, mode)) == NULL) {
-		ERRMSG("Can't open the config file(%s). %s\n",
-		    info->name_configfile, strerror(errno));
+	if ((file_vmcoreinfo = fopen(info->name_vmcoreinfo, mode)) == NULL) {
+		ERRMSG("Can't open the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
 		return FALSE;
 	}
-	info->file_configfile = file_configfile;
+	info->file_vmcoreinfo = file_vmcoreinfo;
 	return TRUE;
 }
 
@@ -552,17 +554,17 @@ open_dump_bitmap(struct DumpInfo *info)
 }
 
 /*
- * Open the following files when it generates the configuration file.
+ * Open the following files when it generates the vmcoreinfo file.
  * - vmlinux
- * - configuration file
+ * - vmcoreinfo file
  */
 int
-open_files_for_generating_configfile(struct DumpInfo *info)
+open_files_for_generating_vmcoreinfo(struct DumpInfo *info)
 {
 	if (!open_kernel_file())
 		return FALSE;
 
-	if (!open_config_file(info, "w"))
+	if (!open_vmcoreinfo(info, "w"))
 		return FALSE;
 
 	return TRUE;
@@ -586,16 +588,16 @@ open_files_for_rearranging_dumpdata(struct DumpInfo *info)
  * - dump mem
  * - dump file
  * - bit map
- * if it reads the configuration file
- *   - configuration file
+ * if it reads the vmcoreinfo file
+ *   - vmcoreinfo file
  * else
  *   - vmlinux
  */
 int
 open_files_for_creating_dumpfile(struct DumpInfo *info)
 {
-	if (info->flag_read_config) {
-		if (!open_config_file(info, "r"))
+	if (info->flag_read_vmcoreinfo) {
+		if (!open_vmcoreinfo(info, "r"))
 			return FALSE;
 	} else if (info->dump_level > DL_EXCLUDE_ZERO) {
 		if (!open_kernel_file())
@@ -630,13 +632,12 @@ dump_Elf64_load(struct DumpInfo *info, Elf64_Phdr *prog, int num_load)
 	pls->virt_end    = pls->virt_start + prog->p_filesz;
 	pls->file_offset = prog->p_offset;
 
-	if (info->flag_debug) {
-		MSG("LOAD (%d)\n", num_load);
-		MSG("  phys_start : %llx\n", pls->phys_start);
-		MSG("  phys_end   : %llx\n", pls->phys_end);
-		MSG("  virt_start : %llx\n", pls->virt_start);
-		MSG("  virt_end   : %llx\n", pls->virt_end);
-	}
+	DEBUG_MSG("LOAD (%d)\n", num_load);
+	DEBUG_MSG("  phys_start : %llx\n", pls->phys_start);
+	DEBUG_MSG("  phys_end   : %llx\n", pls->phys_end);
+	DEBUG_MSG("  virt_start : %llx\n", pls->virt_start);
+	DEBUG_MSG("  virt_end   : %llx\n", pls->virt_end);
+
 	return TRUE;
 }
 
@@ -699,13 +700,12 @@ dump_Elf32_load(struct DumpInfo *info, Elf32_Phdr *prog, int num_load)
 	pls->virt_end    = pls->virt_start + prog->p_filesz;
 	pls->file_offset = prog->p_offset;
 
-	if (info->flag_debug) {
-		MSG("LOAD (%d)\n", num_load);
-		MSG("  phys_start : %llx\n", pls->phys_start);
-		MSG("  phys_end   : %llx\n", pls->phys_end);
-		MSG("  virt_start : %llx\n", pls->virt_start);
-		MSG("  virt_end   : %llx\n", pls->virt_end);
-	}
+	DEBUG_MSG("LOAD (%d)\n", num_load);
+	DEBUG_MSG("  phys_start : %llx\n", pls->phys_start);
+	DEBUG_MSG("  phys_end   : %llx\n", pls->phys_end);
+	DEBUG_MSG("  virt_start : %llx\n", pls->virt_start);
+	DEBUG_MSG("  virt_end   : %llx\n", pls->virt_end);
+
 	return TRUE;
 }
 
@@ -900,10 +900,8 @@ get_elf_info(struct DumpInfo *info)
 
 	info->max_mapnr = get_max_mapnr(info);
 
-	if (info->flag_debug) {
-		MSG("\n");
-		MSG("max_mapnr    : %llx\n", info->max_mapnr);
-	}
+	DEBUG_MSG("\n");
+	DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
 
 	/*
 	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
@@ -1724,7 +1722,7 @@ get_str_osrelease_from_vmlinux(struct DumpInfo *info)
 	    dwarf_info.vmlinux_name, utsname);
 
 	if (!offset) {
-		ERRMSG("Can't convert vaddr (%lx) of utsname to a offset.\n",
+		ERRMSG("Can't convert vaddr (%lx) of utsname to an offset.\n",
 		    utsname);
 		return FALSE;
 	}
@@ -1795,7 +1793,7 @@ get_mem_type(struct DumpInfo *info)
 }
 
 int
-generate_config(struct DumpInfo *info)
+generate_vmcoreinfo(struct DumpInfo *info)
 {
 	if ((info->page_size = sysconf(_SC_PAGE_SIZE)) <= 0) {
 		ERRMSG("Can't get the size of page.\n");
@@ -1829,13 +1827,13 @@ generate_config(struct DumpInfo *info)
 	/*
 	 * write 1st kernel's OSRELEASE
 	 */
-	fprintf(info->file_configfile, "%s%s\n", STR_OSRELEASE,
+	fprintf(info->file_vmcoreinfo, "%s%s\n", STR_OSRELEASE,
 	    info->release);
 
 	/*
 	 * write 1st kernel's PAGESIZE
 	 */
-	fprintf(info->file_configfile, "%s%ld\n", STR_PAGESIZE,
+	fprintf(info->file_vmcoreinfo, "%s%ld\n", STR_PAGESIZE,
 	    info->page_size);
 
 	/*
@@ -1915,19 +1913,19 @@ generate_config(struct DumpInfo *info)
 }
 
 int
-read_config_basic_info(struct DumpInfo *info)
+read_vmcoreinfo_basic_info(struct DumpInfo *info)
 {
 	long page_size = FALSE;
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int get_release = FALSE, i;
 
-	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
-		ERRMSG("Can't seek the config file(%s). %s\n",
-		    info->name_configfile, strerror(errno));
+	if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
 		return FALSE;
 	}
 
-	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
+	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
@@ -1940,12 +1938,12 @@ read_config_basic_info(struct DumpInfo *info)
 			if ((!page_size || page_size == LONG_MAX)
 			    || strlen(endp) != 0) {
 				ERRMSG("Invalid data in %s: %s",
-				    info->name_configfile, buf);
+				    info->name_vmcoreinfo, buf);
 				return FALSE;
 			}
 			if (!is_page_size(page_size)) {
 				ERRMSG("Invalid data in %s: %s",
-				    info->name_configfile, buf);
+				    info->name_vmcoreinfo, buf);
 				return FALSE;
 			}
 		}
@@ -1956,26 +1954,26 @@ read_config_basic_info(struct DumpInfo *info)
 	info->page_shift = ffs(info->page_size) - 1;
 
 	if (!get_release || !info->page_size) {
-		ERRMSG("Invalid format in %s", info->name_configfile);
+		ERRMSG("Invalid format in %s", info->name_vmcoreinfo);
 		return FALSE;
 	}
 	return TRUE;
 }
 
 unsigned long
-read_config_symbol(struct DumpInfo *info, char *str_symbol)
+read_vmcoreinfo_symbol(struct DumpInfo *info, char *str_symbol)
 {
 	unsigned long symbol = NOT_FOUND_SYMBOL;
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int i;
 
-	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
-		ERRMSG("Can't seek the config file(%s). %s\n",
-		    info->name_configfile, strerror(errno));
+	if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
 		return INVALID_SYMBOL_DATA;
 	}
 
-	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
+	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
@@ -1984,7 +1982,7 @@ read_config_symbol(struct DumpInfo *info, char *str_symbol)
 			if ((!symbol || symbol == ULONG_MAX)
 			    || strlen(endp) != 0) {
 				ERRMSG("Invalid data in %s: %s",
-				    info->name_configfile, buf);
+				    info->name_vmcoreinfo, buf);
 				return INVALID_SYMBOL_DATA;
 			}
 			break;
@@ -1994,19 +1992,19 @@ read_config_symbol(struct DumpInfo *info, char *str_symbol)
 }
 
 long
-read_config_structure(struct DumpInfo *info, char *str_structure)
+read_vmcoreinfo_structure(struct DumpInfo *info, char *str_structure)
 {
 	long data = NOT_FOUND_STRUCTURE;
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int i;
 
-	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
-		ERRMSG("Can't seek the config file(%s). %s\n",
-		    info->name_configfile, strerror(errno));
+	if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
 		return INVALID_STRUCTURE_DATA;
 	}
 
-	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
+	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
@@ -2014,7 +2012,7 @@ read_config_structure(struct DumpInfo *info, char *str_structure)
 			data = strtol(buf + strlen(str_structure), &endp, 10);
 			if ((data == LONG_MAX) || strlen(endp) != 0) {
 				ERRMSG("Invalid data in %s: %s",
-				    info->name_configfile, buf);
+				    info->name_vmcoreinfo, buf);
 				return INVALID_STRUCTURE_DATA;
 			}
 			break;
@@ -2024,23 +2022,23 @@ read_config_structure(struct DumpInfo *info, char *str_structure)
 }
 
 int
-read_config_string(struct DumpInfo *info, char *str_in, char *str_out)
+read_vmcoreinfo_string(struct DumpInfo *info, char *str_in, char *str_out)
 {
 	char buf[BUFSIZE_FGETS];
 	unsigned int i;
 
-	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
-		ERRMSG("Can't seek the config file(%s). %s\n",
-		    info->name_configfile, strerror(errno));
+	if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
 		return FALSE;
 	}
 
-	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
+	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, str_in, strlen(str_in)) == 0) {
-			strncpy(str_out, buf + strlen(str_in), BUFSIZE_FGETS - strlen(str_in));
+			strncpy(str_out, buf + strlen(str_in), LEN_SRCFILE - strlen(str_in));
 			break;
 		}
 	}
@@ -2048,9 +2046,9 @@ read_config_string(struct DumpInfo *info, char *str_in, char *str_out)
 }
 
 int
-read_config(struct DumpInfo *info)
+read_vmcoreinfo(struct DumpInfo *info)
 {
-	if (!read_config_basic_info(info))
+	if (!read_vmcoreinfo_basic_info(info))
 		return FALSE;
 
 	READ_SYMBOL("mem_map", mem_map);
@@ -2125,7 +2123,7 @@ get_nodes_online(struct DumpInfo *info)
 	/*
 	 * FIXME
 	 * Size of node_online_map must be dynamically got from debugging
-	 * information each architecture or each config.
+	 * information each architecture or each vmcoreinfo.
 	 */
 	len = SIZEOF_NODE_ONLINE_MAP;
 	if (!(vt->node_online_map = (unsigned long *)malloc(len))) {
@@ -2157,11 +2155,10 @@ get_numnodes(struct DumpInfo *info)
 	if (!(vt->numnodes = get_nodes_online(info))) {
 		vt->numnodes = 1;
 	}
-	if (info->flag_debug) {
-		MSG("\n");
-		MSG("num of NODEs : %d\n", vt->numnodes);
-		MSG("\n");
-	}
+	DEBUG_MSG("\n");
+	DEBUG_MSG("num of NODEs : %d\n", vt->numnodes);
+	DEBUG_MSG("\n");
+
 	return TRUE;
 }
 
@@ -2290,12 +2287,11 @@ dump_mem_map(struct DumpInfo *info, unsigned long long pfn_start,
 	mmd->pfn_end   = pfn_end;
 	mmd->mem_map   = mem_map;
 
-	if (info->flag_debug) {
-		MSG("mem_map (%d)\n", num_mm);
-		MSG("  mem_map    : %lx\n", mem_map);
-		MSG("  pfn_start  : %llx\n", pfn_start);
-		MSG("  pfn_end    : %llx\n", pfn_end);
-	}
+	DEBUG_MSG("mem_map (%d)\n", num_mm);
+	DEBUG_MSG("  mem_map    : %lx\n", mem_map);
+	DEBUG_MSG("  pfn_start  : %llx\n", pfn_start);
+	DEBUG_MSG("  pfn_end    : %llx\n", pfn_end);
+
 	return;
 }
 
@@ -2330,7 +2326,7 @@ get_node_memblk(struct DumpInfo *info, int num_memblk,
 {
 	unsigned long node_memblk;
 
-	if (ARRAY_LENGTH(node_memblk) < num_memblk) {
+	if (ARRAY_LENGTH(node_memblk) <= num_memblk) {
 		ERRMSG("Invalid num_memblk.\n");
 		return FALSE;
 	}
@@ -2375,11 +2371,9 @@ get_num_mm_discontigmem(struct DumpInfo *info)
 			if (!start_paddr && !size &&!nid)
 				break;
 
-			if (info->flag_debug) {
-				MSG("nid : %d\n", nid);
-				MSG("  start_paddr: %lx\n", start_paddr);
-				MSG("  size       : %lx\n", size);
-			}
+			DEBUG_MSG("nid : %d\n", nid);
+			DEBUG_MSG("  start_paddr: %lx\n", start_paddr);
+			DEBUG_MSG("  size       : %lx\n", size);
 		}
 		if (i == 0) {
 			/*
@@ -2409,7 +2403,7 @@ separate_mem_map(struct DumpInfo *info, struct mem_map_data *mmd,
 			break;
 
 		/*
-		 * Check pglist_data.node_id and node_memblk_s.nid much.
+		 * Check pglist_data.node_id and node_memblk_s.nid match.
 		 */
 		if (nid_pgdat != nid)
 			continue;
@@ -2422,13 +2416,12 @@ separate_mem_map(struct DumpInfo *info, struct mem_map_data *mmd,
 			return FALSE;
 		}
 		if (info->max_mapnr < pfn_end) {
-			if (info->flag_debug) {
-				MSG("pfn_end of node (%d) is over max_mapnr.\n",
-				    nid);
-				MSG("  pfn_start: %lx\n", pfn_start);
-				MSG("  pfn_end  : %lx\n", pfn_end);
-				MSG("  max_mapnr: %llx\n", info->max_mapnr);
-			}
+			DEBUG_MSG("pfn_end of node (%d) is over max_mapnr.\n",
+			    nid);
+			DEBUG_MSG("  pfn_start: %lx\n", pfn_start);
+			DEBUG_MSG("  pfn_end  : %lx\n", pfn_end);
+			DEBUG_MSG("  max_mapnr: %llx\n", info->max_mapnr);
+
 			pfn_end = info->max_mapnr;
 		}
 
@@ -2504,7 +2497,7 @@ get_mm_discontigmem(struct DumpInfo *info)
 			 * Nid:      Physical address
 			 *  0 : 0x1000000000 - 0x2000000000
 			 *  1 : 0x2000000000 - 0x3000000000
-			 *  2 : 0x0000000000 - 0x6020000000 <- Duplicated
+			 *  2 : 0x0000000000 - 0x6020000000 <- Overlapping
 			 *  3 : 0x3000000000 - 0x4000000000
 			 *  4 : 0x4000000000 - 0x5000000000
 			 *  5 : 0x5000000000 - 0x6000000000
@@ -2519,13 +2512,12 @@ get_mm_discontigmem(struct DumpInfo *info)
 			}
 		} else {
 			if (info->max_mapnr < pfn_end) {
-				if (info->flag_debug) {
-					MSG("pfn_end of node (%d) is over max_mapnr.\n",
-					    node);
-					MSG("  pfn_start: %lx\n", pfn_start);
-					MSG("  pfn_end  : %lx\n", pfn_end);
-					MSG("  max_mapnr: %llx\n", info->max_mapnr);
-				}
+				DEBUG_MSG("pfn_end of node (%d) is over max_mapnr.\n",
+				    node);
+				DEBUG_MSG("  pfn_start: %lx\n", pfn_start);
+				DEBUG_MSG("  pfn_end  : %lx\n", pfn_end);
+				DEBUG_MSG("  max_mapnr: %llx\n", info->max_mapnr);
+
 				pfn_end = info->max_mapnr;
 			}
 
@@ -2576,7 +2568,7 @@ get_mm_discontigmem(struct DumpInfo *info)
 
 	for (i = 0; i < num_mem_map - 1; i++) {
 		if (mmd[i].pfn_end > mmd[i + 1].pfn_start) {
-			ERRMSG("The mem_map is overlapped.\n");
+			ERRMSG("The mem_map is overlapped with the next one.\n");
 			ERRMSG("mmd[%d].pfn_end   = %llx\n", i, mmd[i].pfn_end);
 			ERRMSG("mmd[%d].pfn_start = %llx\n", i + 1, mmd[i + 1].pfn_start);
 			return FALSE;
@@ -2764,35 +2756,27 @@ get_mem_map(struct DumpInfo *info)
 
 	switch (get_mem_type(info)) {
 	case SPARSEMEM:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : SPARSEMEM\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : SPARSEMEM\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_sparsemem(info);
 		break;
 	case SPARSEMEM_EX:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : SPARSEMEM_EX\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : SPARSEMEM_EX\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_sparsemem(info);
 		break;
 	case DISCONTIGMEM:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : DISCONTIGMEM\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : DISCONTIGMEM\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_discontigmem(info);
 		break;
 	case FLATMEM:
-		if (info->flag_debug) {
-			MSG("\n");
-			MSG("Memory type  : FLATMEM\n");
-			MSG("\n");
-		}
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : FLATMEM\n");
+		DEBUG_MSG("\n");
 		ret = get_mm_flatmem(info);
 		break;
 	default:
@@ -2813,10 +2797,10 @@ initial(struct DumpInfo *info)
 		return FALSE;
 
 	/*
-	 * Get the debug information for analysis from the config file 
+	 * Get the debug information for analysis from the vmcoreinfo file 
 	 */
-	if (info->flag_read_config) {
-		if (!read_config(info))
+	if (info->flag_read_vmcoreinfo) {
+		if (!read_vmcoreinfo(info))
 			return FALSE;
 	/*
 	 * Get the debug information for analysis from the kernel file 
@@ -4047,8 +4031,8 @@ print_progress(unsigned long current, unsigned long end)
 	} else
 		progress = 100;
 
-	MSG("\r");
-	MSG("[%3d %%]", progress);
+	PROGRESS_MSG("\r");
+	PROGRESS_MSG("[%3d %%]", progress);
 }
 
 int
@@ -4401,6 +4385,8 @@ write_elf_pages(struct DumpInfo *info)
 		goto out;
 
 	print_progress(num_dumpable, num_dumpable);
+	PROGRESS_MSG("\n");
+
 	ret = TRUE;
 out:
 	if (buf != NULL)
@@ -4636,6 +4622,7 @@ write_kdump_pages(struct DumpInfo *info)
 	 * Print the progress of the end.
 	 */
 	print_progress(num_dumpable, num_dumpable);
+	PROGRESS_MSG("\n");
 
 	ret = TRUE;
 out:
@@ -4707,11 +4694,11 @@ out:
 }
 
 void
-close_config_file(struct DumpInfo *info)
+close_vmcoreinfo(struct DumpInfo *info)
 {
-	if(fclose(info->file_configfile) < 0)
-		ERRMSG("Can't close the config file(%s). %s\n",
-		    info->name_configfile, strerror(errno));
+	if(fclose(info->file_vmcoreinfo) < 0)
+		ERRMSG("Can't close the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
 }
 
 void
@@ -4751,16 +4738,16 @@ close_kernel_file()
 }
 
 /*
- * Close the following files when it generates the configuration file.
+ * Close the following files when it generates the vmcoreinfo file.
  * - vmlinux
- * - configuration file
+ * - vmcoreinfo file
  */
 int
-close_files_for_generating_configfile(struct DumpInfo *info)
+close_files_for_generating_vmcoreinfo(struct DumpInfo *info)
 {
 	close_kernel_file();
 
-	close_config_file(info);
+	close_vmcoreinfo(info);
 
 	return TRUE;
 }
@@ -4782,16 +4769,16 @@ close_files_for_rearranging_dumpdata(struct DumpInfo *info)
  * - dump mem
  * - dump file
  * - bit map
- * if it reads the configuration file
- *   - configuration file
+ * if it reads the vmcoreinfo file
+ *   - vmcoreinfo file
  * else
  *   - vmlinux
  */
 int
 close_files_for_creating_dumpfile(struct DumpInfo *info)
 {
-	if (info->flag_read_config)
-		close_config_file(info);
+	if (info->flag_read_vmcoreinfo)
+		close_vmcoreinfo(info);
 	else if (info->dump_level > DL_EXCLUDE_ZERO)
 		close_kernel_file();
 
@@ -4991,7 +4978,9 @@ show_data_xen(struct DumpInfo *info)
 {
 	int i;
 
-	/* show data for debug */
+	/*
+	 * Show data for debug
+	 */
 	MSG("\n");
 	MSG("SYMBOL(dom_xen): %lx\n", SYMBOL(dom_xen));
 	MSG("SYMBOL(dom_io): %lx\n", SYMBOL(dom_io));
@@ -5029,7 +5018,7 @@ show_data_xen(struct DumpInfo *info)
 }
 
 int
-generate_config_xen(struct DumpInfo *info)
+generate_vmcoreinfo_xen(struct DumpInfo *info)
 {
 	if ((info->page_size = sysconf(_SC_PAGE_SIZE)) <= 0) {
 		ERRMSG("Can't get the size of page.\n");
@@ -5045,7 +5034,7 @@ generate_config_xen(struct DumpInfo *info)
 	/*
 	 * write 1st kernel's PAGESIZE
 	 */
-	fprintf(info->file_configfile, "%s%ld\n", STR_PAGESIZE,
+	fprintf(info->file_vmcoreinfo, "%s%ld\n", STR_PAGESIZE,
 	    info->page_size);
 
 	/*
@@ -5083,19 +5072,19 @@ generate_config_xen(struct DumpInfo *info)
 }
 
 int
-read_config_basic_info_xen(struct DumpInfo *info)
+read_vmcoreinfo_basic_info_xen(struct DumpInfo *info)
 {
 	long page_size = FALSE;
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int i;
 
-	if (fseek(info->file_configfile, 0, SEEK_SET) < 0) {
-		ERRMSG("Can't seek the config file(%s). %s\n",
-		    info->name_configfile, strerror(errno));
+	if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
 		return FALSE;
 	}
 
-	while (fgets(buf, BUFSIZE_FGETS, info->file_configfile)) {
+	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
@@ -5104,12 +5093,12 @@ read_config_basic_info_xen(struct DumpInfo *info)
 			if ((!page_size || page_size == LONG_MAX)
 			    || strlen(endp) != 0) {
 				ERRMSG("Invalid data in %s: %s",
-				    info->name_configfile, buf);
+				    info->name_vmcoreinfo, buf);
 				return FALSE;
 			}
 			if (!is_page_size(page_size)) {
 				ERRMSG("Invalid data in %s: %s",
-				    info->name_configfile, buf);
+				    info->name_vmcoreinfo, buf);
 				return FALSE;
 			}
 			break;
@@ -5118,16 +5107,16 @@ read_config_basic_info_xen(struct DumpInfo *info)
 	info->page_size = page_size;
 
 	if (!info->page_size) {
-		ERRMSG("Invalid format in %s", info->name_configfile);
+		ERRMSG("Invalid format in %s", info->name_vmcoreinfo);
 		return FALSE;
 	}
 	return TRUE;
 }
 
 int
-read_config_xen(struct DumpInfo *info)
+read_vmcoreinfo_xen(struct DumpInfo *info)
 {
-	if (!read_config_basic_info_xen(info))
+	if (!read_vmcoreinfo_basic_info_xen(info))
 		return FALSE;
 
 	READ_SYMBOL("dom_xen", dom_xen);
@@ -5207,7 +5196,9 @@ create_dump_bitmap_xen(struct DumpInfo *info)
 	struct pt_load_segment *pls;
 	int ret = FALSE;
 
-	/* note: the first half of bitmap is not used for Xen extraction */
+	/*
+	 * NOTE: the first half of bitmap is not used for Xen extraction
+	 */
 	bm2.fd         = info->fd_bitmap;
 	bm2.file_name  = info->name_bitmap;
 	bm2.cache_size = BUFSIZE_BITMAP;
@@ -5294,8 +5285,8 @@ initial_xen(struct DumpInfo *info)
 	if (!get_elf_info(info))
 		return FALSE;
 
-	if (info->flag_read_config) {
-		if (!read_config_xen(info))
+	if (info->flag_read_vmcoreinfo) {
+		if (!read_vmcoreinfo_xen(info))
 			return FALSE;
 	} else {
 		if (!get_symbol_info_xen(info))
@@ -5303,11 +5294,10 @@ initial_xen(struct DumpInfo *info)
 		if (!get_structure_info_xen(info))
 			return FALSE;
 	}
-
 	if (!get_xen_info(info))
 		return FALSE;
 
-	if (info->flag_debug)
+	if (message_level & ML_PRINT_DEBUG_MSG)
 		show_data_xen(info);
 
 	return TRUE;
@@ -5351,14 +5341,15 @@ out:
 
 static struct option longopts[] = {
 	{"xen-syms", required_argument, NULL, 'X'},
-	{"xen-config", required_argument, NULL, 'z'},
+	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
+	{"message-level", required_argument, NULL, 'm'},
 	{0, 0, 0, 0}
 };
 
 int
 main(int argc, char *argv[])
 {
-	int opt;
+	int opt, flag_debug = FALSE;
 	struct DumpInfo *info = NULL;
 
 	if ((info = calloc(1, sizeof(struct DumpInfo))) == NULL) {
@@ -5375,6 +5366,7 @@ main(int argc, char *argv[])
 	vt = &info->vm_table;
 
 	info->block_order = DEFAULT_ORDER;
+	message_level = DEFAULT_MSG_LEVEL;
 	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:Rvx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
@@ -5385,7 +5377,7 @@ main(int argc, char *argv[])
 			info->flag_compress = 1;
 			break;
 		case 'D':
-			info->flag_debug = 1;
+			flag_debug = TRUE;
 			break;
 		case 'd':
 			info->dump_level = atoi(optarg);
@@ -5402,15 +5394,18 @@ main(int argc, char *argv[])
 			info->flag_force = 1;
 			break;
 		case 'g':
-			info->flag_generate_config = 1;
-			info->name_configfile = optarg;
+			info->flag_generate_vmcoreinfo = 1;
+			info->name_vmcoreinfo = optarg;
 			break;
 		case 'h':
 			info->flag_show_usage = 1;
 			break;
 		case 'i':
-			info->flag_read_config = 1;
-			info->name_configfile = optarg;
+			info->flag_read_vmcoreinfo = 1;
+			info->name_vmcoreinfo = optarg;
+			break;
+		case 'm':
+			message_level = atoi(optarg);
 			break;
 		case 'R':
 			info->flag_rearrange = 1;
@@ -5428,8 +5423,8 @@ main(int argc, char *argv[])
 			break;
 		case 'z':
 			info->flag_xen = 1;
-			info->flag_read_config = 1;
-			info->name_configfile = optarg;
+			info->flag_read_vmcoreinfo = 1;
+			info->name_vmcoreinfo = optarg;
 			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");
@@ -5437,6 +5432,9 @@ main(int argc, char *argv[])
 			goto out;
 		}
 	}
+	if (flag_debug)
+		message_level |= ML_PRINT_DEBUG_MSG;
+
 	if (info->flag_show_usage) {
 		print_usage();
 		return COMPLETED;
@@ -5445,9 +5443,9 @@ main(int argc, char *argv[])
 		show_version();
 		return COMPLETED;
 	}
-	if (info->flag_generate_config) {
+	if (info->flag_generate_vmcoreinfo) {
 		/*
-		 * Check parameters to generate the configuration file.
+		 * Check parameters to generate the vmcoreinfo file.
 		 */
 		if (argc != optind) {
 			MSG("Commandline parameter is invalid.\n");
@@ -5455,7 +5453,7 @@ main(int argc, char *argv[])
 			goto out;
 		}
 		if (info->flag_compress || info->dump_level
-		    || info->flag_elf_dumpfile || info->flag_read_config
+		    || info->flag_elf_dumpfile || info->flag_read_vmcoreinfo
 		    || !dwarf_info.vmlinux_name || info->flag_flatten
 		    || info->flag_rearrange) {
 			MSG("Commandline parameter is invalid.\n");
@@ -5472,8 +5470,14 @@ main(int argc, char *argv[])
 			print_usage();
 			goto out;
 		}
+		if ((message_level < MIN_MSG_LEVEL)
+		    || (MAX_MSG_LEVEL < message_level)) {
+			MSG("message_level is invalid.\n");
+			print_usage();
+			goto out;
+		}
 		if ((info->flag_compress && info->flag_elf_dumpfile)
-		    || (info->flag_vmlinux && info->flag_read_config)) {
+		    || (info->flag_vmlinux && info->flag_read_vmcoreinfo)) {
 			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
@@ -5497,7 +5501,7 @@ main(int argc, char *argv[])
 		} else if ((argc == optind + 1)
 		    && !info->flag_flatten && info->flag_rearrange
 		    && !info->dump_level   && !info->flag_compress
-		    && !info->flag_vmlinux && !info->flag_read_config
+		    && !info->flag_vmlinux && !info->flag_read_vmcoreinfo
 		    && !info->flag_elf_dumpfile) {
 			/*
 			 * Parameters for creating dumpfile from the dump data
@@ -5519,27 +5523,27 @@ main(int argc, char *argv[])
 		ERRMSG("Elf library out of date!\n");
 		goto out;
 	}
-	if (info->flag_generate_config) {
-		if (!open_files_for_generating_configfile(info))
+	if (info->flag_generate_vmcoreinfo) {
+		if (!open_files_for_generating_vmcoreinfo(info))
 			goto out;
 
 		if (info->flag_xen) {
-			if (!generate_config_xen(info))
+			if (!generate_vmcoreinfo_xen(info))
 				goto out;
 		} else {
-			if (!generate_config(info))
+			if (!generate_vmcoreinfo(info))
 				goto out;
 		}
 
-		if (!close_files_for_generating_configfile(info))
+		if (!close_files_for_generating_vmcoreinfo(info))
 			goto out;
 
 		MSG("\n");
-		MSG("The configfile is saved to %s.\n", info->name_configfile);
+		MSG("The vmcoreinfo is saved to %s.\n", info->name_vmcoreinfo);
 
 	} else if (info->flag_xen) {
 		if (!info->flag_elf_dumpfile) {
-			MSG("-E must be specified with --xen-syms or --xen-config.\n");
+			MSG("-E must be specified with --xen-syms or --xen-vmcoreinfo.\n");
 			goto out;
 		}
 		info->dump_level = DL_EXCLUDE_XEN;

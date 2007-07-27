@@ -14,11 +14,6 @@
  * GNU General Public License for more details.
  */
 
-/*
- * TODO
- * 1. (i386) fill PT_LOAD headers with appropriate virtual addresses.
- */
-
 #include "makedumpfile.h"
 
 struct symbol_table	symbol_table;
@@ -3931,6 +3926,11 @@ write_elf_pages(struct DumpInfo *info)
 			if (info->flag_elf64) { /* ELF64 */
 				load64.p_paddr += load64.p_memsz;
 #ifdef __x86__
+				/*
+				 * FIXME:
+				 *  (x86) Fill PT_LOAD headers with appropriate
+				 *        virtual addresses.
+				 */
 				if (load64.p_paddr < MAXMEM)
 					load64.p_vaddr += load64.p_memsz;
 #else

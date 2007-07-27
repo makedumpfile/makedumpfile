@@ -62,6 +62,9 @@
 * USAGE
   Please see "man makedumpfile" or "makedumpfile -h".
 
+* TODO
+  1. Supporting more kernels.
+
 * FAQ
   001: It cannot be compiled with the following messages:
     # make

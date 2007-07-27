@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
+#include <stdlib.h>
 #include "makedumpfile.h"
 
 struct symbol_table	symbol_table;
@@ -170,38 +170,38 @@ readmem(struct DumpInfo *info, unsigned long long vaddr, void *bufptr,
 	return size;
 }
 
-int
+int32_t
 get_kernel_version(char *release)
 {
+	int32_t version;
+	long maj, min, rel;
+	char *start, *end;
+
 	/*
 	 * This method checks that vmlinux and vmcore are same kernel version.
 	 */
-	if (strncmp(release, "2.6.", strlen("2.6."))) {
-		ERRMSG("The kernel version is not supported.\n");
+	start = release;
+	maj = strtol(start, &end, 10);
+	if (maj == LONG_MAX)
 		return FALSE;
-	}
 
-	if (!strncmp(release, "2.6.15", strlen("2.6.15"))) {
-		return VERSION_2_6_15;
-	} else if (!strncmp(release, "2.6.16", strlen("2.6.16"))) {
-		return VERSION_2_6_16;
-	} else if (!strncmp(release, "2.6.17", strlen("2.6.17"))) {
-		return VERSION_2_6_17;
-	} else if (!strncmp(release, "2.6.18", strlen("2.6.18"))) {
-		return VERSION_2_6_18;
-	} else if (!strncmp(release, "2.6.19", strlen("2.6.19"))) {
-		return VERSION_2_6_19;
-	} else if (!strncmp(release, "2.6.20", strlen("2.6.20"))) {
-		return VERSION_2_6_20;
-	} else if (!strncmp(release, "2.6.21", strlen("2.6.21"))) {
-		return VERSION_2_6_21;
-	} else {
-		ERRMSG("The kernel version is not supported.\n");
-		ERRMSG("makedumpfile considers %s as the kernel version.\n",
-		    STR_LATEST_VERSION);
-		ERRMSG("The created dumpfile may be incomplete.\n");
-		return LATEST_VERSION;
+	start = end + 1;
+	min = strtol(start, &end, 10);
+	if (min == LONG_MAX)
+		return FALSE;
+
+	start = end + 1;	
+	rel = strtol(start, &end, 10);
+	if (rel == LONG_MAX)
+  		return FALSE;
+
+	version = KERNEL_VERSION(maj, min, rel);
+
+	if ((version < OLDEST_VERSION) || (LATEST_VERSION < version)) {
+		MSG("The kernel version is not supported.\n");
+		MSG("The created dumpfile may be incomplete.\n");
 	}
+	return version;
 }
 
 int

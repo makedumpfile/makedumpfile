@@ -336,6 +336,8 @@ do { \
 #define DEFAULT_ORDER	(4)
 #define TIMEOUT_STDIN	(600)
 #define SIZE_BUF_STDIN	(4096)
+#define ELF32		(1)
+#define ELF64		(2)
 
 /*
  * The value of dependence on machine
@@ -751,4 +753,7 @@ int readmem();
 off_t paddr_to_offset();
 unsigned long long vaddr_to_paddr();
 unsigned long long paddr_to_vaddr();
+int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
+int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
+int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
 

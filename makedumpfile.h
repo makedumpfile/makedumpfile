@@ -70,6 +70,15 @@ enum {
 #define MEMORY_PAGETABLE_4L	(1 << 0)
 #define MEMORY_PAGETABLE_3L	(1 << 1)
 
+/*
+ * Type of address
+ */
+enum {
+	PADDR,
+	VADDR
+};
+
+
 static inline int
 test_bit(int nr, unsigned long addr)
 {
@@ -751,10 +760,10 @@ struct dwarf_info {
 
 extern struct dwarf_info	dwarf_info;
 
-int readmem();
+int readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
+    void *bufptr, size_t size);
 off_t paddr_to_offset();
 unsigned long long vaddr_to_paddr();
-unsigned long long paddr_to_vaddr();
 int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);

@@ -105,7 +105,7 @@ ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PGD_3L;
 	temp = temp >> (PGDIR_SHIFT_3L - 3);
 	page_dir = SYMBOL(swapper_pg_dir) + temp;
-	if (!readmem(info, page_dir, &pgd_pte, sizeof pgd_pte)) {
+	if (!readmem(info, VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
 		ERRMSG("Can't get pgd_pte (page_dir:%lx).\n", page_dir);
 		return 0x0;
 	}
@@ -116,8 +116,7 @@ ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PMD;
 	temp = temp >> (PMD_SHIFT - 3);
 	page_middle = pgd_pte + temp;
-	page_middle = paddr_to_vaddr(info, page_middle);
-	if (!readmem(info, page_middle, &pmd_pte, sizeof pmd_pte)) {
+	if (!readmem(info, PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
 		ERRMSG("Can't get pmd_pte (page_middle:%lx).\n", page_middle);
 		return 0x0;
 	}
@@ -128,8 +127,7 @@ ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PTE;
 	temp = temp >> (PAGE_SHIFT - 3);
 	page_table = pmd_pte + temp;
-	page_table = paddr_to_vaddr(info, page_table);
-	if (!readmem(info, page_table, &pte, sizeof pte)) {
+	if (!readmem(info, PADDR, page_table, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);
 		return 0x0;
 	}
@@ -163,7 +161,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PGD_4L;
 	temp = temp >> (PGDIR_SHIFT_4L - 3);
 	page_dir = SYMBOL(swapper_pg_dir) + temp;
-	if (!readmem(info, page_dir, &pgd_pte, sizeof pgd_pte)) {
+	if (!readmem(info, VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
 		ERRMSG("Can't get pgd_pte (page_dir:%lx).\n", page_dir);
 		return 0x0;
 	}
@@ -174,8 +172,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PUD;
 	temp = temp >> (PUD_SHIFT - 3);
 	page_upper = pgd_pte + temp;
-	page_upper = paddr_to_vaddr(info, page_upper);
-	if (!readmem(info, page_upper, &pud_pte, sizeof pud_pte)) {
+	if (!readmem(info, PADDR, page_upper, &pud_pte, sizeof pud_pte)) {
 		ERRMSG("Can't get pud_pte (page_upper:%lx).\n", page_upper);
 		return 0x0;
 	}
@@ -186,8 +183,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PMD;
 	temp = temp >> (PMD_SHIFT - 3);
 	page_middle = pud_pte + temp;
-	page_middle = paddr_to_vaddr(info, page_middle);
-	if (!readmem(info, page_middle, &pmd_pte, sizeof pmd_pte)) {
+	if (!readmem(info, PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
 		ERRMSG("Can't get pmd_pte (page_middle:%lx).\n", page_middle);
 		return 0x0;
 	}
@@ -198,8 +194,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PTE;
 	temp = temp >> (PAGE_SHIFT - 3);
 	page_table = pmd_pte + temp;
-	page_table = paddr_to_vaddr(info, page_table);
-	if (!readmem(info, page_table, &pte, sizeof pte)) {
+	if (!readmem(info, PADDR, page_table, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);
 		return 0x0;
 	}

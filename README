@@ -6,6 +6,25 @@
 * REQUIREMENTS
   Please download the following library file and install it:
   - elfutils-0.125.tar.gz
+    The "make install" of elfutils installs some commands (ld, readelf, etc.),
+    and the compiling problem sometimes happens due to using the installed
+    commands. To install only the library files, do the following method.
+     # tar -zxvf elfutils-0.125.tar.gz
+     # cd elfutils-0.125
+     # ./configure
+     # make
+     #
+     # mkdir /usr/local/include/elfutils/
+     # cp ./libdw/libdw.h   /usr/local/include/elfutils/libdw.h
+     # cp ./libdw/dwarf.h   /usr/local/include/dwarf.h
+     # cp ./libelf/libelf.h /usr/local/include/libelf.h
+     # cp ./libelf/gelf.h   /usr/local/include/gelf.h
+     #
+     # cp ./libelf/libelf.a /usr/local/lib/libelf.a
+     # cp ./libdw/libdw.a   /usr/local/lib/libdw.a
+     # cp ./libasm/libasm.a /usr/local/lib/libasm.a
+     # cp ./libebl/libebl.a /usr/local/lib/libebl.a
+     #
 
 * BUILD & INSTALL
   1.Get the latest makedumpfile from the following site:
@@ -42,6 +61,33 @@
 
 * USAGE
   Please see "man makedumpfile" or "makedumpfile -h".
+
+* FAQ
+  001: It cannot be compiled with the following messages:
+    # make
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./x86.o ./x86.c
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./x86_64.o ./x86_64.c
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./ia64.o ./ia64.c
+    gcc -g -O2 -Wall -D__x86_64__ -c -o ./ppc64.o ./ppc64.c
+    gcc -g -O2 -Wall -D_FILE_OFFSET_BITS=64 -DVERSION='"1.1.4"'
+    -DRELEASE_DATE='"08 June 2007"' -D__x86_64__ x86.o x86_64.o ia64.o
+    ppc64.o-o makedumpfile
+    makedumpfile.c -static -ldw -lelf -lz
+    /tmp/ccYv3cGF.o: In function `get_debug_info':
+    /tmp/makedumpfile/makedumpfile.c:1341: undefined reference to
+    `elf_getshstrndx'
+    collect2: ld returned 1 exit status
+    make: *** [makedumpfile] Error 1
+    #
+
+    The compiler cannot find out elf_getshstrndx() because it tries
+    searching it only from /usr/lib/libelf.a though elf_getshstrndx()
+    is archived in /usr/local/lib/libelf.a.
+    To solve the problem, add the option (-L/usr/local/lib/) to CFLAGS
+    of Makefile like the following:
+
+    CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 -L/usr/local/lib/ \
+        -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
 
 * REFERENCES
   https://sourceforge.net/projects/makedumpfile/

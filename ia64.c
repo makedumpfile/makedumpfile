@@ -1,7 +1,7 @@
 /* 
  * ia64.c
  *
- * Copyright (C) 2006  NEC Corporation
+ * Copyright (C) 2006, 2007  NEC Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,14 +23,14 @@
  *  bumped up in 2.6 to 0xa000000200000000.
  */
 int
-is_vmalloc_addr_ia64(struct DumpInfo *info, unsigned long vaddr)
+is_vmalloc_addr_ia64(unsigned long vaddr)
 {
 	return ((vaddr >= info->vmalloc_start) &&
 			(vaddr < (unsigned long)KERNEL_UNCACHED_BASE));
 }
 
 int
-get_phys_base_ia64(struct DumpInfo *info)
+get_phys_base_ia64()
 {
 	int i;
 	struct pt_load_segment *pls;
@@ -52,7 +52,7 @@ get_phys_base_ia64(struct DumpInfo *info)
 }
 
 int
-get_machdep_info_ia64(struct DumpInfo *info)
+get_machdep_info_ia64()
 {
 	info->section_size_bits = _SECTION_SIZE_BITS;
 	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
@@ -89,7 +89,7 @@ get_machdep_info_ia64(struct DumpInfo *info)
  * Translate a virtual address to a physical address by using 3 levels paging.
  */
 unsigned long
-ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
+ia64_vtop3(unsigned long long vaddr)
 {
 	unsigned long paddr, temp, page_dir, pgd_pte, page_middle, pmd_pte;
 	unsigned long page_table, pte;
@@ -105,7 +105,7 @@ ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PGD_3L;
 	temp = temp >> (PGDIR_SHIFT_3L - 3);
 	page_dir = SYMBOL(swapper_pg_dir) + temp;
-	if (!readmem(info, VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
+	if (!readmem(VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
 		ERRMSG("Can't get pgd_pte (page_dir:%lx).\n", page_dir);
 		return 0x0;
 	}
@@ -116,7 +116,7 @@ ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PMD;
 	temp = temp >> (PMD_SHIFT - 3);
 	page_middle = pgd_pte + temp;
-	if (!readmem(info, PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
+	if (!readmem(PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
 		ERRMSG("Can't get pmd_pte (page_middle:%lx).\n", page_middle);
 		return 0x0;
 	}
@@ -127,7 +127,7 @@ ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PTE;
 	temp = temp >> (PAGE_SHIFT - 3);
 	page_table = pmd_pte + temp;
-	if (!readmem(info, PADDR, page_table, &pte, sizeof pte)) {
+	if (!readmem(PADDR, page_table, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);
 		return 0x0;
 	}
@@ -145,7 +145,7 @@ ia64_vtop3(struct DumpInfo *info, unsigned long long vaddr)
  * Translate a virtual address to a physical address by using 4 levels paging.
  */
 unsigned long
-ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
+ia64_vtop4(unsigned long long vaddr)
 {
 	unsigned long paddr, temp, page_dir, pgd_pte, page_upper, pud_pte;
 	unsigned long page_middle, pmd_pte, page_table, pte;
@@ -161,7 +161,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PGD_4L;
 	temp = temp >> (PGDIR_SHIFT_4L - 3);
 	page_dir = SYMBOL(swapper_pg_dir) + temp;
-	if (!readmem(info, VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
+	if (!readmem(VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
 		ERRMSG("Can't get pgd_pte (page_dir:%lx).\n", page_dir);
 		return 0x0;
 	}
@@ -172,7 +172,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PUD;
 	temp = temp >> (PUD_SHIFT - 3);
 	page_upper = pgd_pte + temp;
-	if (!readmem(info, PADDR, page_upper, &pud_pte, sizeof pud_pte)) {
+	if (!readmem(PADDR, page_upper, &pud_pte, sizeof pud_pte)) {
 		ERRMSG("Can't get pud_pte (page_upper:%lx).\n", page_upper);
 		return 0x0;
 	}
@@ -183,7 +183,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PMD;
 	temp = temp >> (PMD_SHIFT - 3);
 	page_middle = pud_pte + temp;
-	if (!readmem(info, PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
+	if (!readmem(PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
 		ERRMSG("Can't get pmd_pte (page_middle:%lx).\n", page_middle);
 		return 0x0;
 	}
@@ -194,7 +194,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 	temp = vaddr & MASK_PTE;
 	temp = temp >> (PAGE_SHIFT - 3);
 	page_table = pmd_pte + temp;
-	if (!readmem(info, PADDR, page_table, &pte, sizeof pte)) {
+	if (!readmem(PADDR, page_table, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);
 		return 0x0;
 	}
@@ -209,7 +209,7 @@ ia64_vtop4(struct DumpInfo *info, unsigned long long vaddr)
 }
 
 unsigned long
-ia64_vtop(struct DumpInfo *info, unsigned long long vaddr)
+ia64_vtop(unsigned long long vaddr)
 {
 	unsigned long paddr;
 
@@ -217,27 +217,27 @@ ia64_vtop(struct DumpInfo *info, unsigned long long vaddr)
 		ERRMSG("vaddr(%llx) is not KERNEL_VMALLOC_REGION.\n", vaddr);
 		return 0x0;
 	}
-	paddr = vaddr_to_paddr(info, vaddr);
+	paddr = vaddr_to_paddr(vaddr);
 	if (paddr)
 		return paddr;
 
-	if (!is_vmalloc_addr_ia64(info, vaddr)) {
+	if (!is_vmalloc_addr_ia64(vaddr)) {
 		paddr = vaddr - info->kernel_start +
 			(info->phys_base & KERNEL_TR_PAGE_MASK);
 		return paddr;
 	}
 
 	if (info->mem_flags & MEMORY_PAGETABLE_4L)
-		return ia64_vtop4(info, vaddr);
+		return ia64_vtop4(vaddr);
 	else
-		return ia64_vtop3(info, vaddr);
+		return ia64_vtop3(vaddr);
 }
 
 /*
  * Translate a virtual address to a file offset.
  */
 off_t
-vaddr_to_offset_ia64(struct DumpInfo *info, unsigned long long vaddr)
+vaddr_to_offset_ia64(unsigned long long vaddr)
 {
 	unsigned long paddr;
 
@@ -251,21 +251,21 @@ vaddr_to_offset_ia64(struct DumpInfo *info, unsigned long long vaddr)
 			break;
 
 		case KERNEL_VMALLOC_REGION:
-			paddr = ia64_vtop(info, vaddr);
+			paddr = ia64_vtop(vaddr);
 			break;
 
 		default:
 			ERRMSG("Unknown region (%ld)\n", VADDR_REGION(vaddr));
 			return 0x0;
 	}
-	return paddr_to_offset(info, paddr);
+	return paddr_to_offset(paddr);
 }
 
 /*
  * for Xen extraction
  */
 unsigned long long
-kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr)
+kvtop_xen_ia64(unsigned long kvaddr)
 {
 	unsigned long long addr, dirp, entry;
 
@@ -282,21 +282,21 @@ kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr)
 
 	dirp = SYMBOL(frametable_pg_dir) - DIRECTMAP_VIRT_START;
 	dirp += ((addr >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return FALSE;
  
 	dirp = entry & _PFN_MASK;
 	if (!dirp)
 		return 0;
 	dirp += ((addr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return FALSE;
 
 	dirp = entry & _PFN_MASK;
 	if (!dirp)
 		return 0;
 	dirp += ((addr >> PAGESHIFT()) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return FALSE;
 
 	if (!(entry & _PAGE_P))
@@ -308,7 +308,7 @@ kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr)
 }
 
 int
-get_xen_info_ia64(struct DumpInfo *info)
+get_xen_info_ia64()
 {
 	unsigned long xen_start, xen_end, xen_heap_start;
 	int i;
@@ -319,7 +319,7 @@ get_xen_info_ia64(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+	if (!readmem(VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
 	      sizeof(xen_end))) {
 		ERRMSG("Can't get the value of xenheap_phys_end.\n");
 		return FALSE;
@@ -328,8 +328,8 @@ get_xen_info_ia64(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xen_pstart.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xen_pstart), &xen_start,
-	      sizeof(xen_start))) {
+	if (!readmem(VADDR_XEN, SYMBOL(xen_pstart), &xen_start,
+	    sizeof(xen_start))) {
 		ERRMSG("Can't get the value of xen_pstart.\n");
 		return FALSE;
 	}
@@ -340,7 +340,7 @@ get_xen_info_ia64(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xen_heap_start.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xen_heap_start), &xen_heap_start,
+	if (!readmem(VADDR_XEN, SYMBOL(xen_heap_start), &xen_heap_start,
 	      sizeof(xen_heap_start))) {
 		ERRMSG("Can't get the value of xen_heap_start.\n");
 		return FALSE;

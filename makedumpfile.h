@@ -222,11 +222,11 @@ do { \
 #define SYMBOL(X)		(symbol_table.X)
 #define SYMBOL_INIT(symbol, str_symbol) \
 do { \
-	SYMBOL(symbol) = get_symbol_addr(info, str_symbol); \
+	SYMBOL(symbol) = get_symbol_addr(str_symbol); \
 } while (0)
 #define SYMBOL_INIT_NEXT(symbol, str_symbol) \
 do { \
-	SYMBOL(symbol) = get_next_symbol_addr(info, str_symbol); \
+	SYMBOL(symbol) = get_next_symbol_addr(str_symbol); \
 } while (0)
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \
@@ -237,7 +237,7 @@ do { \
 } while (0)
 #define READ_SYMBOL(str_symbol, symbol) \
 do { \
-	SYMBOL(symbol) = read_vmcoreinfo_symbol(info, STR_SYMBOL(str_symbol)); \
+	SYMBOL(symbol) = read_vmcoreinfo_symbol(STR_SYMBOL(str_symbol)); \
 	if (SYMBOL(symbol) == INVALID_SYMBOL_DATA) \
 		return FALSE; \
 } while (0)
@@ -311,19 +311,19 @@ do { \
 } while (0)
 #define READ_STRUCTURE_SIZE(str_structure, structure) \
 do { \
-	SIZE(structure) = read_vmcoreinfo_structure(info,STR_SIZE(str_structure)); \
+	SIZE(structure) = read_vmcoreinfo_structure(STR_SIZE(str_structure)); \
 	if (SIZE(structure) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_MEMBER_OFFSET(str_member, member) \
 do { \
-	OFFSET(member) = read_vmcoreinfo_structure(info, STR_OFFSET(str_member)); \
+	OFFSET(member) = read_vmcoreinfo_structure(STR_OFFSET(str_member)); \
 	if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_ARRAY_LENGTH(str_array, array) \
 do { \
-	ARRAY_LENGTH(array) = read_vmcoreinfo_structure(info, STR_LENGTH(str_array)); \
+	ARRAY_LENGTH(array) = read_vmcoreinfo_structure(STR_LENGTH(str_array)); \
 	if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
@@ -347,7 +347,7 @@ do { \
 
 #define READ_SRCFILE(str_decl_name, decl_name) \
 do { \
-	if (!read_vmcoreinfo_string(info, STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
+	if (!read_vmcoreinfo_string(STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
 		return FALSE; \
 } while (0)
 
@@ -498,7 +498,7 @@ do { \
 int get_machdep_info_x86();
 #define get_phys_base(X)	TRUE
 #define get_machdep_info(X)	get_machdep_info_x86(X)
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_general(X,Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_general(X)
 #endif /* x86 */
 
 #ifdef __x86_64__
@@ -507,14 +507,14 @@ int get_machdep_info_x86_64();
 off_t vaddr_to_offset_x86_64();
 #define get_phys_base(X)	get_phys_base_x86_64(X)
 #define get_machdep_info(X)	get_machdep_info_x86_64(X)
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_x86_64(X, Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_x86_64(X)
 #endif /* x86_64 */
 
 #ifdef __powerpc__ /* powerpc */
 int get_machdep_info_ppc64();
 #define get_machdep_info(X)	get_machdep_info_ppc64(X)
 #define get_phys_base(X)	TRUE
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_general(X, Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_general(X)
 #endif          /* powerpc */
 
 #ifdef __ia64__ /* ia64 */
@@ -523,7 +523,7 @@ int get_machdep_info_ia64();
 off_t vaddr_to_offset_ia64();
 #define get_machdep_info(X)	get_machdep_info_ia64(X)
 #define get_phys_base(X)	get_phys_base_ia64(X)
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_ia64(X, Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_ia64(X)
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
 
@@ -684,6 +684,7 @@ struct DumpInfo {
 	struct domain_list *domain_list;
 
 };
+extern struct DumpInfo		*info;
 
 struct symbol_table {
 	unsigned long	mem_map;
@@ -847,14 +848,13 @@ struct dwarf_info {
 
 extern struct dwarf_info	dwarf_info;
 
-int readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
-    void *bufptr, size_t size);
+int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 off_t paddr_to_offset();
 unsigned long long vaddr_to_paddr();
 int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
-int get_str_osrelease_from_vmlinux(struct DumpInfo *info);
+int get_str_osrelease_from_vmlinux();
 
 /*
  * for Xen extraction
@@ -893,10 +893,10 @@ struct domain_list {
 
 #define ENTRY_MASK	(~0x8000000000000fffULL)
 
-unsigned long long kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr);
-#define kvtop_xen(X, Y)	kvtop_xen_x86(X, Y)
+unsigned long long kvtop_xen_x86(unsigned long kvaddr);
+#define kvtop_xen(X)	kvtop_xen_x86(X)
 
-int get_xen_info_x86(struct DumpInfo *info);
+int get_xen_info_x86();
 #define get_xen_info_arch(X) get_xen_info_x86(X)
 
 #endif	/* __x86__ */
@@ -932,10 +932,10 @@ int get_xen_info_x86(struct DumpInfo *info);
 #define is_direct(x) \
         ((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
 
-unsigned long long kvtop_xen_x86_64(struct DumpInfo *info, unsigned long kvaddr);
-#define kvtop_xen(X, Y)	kvtop_xen_x86_64(X, Y)
+unsigned long long kvtop_xen_x86_64(unsigned long kvaddr);
+#define kvtop_xen(X)	kvtop_xen_x86_64(X)
 
-int get_xen_info_x86_64(struct DumpInfo *info);
+int get_xen_info_x86_64();
 #define get_xen_info_arch(X) get_xen_info_x86_64(X)
 
 #endif	/* __x86_64__ */
@@ -967,16 +967,16 @@ int get_xen_info_x86_64(struct DumpInfo *info);
 #define _PAGE_P		(1)
 #define _PFN_MASK	(((1UL << IA64_MAX_PHYS_BITS) - 1) & ~0xfffUL)
 
-unsigned long long kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr);
-#define kvtop_xen(X, Y)	kvtop_xen_ia64(X, Y)
+unsigned long long kvtop_xen_ia64(unsigned long kvaddr);
+#define kvtop_xen(X)	kvtop_xen_ia64(X)
 
-int get_xen_info_ia64(struct DumpInfo *info);
+int get_xen_info_ia64();
 #define get_xen_info_arch(X) get_xen_info_ia64(X)
 
 #endif	/* __ia64 */
 
 #ifdef __powerpc__ /* powerpc */
-#define kvtop_xen(X, Y)	FALSE
+#define kvtop_xen(X)	FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* powerpc */
 

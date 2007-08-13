@@ -3432,11 +3432,14 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 		}
 	}
 	if (free_pages != found_free_pages) {
-		ERRMSG("The number of free_pages is invalid.\n");
-		ERRMSG("  free_pages       = %ld\n", free_pages);
-		ERRMSG("  found_free_pages = %ld\n", found_free_pages);
-		retcd = ANALYSIS_FAILED;
-		return FALSE;
+		/*
+		 * On linux-2.6.21 or later, the number of free_pages is
+		 * sometimes different from the one of the list "free_area",
+		 * because the former is flushed asynchronously.
+		 */
+		DEBUG_MSG("The number of free_pages is invalid.\n");
+		DEBUG_MSG("  free_pages       = %ld\n", free_pages);
+		DEBUG_MSG("  found_free_pages = %ld\n", found_free_pages);
 	}
 	return TRUE;
 }

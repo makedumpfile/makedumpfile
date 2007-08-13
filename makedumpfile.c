@@ -3314,15 +3314,15 @@ page_to_pfn(unsigned long page)
 
 	mmd = info->mem_map_data;
 	for (num = 0; num < info->num_mem_map; num++, mmd++) {
-		if (page < mmd->mem_map) {
+		if (mmd->mem_map == NOT_MEMMAP_ADDR)
 			continue;
-		} else {
-			index = (page - mmd->mem_map) / SIZE(page);
-			if (index > mmd->pfn_end - mmd->pfn_start)
-				continue;
-			pfn = mmd->pfn_start + index;
-			break;
-		}
+		if (page < mmd->mem_map)
+			continue;
+		index = (page - mmd->mem_map) / SIZE(page);
+		if (index > mmd->pfn_end - mmd->pfn_start)
+			continue;
+		pfn = mmd->pfn_start + index;
+		break;
 	}
 	if (!pfn) {
 		ERRMSG("Can't convert the address of page descriptor (%lx) to pfn.\n", page);

@@ -636,7 +636,6 @@ struct DumpInfo {
 	 */
 	unsigned int		num_mem_map;
 	struct mem_map_data	*mem_map_data;
-	unsigned int		mem_flags;
 
 	/*
 	 * Dump memory image info:
@@ -656,11 +655,6 @@ struct DumpInfo {
 	int			fd_bitmap;
 	char			*name_bitmap;
 	struct cache_data	*bm2;
-	struct vm_table {                /* kernel VM-related data */
-		int numnodes;
-		ulong *node_online_map;
-		int node_online_map_len;
-	} vm_table;
 
 	/*
 	 * vmcoreinfo file info:
@@ -683,6 +677,17 @@ struct DumpInfo {
 
 };
 extern struct DumpInfo		*info;
+
+/*
+ * kernel VM-related data
+ */
+struct vm_table {
+	int		numnodes;
+	unsigned long	*node_online_map;
+	int		node_online_map_len;
+	unsigned int	mem_flags;
+};
+extern struct vm_table		vt;
 
 struct symbol_table {
 	unsigned long	mem_map;

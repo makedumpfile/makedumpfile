@@ -23,7 +23,7 @@ struct array_table	array_table;
 struct srcfile_table	srcfile_table;
 
 struct dwarf_info	dwarf_info;
-struct vm_table		*vt = 0;
+struct vm_table		vt = { 0 };
 struct DumpInfo		*info = NULL;
 
 int message_level;
@@ -2232,19 +2232,19 @@ get_nodes_online()
 	 * information each architecture or each vmcoreinfo.
 	 */
 	len = SIZEOF_NODE_ONLINE_MAP;
-	if (!(vt->node_online_map = (unsigned long *)malloc(len))) {
+	if (!(vt.node_online_map = (unsigned long *)malloc(len))) {
 		ERRMSG("Can't allocate memory for the node online map. %s\n",
 		    strerror(errno));
 		return 0;
 	}
-	if (!readmem(VADDR, SYMBOL(node_online_map), vt->node_online_map, len)){
+	if (!readmem(VADDR, SYMBOL(node_online_map), vt.node_online_map, len)){
 		ERRMSG("Can't get the node online map.\n");
 		return 0;
 	}
-	vt->node_online_map_len = len/sizeof(unsigned long);
+	vt.node_online_map_len = len/sizeof(unsigned long);
 	online = 0;
-	maskptr = (unsigned long *)vt->node_online_map;
-	for (i = 0; i < vt->node_online_map_len; i++, maskptr++) {
+	maskptr = (unsigned long *)vt.node_online_map;
+	for (i = 0; i < vt.node_online_map_len; i++, maskptr++) {
 		bitbuf = *maskptr;
 		for (j = 0; j < sizeof(bitbuf) * 8; j++) {
 			online += bitbuf & 1;
@@ -2257,11 +2257,11 @@ get_nodes_online()
 int
 get_numnodes()
 {
-	if (!(vt->numnodes = get_nodes_online())) {
-		vt->numnodes = 1;
+	if (!(vt.numnodes = get_nodes_online())) {
+		vt.numnodes = 1;
 	}
 	DEBUG_MSG("\n");
-	DEBUG_MSG("num of NODEs : %d\n", vt->numnodes);
+	DEBUG_MSG("num of NODEs : %d\n", vt.numnodes);
 	DEBUG_MSG("\n");
 
 	return TRUE;
@@ -2274,13 +2274,13 @@ next_online_node(int first)
 	unsigned long mask, *maskptr;
 
 	/* It cannot occur */
-	if ((first/(sizeof(unsigned long) * 8)) >= vt->node_online_map_len) {
+	if ((first/(sizeof(unsigned long) * 8)) >= vt.node_online_map_len) {
 		ERRMSG("next_online_node: %d is too large!\n", first);
 		return -1;
 	}
 
-	maskptr = (unsigned long *)vt->node_online_map;
-	for (i = node = 0; i <  vt->node_online_map_len; i++, maskptr++) {
+	maskptr = (unsigned long *)vt.node_online_map;
+	for (i = node = 0; i <  vt.node_online_map_len; i++, maskptr++) {
 		mask = *maskptr;
 		for (j = 0; j < (sizeof(unsigned long) * 8); j++, node++) {
 			if (mask & 1) {
@@ -2466,7 +2466,7 @@ get_num_mm_discontigmem()
             || (OFFSET(node_memblk_s.start_paddr) == NOT_FOUND_STRUCTURE)
             || (OFFSET(node_memblk_s.size) == NOT_FOUND_STRUCTURE)
             || (OFFSET(node_memblk_s.nid) == NOT_FOUND_STRUCTURE)) {
-		return vt->numnodes;
+		return vt.numnodes;
 	} else {
 		for (i = 0; i < ARRAY_LENGTH(node_memblk); i++) {
 			if (!get_node_memblk(i, &start_paddr, &size, &nid)) {
@@ -2484,7 +2484,7 @@ get_num_mm_discontigmem()
 			/*
 			 * On non-NUMA systems, node_memblk_s is not set.
 			 */
-			return vt->numnodes;
+			return vt.numnodes;
 		} else {
 			return i;
 		}
@@ -2550,12 +2550,12 @@ get_mm_discontigmem()
 	struct mem_map_data temp_mmd;
 
 	num_mem_map = get_num_mm_discontigmem();
-	if (num_mem_map < vt->numnodes) {
+	if (num_mem_map < vt.numnodes) {
 		ERRMSG("Can't get the number of mem_map.\n");
 		return FALSE;
 	}
 	struct mem_map_data mmd[num_mem_map];
-	if (vt->numnodes < num_mem_map) {
+	if (vt.numnodes < num_mem_map) {
 		separate_mm = TRUE;
 	}
 
@@ -2571,7 +2571,7 @@ get_mm_discontigmem()
 		return FALSE;
 	}
 	id_mm = 0;
-	for (i = 0; i < vt->numnodes; i++) {
+	for (i = 0; i < vt.numnodes; i++) {
 		if (!readmem(VADDR, pgdat + OFFSET(pglist_data.node_mem_map),
 		    &mem_map, sizeof mem_map)) {
 			ERRMSG("Can't get mem_map.\n");
@@ -2636,7 +2636,7 @@ get_mm_discontigmem()
 		/*
 		 * Get pglist_data of the next node.
 		 */
-		if (i < (vt->numnodes - 1)) {
+		if (i < (vt.numnodes - 1)) {
 			if ((node = next_online_node(node + 1)) < 0) {
 				ERRMSG("Can't get next online node.\n");
 				return FALSE;
@@ -3458,7 +3458,7 @@ _exclude_free_page()
 		ERRMSG("Can't get pgdat list.\n");
 		return FALSE;
 	}
-	for (num_nodes = 1; num_nodes <= vt->numnodes; num_nodes++) {
+	for (num_nodes = 1; num_nodes <= vt.numnodes; num_nodes++) {
 
 		node_zones = pgdat + OFFSET(pglist_data.node_zones);
 
@@ -3480,7 +3480,7 @@ _exclude_free_page()
 			if (!reset_bitmap_of_free_pages(zone))
 				return FALSE;
 		}
-		if (num_nodes < vt->numnodes) {
+		if (num_nodes < vt.numnodes) {
 			if ((node = next_online_node(node + 1)) < 0) {
 				ERRMSG("Can't get next online node.\n");
 				return FALSE;
@@ -5460,7 +5460,6 @@ main(int argc, char *argv[])
 		    strerror(errno));
 		goto out;
 	}
-	vt = &info->vm_table;
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;

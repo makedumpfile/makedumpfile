@@ -74,10 +74,10 @@ get_machdep_info_ia64()
 	 * Check the pgtable (3 Levels or 4 Levels).
 	 */
 	if (!strncmp(SRCFILE(pud_t), STR_PUD_T_4L, strlen(STR_PUD_T_4L)))
-		info->mem_flags |= MEMORY_PAGETABLE_4L;
+		vt.mem_flags |= MEMORY_PAGETABLE_4L;
 
 	else if (!strncmp(SRCFILE(pud_t), STR_PUD_T_3L, strlen(STR_PUD_T_3L)))
-		info->mem_flags |= MEMORY_PAGETABLE_3L;
+		vt.mem_flags |= MEMORY_PAGETABLE_3L;
 
 	else
 		MSG("Can't distinguish the pgtable.\n");
@@ -227,7 +227,7 @@ ia64_vtop(unsigned long long vaddr)
 		return paddr;
 	}
 
-	if (info->mem_flags & MEMORY_PAGETABLE_4L)
+	if (vt.mem_flags & MEMORY_PAGETABLE_4L)
 		return ia64_vtop4(vaddr);
 	else
 		return ia64_vtop3(vaddr);

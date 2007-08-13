@@ -419,23 +419,32 @@ print_usage()
 	MSG("\n");
 	MSG("  [--message-level ML]:\n");
 	MSG("      Specify the message types.\n");
-	MSG("      A user can specify multiple message types by setting the sum of each\n");
-	MSG("      message type for ML. The default ML is '7' (Print the progress indicator,\n");
-	MSG("      common messages, error messages).\n");
-	MSG("        0: Print nothing.\n");
-	MSG("        1: Print progress indicator.\n");
-	MSG("        2: Print common messages.\n");
-	MSG("        4: Print error messages.\n");
-	MSG("        8: Print debugging messages.\n");
+	MSG("      Users can restrict outputs printed by specifying Message_Level (ML) with\n");
+	MSG("      this option. The message type marked with an X in the following table is\n");
+	MSG("      printed to standard error output. For example, according to the table,\n");
+	MSG("      specifying 7 as ML means progress indicator, common message, and error\n");
+	MSG("      message are printed, and this is a default value.\n");
+	MSG("      Note that the maximum value of message_level is 15.\n");
+	MSG("\n");
+	MSG("      Message | progress    common    error     debug\n");
+	MSG("      Level   | indicator   message   message   message\n");
+	MSG("     ---------+-----------------------------------------\n");
+	MSG("            0 |\n");
+	MSG("            1 |     X\n");
+	MSG("            2 |                X\n");
+	MSG("            4 |                          X\n");
+	MSG("          * 7 |     X          X         X\n");
+	MSG("            8 |                                    X\n");
+	MSG("           15 |     X          X         X         X\n");
 	MSG("\n");
 	MSG("  [-D]:\n");
-	MSG("      Print debugging messages.\n");
+	MSG("      Print debugging message.\n");
 	MSG("\n");
 	MSG("  [-f]:\n");
 	MSG("      Overwrite DUMPFILE even if it already exists.\n");
 	MSG("\n");
 	MSG("  [-h]:\n");
-	MSG("      Show help messages.\n");
+	MSG("      Show help message.\n");
 	MSG("\n");
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile.\n");
@@ -5460,7 +5469,8 @@ main(int argc, char *argv[])
 		}
 		if ((message_level < MIN_MSG_LEVEL)
 		    || (MAX_MSG_LEVEL < message_level)) {
-			MSG("message_level is invalid.\n");
+			message_level = DEFAULT_MSG_LEVEL;
+			MSG("Message_level is invalid.\n");
 			print_usage();
 			goto out;
 		}

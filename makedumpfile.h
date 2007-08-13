@@ -264,6 +264,12 @@ do { \
 	     == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
+#define OFFSET_IN_UNION_INIT(X, Y, Z) \
+do { \
+	if ((OFFSET(X) = get_member_offset(Y, Z, DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION)) \
+	     == FAILED_DWARFINFO) \
+		return FALSE; \
+} while (0)
 #define SYMBOL_ARRAY_LENGTH_INIT(X, Y) \
 do { \
 	if ((ARRAY_LENGTH(X) = get_array_length(Y, NULL, DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)) == FAILED_DWARFINFO) \
@@ -357,7 +363,7 @@ do { \
 #define KVER_MIN_SHIFT 16
 #define KERNEL_VERSION(x,y,z) (((x) << KVER_MAJ_SHIFT) | ((y) << KVER_MIN_SHIFT) | (z))
 #define OLDEST_VERSION		(0x0206000f)	/* linux-2.6.15 */
-#define LATEST_VERSION		(0x02060015)	/* linux-2.6.21 */
+#define LATEST_VERSION		(0x02060016)	/* linux-2.6.22 */
 
 /*
  * field name of vmcoreinfo file
@@ -819,6 +825,7 @@ extern struct srcfile_table	srcfile_table;
 enum {
 	DWARF_INFO_GET_STRUCT_SIZE,
 	DWARF_INFO_GET_MEMBER_OFFSET,
+	DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION,
 	DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION,
 	DWARF_INFO_GET_MEMBER_ARRAY_LENGTH,
 	DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH,

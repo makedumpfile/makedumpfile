@@ -1088,7 +1088,7 @@ is_kvaddr(unsigned long long addr)
 }
 
 static int
-get_data_member_location(Dwarf_Die *die)
+get_data_member_location(Dwarf_Die *die, long *offset)
 {
 	size_t expcnt;
 	Dwarf_Attribute attr;
@@ -1100,7 +1100,7 @@ get_data_member_location(Dwarf_Die *die)
 	if (dwarf_getlocation(&attr, &expr, &expcnt) < 0)
 		return FALSE;
 
-	dwarf_info.member_offset = expr[0].number;
+	(*offset) = expr[0].number;
 
 	return TRUE;
 }
@@ -1197,8 +1197,9 @@ static void
 search_member(Dwarf *dwarfd, Dwarf_Die *die)
 {
 	int tag;
+	long offset;
 	const char *name;
-	Dwarf_Die child, *walker;
+	Dwarf_Die child, *walker, die_union;
 
 	if (dwarf_child(die, &child) != 0)
 		return;
@@ -1219,17 +1220,21 @@ search_member(Dwarf *dwarfd, Dwarf_Die *die)
 			/*
 			 * Get the member offset.
 			 */
-			if (!get_data_member_location(walker))
+			if (!get_data_member_location(walker, &offset))
 				continue;
+			dwarf_info.member_offset = offset;
 			return;
-		case DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET:
-			if (name)
+		case DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION:
+			if (!get_die_type(dwarfd, walker, &die_union))
+				continue;
+			if (dwarf_tag(&die_union) != DW_TAG_union_type)
 				continue;
 			/*
 			 * Get the member offset.
 			 */
-			if (!get_data_member_location(walker))
+			if (!get_data_member_location(walker, &offset))
 				continue;
+			dwarf_info.member_offset = offset;
 			return;
 		case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
 			if ((!name) || strcmp(name, dwarf_info.member_name))
@@ -1254,7 +1259,7 @@ is_search_structure(int cmd)
 {
 	if ((cmd == DWARF_INFO_GET_STRUCT_SIZE)
 	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET)
-	    || (cmd == DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET)
+	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION)
 	    || (cmd == DWARF_INFO_GET_MEMBER_ARRAY_LENGTH))
 		return TRUE;
 	else
@@ -1321,7 +1326,7 @@ search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	case DWARF_INFO_GET_STRUCT_SIZE:
 		break;
 	case DWARF_INFO_GET_MEMBER_OFFSET:
-	case DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET:
+	case DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION:
 	case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
 		search_member(dwarfd, die);
 		break;
@@ -1639,11 +1644,18 @@ get_structure_info()
 
 	/*
 	 * On linux-2.6.16 or later, page.mapping is defined
-	 * in anonymous union.
+	 * in anonymous union. makedumpfile assumes that there is
+	 * "mapping" next to "private(unsigned long)" in the first
+	 * union.
 	 */
-	if (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE)
-		OFFSET_INIT_NONAME(page.mapping, "page",
-		   sizeof(unsigned long));
+	if (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE) {
+		OFFSET(page.mapping) = get_member_offset("page", NULL,
+		    DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION);
+		if (OFFSET(page.mapping) == FAILED_DWARFINFO)
+			return FALSE;
+		if (OFFSET(page.mapping) != NOT_FOUND_STRUCTURE)
+			OFFSET(page.mapping) += sizeof(unsigned long);
+	}
 
 	OFFSET_INIT(page.lru, "page", "lru");
 

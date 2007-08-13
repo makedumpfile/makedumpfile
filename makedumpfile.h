@@ -253,22 +253,14 @@ do { \
 #define SIZE(X)			(size_table.X)
 #define OFFSET(X)		(offset_table.X)
 #define ARRAY_LENGTH(X)		(array_table.X)
-#define GET_STRUCTURE_SIZE	get_structure_size
-#define GET_MEMBER_OFFSET	get_member_offset
 #define SIZE_INIT(X, Y) \
 do { \
-	if ((SIZE(X) = GET_STRUCTURE_SIZE(Y)) == FAILED_DWARFINFO) \
+	if ((SIZE(X) = get_structure_size(Y)) == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
 #define OFFSET_INIT(X, Y, Z) \
 do { \
-	if ((OFFSET(X) = GET_MEMBER_OFFSET(Y, Z, DWARF_INFO_GET_MEMBER_OFFSET)) \
-	     == FAILED_DWARFINFO) \
-		return FALSE; \
-} while (0)
-#define OFFSET_INIT_NONAME(X, Y, S) \
-do { \
-	if ((OFFSET(X) = (GET_MEMBER_OFFSET(Y, NULL, DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET) + S)) \
+	if ((OFFSET(X) = get_member_offset(Y, Z, DWARF_INFO_GET_MEMBER_OFFSET)) \
 	     == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
@@ -824,13 +816,15 @@ extern struct srcfile_table	srcfile_table;
 /*
  * Debugging information
  */
-#define DWARF_INFO_GET_STRUCT_SIZE		(1)
-#define DWARF_INFO_GET_MEMBER_OFFSET		(2)
-#define DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET	(3)
-#define DWARF_INFO_GET_MEMBER_ARRAY_LENGTH	(4)
-#define DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH	(5)
-#define DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE	(6)
-#define DWARF_INFO_GET_TYPEDEF_SRCNAME		(7)
+enum {
+	DWARF_INFO_GET_STRUCT_SIZE,
+	DWARF_INFO_GET_MEMBER_OFFSET,
+	DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION,
+	DWARF_INFO_GET_MEMBER_ARRAY_LENGTH,
+	DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH,
+	DWARF_INFO_GET_TYPEDEF_SRCNAME,
+	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE
+};
 
 struct dwarf_info {
 	unsigned int	cmd;		/* IN */

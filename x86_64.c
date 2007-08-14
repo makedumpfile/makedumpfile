@@ -1,7 +1,7 @@
 /* 
  * x86_64.c
  *
- * Copyright (C) 2006  NEC Corporation
+ * Copyright (C) 2006, 2007  NEC Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ is_vmalloc_addr(ulong vaddr)
 }
 
 int
-get_phys_base_x86_64(struct DumpInfo *info)
+get_phys_base_x86_64()
 {
 	int i;
 	struct pt_load_segment *pls;
@@ -54,7 +54,7 @@ get_phys_base_x86_64(struct DumpInfo *info)
 }
 
 int
-get_machdep_info_x86_64(struct DumpInfo *info)
+get_machdep_info_x86_64()
 {
 	info->section_size_bits = _SECTION_SIZE_BITS;
 	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
@@ -63,7 +63,7 @@ get_machdep_info_x86_64(struct DumpInfo *info)
 }
 
 off_t
-vaddr_to_offset_x86_64(struct DumpInfo *info,  unsigned long vaddr)
+vaddr_to_offset_x86_64(unsigned long vaddr)
 {
 	int i;
 	off_t offset;
@@ -99,7 +99,7 @@ vaddr_to_offset_x86_64(struct DumpInfo *info,  unsigned long vaddr)
  * for Xen extraction
  */
 unsigned long long
-kvtop_xen_x86_64(struct DumpInfo *info, unsigned long kvaddr)
+kvtop_xen_x86_64(unsigned long kvaddr)
 {
 	unsigned long long dirp, entry;
 
@@ -109,23 +109,23 @@ kvtop_xen_x86_64(struct DumpInfo *info, unsigned long kvaddr)
 	if (is_direct(kvaddr))
 		return (unsigned long)kvaddr - DIRECTMAP_VIRT_START;
 
-	dirp = kvtop_xen_x86_64(info, SYMBOL(pgd_l4));
+	dirp = kvtop_xen_x86_64(SYMBOL(pgd_l4));
 	dirp += pml4_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
 
 	if (!(entry & _PAGE_PRESENT))
 		return 0;
 	dirp = entry & ENTRY_MASK;
 	dirp += pgd_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
  
 	if (!(entry & _PAGE_PRESENT))
 		return 0;
 	dirp = entry & ENTRY_MASK;
 	dirp += pmd_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -136,7 +136,7 @@ kvtop_xen_x86_64(struct DumpInfo *info, unsigned long kvaddr)
 	}
 	dirp = entry & ENTRY_MASK;
 	dirp += pte_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
 
 	if (!(entry & _PAGE_PRESENT)) {
@@ -148,7 +148,7 @@ kvtop_xen_x86_64(struct DumpInfo *info, unsigned long kvaddr)
 	return entry;
 }
 
-int get_xen_info_x86_64(struct DumpInfo *info)
+int get_xen_info_x86_64()
 {
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;
@@ -163,7 +163,7 @@ int get_xen_info_x86_64(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of frame_table.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(frame_table), &frame_table_vaddr,
+	if (!readmem(VADDR_XEN, SYMBOL(frame_table), &frame_table_vaddr,
 	      sizeof(frame_table_vaddr))) {
 		ERRMSG("Can't get the value of frame_table.\n");
 		return FALSE;
@@ -174,7 +174,7 @@ int get_xen_info_x86_64(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+	if (!readmem(VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
 	      sizeof(xen_end))) {
 		ERRMSG("Can't get the value of xenheap_phys_end.\n");
 		return FALSE;

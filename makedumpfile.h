@@ -222,11 +222,11 @@ do { \
 #define SYMBOL(X)		(symbol_table.X)
 #define SYMBOL_INIT(symbol, str_symbol) \
 do { \
-	SYMBOL(symbol) = get_symbol_addr(info, str_symbol); \
+	SYMBOL(symbol) = get_symbol_addr(str_symbol); \
 } while (0)
 #define SYMBOL_INIT_NEXT(symbol, str_symbol) \
 do { \
-	SYMBOL(symbol) = get_next_symbol_addr(info, str_symbol); \
+	SYMBOL(symbol) = get_next_symbol_addr(str_symbol); \
 } while (0)
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \
@@ -237,7 +237,7 @@ do { \
 } while (0)
 #define READ_SYMBOL(str_symbol, symbol) \
 do { \
-	SYMBOL(symbol) = read_vmcoreinfo_symbol(info, STR_SYMBOL(str_symbol)); \
+	SYMBOL(symbol) = read_vmcoreinfo_symbol(STR_SYMBOL(str_symbol)); \
 	if (SYMBOL(symbol) == INVALID_SYMBOL_DATA) \
 		return FALSE; \
 } while (0)
@@ -253,22 +253,20 @@ do { \
 #define SIZE(X)			(size_table.X)
 #define OFFSET(X)		(offset_table.X)
 #define ARRAY_LENGTH(X)		(array_table.X)
-#define GET_STRUCTURE_SIZE	get_structure_size
-#define GET_MEMBER_OFFSET	get_member_offset
 #define SIZE_INIT(X, Y) \
 do { \
-	if ((SIZE(X) = GET_STRUCTURE_SIZE(Y)) == FAILED_DWARFINFO) \
+	if ((SIZE(X) = get_structure_size(Y)) == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
 #define OFFSET_INIT(X, Y, Z) \
 do { \
-	if ((OFFSET(X) = GET_MEMBER_OFFSET(Y, Z, DWARF_INFO_GET_MEMBER_OFFSET)) \
+	if ((OFFSET(X) = get_member_offset(Y, Z, DWARF_INFO_GET_MEMBER_OFFSET)) \
 	     == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
-#define OFFSET_INIT_NONAME(X, Y, S) \
+#define OFFSET_IN_UNION_INIT(X, Y, Z) \
 do { \
-	if ((OFFSET(X) = (GET_MEMBER_OFFSET(Y, NULL, DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET) + S)) \
+	if ((OFFSET(X) = get_member_offset(Y, Z, DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION)) \
 	     == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
@@ -311,19 +309,19 @@ do { \
 } while (0)
 #define READ_STRUCTURE_SIZE(str_structure, structure) \
 do { \
-	SIZE(structure) = read_vmcoreinfo_structure(info,STR_SIZE(str_structure)); \
+	SIZE(structure) = read_vmcoreinfo_structure(STR_SIZE(str_structure)); \
 	if (SIZE(structure) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_MEMBER_OFFSET(str_member, member) \
 do { \
-	OFFSET(member) = read_vmcoreinfo_structure(info, STR_OFFSET(str_member)); \
+	OFFSET(member) = read_vmcoreinfo_structure(STR_OFFSET(str_member)); \
 	if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_ARRAY_LENGTH(str_array, array) \
 do { \
-	ARRAY_LENGTH(array) = read_vmcoreinfo_structure(info, STR_LENGTH(str_array)); \
+	ARRAY_LENGTH(array) = read_vmcoreinfo_structure(STR_LENGTH(str_array)); \
 	if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
@@ -347,7 +345,7 @@ do { \
 
 #define READ_SRCFILE(str_decl_name, decl_name) \
 do { \
-	if (!read_vmcoreinfo_string(info, STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
+	if (!read_vmcoreinfo_string(STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
 		return FALSE; \
 } while (0)
 
@@ -365,7 +363,7 @@ do { \
 #define KVER_MIN_SHIFT 16
 #define KERNEL_VERSION(x,y,z) (((x) << KVER_MAJ_SHIFT) | ((y) << KVER_MIN_SHIFT) | (z))
 #define OLDEST_VERSION		(0x0206000f)	/* linux-2.6.15 */
-#define LATEST_VERSION		(0x02060015)	/* linux-2.6.21 */
+#define LATEST_VERSION		(0x02060016)	/* linux-2.6.22 */
 
 /*
  * field name of vmcoreinfo file
@@ -498,7 +496,7 @@ do { \
 int get_machdep_info_x86();
 #define get_phys_base(X)	TRUE
 #define get_machdep_info(X)	get_machdep_info_x86(X)
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_general(X,Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_general(X)
 #endif /* x86 */
 
 #ifdef __x86_64__
@@ -507,14 +505,14 @@ int get_machdep_info_x86_64();
 off_t vaddr_to_offset_x86_64();
 #define get_phys_base(X)	get_phys_base_x86_64(X)
 #define get_machdep_info(X)	get_machdep_info_x86_64(X)
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_x86_64(X, Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_x86_64(X)
 #endif /* x86_64 */
 
 #ifdef __powerpc__ /* powerpc */
 int get_machdep_info_ppc64();
 #define get_machdep_info(X)	get_machdep_info_ppc64(X)
 #define get_phys_base(X)	TRUE
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_general(X, Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_general(X)
 #endif          /* powerpc */
 
 #ifdef __ia64__ /* ia64 */
@@ -523,7 +521,7 @@ int get_machdep_info_ia64();
 off_t vaddr_to_offset_ia64();
 #define get_machdep_info(X)	get_machdep_info_ia64(X)
 #define get_phys_base(X)	get_phys_base_ia64(X)
-#define vaddr_to_offset(X, Y)	vaddr_to_offset_ia64(X, Y)
+#define vaddr_to_offset(X)	vaddr_to_offset_ia64(X)
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
 
@@ -638,7 +636,6 @@ struct DumpInfo {
 	 */
 	unsigned int		num_mem_map;
 	struct mem_map_data	*mem_map_data;
-	unsigned int		mem_flags;
 
 	/*
 	 * Dump memory image info:
@@ -658,11 +655,6 @@ struct DumpInfo {
 	int			fd_bitmap;
 	char			*name_bitmap;
 	struct cache_data	*bm2;
-	struct vm_table {                /* kernel VM-related data */
-		int numnodes;
-		ulong *node_online_map;
-		int node_online_map_len;
-	} vm_table;
 
 	/*
 	 * vmcoreinfo file info:
@@ -684,6 +676,18 @@ struct DumpInfo {
 	struct domain_list *domain_list;
 
 };
+extern struct DumpInfo		*info;
+
+/*
+ * kernel VM-related data
+ */
+struct vm_table {
+	int		numnodes;
+	unsigned long	*node_online_map;
+	int		node_online_map_len;
+	unsigned int	mem_flags;
+};
+extern struct vm_table		vt;
 
 struct symbol_table {
 	unsigned long	mem_map;
@@ -823,13 +827,16 @@ extern struct srcfile_table	srcfile_table;
 /*
  * Debugging information
  */
-#define DWARF_INFO_GET_STRUCT_SIZE		(1)
-#define DWARF_INFO_GET_MEMBER_OFFSET		(2)
-#define DWARF_INFO_GET_NOT_NAMED_UNION_OFFSET	(3)
-#define DWARF_INFO_GET_MEMBER_ARRAY_LENGTH	(4)
-#define DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH	(5)
-#define DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE	(6)
-#define DWARF_INFO_GET_TYPEDEF_SRCNAME		(7)
+enum {
+	DWARF_INFO_GET_STRUCT_SIZE,
+	DWARF_INFO_GET_MEMBER_OFFSET,
+	DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION,
+	DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION,
+	DWARF_INFO_GET_MEMBER_ARRAY_LENGTH,
+	DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH,
+	DWARF_INFO_GET_TYPEDEF_SRCNAME,
+	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE
+};
 
 struct dwarf_info {
 	unsigned int	cmd;		/* IN */
@@ -847,14 +854,13 @@ struct dwarf_info {
 
 extern struct dwarf_info	dwarf_info;
 
-int readmem(struct DumpInfo *info, int type_addr, unsigned long long addr,
-    void *bufptr, size_t size);
+int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 off_t paddr_to_offset();
 unsigned long long vaddr_to_paddr();
 int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
-int get_str_osrelease_from_vmlinux(struct DumpInfo *info);
+int get_str_osrelease_from_vmlinux();
 
 /*
  * for Xen extraction
@@ -893,10 +899,10 @@ struct domain_list {
 
 #define ENTRY_MASK	(~0x8000000000000fffULL)
 
-unsigned long long kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr);
-#define kvtop_xen(X, Y)	kvtop_xen_x86(X, Y)
+unsigned long long kvtop_xen_x86(unsigned long kvaddr);
+#define kvtop_xen(X)	kvtop_xen_x86(X)
 
-int get_xen_info_x86(struct DumpInfo *info);
+int get_xen_info_x86();
 #define get_xen_info_arch(X) get_xen_info_x86(X)
 
 #endif	/* __x86__ */
@@ -932,10 +938,10 @@ int get_xen_info_x86(struct DumpInfo *info);
 #define is_direct(x) \
         ((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
 
-unsigned long long kvtop_xen_x86_64(struct DumpInfo *info, unsigned long kvaddr);
-#define kvtop_xen(X, Y)	kvtop_xen_x86_64(X, Y)
+unsigned long long kvtop_xen_x86_64(unsigned long kvaddr);
+#define kvtop_xen(X)	kvtop_xen_x86_64(X)
 
-int get_xen_info_x86_64(struct DumpInfo *info);
+int get_xen_info_x86_64();
 #define get_xen_info_arch(X) get_xen_info_x86_64(X)
 
 #endif	/* __x86_64__ */
@@ -967,16 +973,16 @@ int get_xen_info_x86_64(struct DumpInfo *info);
 #define _PAGE_P		(1)
 #define _PFN_MASK	(((1UL << IA64_MAX_PHYS_BITS) - 1) & ~0xfffUL)
 
-unsigned long long kvtop_xen_ia64(struct DumpInfo *info, unsigned long kvaddr);
-#define kvtop_xen(X, Y)	kvtop_xen_ia64(X, Y)
+unsigned long long kvtop_xen_ia64(unsigned long kvaddr);
+#define kvtop_xen(X)	kvtop_xen_ia64(X)
 
-int get_xen_info_ia64(struct DumpInfo *info);
+int get_xen_info_ia64();
 #define get_xen_info_arch(X) get_xen_info_ia64(X)
 
 #endif	/* __ia64 */
 
 #ifdef __powerpc__ /* powerpc */
-#define kvtop_xen(X, Y)	FALSE
+#define kvtop_xen(X)	FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* powerpc */
 

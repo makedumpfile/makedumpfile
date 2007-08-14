@@ -1,4 +1,4 @@
-.TH MAKEDUMPFILE 8 "July 2007" "makedumpfile v1.1.5" "Linux System Administrator's Manual"
+.TH MAKEDUMPFILE 8 "August 2007" "makedumpfile v1.1.6" "Linux System Administrator's Manual"
 .SH NAME
 makedumpfile \- make a small dumpfile of kdump
 .SH SYNOPSIS
@@ -272,24 +272,42 @@ it contains the xen's information.
 \fB\-\-message-level\fR \fImessage_level\fR
 Specify the message types.
 .br
-All the messages are printed to the standard error.
-A user can specify multiple message types by setting the sum of each message
-type for message_level. The default value is '7' (Print the progress indicator
-common messages, error messages).
+Users can restrict outputs printed by specifying \fImessage_level\fR
+with this option. The message type marked with an X in the following
+table is printed to standard error output. For example, according to
+the table, specifying 7 as \fImessage_level\fR means progress indicator,
+common message, and error message are printed, and this is a default
+value. Note that the maximum value of \fImessage_level\fR is 15.
 .br
-  0: Print nothing.
-  1: Print the progress indicator.
-  2: Print common messages.
-  4: Print error messages.
-  8: Print debugging messages.
+
+ message | progress | common  | error   | debug 
+ level   | indicator| message | message | message
+.br
+\-\-\-\-\-\-\-\-\-+\-\-\-\-\-\-\-\-\-\-+\-\-\-\-\-\-\-\-\-+\-\-\-\-\-\-\-\-\-+\-\-\-\-\-\-\-\-\-
+       0 |          |         |         |
+       1 |    X     |         |         |
+       2 |          |    X    |         |
+       3 |    X     |    X    |         |
+       4 |          |         |    X    |
+       5 |    X     |         |    X    |
+       6 |          |    X    |    X    |
+     * 7 |    X     |    X    |    X    |
+       8 |          |         |         |    X
+       9 |    X     |         |         |    X
+      10 |          |    X    |         |    X
+      11 |    X     |    X    |         |    X
+      12 |          |         |    X    |    X
+      13 |    X     |         |    X    |    X
+      14 |          |    X    |    X    |    X
+      15 |    X     |    X    |    X    |    X
 
 .TP
 \fB\-D\fR
-Print debugging messages.
+Print debugging message.
 
 .TP
 \fB\-h\fR
-Show help messages.
+Show help message.
 
 .TP
 \fB\-v\fR

@@ -1,7 +1,7 @@
 /* 
  * x86.c
  *
- * Copyright (C) 2006  NEC Corporation
+ * Copyright (C) 2006, 2007  NEC Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #include "makedumpfile.h"
 
 int
-get_machdep_info_x86(struct DumpInfo *info)
+get_machdep_info_x86()
 {
 	/* PAE */
 	if ((SYMBOL(pkmap_count) != NOT_FOUND_SYMBOL)
@@ -43,7 +43,7 @@ get_machdep_info_x86(struct DumpInfo *info)
  * for Xen extraction
  */
 unsigned long long
-kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr)
+kvtop_xen_x86(unsigned long kvaddr)
 {
 	unsigned long long dirp, entry;
 
@@ -53,16 +53,16 @@ kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr)
 	if (is_direct(kvaddr))
 		return (unsigned long)kvaddr - DIRECTMAP_VIRT_START;
 
-	dirp = kvtop_xen_x86(info, SYMBOL(pgd_l3));
+	dirp = kvtop_xen_x86(SYMBOL(pgd_l3));
 	dirp += ((kvaddr >> PGDIR_SHIFT_3LEVEL) & (PTRS_PER_PGD_3LEVEL - 1)) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
  
 	if (!(entry & _PAGE_PRESENT))
 		return 0;
 	dirp = entry & ENTRY_MASK;
 	dirp += ((kvaddr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -73,7 +73,7 @@ kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr)
 	}
 	dirp = entry & ENTRY_MASK;
 	dirp += ((kvaddr >> PTE_SHIFT) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
-	if (!readmem(info, PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return 0;
 
 	if (!(entry & _PAGE_PRESENT)) {
@@ -85,7 +85,7 @@ kvtop_xen_x86(struct DumpInfo *info, unsigned long kvaddr)
 	return entry;
 }
 
-int get_xen_info_x86(struct DumpInfo *info)
+int get_xen_info_x86()
 {
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;
@@ -106,7 +106,7 @@ int get_xen_info_x86(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of frame_table.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(frame_table), &frame_table_vaddr,
+	if (!readmem(VADDR_XEN, SYMBOL(frame_table), &frame_table_vaddr,
 	      sizeof(frame_table_vaddr))) {
 		ERRMSG("Can't get the value of frame_table.\n");
 		return FALSE;
@@ -117,7 +117,7 @@ int get_xen_info_x86(struct DumpInfo *info)
 		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	if (!readmem(info, VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+	if (!readmem(VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
 	      sizeof(xen_end))) {
 		ERRMSG("Can't get the value of xenheap_phys_end.\n");
 		return FALSE;

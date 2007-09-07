@@ -70,6 +70,7 @@ enum {
  */
 #define MEMORY_PAGETABLE_4L	(1 << 0)
 #define MEMORY_PAGETABLE_3L	(1 << 1)
+#define MEMORY_X86_PAE		(1 << 2)
 
 /*
  * Type of address
@@ -369,15 +370,26 @@ do { \
 #define LATEST_VERSION		(0x02060016)	/* linux-2.6.22 */
 
 /*
+ * vmcoreinfo in /proc/vmcore
+ */
+#define VMCOREINFO_BYTES		(4096)
+#define VMCOREINFO_NOTE_NAME		"VMCOREINFO"
+#define VMCOREINFO_NOTE_NAME_BYTES	(sizeof(VMCOREINFO_NOTE_NAME))
+#define FILENAME_VMCOREINFO		"/tmp/vmcoreinfoXXXXXX"
+
+/*
  * field name of vmcoreinfo file
  */
-#define STR_OSRELEASE	"OSRELEASE="
-#define STR_PAGESIZE	"PAGESIZE="
-#define STR_SYMBOL(X)	"SYMBOL("X")="
-#define STR_SIZE(X)	"SIZE("X")="
-#define STR_OFFSET(X)	"OFFSET("X")="
-#define STR_LENGTH(X)	"LENGTH("X")="
-#define STR_SRCFILE(X)	"SRCFILE("X")="
+#define STR_OSRELEASE		"OSRELEASE="
+#define STR_PAGESIZE		"PAGESIZE="
+#define STR_SYMBOL(X)		"SYMBOL("X")="
+#define STR_SIZE(X)		"SIZE("X")="
+#define STR_OFFSET(X)		"OFFSET("X")="
+#define STR_LENGTH(X)		"LENGTH("X")="
+#define STR_SRCFILE(X)		"SRCFILE("X")="
+#define STR_CONFIG_X86_PAE	"CONFIG_X86_PAE=y"
+#define STR_CONFIG_PGTABLE_4	"CONFIG_PGTABLE_4=y"
+#define STR_CONFIG_PGTABLE_3	"CONFIG_PGTABLE_3=y"
 
 /*
  * common value
@@ -664,6 +676,12 @@ struct DumpInfo {
 	FILE			*file_vmcoreinfo;
 	char			*name_vmcoreinfo;	     /* vmcoreinfo file */
 	char			release[STRLEN_OSRELEASE];
+
+	/*
+	 * vmcoreinfo in dump memory image info:
+	 */
+	off_t			offset_vmcoreinfo;
+	unsigned long		size_vmcoreinfo;
 
 	/*
 	 * for Xen extraction

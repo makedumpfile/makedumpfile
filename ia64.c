@@ -70,6 +70,10 @@ get_machdep_info_ia64()
 	else
 		info->vmalloc_start = KERNEL_VMALLOC_BASE;
 
+	if ((vt.mem_flags & MEMORY_PAGETABLE_4L)
+	    || (vt.mem_flags & MEMORY_PAGETABLE_3L))
+		return TRUE;
+
 	/*
 	 * Check the pgtable (3 Levels or 4 Levels).
 	 */

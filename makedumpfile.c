@@ -609,7 +609,7 @@ open_files_for_creating_dumpfile()
 	if (info->flag_read_vmcoreinfo) {
 		if (!open_vmcoreinfo("r"))
 			return FALSE;
-	} else if (info->dump_level > DL_EXCLUDE_ZERO) {
+	} else if (dwarf_info.vmlinux_name) {
 		if (!open_kernel_file())
 			return FALSE;
 	}
@@ -2054,8 +2054,17 @@ read_vmcoreinfo_basic_info()
 				return FALSE;
 			}
 		}
-		if (get_release && page_size)
-			break;
+		if (strncmp(buf, STR_CONFIG_X86_PAE,
+		    strlen(STR_CONFIG_X86_PAE)) == 0)
+			vt.mem_flags |= MEMORY_X86_PAE;
+
+		if (strncmp(buf, STR_CONFIG_PGTABLE_3,
+		    strlen(STR_CONFIG_PGTABLE_3)) == 0)
+			vt.mem_flags |= MEMORY_PAGETABLE_3L;
+
+		if (strncmp(buf, STR_CONFIG_PGTABLE_4,
+		    strlen(STR_CONFIG_PGTABLE_4)) == 0)
+			vt.mem_flags |= MEMORY_PAGETABLE_4L;
 	}
 	info->page_size = page_size;
 	info->page_shift = ffs(info->page_size) - 1;
@@ -2213,6 +2222,178 @@ read_vmcoreinfo()
 
 	READ_SRCFILE("pud_t", pud_t);
 
+	return TRUE;
+}
+
+int
+get_pt_note_info(int *flag_elf64, off_t *offset, unsigned long *size)
+{
+	Elf64_Phdr phdr64;
+	Elf32_Phdr phdr32;
+	int i, phnum, num_load, elf_format;
+
+	(*offset) = 0;
+	(*size)   = 0;
+
+	elf_format = check_elf_format(info->fd_memory, info->name_memory,
+	    &phnum, &num_load);
+
+	if (elf_format == ELF64)
+		(*flag_elf64) = TRUE;
+	else if (elf_format == ELF32)
+		(*flag_elf64) = FALSE;
+	else
+		return FALSE;
+
+	for (i = 0; i < phnum; i++) {
+		if (flag_elf64) { /* ELF64 */
+			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
+			    i, &phdr64)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				return FALSE;
+			}
+			if (phdr64.p_type != PT_NOTE)
+				continue;
+
+			(*offset) = phdr64.p_offset;
+			(*size)   = phdr64.p_filesz;
+			break;
+		} else {         /* ELF32 */
+			if (!get_elf32_phdr(info->fd_memory, info->name_memory,
+			    i, &phdr32)) {
+				ERRMSG("Can't find Phdr %d.\n", i);
+				return FALSE;
+			}
+			if (phdr32.p_type != PT_NOTE)
+				continue;
+
+			(*offset) = phdr32.p_offset;
+			(*size)   = phdr32.p_filesz;
+			break;
+		}
+	}
+	if (*offset == 0 || *size == 0) {
+		ERRMSG("Can't find PT_NOTE Phdr.\n");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+is_vmcoreinfo_in_vmcore(int *flag_found)
+{
+	off_t offset, off_note;
+	int flag_elf64;
+	unsigned long sz_note;
+	char buf[VMCOREINFO_NOTE_NAME_BYTES];
+	Elf64_Nhdr note64;
+	Elf32_Nhdr note32;
+
+	const off_t failed = (off_t)-1;
+
+	(*flag_found) = FALSE;
+
+	/*
+	 * Get information about PT_NOTE segment.
+	 */
+	if (!get_pt_note_info(&flag_elf64, &off_note, &sz_note))
+		return FALSE;
+
+	offset = off_note;
+	while (offset < off_note + sz_note) {
+		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+			ERRMSG("Can't seek the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			return FALSE;
+		}
+		if (flag_elf64) {
+			if (read(info->fd_memory, &note64, sizeof(note64))
+			    != sizeof(note64)) {
+				ERRMSG("Can't read the dump memory(%s). %s\n",
+				    info->name_memory, strerror(errno));
+				return FALSE;
+			}
+		} else {
+			if (read(info->fd_memory, &note32, sizeof(note32))
+			    != sizeof(note32)) {
+				ERRMSG("Can't read the dump memory(%s). %s\n",
+				    info->name_memory, strerror(errno));
+				return FALSE;
+			}
+		}
+		if (read(info->fd_memory, &buf, sizeof(buf)) != sizeof(buf)) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			return FALSE;
+		}
+		if (strncmp(VMCOREINFO_NOTE_NAME, buf,
+		    VMCOREINFO_NOTE_NAME_BYTES)) {
+			if (flag_elf64) {
+				offset += sizeof(Elf64_Nhdr)
+				    + ((note64.n_namesz + 3) & ~3)
+				    + ((note64.n_descsz + 3) & ~3);
+			} else {
+				offset += sizeof(Elf32_Nhdr)
+				    + ((note32.n_namesz + 3) & ~3)
+				    + ((note32.n_descsz + 3) & ~3);
+			}
+			continue;
+		}
+		if (flag_elf64) {
+			info->offset_vmcoreinfo = offset + (sizeof(note64)
+			    + ((note64.n_namesz + 3) & ~3));
+			info->size_vmcoreinfo = note64.n_descsz;
+		} else {
+			info->offset_vmcoreinfo = offset + (sizeof(note32)
+			    + ((note32.n_namesz + 3) & ~3));
+			info->size_vmcoreinfo = note32.n_descsz;
+		}
+		(*flag_found) = TRUE;
+		break;
+	}
+	return TRUE;
+}
+
+/*
+ * Extract vmcoreinfo from /proc/vmcore and output it to /tmp/vmcoreinfo.tmp.
+ */
+int
+copy_vmcoreinfo()
+{
+	int fd;
+	char buf[VMCOREINFO_BYTES];
+	const off_t failed = (off_t)-1;
+
+	if (!info->offset_vmcoreinfo || !info->size_vmcoreinfo)
+		return FALSE;
+
+	if ((fd = mkstemp(info->name_vmcoreinfo)) < 0) {
+		ERRMSG("Can't open the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
+		return FALSE;
+	}
+	if (lseek(info->fd_memory, info->offset_vmcoreinfo, SEEK_SET)
+	    == failed) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (read(info->fd_memory, &buf, info->size_vmcoreinfo)
+	    != info->size_vmcoreinfo) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (write(fd, &buf, info->size_vmcoreinfo) != info->size_vmcoreinfo) {
+		ERRMSG("Can't write the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
+		return FALSE;
+	}
+	if (close(fd) < 0) {
+		ERRMSG("Can't close the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
+		return FALSE;
+	}
 	return TRUE;
 }
 
@@ -2891,6 +3072,8 @@ get_mem_map()
 int
 initial()
 {
+	int vmcoreinfo_in_vmcore = FALSE;
+
 	if (!get_elf_info())
 		return FALSE;
 
@@ -2906,22 +3089,60 @@ initial()
 	/*
 	 * Get the debug information for analysis from the kernel file 
 	 */
-	} else {
-		if (info->dump_level <= DL_EXCLUDE_ZERO) {
-			if (!get_mem_map_without_mm())
-				return FALSE;
-			else
-				return TRUE;
-		} else {
-			if (!get_symbol_info())
-				return FALSE;
-		}
+	} else if (info->flag_vmlinux) {
+		if (!get_symbol_info())
+			return FALSE;
+
 		if (!get_structure_info())
 			return FALSE;
 
 		if (!get_srcfile_info())
 			return FALSE;
+	/*
+	 * Get the debug information for analysis from /proc/vmcore
+	 */
+	} else {
+		/*
+		 * Check whether /proc/vmcore contains vmcoreinfo,
+		 * and get both the offset and the size.
+		 */
+		if (!is_vmcoreinfo_in_vmcore(&vmcoreinfo_in_vmcore))
+			return FALSE;
+
+		if (!vmcoreinfo_in_vmcore) {
+			MSG("%s doesn't contain vmcoreinfo.\n",
+			    info->name_memory);
+			MSG("'-x' or '-i' must be specified.\n");
+			return FALSE;
+		}
+		/*
+		 * Copy vmcoreinfo to /tmp/vmcoreinfoXXXXXX.
+		 */
+		if ((info->name_vmcoreinfo
+		    = malloc(sizeof(FILENAME_VMCOREINFO))) == NULL) {
+			ERRMSG("Can't allocate memory for the name(%s). %s\n",
+			    FILENAME_VMCOREINFO, strerror(errno));
+			return FALSE;
+		}
+		strcpy(info->name_vmcoreinfo, FILENAME_VMCOREINFO);
+		if (!copy_vmcoreinfo())
+			return FALSE;
+		/*
+		 * Read vmcoreinfo from /tmp/vmcoreinfoXXXXXX.
+		 */
+		if (!open_vmcoreinfo("r"))
+			return FALSE;
+		if (!read_vmcoreinfo())
+			return FALSE;
+		unlink(info->name_vmcoreinfo);
 	}
+	if (info->dump_level <= DL_EXCLUDE_ZERO) {
+		if (!get_mem_map_without_mm())
+			return FALSE;
+		else
+			return TRUE;
+	}
+
 	if (!get_machdep_info())
 		return FALSE;
 

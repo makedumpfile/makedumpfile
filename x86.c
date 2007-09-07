@@ -21,10 +21,11 @@ int
 get_machdep_info_x86()
 {
 	/* PAE */
-	if ((SYMBOL(pkmap_count) != NOT_FOUND_SYMBOL)
-	    && (SYMBOL(pkmap_count_next) != NOT_FOUND_SYMBOL)
-	    && ((SYMBOL(pkmap_count_next)-SYMBOL(pkmap_count))/sizeof(int))
-	    == 512) {
+	if ((vt.mem_flags & MEMORY_X86_PAE)
+	    || ((SYMBOL(pkmap_count) != NOT_FOUND_SYMBOL)
+	      && (SYMBOL(pkmap_count_next) != NOT_FOUND_SYMBOL)
+	      && ((SYMBOL(pkmap_count_next)-SYMBOL(pkmap_count))/sizeof(int))
+	      == 512)) {
 		DEBUG_MSG("\n");
 		DEBUG_MSG("PAE          : ON\n");
 		info->section_size_bits = _SECTION_SIZE_BITS_PAE;

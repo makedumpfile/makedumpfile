@@ -336,6 +336,32 @@ do { \
 } while (0)
 
 /*
+ * for number
+ */
+#define NOT_FOUND_NUMBER	(LONG_MAX)
+#define NUMBER(X)		(number_table.X)
+
+#define ENUM_NUMBER_INIT(number, str_number)	\
+do {\
+	NUMBER(number) = get_enum_number(str_number); \
+	if (NUMBER(number) == FAILED_DWARFINFO) \
+		return FALSE; \
+} while (0)
+#define WRITE_NUMBER(str_number, number) \
+do { \
+	if (NUMBER(number) != NOT_FOUND_NUMBER) { \
+		fprintf(info->file_vmcoreinfo, "%s%ld\n", \
+		    STR_NUMBER(str_number), NUMBER(number)); \
+	} \
+} while (0)
+#define READ_NUMBER(str_number, number) \
+do { \
+	NUMBER(number) = read_vmcoreinfo_structure(STR_NUMBER(str_number)); \
+	if (NUMBER(number) == INVALID_STRUCTURE_DATA) \
+		return FALSE; \
+} while (0)
+
+/*
  * for source file name
  */
 #define SRCFILE(X)		(srcfile_table.X)
@@ -391,6 +417,7 @@ do { \
 #define STR_SIZE(X)		"SIZE("X")="
 #define STR_OFFSET(X)		"OFFSET("X")="
 #define STR_LENGTH(X)		"LENGTH("X")="
+#define STR_NUMBER(X)		"NUMBER("X")="
 #define STR_SRCFILE(X)		"SRCFILE("X")="
 #define STR_CONFIG_X86_PAE	"CONFIG_X86_PAE=y"
 #define STR_CONFIG_PGTABLE_4	"CONFIG_PGTABLE_4=y"
@@ -832,6 +859,10 @@ struct array_table {
 	} zone;
 };
 
+struct number_table {
+	long	NR_FREE_PAGES;
+};
+
 #define LEN_SRCFILE				(100)
 struct srcfile_table {
 	/*
@@ -844,6 +875,7 @@ extern struct symbol_table	symbol_table;
 extern struct size_table	size_table;
 extern struct offset_table	offset_table;
 extern struct array_table	array_table;
+extern struct number_table	number_table;
 extern struct srcfile_table	srcfile_table;
 
 /*
@@ -858,6 +890,7 @@ enum {
 	DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH,
 	DWARF_INFO_GET_TYPEDEF_SIZE,
 	DWARF_INFO_GET_TYPEDEF_SRCNAME,
+	DWARF_INFO_GET_ENUM_NUMBER,
 	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE
 };
 
@@ -868,9 +901,11 @@ struct dwarf_info {
 	char	*struct_name;		/* IN */
 	char	*symbol_name;		/* IN */
 	char	*member_name;		/* IN */
+	char	*enum_name;		/* IN */
 	long	struct_size;		/* OUT */
 	long	member_offset;		/* OUT */
 	long	array_length;		/* OUT */
+	long	enum_number;		/* OUT */
 	char	src_name[LEN_SRCFILE];	/* OUT */
 };
 

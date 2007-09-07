@@ -20,6 +20,7 @@ struct symbol_table	symbol_table;
 struct size_table	size_table;
 struct offset_table	offset_table;
 struct array_table	array_table;
+struct number_table	number_table;
 struct srcfile_table	srcfile_table;
 
 struct dwarf_info	dwarf_info;
@@ -1344,6 +1345,15 @@ is_search_structure(int cmd)
 }
 
 int
+is_search_number(int cmd)
+{
+	if (cmd == DWARF_INFO_GET_ENUM_NUMBER)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+int
 is_search_symbol(int cmd)
 {
 	if ((cmd == DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)
@@ -1410,6 +1420,47 @@ search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 		search_member(dwarfd, die);
 		break;
 	}
+}
+
+static void
+search_number(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+{
+	int tag;
+	Dwarf_Word const_value;
+	Dwarf_Attribute attr;
+	Dwarf_Die child, *walker;
+	const char *name;
+
+	do {
+		tag  = dwarf_tag(die);
+		if (tag != DW_TAG_enumeration_type)
+			continue;
+
+		if (dwarf_child(die, &child) != 0)
+			continue;
+
+		walker = &child;
+
+		do {
+			tag  = dwarf_tag(walker);
+			name = dwarf_diename(walker);
+
+			if ((tag != DW_TAG_enumerator) || (!name)
+			    || strcmp(name, dwarf_info.enum_name))
+				continue;
+
+			if (!dwarf_attr(walker, DW_AT_const_value, &attr))
+				continue;
+
+			if (dwarf_formudata(&attr, &const_value) < 0)
+				continue;
+
+			*found = TRUE;
+			dwarf_info.enum_number = (long)const_value;
+
+		} while (!dwarf_siblingof(walker, walker)); 
+
+	} while (!dwarf_siblingof(die, die));
 }
 
 static void
@@ -1513,6 +1564,9 @@ search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 
 	if (is_search_structure(dwarf_info.cmd))
 		search_structure(dwarfd, die, found);
+
+	else if (is_search_number(dwarf_info.cmd))
+		search_number(dwarfd, die, found);
 
 	else if (is_search_symbol(dwarf_info.cmd))
 		search_symbol(dwarfd, die, found);
@@ -1663,6 +1717,19 @@ get_array_length(char *name01, char *name02, unsigned int cmd)
 	return dwarf_info.array_length;
 }
 
+long
+get_enum_number(char *enum_name) {
+
+	dwarf_info.cmd         = DWARF_INFO_GET_ENUM_NUMBER;
+	dwarf_info.enum_name   = enum_name;
+	dwarf_info.enum_number = NOT_FOUND_NUMBER;
+
+	if (!get_debug_info())
+		return FAILED_DWARFINFO;
+
+	return dwarf_info.enum_number;
+}
+
 /*
  * Get the source filename.
  */
@@ -1798,6 +1865,8 @@ get_structure_info()
 	OFFSET_INIT(node_memblk_s.start_paddr, "node_memblk_s", "start_paddr");
 	OFFSET_INIT(node_memblk_s.size, "node_memblk_s", "size");
 	OFFSET_INIT(node_memblk_s.nid, "node_memblk_s", "nid");
+
+	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
 
 	TYPEDEF_SIZE_INIT(nodemask_t, "nodemask_t");
 
@@ -2018,6 +2087,8 @@ generate_vmcoreinfo()
 
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
+	WRITE_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
+
 	/*
 	 * write the source file of 1st kernel
 	 */
@@ -2227,6 +2298,8 @@ read_vmcoreinfo()
 	READ_ARRAY_LENGTH("mem_section", mem_section);
 	READ_ARRAY_LENGTH("node_memblk", node_memblk);
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
+
+	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 
 	READ_SRCFILE("pud_t", pud_t);
 
@@ -3590,7 +3663,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 
 	int order, i;
 	unsigned long curr, previous, head, curr_page, curr_prev;
-	unsigned long free_pages = 0, found_free_pages = 0;
+	unsigned long addr_free_pages, free_pages = 0, found_free_pages = 0;
 	unsigned long long pfn, start_pfn;
 
 	for (order = (ARRAY_LENGTH(zone.free_area) - 1); order >= 0; --order) {
@@ -3637,22 +3710,23 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 	 * Check the number of free pages.
 	 */
 	if (OFFSET(zone.free_pages) != NOT_FOUND_STRUCTURE) {
-		if (!readmem(VADDR, node_zones + OFFSET(zone.free_pages), 
-		    &free_pages, sizeof free_pages)) {
-			ERRMSG("Can't get free_pages.\n");
-			return FALSE;
-		}
+		addr_free_pages = node_zones + OFFSET(zone.free_pages);
+
 	} else if (OFFSET(zone.vm_stat) != NOT_FOUND_STRUCTURE) {
 		/*
-		 * FIXME
-		 * This code expects the NR_FREE_PAGES of zone_stat_item is 0.
-		 * The NR_FREE_PAGES should be checked. 
+		 * On linux-2.6.21 or later, the number of free_pages is
+		 * in vm_stat[NR_FREE_PAGES].
 		 */
-		if (!readmem(VADDR, node_zones + OFFSET(zone.vm_stat), 
-		    &free_pages, sizeof free_pages)) {
-			ERRMSG("Can't get free_pages.\n");
-			return FALSE;
-		}
+		addr_free_pages = node_zones + OFFSET(zone.vm_stat)
+		    + sizeof(long) * NUMBER(NR_FREE_PAGES);
+
+	} else {
+		ERRMSG("Can't get addr_free_pages.\n");
+		return FALSE;
+	}
+	if (!readmem(VADDR, addr_free_pages, &free_pages, sizeof free_pages)) {
+		ERRMSG("Can't get free_pages.\n");
+		return FALSE;
 	}
 	if (free_pages != found_free_pages) {
 		/*

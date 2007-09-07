@@ -125,7 +125,7 @@ ia64_vtop3(unsigned long long vaddr)
 	 * Get PTE
 	 */
 	temp = vaddr & MASK_PTE;
-	temp = temp >> (PAGE_SHIFT - 3);
+	temp = temp >> (PAGESHIFT() - 3);
 	page_table = pmd_pte + temp;
 	if (!readmem(PADDR, page_table, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);
@@ -192,7 +192,7 @@ ia64_vtop4(unsigned long long vaddr)
 	 * Get PTE
 	 */
 	temp = vaddr & MASK_PTE;
-	temp = temp >> (PAGE_SHIFT - 3);
+	temp = temp >> (PAGESHIFT() - 3);
 	page_table = pmd_pte + temp;
 	if (!readmem(PADDR, page_table, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);

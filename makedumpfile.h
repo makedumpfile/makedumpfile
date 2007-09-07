@@ -105,7 +105,7 @@ isAnon(unsigned long mapping)
  */
 #define SECTION_SIZE_BITS()	(info->section_size_bits)
 #define MAX_PHYSMEM_BITS()	(info->max_physmem_bits)
-#define PAGESHIFT()		(ffs(info->page_size) - 1)
+#define PAGESHIFT()		(info->page_shift)
 #define PFN_SECTION_SHIFT()	(SECTION_SIZE_BITS() - PAGESHIFT())
 #define PAGES_PER_SECTION()	(1UL << PFN_SECTION_SHIFT())
 #define _SECTIONS_PER_ROOT()	(1)
@@ -461,14 +461,13 @@ do { \
  * 3 Levels paging
  */
 #define _PAGE_PPN_MASK		(((1UL << _MAX_PHYSMEM_BITS) - 1) & ~0xfffUL)
-#define PAGE_SHIFT		(info->page_shift)
-#define PTRS_PER_PTD_SHIFT	(PAGE_SHIFT - 3)
+#define PTRS_PER_PTD_SHIFT	(PAGESHIFT() - 3)
 
-#define PMD_SHIFT		(PAGE_SHIFT + PTRS_PER_PTD_SHIFT)
-#define PGDIR_SHIFT_3L		(PMD_SHIFT  + PTRS_PER_PTD_SHIFT)
+#define PMD_SHIFT		(PAGESHIFT() + PTRS_PER_PTD_SHIFT)
+#define PGDIR_SHIFT_3L		(PMD_SHIFT   + PTRS_PER_PTD_SHIFT)
 
-#define MASK_POFFSET	((1UL << PAGE_SHIFT) - 1)
-#define MASK_PTE	((1UL << PMD_SHIFT) - 1) &~((1UL << PAGE_SHIFT) - 1)
+#define MASK_POFFSET	((1UL << PAGESHIFT()) - 1)
+#define MASK_PTE	((1UL << PMD_SHIFT) - 1) &~((1UL << PAGESHIFT()) - 1)
 #define MASK_PMD	((1UL << PGDIR_SHIFT_3L) - 1) &~((1UL << PMD_SHIFT) - 1)
 #define MASK_PGD_3L	((1UL << REGION_SHIFT) - 1) & (~((1UL << PGDIR_SHIFT_3L) - 1))
 

@@ -39,7 +39,7 @@ show_version()
 }
 
 /*
- * Convert Physical Address to File Offest.
+ * Convert Physical Address to File Offset.
  *  If this function returns 0x0, File Offset isn't found.
  *  The File Offset 0x0 is in the ELF header.
  *  It is not in the memory image.
@@ -83,7 +83,7 @@ vaddr_to_paddr(unsigned long long vaddr)
 }
 
 /*
- * Convert Virtual Address to File Offest.
+ * Convert Virtual Address to File Offset.
  *  If this function returns 0x0, File Offset isn't found.
  *  The File Offset 0x0 is the ELF header.
  *  It is not in the memory image.
@@ -338,7 +338,7 @@ print_usage()
 	MSG("  Outputting the dump data in the flattened format to the standard output:\n");
 	MSG("  # makedumpfile -F [-c|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
 	MSG("\n");
-	MSG("  Re-arranging the dump data in the flattened format to a readable DUMPFILE:\n");
+	MSG("  Rearranging the dump data in the flattened format to a readable DUMPFILE:\n");
 	MSG("  # makedumpfile -R DUMPFILE\n");
 	MSG("\n");
 	MSG("  Generating VMCOREINFO:\n");
@@ -392,7 +392,7 @@ print_usage()
 	MSG("      Specify VMCOREINFO instead of VMLINUX for analyzing the first kernel's\n");
 	MSG("      memory usage.\n");
 	MSG("      VMCOREINFO should be made beforehand by makedumpfile with -g option,\n");
-	MSG("      and it containes the first kernel's information. If Dump_Level is 2 or\n");
+	MSG("      and it contains the first kernel's information. If Dump_Level is 2 or\n");
 	MSG("      more and [-x VMLINUX] is not specified, this option is necessary.\n");
 	MSG("\n");
 	MSG("  [-g VMCOREINFO]:\n");
@@ -406,22 +406,22 @@ print_usage()
 	MSG("      Output the dump data in the flattened format to the standard output\n");
 	MSG("      for transporting the dump data by SSH.\n");
 	MSG("      Analysis tools cannot read the flattened format directly. For analysis,\n");
-	MSG("      the dump data in the flattened format should be re-arranged to a readable\n");
+	MSG("      the dump data in the flattened format should be rearranged to a readable\n");
 	MSG("      DUMPFILE by -R option.\n");
 	MSG("\n");
 	MSG("  [-R]:\n");
-	MSG("      Re-arrange the dump data in the flattened format from the standard input\n");
+	MSG("      Rearrange the dump data in the flattened format from the standard input\n");
 	MSG("      to a readable DUMPFILE.\n");
 	MSG("\n");
 	MSG("  [--xen-syms XEN-SYMS]:\n");
-	MSG("      Specify the XEN-SYMS to analyze the xen's memory usage.\n");
+	MSG("      Specify the XEN-SYMS to analyze Xen's memory usage.\n");
 	MSG("\n");
 	MSG("  [--xen-vmcoreinfo VMCOREINFO]:\n");
-	MSG("      Specify the VMCOREINFO of xen to analyze the xen's memory usage.\n");
+	MSG("      Specify the VMCOREINFO of Xen to analyze Xen's memory usage.\n");
 	MSG("\n");
 	MSG("  [--message-level ML]:\n");
 	MSG("      Specify the message types.\n");
-	MSG("      Users can restrict outputs printed by specifying Message_Level (ML) with\n");
+	MSG("      Users can restrict output printed by specifying Message_Level (ML) with\n");
 	MSG("      this option. The message type marked with an X in the following table is\n");
 	MSG("      printed to standard error output. For example, according to the table,\n");
 	MSG("      specifying 7 as ML means progress indicator, common message, and error\n");
@@ -465,8 +465,8 @@ print_usage()
 	MSG("\n");
 	MSG("  XEN-SYMS:\n");
 	MSG("      This is a pathname to the xen-syms.\n");
-	MSG("      This file must have the debug information of the xen to analyze the\n");
-	MSG("      xen's memory usage.\n");
+	MSG("      This file must have the debug information of Xen to analyze\n");
+	MSG("      Xen's memory usage.\n");
 	MSG("\n");
 }
 
@@ -581,7 +581,7 @@ open_files_for_generating_vmcoreinfo()
 }
 
 /*
- * Open the following file when it re-arranges the dump data.
+ * Open the following file when it rearranges the dump data.
  * - dump file
  */
 int
@@ -902,8 +902,8 @@ get_elf_info()
 
 	/*
 	 * FIXME
-	 *   If the page_size of 1st-kernel is different from the one of
-	 *   capture(2nd)-kernel, the problem will happen.
+	 *   If the page_size of 1st kernel is different from the one of
+	 *   capture(2nd) kernel, the problem will happen.
 	 */
 	info->page_size = sysconf(_SC_PAGE_SIZE);
 	info->page_shift = ffs(info->page_size) - 1;
@@ -2867,7 +2867,7 @@ get_mm_discontigmem()
 			/*
 			 * For some ia64 NUMA systems.
 			 * On some systems, a node has the separated memory.
-			 * And pglist_data(s) have the dumplicated memory range
+			 * And pglist_data(s) have the duplicated memory range
 			 * like following:
 			 *
 			 * Nid:      Physical address
@@ -3436,7 +3436,7 @@ read_buf_from_stdin(void *buf, int buf_size)
 		} else if (0 == tmp_read_size) {
 			/*
 			 * If it cannot get any data from a standard input
-			 * while long time, break this loop.
+			 * for a long time, break this loop.
 			 */
 			tm = time(NULL);
 			if (TIMEOUT_STDIN < (tm - last_time)) {
@@ -3534,7 +3534,7 @@ rearrange_dumpdata()
 	}
 
 	if ((buf = malloc(buf_size)) == NULL) {
-		ERRMSG("Can't allocate memory for buffer of flattend format. %s\n",
+		ERRMSG("Can't allocate memory for buffer of flattened format. %s\n",
 		    strerror(errno));
 		return FALSE;
 	}
@@ -3591,7 +3591,7 @@ out:
 }
 
 /*
- * Sames as paddr_to_offset() but makes sure that the specified offset (hint)
+ * Same as paddr_to_offset() but makes sure that the specified offset (hint)
  * in the segment.
  */
 off_t
@@ -3820,7 +3820,7 @@ exclude_free_page(struct cache_data *bm2)
 {
 
 	/*
-	 * Check having neccesary information.
+	 * Check having necessary information.
 	 */
 	if ((SYMBOL(node_data) == NOT_FOUND_SYMBOL)
 	    && (SYMBOL(pgdat_list) == NOT_FOUND_SYMBOL)
@@ -3981,7 +3981,7 @@ create_dump_bitmap()
 			    && (info->dump_level & DL_EXCLUDE_ZERO)) {
 				offset_page = paddr_to_offset(paddr);
 				if (!offset_page) {
-					ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
+					ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
 					    paddr);
 					goto out;
 				}
@@ -4287,7 +4287,7 @@ write_elf_header()
 	}
 
 	/*
-	 * Write a ELF header.
+	 * Write an ELF header.
 	 */
 	if (info->flag_elf64) { /* ELF64 */
 		if (!write_buffer(info->fd_dumpfile, 0, &ehdr64, sizeof(ehdr64),
@@ -4378,7 +4378,7 @@ write_elf_header()
 		goto out;
 
 	/*
-	 * Set a offset of PT_LOAD segment.
+	 * Set an offset of PT_LOAD segment.
 	 */
 	info->offset_load_dumpfile = offset_note_dumpfile + size_note;
 
@@ -4658,7 +4658,7 @@ write_elf_pages()
 			 */
 			off_memory = paddr_to_offset2(paddr, off_memory);
 			if (!off_memory) {
-				ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
+				ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
 				    paddr);
 				goto out;
 			}
@@ -4755,7 +4755,7 @@ write_elf_pages()
 		 */
 		off_memory = paddr_to_offset2(paddr, off_memory);
 		if (!off_memory) {
-			ERRMSG("Can't convert physaddr(%llx) to a offset.\n",
+			ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
 			    paddr);
 			goto out;
 		}
@@ -5170,7 +5170,7 @@ close_files_for_generating_vmcoreinfo()
 }
 
 /*
- * Close the following file when it re-arranges the dump data.
+ * Close the following file when it rearranges the dump data.
  * - dump file
  */
 int
@@ -5948,7 +5948,7 @@ main(int argc, char *argv[])
 		    && !info->flag_elf_dumpfile) {
 			/*
 			 * Parameters for creating dumpfile from the dump data
-			 * of flattened format by re-arranging the dump data.
+			 * of flattened format by rearranging the dump data.
 			 */
 			info->name_dumpfile = argv[optind];
 

@@ -65,7 +65,7 @@ data by SSH, makedumpfile outputs the dump data in the intermediate format (the
 flattened format) to the standard output. By piping the output data to SSH,
 a user can transport the dump data to a remote host. Note that analysis tools
 cannot read the flattened format directly, so on a remote host the received
-data in the flattened format needs to be re\-arranged to a readable
+data in the flattened format needs to be rearranged to a readable
 \fIDUMPFILE\fR format by makedumpfile (or makedumpfile\-R.pl).
 
 
@@ -199,12 +199,12 @@ Output the dump data in the flattened format to the standard output for
 transporting the dump data by SSH.
 .br
 Analysis tools cannot read the flattened format directly. For analysis, the
-dump data in the flattened format should be re\-arranged to a normal
+dump data in the flattened format should be rearranged to a normal
 \fIDUMPFILE\fR (readable with analysis tools) by \-R option. By which option is
-specified with \-F option, the format of the re\-arranged \fIDUMPFILE\fR is fixed.
+specified with \-F option, the format of the rearranged \fIDUMPFILE\fR is fixed.
 In other words, it is impossible to specify the \fIDUMPFILE\fR format when the
-dump data is re\-arranged with \-R option. If specifying \-E option with \-F option,
-the format of the re\-arranged \fIDUMPFILE\fR is the ELF format. Otherwise, it
+dump data is rearranged with \-R option. If specifying \-E option with \-F option,
+the format of the rearranged \fIDUMPFILE\fR is the ELF format. Otherwise, it
 is the kdump\-compressed format.
 .br
 .B Example:
@@ -223,7 +223,7 @@ is the kdump\-compressed format.
 
 .TP
 \fB\-R\fR
-Re\-arrange the dump data in the flattened format from the standard input to a
+Rearrange the dump data in the flattened format from the standard input to a
 normal \fIDUMPFILE\fR (readable with analysis tools).
 .br
 .B Example:
@@ -234,10 +234,10 @@ normal \fIDUMPFILE\fR (readable with analysis tools).
 .br
 | ssh user@host "makedumpfile \-R dumpfile"
 
-Instead of using \-R option, a perl script "makedumpfile\-R.pl" re\-arranges the
+Instead of using \-R option, a perl script "makedumpfile\-R.pl" rearranges the
 dump data in the flattened format to a normal \fIDUMPFILE\fR, too. The perl
 script does not depend on architecture, and most systems have perl command.
-Even if a remote host does not have makedumpfile, it is possible to re\-arrange
+Even if a remote host does not have makedumpfile, it is possible to rearrange
 the dump data in the flattened format to a readable \fIDUMPFILE\fR on a remote
 host by running this script.
 .br

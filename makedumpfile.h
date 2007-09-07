@@ -138,6 +138,9 @@ isAnon(unsigned long mapping)
 				           with Private Pages */
 #define DL_EXCLUDE_USER_DATA	(0x008) /* Exclude UserProcessData Pages */
 #define DL_EXCLUDE_FREE		(0x010)	/* Exclude Free Pages */
+#define DL_EXCLUDE_XEN		(0x020) /* Exclude Domain-U from xen-kdump.
+					 * This defined value is internal,
+					 * and it can be changed. */
 
 /*
  * Message Level
@@ -870,7 +873,6 @@ struct domain_list {
 	unsigned int  pickled_id;
 };
 
-#define DL_EXCLUDE_XEN	DL_EXCLUDE_FREE
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
 #ifdef __x86__

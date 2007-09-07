@@ -5240,11 +5240,11 @@ read_vmcoreinfo_xen()
 }
 
 int
-allocated_in_map(unsigned long pfn)
+allocated_in_map(unsigned long long pfn)
 {
-	static int cur_idx = -1;
+	static unsigned long long cur_idx = -1;
 	static unsigned long cur_word;
-	int idx;
+	unsigned long long idx;
 
 	idx = pfn / PAGES_PER_MAPWORD;
 	if (idx != cur_idx) {
@@ -5281,15 +5281,12 @@ is_select_domain(unsigned int id)
 int
 create_dump_bitmap_xen()
 {
-	unsigned int remain_size;
-	struct cache_data bm2;
+	int i, ret = FALSE;
+	unsigned int remain_size, count_info, _domain;
 	unsigned long page_info_addr;
-	unsigned long pfn;
-	unsigned int count_info;
-	unsigned int _domain;
-	int i;
+	unsigned long long pfn, pfn_start, pfn_end;
+	struct cache_data bm2;
 	struct pt_load_segment *pls;
-	int ret = FALSE;
 
 	/*
 	 * NOTE: the first half of bitmap is not used for Xen extraction
@@ -5310,8 +5307,13 @@ create_dump_bitmap_xen()
 	pfn = 0;
 	for (i = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
+		pfn_start = pls->phys_start >> PAGESHIFT();
+		pfn_end   = pls->phys_end >> PAGESHIFT();
 
-		for (; pfn < (unsigned long)(pls->phys_start >> PAGESHIFT()); pfn++) { /* memory hole */
+		/*
+		 * Pad the bits for memory hole.
+		 */
+		for (; pfn < pfn_start; pfn++) {
 			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
 				bm2.buf_size = BUFSIZE_BITMAP;
 				if (!write_cache_bufsz(&bm2))
@@ -5319,9 +5321,7 @@ create_dump_bitmap_xen()
 				memset(bm2.buf, 0, BUFSIZE_BITMAP);
 			}
 		}
-
-		for (; pfn < (unsigned long)(pls->phys_end >> PAGESHIFT()); pfn++) {
-
+		for (; pfn < pfn_end; pfn++) {
 			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
 				bm2.buf_size = BUFSIZE_BITMAP;
 				if (!write_cache_bufsz(&bm2))
@@ -5350,9 +5350,9 @@ create_dump_bitmap_xen()
 			 *  - xen heap area, or
 			 *  - selected domain page
 			 */
-			if (_domain == 0 ||
-				(info->xen_heap_start <= pfn && pfn < info->xen_heap_end) ||
-				((count_info & 0xffff) && is_select_domain(_domain))) {
+			if (_domain == 0
+			    || (info->xen_heap_start <= pfn && pfn < info->xen_heap_end)
+			    || ((count_info & 0xffff) && is_select_domain(_domain))) {
 				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 1);
 			}
 		}

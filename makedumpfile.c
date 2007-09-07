@@ -801,7 +801,7 @@ check_elf_format(int fd, char *filename, int *phnum, int *num_load)
 		return ELF64;
 
 	} else if ((ehdr64.e_ident[EI_CLASS] != ELFCLASS64)
-            && (ehdr32.e_ident[EI_CLASS] == ELFCLASS32)) {
+	    && (ehdr32.e_ident[EI_CLASS] == ELFCLASS32)) {
 		(*phnum) = ehdr32.e_phnum;
 		for (i = 0; i < ehdr32.e_phnum; i++) {
 			if (!get_elf32_phdr(fd, filename, i, &load32)) {
@@ -2462,10 +2462,10 @@ get_num_mm_discontigmem()
 
 	if ((SYMBOL(node_memblk) == NOT_FOUND_SYMBOL)
 	    || (ARRAY_LENGTH(node_memblk) == NOT_FOUND_STRUCTURE)
-            || (SIZE(node_memblk_s) == NOT_FOUND_STRUCTURE)
-            || (OFFSET(node_memblk_s.start_paddr) == NOT_FOUND_STRUCTURE)
-            || (OFFSET(node_memblk_s.size) == NOT_FOUND_STRUCTURE)
-            || (OFFSET(node_memblk_s.nid) == NOT_FOUND_STRUCTURE)) {
+	    || (SIZE(node_memblk_s) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(node_memblk_s.start_paddr) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(node_memblk_s.size) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(node_memblk_s.nid) == NOT_FOUND_STRUCTURE)) {
 		return vt.numnodes;
 	} else {
 		for (i = 0; i < ARRAY_LENGTH(node_memblk); i++) {
@@ -2492,9 +2492,8 @@ get_num_mm_discontigmem()
 }
 
 int
-separate_mem_map(struct mem_map_data *mmd,
-    int *id_mm, int nid_pgdat, unsigned long mem_map_pgdat,
-    unsigned long pfn_start_pgdat)
+separate_mem_map(struct mem_map_data *mmd, int *id_mm, int nid_pgdat,
+    unsigned long mem_map_pgdat, unsigned long pfn_start_pgdat)
 {
 	int i, nid;
 	unsigned long start_paddr, size, pfn_start, pfn_end, mem_map;
@@ -2768,8 +2767,7 @@ section_mem_map_addr(unsigned long addr)
 }
 
 unsigned long
-sparse_decode_mem_map(ulong coded_mem_map,
-    unsigned long section_nr)
+sparse_decode_mem_map(unsigned long coded_mem_map, unsigned long section_nr)
 {
 	if (!is_kvaddr(coded_mem_map))
 		return NOT_KV_ADDR;
@@ -3031,8 +3029,7 @@ is_bigendian()
 }
 
 int
-write_buffer(int fd, off_t offset, void *buf, size_t buf_size,
-    char *file_name)
+write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 {
 	struct makedumpfile_data_header fdh;
 	const off_t failed = (off_t)-1;
@@ -4953,7 +4950,7 @@ get_xen_info()
 		ERRMSG("Can't get the symbol of alloc_bitmap.\n");
 		return FALSE;
 	}
-        if (!readmem(VADDR_XEN, SYMBOL(alloc_bitmap), &info->alloc_bitmap,
+	if (!readmem(VADDR_XEN, SYMBOL(alloc_bitmap), &info->alloc_bitmap,
 	      sizeof(info->alloc_bitmap))) {
 		ERRMSG("Can't get the value of alloc_bitmap.\n");
 		return FALSE;
@@ -4962,7 +4959,7 @@ get_xen_info()
 		ERRMSG("Can't get the symbol of max_page.\n");
 		return FALSE;
 	}
-        if (!readmem(VADDR_XEN, SYMBOL(max_page), &info->max_page,
+	if (!readmem(VADDR_XEN, SYMBOL(max_page), &info->max_page,
 	    sizeof(info->max_page))) {
 		ERRMSG("Can't get the value of max_page.\n");
 		return FALSE;

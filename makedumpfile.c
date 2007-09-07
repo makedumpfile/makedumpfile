@@ -364,6 +364,7 @@ print_usage()
 	MSG("      marked in the following table is excluded. A user can specify multiple\n");
 	MSG("      page types by setting the sum of each page type for Dump_Level (DL).\n");
 	MSG("      The maximum of Dump_Level is 31.\n");
+	MSG("      Note that Dump_Level for Xen dump filtering is 0 or 1.\n");
 	MSG("\n");
 	MSG("      Dump  |  zero   cache   cache    user    free\n");
 	MSG("      Level |  page   page    private  data    page\n");
@@ -5284,9 +5285,12 @@ create_dump_bitmap_xen()
 	int i, ret = FALSE;
 	unsigned int remain_size, count_info, _domain;
 	unsigned long page_info_addr;
-	unsigned long long pfn, pfn_start, pfn_end;
+	unsigned long long paddr, pfn, pfn_start, pfn_end;
 	struct cache_data bm2;
 	struct pt_load_segment *pls;
+	unsigned char *buf = NULL;
+	off_t offset_page;
+	const off_t failed = (off_t)-1;
 
 	/*
 	 * NOTE: the first half of bitmap is not used for Xen extraction
@@ -5300,6 +5304,11 @@ create_dump_bitmap_xen()
 
 	if ((bm2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
 		ERRMSG("Can't allocate memory for 2nd-bitmap buffer. %s\n",
+		    strerror(errno));
+		goto out;
+	}
+	if ((buf = malloc(info->page_size)) == NULL) {
+		ERRMSG("Can't allocate memory for the page. %s\n",
 		    strerror(errno));
 		goto out;
 	}
@@ -5344,6 +5353,29 @@ create_dump_bitmap_xen()
 				ERRMSG("Can't get page_info._domain.\n");
 				goto out;
 			}
+			if (info->dump_level & DL_EXCLUDE_ZERO) {
+				paddr = (unsigned long long)pfn * info->page_size;
+				offset_page = paddr_to_offset(paddr);
+				if (!offset_page) {
+					ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
+					    paddr);
+					goto out;
+				}
+				if (lseek(info->fd_memory, offset_page,
+				    SEEK_SET) == failed) {
+					ERRMSG("Can't seek the dump memory(%s). %s\n",
+					    info->name_memory, strerror(errno));
+					goto out;
+				}
+				if (read(info->fd_memory, buf, info->page_size)
+				    != info->page_size) {
+					ERRMSG("Can't read the dump memory(%s). %s\n",
+					    info->name_memory, strerror(errno));
+					goto out;
+				}
+				if (is_zero_page(buf, info->page_size))
+					continue;
+			}
 			/*
 			 * select:
 			 *  - anonymous (_domain == 0), or
@@ -5370,6 +5402,8 @@ create_dump_bitmap_xen()
 out:
 	if (bm2.buf != NULL)
 		free(bm2.buf);
+	if (buf != NULL)
+		free(buf);
 
 	return ret;
 }
@@ -5640,7 +5674,12 @@ main(int argc, char *argv[])
 			MSG("-E must be specified with --xen-syms or --xen-vmcoreinfo.\n");
 			goto out;
 		}
-		info->dump_level = DL_EXCLUDE_XEN;
+		if (DL_EXCLUDE_ZERO < info->dump_level) {
+			MSG("Dump_level is invalid. It should be 0 or 1.\n");
+			print_usage();
+			goto out;
+		}
+		info->dump_level |= DL_EXCLUDE_XEN;
 		return handle_xen();
 
 	} else if (info->flag_rearrange) {

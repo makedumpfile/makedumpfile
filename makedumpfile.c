@@ -1354,9 +1354,10 @@ is_search_symbol(int cmd)
 }
 
 int
-is_search_srcfile(int cmd)
+is_search_typedef(int cmd)
 {
-	if (cmd == DWARF_INFO_GET_TYPEDEF_SRCNAME)
+	if ((cmd == DWARF_INFO_GET_TYPEDEF_SIZE)
+	    || (cmd == DWARF_INFO_GET_TYPEDEF_SRCNAME))
 		return TRUE;
 	else
 		return FALSE;
@@ -1412,17 +1413,12 @@ search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 }
 
 static void
-search_srcfile(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+search_typedef(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 {
-	int tag = 0, rtag = 0;
+	int tag = 0;
 	char *src_name = NULL;
 	const char *name;
-
-	switch (dwarf_info.cmd) {
-	case DWARF_INFO_GET_TYPEDEF_SRCNAME:
-		rtag = DW_TAG_typedef;
-		break;
-	}
+	Dwarf_Die die_type;
 
 	/*
 	 * If we get to here then we don't have any more
@@ -1432,26 +1428,31 @@ search_srcfile(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 		tag  = dwarf_tag(die);
 		name = dwarf_diename(die);
 
-		if ((tag != rtag) || (!name)
-		    || strcmp(name, dwarf_info.decl_name))
+		if ((tag != DW_TAG_typedef) || (!name)
+		    || strcmp(name, dwarf_info.struct_name))
 			continue;
 
-		src_name = (char *)dwarf_decl_file(die);
+		if (dwarf_info.cmd == DWARF_INFO_GET_TYPEDEF_SIZE) {
+			if (!get_die_type(dwarfd, die, &die_type)) {
+				ERRMSG("Can't get CU die of DW_AT_type.\n");
+				break;
+			}
+			dwarf_info.struct_size = dwarf_bytesize(&die_type);
+			if (dwarf_info.struct_size <= 0)
+				continue;
 
-		if (!src_name)
+			*found = TRUE;
 			break;
+		} else if (dwarf_info.cmd == DWARF_INFO_GET_TYPEDEF_SRCNAME) {
+			src_name = (char *)dwarf_decl_file(die);
+			if (!src_name)
+				continue;
 
+			*found = TRUE;
+			strncpy(dwarf_info.src_name, src_name, LEN_SRCFILE);
+			break;
+		}
 	} while (!dwarf_siblingof(die, die));
-
-	if (!src_name)
-		return;
-
-	/*
-	 * Found the demanded one.
-	 */
-	strncpy(dwarf_info.src_name, src_name, LEN_SRCFILE);
-
-	*found = TRUE;
 }
 
 static void
@@ -1516,8 +1517,8 @@ search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	else if (is_search_symbol(dwarf_info.cmd))
 		search_symbol(dwarfd, die, found);
 
-	else if (is_search_srcfile(dwarf_info.cmd))
-		search_srcfile(dwarfd, die, found);
+	else if (is_search_typedef(dwarf_info.cmd))
+		search_typedef(dwarfd, die, found);
 }
 
 int
@@ -1599,9 +1600,13 @@ out:
  * Get the size of structure.
  */
 long
-get_structure_size(char *structname)
+get_structure_size(char *structname, int flag_typedef)
 {
-	dwarf_info.cmd = DWARF_INFO_GET_STRUCT_SIZE;
+	if (flag_typedef)
+		dwarf_info.cmd = DWARF_INFO_GET_TYPEDEF_SIZE;
+	else
+		dwarf_info.cmd = DWARF_INFO_GET_STRUCT_SIZE;
+
 	dwarf_info.struct_name = structname;
 	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
 
@@ -1662,10 +1667,10 @@ get_array_length(char *name01, char *name02, unsigned int cmd)
  * Get the source filename.
  */
 int
-get_source_filename(char *decl_name, char *src_name, int cmd)
+get_source_filename(char *structname, char *src_name, int cmd)
 {
 	dwarf_info.cmd = cmd;
-	dwarf_info.decl_name = decl_name;
+	dwarf_info.struct_name = structname;
 
 	if (!get_debug_info())
 		return FALSE;
@@ -1793,6 +1798,8 @@ get_structure_info()
 	OFFSET_INIT(node_memblk_s.start_paddr, "node_memblk_s", "start_paddr");
 	OFFSET_INIT(node_memblk_s.size, "node_memblk_s", "size");
 	OFFSET_INIT(node_memblk_s.nid, "node_memblk_s", "nid");
+
+	TYPEDEF_SIZE_INIT(nodemask_t, "nodemask_t");
 
 	return TRUE;
 }
@@ -1969,6 +1976,7 @@ generate_vmcoreinfo()
 	WRITE_STRUCTURE_SIZE("free_area", free_area);
 	WRITE_STRUCTURE_SIZE("list_head", list_head);
 	WRITE_STRUCTURE_SIZE("node_memblk_s", node_memblk_s);
+	WRITE_STRUCTURE_SIZE("nodemask_t", nodemask_t);
 
 	/*
 	 * write the member offset of 1st kernel
@@ -2187,6 +2195,7 @@ read_vmcoreinfo()
 	READ_STRUCTURE_SIZE("free_area", free_area);
 	READ_STRUCTURE_SIZE("list_head", list_head);
 	READ_STRUCTURE_SIZE("node_memblk_s", node_memblk_s);
+	READ_STRUCTURE_SIZE("nodemask_t", nodemask_t);
 
 	READ_MEMBER_OFFSET("page.flags", page.flags);
 	READ_MEMBER_OFFSET("page._count", page._count);
@@ -2407,12 +2416,8 @@ get_nodes_online()
 
 	if (SYMBOL(node_online_map) == NOT_FOUND_SYMBOL)
 		return 0;
-	/*
-	 * FIXME
-	 * Size of node_online_map must be dynamically got from debugging
-	 * information each architecture or each vmcoreinfo.
-	 */
-	len = SIZEOF_NODE_ONLINE_MAP;
+
+	len = SIZE(nodemask_t);
 	if (!(vt.node_online_map = (unsigned long *)malloc(len))) {
 		ERRMSG("Can't allocate memory for the node online map. %s\n",
 		    strerror(errno));

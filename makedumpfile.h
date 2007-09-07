@@ -259,7 +259,12 @@ do { \
 #define ARRAY_LENGTH(X)		(array_table.X)
 #define SIZE_INIT(X, Y) \
 do { \
-	if ((SIZE(X) = get_structure_size(Y)) == FAILED_DWARFINFO) \
+	if ((SIZE(X) = get_structure_size(Y, 0)) == FAILED_DWARFINFO) \
+		return FALSE; \
+} while (0)
+#define TYPEDEF_SIZE_INIT(X, Y) \
+do { \
+	if ((SIZE(X) = get_structure_size(Y, 1)) == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
 #define OFFSET_INIT(X, Y, Z) \
@@ -421,7 +426,6 @@ do { \
 #define _SECTION_SIZE_BITS_PAE	(30)
 #define _MAX_PHYSMEM_BITS	(32)
 #define _MAX_PHYSMEM_BITS_PAE	(36)
-#define SIZEOF_NODE_ONLINE_MAP	(4)
 #endif /* x86 */
 
 #ifdef __x86_64__
@@ -434,7 +438,6 @@ do { \
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
 #define _MAX_PHYSMEM_BITS	(40)
-#define SIZEOF_NODE_ONLINE_MAP	(8)
 #endif /* x86_64 */
 
 #ifdef __powerpc__
@@ -444,7 +447,6 @@ do { \
 #define KVBASE			(SYMBOL(_stext))
 #define _SECTION_SIZE_BITS	(24)
 #define _MAX_PHYSMEM_BITS	(44)
-#define SIZEOF_NODE_ONLINE_MAP	(8)
 #endif
 
 #ifdef __ia64__ /* ia64 */
@@ -470,7 +472,6 @@ do { \
 #define DEFAULT_PHYS_START	(KERNEL_TR_PAGE_SIZE * 1)
 #define _SECTION_SIZE_BITS	(30)
 #define _MAX_PHYSMEM_BITS	(50)
-#define SIZEOF_NODE_ONLINE_MAP	(32)
 
 /*
  * 3 Levels paging
@@ -751,6 +752,7 @@ struct size_table {
 	long	free_area;
 	long	list_head;
 	long	node_memblk_s;
+	long	nodemask_t;
 
 	/*
 	 * for Xen extraction
@@ -854,6 +856,7 @@ enum {
 	DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION,
 	DWARF_INFO_GET_MEMBER_ARRAY_LENGTH,
 	DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH,
+	DWARF_INFO_GET_TYPEDEF_SIZE,
 	DWARF_INFO_GET_TYPEDEF_SRCNAME,
 	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE
 };
@@ -865,7 +868,6 @@ struct dwarf_info {
 	char	*struct_name;		/* IN */
 	char	*symbol_name;		/* IN */
 	char	*member_name;		/* IN */
-	char	*decl_name;		/* IN */
 	long	struct_size;		/* OUT */
 	long	member_offset;		/* OUT */
 	long	array_length;		/* OUT */

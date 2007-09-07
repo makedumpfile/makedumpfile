@@ -748,6 +748,7 @@ struct symbol_table {
 	unsigned long	swapper_pg_dir;
 	unsigned long	phys_base;
 	unsigned long	node_online_map;
+	unsigned long	node_states;
 	unsigned long	node_memblk;
 	unsigned long	node_data;
 	unsigned long	pgdat_list;
@@ -861,6 +862,7 @@ struct array_table {
 
 struct number_table {
 	long	NR_FREE_PAGES;
+	long	N_ONLINE;
 };
 
 #define LEN_SRCFILE				(100)

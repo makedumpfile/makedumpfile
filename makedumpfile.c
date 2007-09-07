@@ -1763,6 +1763,7 @@ get_symbol_info()
 	SYMBOL_INIT(swapper_pg_dir, "swapper_pg_dir");
 	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
+	SYMBOL_INIT(node_states, "node_states");
 	SYMBOL_INIT(node_memblk, "node_memblk");
 	SYMBOL_INIT(node_data, "node_data");
 	SYMBOL_INIT(pgdat_list, "pgdat_list");
@@ -1867,6 +1868,7 @@ get_structure_info()
 	OFFSET_INIT(node_memblk_s.nid, "node_memblk_s", "nid");
 
 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
+	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");
 
 	TYPEDEF_SIZE_INIT(nodemask_t, "nodemask_t");
 
@@ -2031,6 +2033,7 @@ generate_vmcoreinfo()
 	WRITE_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
+	WRITE_SYMBOL("node_states", node_states);
 	WRITE_SYMBOL("node_data", node_data);
 	WRITE_SYMBOL("pgdat_list", pgdat_list);
 	WRITE_SYMBOL("contig_page_data", contig_page_data);
@@ -2088,6 +2091,7 @@ generate_vmcoreinfo()
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	WRITE_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
+	WRITE_NUMBER("N_ONLINE", N_ONLINE);
 
 	/*
 	 * write the source file of 1st kernel
@@ -2255,6 +2259,7 @@ read_vmcoreinfo()
 	READ_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
+	READ_SYMBOL("node_states", node_states);
 	READ_SYMBOL("node_data", node_data);
 	READ_SYMBOL("pgdat_list", pgdat_list);
 	READ_SYMBOL("contig_page_data", contig_page_data);
@@ -2300,6 +2305,7 @@ read_vmcoreinfo()
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
 
 	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
+	READ_NUMBER("N_ONLINE", N_ONLINE);
 
 	READ_SRCFILE("pud_t", pud_t);
 
@@ -2485,22 +2491,32 @@ int
 get_nodes_online()
 {
 	int len, i, j, online;
-	unsigned long bitbuf, *maskptr;
+	unsigned long node_online_map = 0, bitbuf, *maskptr;
 
-	if (SYMBOL(node_online_map) == NOT_FOUND_SYMBOL)
+	if ((SYMBOL(node_online_map) == NOT_FOUND_SYMBOL)
+	    && (SYMBOL(node_states) == NOT_FOUND_SYMBOL))
 		return 0;
 
 	len = SIZE(nodemask_t);
+	vt.node_online_map_len = len/sizeof(unsigned long);
 	if (!(vt.node_online_map = (unsigned long *)malloc(len))) {
 		ERRMSG("Can't allocate memory for the node online map. %s\n",
 		    strerror(errno));
 		return 0;
 	}
-	if (!readmem(VADDR, SYMBOL(node_online_map), vt.node_online_map, len)){
+	if (SYMBOL(node_online_map) != NOT_FOUND_SYMBOL) {
+		node_online_map = SYMBOL(node_online_map);
+	} else if (SYMBOL(node_states) != NOT_FOUND_SYMBOL) {
+		/*
+		 * For linux-2.6.23-rc4-mm1
+		 */
+		node_online_map = SYMBOL(node_states)
+		     + (SIZE(nodemask_t) * NUMBER(N_ONLINE));
+	}
+	if (!readmem(VADDR, node_online_map, vt.node_online_map, len)){
 		ERRMSG("Can't get the node online map.\n");
 		return 0;
 	}
-	vt.node_online_map_len = len/sizeof(unsigned long);
 	online = 0;
 	maskptr = (unsigned long *)vt.node_online_map;
 	for (i = 0; i < vt.node_online_map_len; i++, maskptr++) {

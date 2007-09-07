@@ -4,11 +4,13 @@
 ======================
 
 * REQUIREMENTS
-  Please download the following library file and install it:
+  Please download the following library file and install it exactly as below;
+  do NOT use "make install".
   - elfutils-0.125.tar.gz
     The "make install" of elfutils installs some commands (ld, readelf, etc.),
-    and the compiling problem sometimes happens due to using the installed
-    commands. To install only the library files, do the following method.
+    and compiling problems sometimes happen due to using the installed
+    commands. To install only the library & header files, use the following
+    method:
      # tar -zxvf elfutils-0.125.tar.gz
      # cd elfutils-0.125
      # ./configure
@@ -85,8 +87,8 @@
     make: *** [makedumpfile] Error 1
     #
 
-    The compiler cannot find out elf_getshstrndx() because it tries
-    searching it only from /usr/lib/libelf.a though elf_getshstrndx()
+    The compiler cannot find elf_getshstrndx() because it tries
+    searching for it only from /usr/lib/libelf.a though elf_getshstrndx()
     is archived in /usr/local/lib/libelf.a.
     To solve the problem, add the option (-L/usr/local/lib/) to CFLAGS
     of Makefile like the following:

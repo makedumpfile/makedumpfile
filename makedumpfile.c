@@ -552,10 +552,9 @@ open_dump_bitmap()
 		return FALSE;
 	}
 	strcpy(info->name_bitmap, FILENAME_BITMAP);
-	if ((fd = open(info->name_bitmap, O_RDWR|O_CREAT,
-	    S_IRUSR|S_IWUSR)) < 0) {
-		ERRMSG("Can't open the dump file(%s). %s\n",
-		    FILENAME_BITMAP, strerror(errno));
+	if ((fd = mkstemp(info->name_bitmap)) < 0) {
+		ERRMSG("Can't open the bitmap file(%s). %s\n",
+		    info->name_bitmap, strerror(errno));
 		return FALSE;
 	}
 	unlink(info->name_bitmap);

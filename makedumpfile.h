@@ -200,7 +200,7 @@ do { \
 #define BUFSIZE_FGETS		(1500)
 #define BUFSIZE_BITMAP		(4096)
 #define PFN_BUFBITMAP		(BITPERBYTE*BUFSIZE_BITMAP)
-#define FILENAME_BITMAP		"/tmp/kdump_bitmap.tmp"
+#define FILENAME_BITMAP		"/tmp/kdump_bitmapXXXXXX"
 #define FILENAME_STDOUT		"STDOUT"
 
 /*

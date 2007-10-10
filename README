@@ -39,7 +39,7 @@
     # make; make install
 
 * SUPPORTED KERNELS
-  makedumpfile (version 1.2.0) supports the following kernels.
+  makedumpfile (version 1.2.1) supports the following kernels.
 
          |      FLATMEM      |   DISCONTIGMEM    |     SPARSEMEM
          |-------------------+-------------------+-------------------

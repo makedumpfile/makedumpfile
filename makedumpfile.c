@@ -2190,9 +2190,9 @@ read_vmcoreinfo_symbol(char *str_symbol)
 }
 
 long
-read_vmcoreinfo_structure(char *str_structure)
+read_vmcoreinfo_long(char *str_structure)
 {
-	long data = NOT_FOUND_STRUCTURE;
+	long data = NOT_FOUND_LONG_VALUE;
 	char buf[BUFSIZE_FGETS], *endp;
 	unsigned int i;
 

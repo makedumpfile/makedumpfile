@@ -249,7 +249,8 @@ do { \
 /*
  * for structure
  */
-#define NOT_FOUND_STRUCTURE	(-1)
+#define NOT_FOUND_LONG_VALUE	(-1)
+#define NOT_FOUND_STRUCTURE	(NOT_FOUND_LONG_VALUE)
 #define FAILED_DWARFINFO	(-2)
 #define INVALID_STRUCTURE_DATA	(-3)
 #define FOUND_ARRAY_TYPE	(LONG_MAX - 1)
@@ -318,19 +319,19 @@ do { \
 } while (0)
 #define READ_STRUCTURE_SIZE(str_structure, structure) \
 do { \
-	SIZE(structure) = read_vmcoreinfo_structure(STR_SIZE(str_structure)); \
+	SIZE(structure) = read_vmcoreinfo_long(STR_SIZE(str_structure)); \
 	if (SIZE(structure) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_MEMBER_OFFSET(str_member, member) \
 do { \
-	OFFSET(member) = read_vmcoreinfo_structure(STR_OFFSET(str_member)); \
+	OFFSET(member) = read_vmcoreinfo_long(STR_OFFSET(str_member)); \
 	if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
 #define READ_ARRAY_LENGTH(str_array, array) \
 do { \
-	ARRAY_LENGTH(array) = read_vmcoreinfo_structure(STR_LENGTH(str_array)); \
+	ARRAY_LENGTH(array) = read_vmcoreinfo_long(STR_LENGTH(str_array)); \
 	if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)
@@ -338,7 +339,7 @@ do { \
 /*
  * for number
  */
-#define NOT_FOUND_NUMBER	(LONG_MAX)
+#define NOT_FOUND_NUMBER	(NOT_FOUND_LONG_VALUE)
 #define NUMBER(X)		(number_table.X)
 
 #define ENUM_NUMBER_INIT(number, str_number)	\
@@ -356,7 +357,7 @@ do { \
 } while (0)
 #define READ_NUMBER(str_number, number) \
 do { \
-	NUMBER(number) = read_vmcoreinfo_structure(STR_NUMBER(str_number)); \
+	NUMBER(number) = read_vmcoreinfo_long(STR_NUMBER(str_number)); \
 	if (NUMBER(number) == INVALID_STRUCTURE_DATA) \
 		return FALSE; \
 } while (0)

@@ -463,15 +463,36 @@ do { \
 #endif /* x86 */
 
 #ifdef __x86_64__
-#define PAGE_OFFSET		(0xffff810000000000)
-#define __START_KERNEL_map	(0xffffffff80000000)
+#define PAGE_OFFSET		(0xffff810000000000) /* Direct mapping */
 #define VMALLOC_START		(0xffffc20000000000)
 #define VMALLOC_END		(0xffffe1ffffffffff)
+
+#define __START_KERNEL_map	(0xffffffff80000000)
 #define MODULES_VADDR		(0xffffffff88000000)
 #define MODULES_END		(0xfffffffffff00000)
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
 #define _MAX_PHYSMEM_BITS	(40)
+
+/*
+ * 4 Levels paging
+ */
+#define PML4_SHIFT		(39)
+#define PTRS_PER_PML4		(512)
+#define PGDIR_SHIFT		(30)
+#define PTRS_PER_PGD		(512)
+#define PMD_SHIFT		(21)
+#define PTRS_PER_PMD		(512)
+#define PTRS_PER_PTE		(512)
+#define PTE_SHIFT		(12)
+
+#define pml4_index(address) (((address) >> PML4_SHIFT) & (PTRS_PER_PML4 - 1))
+#define pgd_index(address)  (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+#define pmd_index(address)  (((address) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+#define pte_index(address)  (((address) >> PTE_SHIFT) & (PTRS_PER_PTE - 1))
+
+#define _PAGE_PRESENT		(0x001)
+#define _PAGE_PSE		(0x080)    /* 2MB page */
 #endif /* x86_64 */
 
 #ifdef __powerpc__
@@ -973,23 +994,6 @@ int get_xen_info_x86();
 #endif	/* __x86__ */
 
 #ifdef __x86_64__
-
-#define PML4_SHIFT      (39)
-#define PTRS_PER_PML4   (512)
-#define PGDIR_SHIFT     (30)
-#define PTRS_PER_PGD    (512)
-#define PMD_SHIFT       (21)
-#define PTRS_PER_PMD    (512)
-#define PTRS_PER_PTE    (512)
-#define PTE_SHIFT       (12)
-
-#define pml4_index(address) (((address) >> PML4_SHIFT) & (PTRS_PER_PML4 - 1))
-#define pgd_index(address)  (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
-#define pmd_index(address)  (((address) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
-#define pte_index(address)  (((address) >> PTE_SHIFT) & (PTRS_PER_PTE - 1))
-
-#define _PAGE_PRESENT   0x001
-#define _PAGE_PSE       0x080
 
 #define ENTRY_MASK	(~0x8000000000000fffULL)
 

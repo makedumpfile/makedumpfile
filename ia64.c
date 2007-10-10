@@ -93,7 +93,7 @@ get_machdep_info_ia64()
  * Translate a virtual address to a physical address by using 3 levels paging.
  */
 unsigned long
-ia64_vtop3(unsigned long long vaddr)
+vtop3_ia64(unsigned long long vaddr)
 {
 	unsigned long paddr, temp, page_dir, pgd_pte, page_middle, pmd_pte;
 	unsigned long page_table, pte;
@@ -149,7 +149,7 @@ ia64_vtop3(unsigned long long vaddr)
  * Translate a virtual address to a physical address by using 4 levels paging.
  */
 unsigned long
-ia64_vtop4(unsigned long long vaddr)
+vtop4_ia64(unsigned long long vaddr)
 {
 	unsigned long paddr, temp, page_dir, pgd_pte, page_upper, pud_pte;
 	unsigned long page_middle, pmd_pte, page_table, pte;
@@ -213,7 +213,7 @@ ia64_vtop4(unsigned long long vaddr)
 }
 
 unsigned long
-ia64_vtop(unsigned long long vaddr)
+vtop_ia64(unsigned long long vaddr)
 {
 	unsigned long paddr;
 
@@ -232,9 +232,9 @@ ia64_vtop(unsigned long long vaddr)
 	}
 
 	if (vt.mem_flags & MEMORY_PAGETABLE_4L)
-		return ia64_vtop4(vaddr);
+		return vtop4_ia64(vaddr);
 	else
-		return ia64_vtop3(vaddr);
+		return vtop3_ia64(vaddr);
 }
 
 /*
@@ -255,7 +255,7 @@ vaddr_to_offset_ia64(unsigned long long vaddr)
 			break;
 
 		case KERNEL_VMALLOC_REGION:
-			paddr = ia64_vtop(vaddr);
+			paddr = vtop_ia64(vaddr);
 			break;
 
 		default:

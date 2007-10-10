@@ -101,12 +101,17 @@ isAnon(unsigned long mapping)
 	return ((unsigned long)mapping & PAGE_MAPPING_ANON) != 0;
 }
 
+#define PAGESIZE()		(info->page_size)
+#define PAGESHIFT()		(info->page_shift)
+#define PAGEOFFSET(X)		(((unsigned long)(X)) & (PAGESIZE() - 1))
+#define PAGEBASE(X)		(((unsigned long)(X)) & ~(PAGESIZE() - 1))
+#define _2MB_PAGE_MASK		(~((2*1048576)-1))
+
 /*
  * for SPARSEMEM
  */
 #define SECTION_SIZE_BITS()	(info->section_size_bits)
 #define MAX_PHYSMEM_BITS()	(info->max_physmem_bits)
-#define PAGESHIFT()		(info->page_shift)
 #define PFN_SECTION_SHIFT()	(SECTION_SIZE_BITS() - PAGESHIFT())
 #define PAGES_PER_SECTION()	(1UL << PFN_SECTION_SHIFT())
 #define _SECTIONS_PER_ROOT()	(1)
@@ -126,6 +131,7 @@ isAnon(unsigned long mapping)
  */
 #define NOT_MEMMAP_ADDR	(0x0)
 #define NOT_KV_ADDR	(0x0)
+#define NOT_PADDR	(ULONGLONG_MAX)
 
 /*
  * Dump Level
@@ -466,6 +472,8 @@ do { \
 #define PAGE_OFFSET		(0xffff810000000000) /* Direct mapping */
 #define VMALLOC_START		(0xffffc20000000000)
 #define VMALLOC_END		(0xffffe1ffffffffff)
+#define VMEMMAP_START		(0xffffe20000000000)
+#define VMEMMAP_END		(0xffffe2ffffffffff)
 
 #define __START_KERNEL_map	(0xffffffff80000000)
 #define MODULES_VADDR		(0xffffffff88000000)
@@ -493,6 +501,11 @@ do { \
 
 #define _PAGE_PRESENT		(0x001)
 #define _PAGE_PSE		(0x080)    /* 2MB page */
+
+#define __PHYSICAL_MASK_SHIFT	(40)
+#define __PHYSICAL_MASK		((1UL << __PHYSICAL_MASK_SHIFT) - 1)
+#define PHYSICAL_PAGE_MASK	(~(PAGESIZE()-1) & (__PHYSICAL_MASK << PAGESHIFT()))
+
 #endif /* x86_64 */
 
 #ifdef __powerpc__
@@ -774,6 +787,7 @@ struct symbol_table {
 	unsigned long	init_uts_ns;
 	unsigned long	_stext;
 	unsigned long	swapper_pg_dir;
+	unsigned long	init_level4_pgt;
 	unsigned long	phys_base;
 	unsigned long	node_online_map;
 	unsigned long	node_states;

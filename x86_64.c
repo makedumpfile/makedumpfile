@@ -17,14 +17,15 @@
 
 #include "makedumpfile.h"
 
-/*
- *  Include both vmalloc'd and module address space as VMALLOC space.
- */
 int
 is_vmalloc_addr(ulong vaddr)
 {
-	return ((vaddr >= VMALLOC_START && vaddr <= VMALLOC_END) ||
-	    (vaddr >= MODULES_VADDR && vaddr <= MODULES_END));
+	/*
+	 *  vmalloc, virtual memmap, and module space as VMALLOC space.
+	 */
+	return ((vaddr >= VMALLOC_START && vaddr <= VMALLOC_END)
+	    || (vaddr >= VMEMMAP_START && vaddr <= VMEMMAP_END)
+	    || (vaddr >= MODULES_VADDR && vaddr <= MODULES_END));
 }
 
 int
@@ -62,12 +63,88 @@ get_machdep_info_x86_64()
 	return TRUE;
 }
 
+/*
+ * Translate a virtual address to a physical address by using 4 levels paging.
+ */
+unsigned long long
+vtop4_x86_64(unsigned long vaddr)
+{
+	unsigned long page_dir, pml4, pgd_paddr, pgd_pte, pmd_paddr, pmd_pte;
+	unsigned long pte_paddr, pte;
+
+	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of init_level4_pgt.\n");
+		return NOT_PADDR;
+	}
+
+	/*
+	 * Get PGD.
+	 */
+	page_dir  = SYMBOL(init_level4_pgt);
+	page_dir += pml4_index(vaddr) * sizeof(unsigned long);
+	if (!readmem(VADDR, page_dir, &pml4, sizeof pml4)) {
+		ERRMSG("Can't get pml4 (page_dir:%lx).\n", page_dir);
+		return NOT_PADDR;
+	}
+	if (!(pml4 & _PAGE_PRESENT)) {
+		ERRMSG("Can't get a valid pml4.\n");
+		return NOT_PADDR;
+	}
+
+	/*
+	 * Get PUD.
+	 */
+	pgd_paddr  = pml4 & PHYSICAL_PAGE_MASK;
+	pgd_paddr += pgd_index(vaddr) * sizeof(unsigned long);
+	if (!readmem(PADDR, pgd_paddr, &pgd_pte, sizeof pgd_pte)) {
+		ERRMSG("Can't get pgd_pte (pgd_paddr:%lx).\n", pgd_paddr);
+		return NOT_PADDR;
+	}
+	if (!(pgd_pte & _PAGE_PRESENT)) {
+		ERRMSG("Can't get a valid pgd_pte.\n");
+		return NOT_PADDR;
+	}
+
+	/*
+	 * Get PMD.
+	 */
+	pmd_paddr  = pgd_pte & PHYSICAL_PAGE_MASK;
+	pmd_paddr += pmd_index(vaddr) * sizeof(unsigned long);
+	if (!readmem(PADDR, pmd_paddr, &pmd_pte, sizeof pmd_pte)) {
+		ERRMSG("Can't get pmd_pte (pmd_paddr:%lx).\n", pmd_paddr);
+		return NOT_PADDR;
+	}
+	if (!(pmd_pte & _PAGE_PRESENT)) {
+		ERRMSG("Can't get a valid pmd_pte.\n");
+		return NOT_PADDR;
+	}
+	if (pmd_pte & _PAGE_PSE)
+		return (PAGEBASE(pmd_pte) & PHYSICAL_PAGE_MASK)
+			+ (vaddr & ~_2MB_PAGE_MASK);
+
+	/*
+	 * Get PTE.
+	 */
+	pte_paddr  = pmd_pte & PHYSICAL_PAGE_MASK;
+	pte_paddr += pte_index(vaddr) * sizeof(unsigned long);
+	if (!readmem(PADDR, pte_paddr, &pte, sizeof pte)) {
+		ERRMSG("Can't get pte (pte_paddr:%lx).\n", pte_paddr);
+		return NOT_PADDR;
+	}
+	if (!(pte & _PAGE_PRESENT)) {
+		ERRMSG("Can't get a valid pte.\n");
+		return NOT_PADDR;
+	}
+	return (PAGEBASE(pte) & PHYSICAL_PAGE_MASK) + PAGEOFFSET(vaddr);
+}
+
 off_t
 vaddr_to_offset_x86_64(unsigned long vaddr)
 {
 	int i;
 	off_t offset;
-	unsigned long paddr, phys_base;
+	unsigned long phys_base;
+	unsigned long long paddr;
 	struct pt_load_segment *pls;
 
 	/*
@@ -78,7 +155,14 @@ vaddr_to_offset_x86_64(unsigned long vaddr)
 	else
 		phys_base = 0;
 
-	if (vaddr >= __START_KERNEL_map)
+	if (is_vmalloc_addr(vaddr)) {
+		if ((paddr = vtop4_x86_64(vaddr)) == NOT_PADDR) {
+			ERRMSG("Can't convert a virtual address(%lx) to " \
+			    "physical address.\n", vaddr);
+			return 0x0;
+		}
+	}
+	else if (vaddr >= __START_KERNEL_map)
 		paddr = vaddr - __START_KERNEL_map + phys_base;
 	else
 		paddr = vaddr - PAGE_OFFSET;

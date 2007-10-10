@@ -1761,6 +1761,7 @@ get_symbol_info()
 	SYMBOL_INIT(init_uts_ns, "init_uts_ns");
 	SYMBOL_INIT(_stext, "_stext");
 	SYMBOL_INIT(swapper_pg_dir, "swapper_pg_dir");
+	SYMBOL_INIT(init_level4_pgt, "init_level4_pgt");
 	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
 	SYMBOL_INIT(node_states, "node_states");
@@ -2031,6 +2032,7 @@ generate_vmcoreinfo()
 	WRITE_SYMBOL("init_uts_ns", init_uts_ns);
 	WRITE_SYMBOL("_stext", _stext);
 	WRITE_SYMBOL("swapper_pg_dir", swapper_pg_dir);
+	WRITE_SYMBOL("init_level4_pgt", init_level4_pgt);
 	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
 	WRITE_SYMBOL("node_states", node_states);
@@ -2257,6 +2259,7 @@ read_vmcoreinfo()
 	READ_SYMBOL("init_uts_ns", init_uts_ns);
 	READ_SYMBOL("_stext", _stext);
 	READ_SYMBOL("swapper_pg_dir", swapper_pg_dir);
+	READ_SYMBOL("init_level4_pgt", init_level4_pgt);
 	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
 	READ_SYMBOL("node_states", node_states);

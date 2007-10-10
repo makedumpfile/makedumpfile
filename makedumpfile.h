@@ -153,13 +153,14 @@ isAnon(unsigned long mapping)
  * Message Level
  */
 #define MIN_MSG_LEVEL		(0)
-#define MAX_MSG_LEVEL		(15)
+#define MAX_MSG_LEVEL		(31)
 #define DEFAULT_MSG_LEVEL	(7)	/* Print the progress indicator, the
 					   common message, the error message */
 #define ML_PRINT_PROGRESS	(0x001) /* Print the progress indicator */
 #define ML_PRINT_COMMON_MSG	(0x002)	/* Print the common message */
 #define ML_PRINT_ERROR_MSG	(0x004)	/* Print the error message */
 #define ML_PRINT_DEBUG_MSG	(0x008) /* Print the debugging message */
+#define ML_PRINT_REPORT_MSG	(0x010) /* Print the report message */
 extern int message_level;
 
 #define MSG(x...) \
@@ -191,6 +192,16 @@ do { \
 #define DEBUG_MSG(x...) \
 do { \
 	if (message_level & ML_PRINT_DEBUG_MSG) { \
+		if (info->flag_flatten) \
+			fprintf(stderr, x); \
+		else \
+			fprintf(stdout, x); \
+	} \
+} while (0)
+
+#define REPORT_MSG(x...) \
+do { \
+	if (message_level & ML_PRINT_REPORT_MSG) { \
 		if (info->flag_flatten) \
 			fprintf(stderr, x); \
 		else \

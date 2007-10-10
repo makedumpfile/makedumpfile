@@ -29,6 +29,16 @@ struct DumpInfo		*info = NULL;
 
 int message_level;
 
+/*
+ * The numbers of the excluded pages
+ */
+unsigned long long pfn_zero;
+unsigned long long pfn_memhole;
+unsigned long long pfn_cache;
+unsigned long long pfn_cache_private;
+unsigned long long pfn_user;
+unsigned long long pfn_free;
+
 int retcd = FAILED;	/* return code */
 
 void
@@ -426,18 +436,19 @@ print_usage()
 	MSG("      printed. For example, according to the table, specifying 7 as ML means\n");
 	MSG("      progress indicator, common message, and error message are printed, and\n");
 	MSG("      this is a default value.\n");
-	MSG("      Note that the maximum value of message_level is 15.\n");
+	MSG("      Note that the maximum value of message_level is 31.\n");
 	MSG("\n");
-	MSG("      Message | progress    common    error     debug\n");
-	MSG("      Level   | indicator   message   message   message\n");
-	MSG("     ---------+-----------------------------------------\n");
+	MSG("      Message | progress    common    error     debug     report\n");
+	MSG("      Level   | indicator   message   message   message   message\n");
+	MSG("     ---------+------------------------------------------------------\n");
 	MSG("            0 |\n");
 	MSG("            1 |     X\n");
 	MSG("            2 |                X\n");
 	MSG("            4 |                          X\n");
 	MSG("          * 7 |     X          X         X\n");
 	MSG("            8 |                                    X\n");
-	MSG("           15 |     X          X         X         X\n");
+	MSG("           16 |                                              X\n");
+	MSG("           31 |     X          X         X         X         X\n");
 	MSG("\n");
 	MSG("  [-D]:\n");
 	MSG("      Print debugging message.\n");
@@ -3757,6 +3768,8 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 		DEBUG_MSG("  free_pages       = %ld\n", free_pages);
 		DEBUG_MSG("  found_free_pages = %ld\n", found_free_pages);
 	}
+	pfn_free += found_free_pages;
+
 	return TRUE;
 }
 
@@ -3957,9 +3970,10 @@ create_dump_bitmap()
 			/*
 			 * Exclude the memory hole.
 			 */
-			if (!is_in_segs(paddr))
+			if (!is_in_segs(paddr)) {
 				val = 0;
-
+				pfn_memhole++;
+			}
 			/*
 			 * Set the 1st-bitmap.
 			 *  val  1: not memory hole
@@ -4000,8 +4014,10 @@ create_dump_bitmap()
 					    info->name_memory, strerror(errno));
 					goto out;
 				}
-				if (is_zero_page(buf, info->page_size))
+				if (is_zero_page(buf, info->page_size)) {
 					val = 0;
+					pfn_zero++;
+				}
 			}
 			if ((info->dump_level <= DL_EXCLUDE_ZERO)
 			    || not_found_mem_map) {
@@ -4028,24 +4044,27 @@ create_dump_bitmap()
 			 */
 			if ((info->dump_level & DL_EXCLUDE_CACHE)
 			    && (isLRU(flags) || isSwapCache(flags))
-			    && !isPrivate(flags) && !isAnon(mapping))
+			    && !isPrivate(flags) && !isAnon(mapping)) {
 				val = 0;
-
+				pfn_cache++;
+			}
 			/*
 			 * Exclude the cache page with the private page.
 			 */
 			else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
 			    && (isLRU(flags) || isSwapCache(flags))
-			    && !isAnon(mapping))
+			    && !isAnon(mapping)) {
 				val = 0;
-
+				pfn_cache_private++;
+			}
 			/*
 			 * Exclude the data page of the user process.
 			 */
 			else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
-			    && isAnon(mapping))
+			    && isAnon(mapping)) {
 				val = 0;
-
+				pfn_user++;
+			}
 			/*
 			 * Set the 2nd-bitmap.
 			 *  val  1: dump page
@@ -4996,6 +5015,7 @@ write_kdump_pages()
 		    && is_zero_page(buf, info->page_size)) {
 			if (!write_cache(&pdesc, &pd_zero, sizeof(page_desc_t)))
 				goto out;
+			pfn_zero++;
 			continue;
 		}
 		/*
@@ -5786,6 +5806,40 @@ out:
 #endif
 }
 
+void
+print_report()
+{
+	unsigned long long pfn_original, pfn_excluded, shrinking;
+
+	/*
+	 * /proc/vmcore doesn't contain the memory hole area.
+	 */
+	pfn_original = info->max_mapnr - pfn_memhole;
+
+	pfn_excluded = pfn_zero + pfn_cache + pfn_cache_private
+	    + pfn_user + pfn_free;
+	shrinking = (pfn_original - pfn_excluded) * 100;
+	shrinking = shrinking / pfn_original;
+
+	REPORT_MSG("Original pages  : 0x%016llx\n", pfn_original);
+	REPORT_MSG("  Excluded pages   : 0x%016llx\n", pfn_excluded); 
+	REPORT_MSG("    Pages filled with zero  : 0x%016llx\n", pfn_zero);
+	REPORT_MSG("    Cache pages             : 0x%016llx\n", pfn_cache);
+	REPORT_MSG("    Cache pages + private   : 0x%016llx\n",
+	    pfn_cache_private);
+	REPORT_MSG("    User process data pages : 0x%016llx\n", pfn_user);
+	REPORT_MSG("    Free pages              : 0x%016llx\n", pfn_free);
+	REPORT_MSG("  Remaining pages  : 0x%016llx\n",
+	    pfn_original - pfn_excluded);
+	REPORT_MSG("  (The number of pages is reduced to %lld%%.)\n",
+	    shrinking);
+	REPORT_MSG("Memory Hole     : 0x%016llx\n", pfn_memhole);
+	REPORT_MSG("--------------------------------------------------\n");
+	REPORT_MSG("Total pages     : 0x%016llx\n", info->max_mapnr);
+	REPORT_MSG("\n");
+}
+
+
 static struct option longopts[] = {
 	{"xen-syms", required_argument, NULL, 'X'},
 	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
@@ -6046,6 +6100,8 @@ main(int argc, char *argv[])
 
 		if (!close_files_for_creating_dumpfile())
 			goto out;
+
+		print_report();
 
 		MSG("\n");
 		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);

@@ -159,7 +159,10 @@ extern int message_level;
 #define MSG(x...) \
 do { \
 	if (message_level & ML_PRINT_COMMON_MSG) { \
-		fprintf(stderr, x); \
+		if (info->flag_flatten) \
+			fprintf(stderr, x); \
+		else \
+			fprintf(stdout, x); \
 	} \
 } while (0)
 
@@ -182,7 +185,10 @@ do { \
 #define DEBUG_MSG(x...) \
 do { \
 	if (message_level & ML_PRINT_DEBUG_MSG) { \
-		fprintf(stderr, x); \
+		if (info->flag_flatten) \
+			fprintf(stderr, x); \
+		else \
+			fprintf(stdout, x); \
 	} \
 } while (0)
 

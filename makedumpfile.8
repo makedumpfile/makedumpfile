@@ -205,7 +205,8 @@ specified with \-F option, the format of the rearranged \fIDUMPFILE\fR is fixed.
 In other words, it is impossible to specify the \fIDUMPFILE\fR format when the
 dump data is rearranged with \-R option. If specifying \-E option with \-F option,
 the format of the rearranged \fIDUMPFILE\fR is the ELF format. Otherwise, it
-is the kdump\-compressed format.
+is the kdump\-compressed format. All the messages are output to standard error
+output by \-F option because standard output is used for the dump data.
 .br
 .B Example:
 .br
@@ -275,10 +276,10 @@ Specify the message types.
 .br
 Users can restrict outputs printed by specifying \fImessage_level\fR
 with this option. The message type marked with an X in the following
-table is printed to standard error output. For example, according to
-the table, specifying 7 as \fImessage_level\fR means progress indicator,
-common message, and error message are printed, and this is a default
-value. Note that the maximum value of \fImessage_level\fR is 15.
+table is printed. For example, according to the table, specifying 7 as
+\fImessage_level\fR means progress indicator, common message, and error
+message are printed, and this is a default value. Note that the maximum
+value of \fImessage_level\fR is 15.
 .br
 
  message | progress | common  | error   | debug 

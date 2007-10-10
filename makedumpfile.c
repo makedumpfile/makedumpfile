@@ -423,9 +423,9 @@ print_usage()
 	MSG("      Specify the message types.\n");
 	MSG("      Users can restrict output printed by specifying Message_Level (ML) with\n");
 	MSG("      this option. The message type marked with an X in the following table is\n");
-	MSG("      printed to standard error output. For example, according to the table,\n");
-	MSG("      specifying 7 as ML means progress indicator, common message, and error\n");
-	MSG("      message are printed, and this is a default value.\n");
+	MSG("      printed. For example, according to the table, specifying 7 as ML means\n");
+	MSG("      progress indicator, common message, and error message are printed, and\n");
+	MSG("      this is a default value.\n");
 	MSG("      Note that the maximum value of message_level is 15.\n");
 	MSG("\n");
 	MSG("      Message | progress    common    error     debug\n");

@@ -2347,7 +2347,7 @@ get_pt_note_info(int *flag_elf64, off_t *offset, unsigned long *size)
 		return FALSE;
 
 	for (i = 0; i < phnum; i++) {
-		if (flag_elf64) { /* ELF64 */
+		if (*flag_elf64) { /* ELF64 */
 			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
 			    i, &phdr64)) {
 				ERRMSG("Can't find Phdr %d.\n", i);

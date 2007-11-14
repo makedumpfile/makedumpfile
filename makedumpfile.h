@@ -911,6 +911,9 @@ struct array_table {
 	struct zone_at {
 		long	free_area;
 	} zone;
+	struct free_area_at {
+		long	free_list;
+	} free_area;
 };
 
 struct number_table {

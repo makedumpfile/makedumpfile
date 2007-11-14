@@ -1863,6 +1863,7 @@ get_structure_info()
 	 */
 	SIZE_INIT(free_area, "free_area");
 	OFFSET_INIT(free_area.free_list, "free_area", "free_list");
+	MEMBER_ARRAY_LENGTH_INIT(free_area.free_list, "free_area", "free_list");
 
 	/*
 	 * Get offsets of the list_head's members.
@@ -2102,6 +2103,7 @@ generate_vmcoreinfo()
 		WRITE_ARRAY_LENGTH("node_memblk", node_memblk);
 
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
+	WRITE_ARRAY_LENGTH("free_area.free_list", free_area.free_list);
 
 	WRITE_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	WRITE_NUMBER("N_ONLINE", N_ONLINE);
@@ -2317,6 +2319,7 @@ read_vmcoreinfo()
 	READ_ARRAY_LENGTH("mem_section", mem_section);
 	READ_ARRAY_LENGTH("node_memblk", node_memblk);
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
+	READ_ARRAY_LENGTH("free_area.free_list", free_area.free_list);
 
 	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	READ_NUMBER("N_ONLINE", N_ONLINE);
@@ -3691,47 +3694,59 @@ int
 reset_bitmap_of_free_pages(unsigned long node_zones)
 {
 
-	int order, i;
+	int order, i, migrate_type, migrate_types;
 	unsigned long curr, previous, head, curr_page, curr_prev;
 	unsigned long addr_free_pages, free_pages = 0, found_free_pages = 0;
 	unsigned long long pfn, start_pfn;
 
+	/*
+	 * On linux-2.6.24 or later, free_list is divided into the array.
+	 */
+	migrate_types = ARRAY_LENGTH(free_area.free_list);
+	if (migrate_types == NOT_FOUND_STRUCTURE)
+		migrate_types = 1;
+
 	for (order = (ARRAY_LENGTH(zone.free_area) - 1); order >= 0; --order) {
-		head = node_zones + OFFSET(zone.free_area)
-			+ SIZE(free_area) * order + OFFSET(free_area.free_list);
-		previous = head;
-		if (!readmem(VADDR, head + OFFSET(list_head.next), &curr,
-		    sizeof curr)) {
-			ERRMSG("Can't get next list_head.\n");
-			return FALSE;
-		}
-		for (;curr != head;) {
-			curr_page = curr - OFFSET(page.lru);
-			start_pfn = page_to_pfn(curr_page);
-			if (start_pfn == ULONGLONG_MAX)
-				return FALSE;
-
-			if (!readmem(VADDR, curr + OFFSET(list_head.prev),
-			    &curr_prev, sizeof curr_prev)) {
-				ERRMSG("Can't get prev list_head.\n");
-				return FALSE;
-			}
-			if (previous != curr_prev) {
-				ERRMSG("The free list is broken.\n");
-				retcd = ANALYSIS_FAILED;
-				return FALSE;
-			}
-			for (i = 0; i < (1<<order); i++) {
-				pfn = start_pfn + i;
-				reset_2nd_bitmap(pfn);
-			}
-			found_free_pages += i;
-
-			previous=curr;
-			if (!readmem(VADDR, curr + OFFSET(list_head.next),
-			    &curr, sizeof curr)) {
+		for (migrate_type = 0; migrate_type < migrate_types;
+		     migrate_type++) {
+			head = node_zones + OFFSET(zone.free_area)
+				+ SIZE(free_area) * order
+				+ OFFSET(free_area.free_list)
+				+ SIZE(list_head) * migrate_type;
+			previous = head;
+			if (!readmem(VADDR, head + OFFSET(list_head.next),
+				     &curr, sizeof curr)) {
 				ERRMSG("Can't get next list_head.\n");
 				return FALSE;
+			}
+			for (;curr != head;) {
+				curr_page = curr - OFFSET(page.lru);
+				start_pfn = page_to_pfn(curr_page);
+				if (start_pfn == ULONGLONG_MAX)
+					return FALSE;
+
+				if (!readmem(VADDR, curr+OFFSET(list_head.prev),
+					     &curr_prev, sizeof curr_prev)) {
+					ERRMSG("Can't get prev list_head.\n");
+					return FALSE;
+				}
+				if (previous != curr_prev) {
+					ERRMSG("The free list is broken.\n");
+					retcd = ANALYSIS_FAILED;
+					return FALSE;
+				}
+				for (i = 0; i < (1<<order); i++) {
+					pfn = start_pfn + i;
+					reset_2nd_bitmap(pfn);
+				}
+				found_free_pages += i;
+
+				previous = curr;
+				if (!readmem(VADDR, curr+OFFSET(list_head.next),
+					     &curr, sizeof curr)) {
+					ERRMSG("Can't get next list_head.\n");
+					return FALSE;
+				}
 			}
 		}
 	}

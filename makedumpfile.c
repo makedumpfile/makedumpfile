@@ -1628,10 +1628,10 @@ get_debug_info(void)
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
 		scnhdr = gelf_getshdr(scn, &scnhdr_mem);
 		name = elf_strptr(elfd, shstrndx, scnhdr->sh_name);
-		if (strcmp(name, ".debug_info"))
-			continue;
+		if (!strcmp(name, ".debug_info"))
+			break;
 	}
-	if (!strcmp(name, ".debug_info")) {
+	if (strcmp(name, ".debug_info")) {
 		ERRMSG("Can't get .debug_info section.\n");
 		goto out;
 	}

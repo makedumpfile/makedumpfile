@@ -221,6 +221,10 @@ output by \-F option because standard output is used for the dump data.
 # makedumpfile \-F \-E \-d 31 \-i vmcoreinfo  /proc/vmcore \e
 .br
 | ssh user@host "makedumpfile \-R dumpfile"
+.br
+# makedumpfile \-F \-E \-\-xen-vmcoreinfo \fIVMCOREINFO\fR /proc/vmcore \e
+.br
+| ssh user@host "makedumpfile \-R dumpfile"
 
 .TP
 \fB\-R\fR

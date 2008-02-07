@@ -5803,11 +5803,21 @@ handle_xen()
 	if (!create_dump_bitmap_xen())
 		goto out;
 
+	if (info->flag_flatten) {
+		if (!write_start_flat_header())
+			goto out;
+	}
+
 	if (!write_elf_header())
 		goto out;
 
 	if (!write_elf_pages())
 		goto out;
+
+	if (info->flag_flatten) {
+		if (!write_end_flat_header())
+			goto out;
+	}
 
 	if (!close_files_for_creating_dumpfile())
 		goto out;

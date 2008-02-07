@@ -3220,6 +3220,9 @@ initial()
 			return FALSE;
 
 		if (!vmcoreinfo_in_vmcore) {
+			if (info->dump_level <= DL_EXCLUDE_ZERO)
+				goto out;
+
 			MSG("%s doesn't contain vmcoreinfo.\n",
 			    info->name_memory);
 			MSG("'-x' or '-i' must be specified.\n");
@@ -3246,6 +3249,7 @@ initial()
 			return FALSE;
 		unlink(info->name_vmcoreinfo);
 	}
+out:
 	if (info->dump_level <= DL_EXCLUDE_ZERO) {
 		if (!get_mem_map_without_mm())
 			return FALSE;

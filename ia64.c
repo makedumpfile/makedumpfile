@@ -92,15 +92,15 @@ get_machdep_info_ia64()
 /*
  * Translate a virtual address to a physical address by using 3 levels paging.
  */
-unsigned long
-vtop3_ia64(unsigned long long vaddr)
+unsigned long long
+vtop3_ia64(unsigned long vaddr)
 {
-	unsigned long paddr, temp, page_dir, pgd_pte, page_middle, pmd_pte;
-	unsigned long page_table, pte;
+	unsigned long long paddr, temp, page_dir, pgd_pte, page_middle, pmd_pte;
+	unsigned long long page_table, pte;
 
 	if (SYMBOL(swapper_pg_dir) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of swapper_pg_dir.\n");
-		return 0x0;
+		return NOT_PADDR;
 	}
 
 	/*
@@ -110,8 +110,8 @@ vtop3_ia64(unsigned long long vaddr)
 	temp = temp >> (PGDIR_SHIFT_3L - 3);
 	page_dir = SYMBOL(swapper_pg_dir) + temp;
 	if (!readmem(VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
-		ERRMSG("Can't get pgd_pte (page_dir:%lx).\n", page_dir);
-		return 0x0;
+		ERRMSG("Can't get pgd_pte (page_dir:%llx).\n", page_dir);
+		return NOT_PADDR;
 	}
 
 	/*
@@ -121,8 +121,8 @@ vtop3_ia64(unsigned long long vaddr)
 	temp = temp >> (PMD_SHIFT - 3);
 	page_middle = pgd_pte + temp;
 	if (!readmem(PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
-		ERRMSG("Can't get pmd_pte (page_middle:%lx).\n", page_middle);
-		return 0x0;
+		ERRMSG("Can't get pmd_pte (page_middle:%llx).\n", page_middle);
+		return NOT_PADDR;
 	}
 
 	/*
@@ -132,8 +132,8 @@ vtop3_ia64(unsigned long long vaddr)
 	temp = temp >> (PAGESHIFT() - 3);
 	page_table = pmd_pte + temp;
 	if (!readmem(PADDR, page_table, &pte, sizeof pte)) {
-		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);
-		return 0x0;
+		ERRMSG("Can't get pte (page_table:%llx).\n", page_table);
+		return NOT_PADDR;
 	}
 
 	/*
@@ -148,15 +148,15 @@ vtop3_ia64(unsigned long long vaddr)
 /*
  * Translate a virtual address to a physical address by using 4 levels paging.
  */
-unsigned long
-vtop4_ia64(unsigned long long vaddr)
+unsigned long long
+vtop4_ia64(unsigned long vaddr)
 {
-	unsigned long paddr, temp, page_dir, pgd_pte, page_upper, pud_pte;
-	unsigned long page_middle, pmd_pte, page_table, pte;
+	unsigned long long paddr, temp, page_dir, pgd_pte, page_upper, pud_pte;
+	unsigned long long page_middle, pmd_pte, page_table, pte;
 
 	if (SYMBOL(swapper_pg_dir) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of swapper_pg_dir.\n");
-		return 0x0;
+		return NOT_PADDR;
 	}
 
 	/*
@@ -166,8 +166,8 @@ vtop4_ia64(unsigned long long vaddr)
 	temp = temp >> (PGDIR_SHIFT_4L - 3);
 	page_dir = SYMBOL(swapper_pg_dir) + temp;
 	if (!readmem(VADDR, page_dir, &pgd_pte, sizeof pgd_pte)) {
-		ERRMSG("Can't get pgd_pte (page_dir:%lx).\n", page_dir);
-		return 0x0;
+		ERRMSG("Can't get pgd_pte (page_dir:%llx).\n", page_dir);
+		return NOT_PADDR;
 	}
 
 	/*
@@ -177,8 +177,8 @@ vtop4_ia64(unsigned long long vaddr)
 	temp = temp >> (PUD_SHIFT - 3);
 	page_upper = pgd_pte + temp;
 	if (!readmem(PADDR, page_upper, &pud_pte, sizeof pud_pte)) {
-		ERRMSG("Can't get pud_pte (page_upper:%lx).\n", page_upper);
-		return 0x0;
+		ERRMSG("Can't get pud_pte (page_upper:%llx).\n", page_upper);
+		return NOT_PADDR;
 	}
 
 	/*
@@ -188,8 +188,8 @@ vtop4_ia64(unsigned long long vaddr)
 	temp = temp >> (PMD_SHIFT - 3);
 	page_middle = pud_pte + temp;
 	if (!readmem(PADDR, page_middle, &pmd_pte, sizeof pmd_pte)) {
-		ERRMSG("Can't get pmd_pte (page_middle:%lx).\n", page_middle);
-		return 0x0;
+		ERRMSG("Can't get pmd_pte (page_middle:%llx).\n", page_middle);
+		return NOT_PADDR;
 	}
 
 	/*
@@ -199,8 +199,8 @@ vtop4_ia64(unsigned long long vaddr)
 	temp = temp >> (PAGESHIFT() - 3);
 	page_table = pmd_pte + temp;
 	if (!readmem(PADDR, page_table, &pte, sizeof pte)) {
-		ERRMSG("Can't get pte (page_table:%lx).\n", page_table);
-		return 0x0;
+		ERRMSG("Can't get pte (page_table:%llx).\n", page_table);
+		return NOT_PADDR;
 	}
 
 	/*
@@ -212,17 +212,17 @@ vtop4_ia64(unsigned long long vaddr)
 	return paddr;
 }
 
-unsigned long
-vtop_ia64(unsigned long long vaddr)
+unsigned long long
+vtop_ia64(unsigned long vaddr)
 {
-	unsigned long paddr;
+	unsigned long long paddr;
 
 	if (VADDR_REGION(vaddr) != KERNEL_VMALLOC_REGION) {
-		ERRMSG("vaddr(%llx) is not KERNEL_VMALLOC_REGION.\n", vaddr);
-		return 0x0;
+		ERRMSG("vaddr(%lx) is not KERNEL_VMALLOC_REGION.\n", vaddr);
+		return NOT_PADDR;
 	}
 	paddr = vaddr_to_paddr(vaddr);
-	if (paddr)
+	if (paddr != NOT_PADDR)
 		return paddr;
 
 	if (!is_vmalloc_addr_ia64(vaddr)) {
@@ -241,9 +241,9 @@ vtop_ia64(unsigned long long vaddr)
  * Translate a virtual address to a file offset.
  */
 off_t
-vaddr_to_offset_ia64(unsigned long long vaddr)
+vaddr_to_offset_ia64(unsigned long vaddr)
 {
-	unsigned long paddr;
+	unsigned long long paddr;
 
 	switch (VADDR_REGION(vaddr)) {
 		case KERNEL_CACHED_REGION:
@@ -262,6 +262,11 @@ vaddr_to_offset_ia64(unsigned long long vaddr)
 			ERRMSG("Unknown region (%ld)\n", VADDR_REGION(vaddr));
 			return 0x0;
 	}
+	if (paddr == NOT_PADDR) {
+		ERRMSG("Can't convert a virtual address(%lx) to offset.\n",
+		    vaddr);
+		return 0x0;
+	}
 	return paddr_to_offset(paddr);
 }
 
@@ -274,37 +279,39 @@ kvtop_xen_ia64(unsigned long kvaddr)
 	unsigned long long addr, dirp, entry;
 
 	if (!is_xen_vaddr(kvaddr))
-		return 0;
+		return NOT_PADDR;
 
 	if (is_direct(kvaddr))
 		return (unsigned long)kvaddr - DIRECTMAP_VIRT_START;
 
 	if (!is_frame_table_vaddr(kvaddr))
-		return 0;
+		return NOT_PADDR;
 
 	addr = kvaddr - VIRT_FRAME_TABLE_ADDR;
 
 	dirp = SYMBOL(frametable_pg_dir) - DIRECTMAP_VIRT_START;
 	dirp += ((addr >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
-		return FALSE;
+		return NOT_PADDR;
  
 	dirp = entry & _PFN_MASK;
 	if (!dirp)
-		return 0;
+		return NOT_PADDR;
+
 	dirp += ((addr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
-		return FALSE;
+		return NOT_PADDR;
 
 	dirp = entry & _PFN_MASK;
 	if (!dirp)
-		return 0;
+		return NOT_PADDR;
+
 	dirp += ((addr >> PAGESHIFT()) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
-		return FALSE;
+		return NOT_PADDR;
 
 	if (!(entry & _PAGE_P))
-		return 0;
+		return NOT_PADDR;
 
 	entry = (entry & _PFN_MASK) + (addr & ((1UL << PAGESHIFT()) - 1));
 

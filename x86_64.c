@@ -188,32 +188,36 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	unsigned long long dirp, entry;
 
 	if (!is_xen_vaddr(kvaddr))
-		return 0;
+		return NOT_PADDR;
 
 	if (is_direct(kvaddr))
 		return (unsigned long)kvaddr - DIRECTMAP_VIRT_START;
 
-	dirp = kvtop_xen_x86_64(SYMBOL(pgd_l4));
+	if ((dirp = kvtop_xen_x86_64(SYMBOL(pgd_l4))) == NOT_PADDR)
+		return NOT_PADDR;
 	dirp += pml4_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
-		return 0;
+		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT))
-		return 0;
+		return NOT_PADDR;
+
 	dirp = entry & ENTRY_MASK;
 	dirp += pgd_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
-		return 0;
+		return NOT_PADDR;
  
 	if (!(entry & _PAGE_PRESENT))
-		return 0;
+		return NOT_PADDR;
+
 	dirp = entry & ENTRY_MASK;
 	dirp += pmd_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
-		return 0;
+		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT))
-		return 0;
+		return NOT_PADDR;
+
 	if (entry & _PAGE_PSE) {
 		entry = (entry & ENTRY_MASK) + (kvaddr & ((1UL << PMD_SHIFT) - 1));
 		return entry;
@@ -221,10 +225,10 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	dirp = entry & ENTRY_MASK;
 	dirp += pte_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
-		return 0;
+		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT)) {
-		return 0;
+		return NOT_PADDR;
 	}
 
 	entry = (entry & ENTRY_MASK) + (kvaddr & ((1UL << PTE_SHIFT) - 1));

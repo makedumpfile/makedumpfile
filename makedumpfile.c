@@ -77,10 +77,10 @@ unsigned long long
 vaddr_to_paddr(unsigned long long vaddr)
 {
 	int i;
-	unsigned long long paddr;
+	unsigned long long paddr = NOT_PADDR;
 	struct pt_load_segment *pls;
 
-	for (i = paddr = 0; i < info->num_load_memory; i++) {
+	for (i = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
 		if ((vaddr >= pls->virt_start)
 		    && (vaddr < pls->virt_end)) {

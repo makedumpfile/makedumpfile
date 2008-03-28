@@ -5868,6 +5868,47 @@ print_report()
 	REPORT_MSG("\n");
 }
 
+int
+create_dumpfile()
+{
+	if (!open_files_for_creating_dumpfile())
+		return FALSE;
+
+	if (!initial())
+		return FALSE;
+
+	if (!create_dump_bitmap())
+		return FALSE;
+
+	if (info->flag_flatten) {
+		if (!write_start_flat_header())
+			return FALSE;
+	}
+	if (info->flag_elf_dumpfile) {
+		if (!write_elf_header())
+			return FALSE;
+		if (!write_elf_pages())
+			return FALSE;
+	} else {
+		if (!write_kdump_header())
+			return FALSE;
+		if (!write_kdump_pages())
+			return FALSE;
+		if (!write_kdump_bitmap())
+			return FALSE;
+	}
+	if (info->flag_flatten) {
+		if (!write_end_flat_header())
+			return FALSE;
+	}
+
+	if (!close_files_for_creating_dumpfile())
+		return FALSE;
+
+	print_report();
+
+	return TRUE;
+}
 
 static struct option longopts[] = {
 	{"xen-syms", required_argument, NULL, 'X'},
@@ -6094,41 +6135,8 @@ main(int argc, char *argv[])
 		MSG("\n");
 		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
 	} else {
-		if (!open_files_for_creating_dumpfile())
+		if (!create_dumpfile())
 			goto out;
-
-		if (!initial())
-			goto out;
-
-		if (!create_dump_bitmap())
-			goto out;
-
-		if (info->flag_flatten) {
-			if (!write_start_flat_header())
-				goto out;
-		}
-		if (info->flag_elf_dumpfile) {
-			if (!write_elf_header())
-				goto out;
-			if (!write_elf_pages())
-				goto out;
-		} else {
-			if (!write_kdump_header())
-				goto out;
-			if (!write_kdump_pages())
-				goto out;
-			if (!write_kdump_bitmap())
-				goto out;
-		}
-		if (info->flag_flatten) {
-			if (!write_end_flat_header())
-				goto out;
-		}
-
-		if (!close_files_for_creating_dumpfile())
-			goto out;
-
-		print_report();
 
 		MSG("\n");
 		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);

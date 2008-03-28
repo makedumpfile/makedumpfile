@@ -689,7 +689,6 @@ struct DumpInfo {
 	int		flag_vmlinux;	     /* flag of vmlinux */
 	int		flag_generate_vmcoreinfo;/* flag of generating vmcoreinfo file */
 	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */
-	int		flag_exclude_free;   /* flag of excluding free page */
 	int		flag_show_usage;     /* flag of showing usage */
 	int		flag_show_version;   /* flag of showing version */
 	int		flag_flatten;        /* flag of outputting flattened

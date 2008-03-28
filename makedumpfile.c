@@ -4104,7 +4104,7 @@ create_dump_bitmap()
 	if (!write_cache_bufsz(&bm2))
 		goto out;
 
-	if (info->flag_exclude_free)
+	if (info->dump_level & DL_EXCLUDE_FREE)
 		if (!exclude_free_page(&bm2))
 			goto out;
 
@@ -5909,8 +5909,6 @@ main(int argc, char *argv[])
 			break;
 		case 'd':
 			info->dump_level = atoi(optarg);
-			if (info->dump_level & DL_EXCLUDE_FREE)
-				info->flag_exclude_free = 1;
 			break;
 		case 'E':
 			info->flag_elf_dumpfile = 1;

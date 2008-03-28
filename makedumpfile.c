@@ -1883,6 +1883,10 @@ get_structure_info()
 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
 	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");
 
+	ENUM_NUMBER_INIT(PG_lru, "PG_lru");
+	ENUM_NUMBER_INIT(PG_private, "PG_private");
+	ENUM_NUMBER_INIT(PG_swapcache, "PG_swapcache");
+
 	TYPEDEF_SIZE_INIT(nodemask_t, "nodemask_t");
 
 	return TRUE;
@@ -1893,6 +1897,18 @@ get_srcfile_info()
 {
 	TYPEDEF_SRCFILE_INIT(pud_t, "pud_t");
 
+	return TRUE;
+}
+
+int
+get_value_for_old_linux()
+{
+	if (NUMBER(PG_lru) == NOT_FOUND_NUMBER)
+		NUMBER(PG_lru) = PG_lru_ORIGINAL;
+	if (NUMBER(PG_private) == NOT_FOUND_NUMBER)
+		NUMBER(PG_private) = PG_private_ORIGINAL;
+	if (NUMBER(PG_swapcache) == NOT_FOUND_NUMBER)
+		NUMBER(PG_swapcache) = PG_swapcache_ORIGINAL;
 	return TRUE;
 }
 
@@ -2107,6 +2123,10 @@ generate_vmcoreinfo()
 
 	WRITE_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	WRITE_NUMBER("N_ONLINE", N_ONLINE);
+
+	WRITE_NUMBER("PG_lru", PG_lru);
+	WRITE_NUMBER("PG_private", PG_private);
+	WRITE_NUMBER("PG_swapcache", PG_swapcache);
 
 	/*
 	 * write the source file of 1st kernel
@@ -2323,6 +2343,10 @@ read_vmcoreinfo()
 
 	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	READ_NUMBER("N_ONLINE", N_ONLINE);
+
+	READ_NUMBER("PG_lru", PG_lru);
+	READ_NUMBER("PG_private", PG_private);
+	READ_NUMBER("PG_swapcache", PG_swapcache);
 
 	READ_SRCFILE("pud_t", pud_t);
 
@@ -3249,6 +3273,8 @@ initial()
 			return FALSE;
 		unlink(info->name_vmcoreinfo);
 	}
+	if (!get_value_for_old_linux())
+		return FALSE;
 out:
 	if (info->dump_level <= DL_EXCLUDE_ZERO) {
 		if (!get_mem_map_without_mm())

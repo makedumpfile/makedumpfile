@@ -54,10 +54,12 @@ enum {
 
 /*
  * Page flags
+ *
+ * TODO: _ORIGINAL should be changed to _2_6_XX.
  */
-#define PG_lru			 (5)
-#define PG_private		(11)	/* Has something at ->private */
-#define PG_swapcache		(15)	/* Swap page: swp_entry_t in private */
+#define PG_lru_ORIGINAL	 	(5)
+#define PG_private_ORIGINAL	(11)	/* Has something at ->private */
+#define PG_swapcache_ORIGINAL	(15)	/* Swap page: swp_entry_t in private */
 
 #define PAGE_MAPPING_ANON	(1)
 
@@ -91,9 +93,9 @@ test_bit(int nr, unsigned long addr)
 	return ((mask & addr) != 0);
 }
 
-#define isLRU(flags)		test_bit(PG_lru, flags)
-#define isPrivate(flags)	test_bit(PG_private, flags)
-#define isSwapCache(flags)	test_bit(PG_swapcache, flags)
+#define isLRU(flags)		test_bit(NUMBER(PG_lru), flags)
+#define isPrivate(flags)	test_bit(NUMBER(PG_private), flags)
+#define isSwapCache(flags)	test_bit(NUMBER(PG_swapcache), flags)
 
 static inline int
 isAnon(unsigned long mapping)
@@ -918,6 +920,13 @@ struct array_table {
 struct number_table {
 	long	NR_FREE_PAGES;
 	long	N_ONLINE;
+
+	/*
+ 	* Page flags
+	 */
+	long	PG_lru;
+	long	PG_private;
+	long	PG_swapcache;
 };
 
 #define LEN_SRCFILE				(100)

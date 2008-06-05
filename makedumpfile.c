@@ -3214,6 +3214,7 @@ initial()
 		MSG("'-X' option is disable,");
 		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
 		MSG("Commandline parameter is invalid.\n");
+		MSG("Try `makedumpfile --help' for more information.\n");
 		return FALSE;
 	}
 
@@ -3255,7 +3256,9 @@ initial()
 
 			MSG("%s doesn't contain vmcoreinfo.\n",
 			    info->name_memory);
-			MSG("'-x' or '-i' must be specified.\n");
+			MSG("Specify '-x' option or '-i' option.\n");
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
 			return FALSE;
 		}
 		/*
@@ -5889,12 +5892,15 @@ initial_xen()
 	return FALSE;
 #else
 	if(!info->flag_elf_dumpfile) {
-		MSG("-E must be specified for Xen.\n");
+		MSG("Specify '-E' option for Xen.\n");
+		MSG("Commandline parameter is invalid.\n");
+		MSG("Try `makedumpfile --help' for more information.\n");
 		return FALSE;
 	}
 	if (DL_EXCLUDE_ZERO < info->dump_level) {
 		MSG("Dump_level is invalid. It should be 0 or 1.\n");
-		print_usage();
+		MSG("Commandline parameter is invalid.\n");
+		MSG("Try `makedumpfile --help' for more information.\n");
 		return FALSE;
 	}
 
@@ -5929,7 +5935,9 @@ initial_xen()
 
 			MSG("%s doesn't contain a vmcoreinfo for Xen.\n",
 			    info->name_memory);
-			MSG("'--xen-syms' or '--xen-vmcoreinfo' must be specified.\n");
+			MSG("Specify '--xen-syms' option or '--xen-vmcoreinfo' option.\n");
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
 			return FALSE;
 		}
 
@@ -6047,10 +6055,97 @@ create_dumpfile()
 	return TRUE;
 }
 
+int
+check_param_for_generating_vmcoreinfo(int argc, char *argv[])
+{
+	if (argc != optind)
+		return FALSE;
+
+	if (info->flag_compress        || info->dump_level
+	    || info->flag_elf_dumpfile || info->flag_read_vmcoreinfo
+	    || info->flag_flatten      || info->flag_rearrange
+	    || info->flag_exclude_xen_dom
+	    || (!info->name_vmlinux && !info->name_xen_syms))
+	
+		return FALSE;
+
+	return TRUE;
+}
+
+/*
+ * Parameters for creating dumpfile from the dump data
+ * of flattened format by rearranging the dump data.
+ */
+int
+check_param_for_rearranging_dumpdata(int argc, char *argv[])
+{
+	if (argc != optind + 1)
+		return FALSE;
+
+	if (info->flag_compress        || info->dump_level
+	    || info->flag_elf_dumpfile || info->flag_read_vmcoreinfo
+	    || info->name_vmlinux      || info->name_xen_syms
+	    || info->flag_flatten      || info->flag_generate_vmcoreinfo
+	    || info->flag_exclude_xen_dom)
+		return FALSE;
+
+	info->name_dumpfile = argv[optind];
+	return TRUE;
+}
+
+/*
+ * Check parameters to create the dump file.
+ */
+int
+check_param_for_creating_dumpfile(int argc, char *argv[])
+{
+	if (argc > optind + 2)
+		return FALSE;
+
+	if (info->flag_generate_vmcoreinfo || info->flag_rearrange)
+		return FALSE;
+
+	if ((info->dump_level < MIN_DUMP_LEVEL)
+	    || (MAX_DUMP_LEVEL < info->dump_level)) {
+		MSG("Dump_level is invalid.\n");
+		return FALSE;
+	}
+	if ((message_level < MIN_MSG_LEVEL)
+	    || (MAX_MSG_LEVEL < message_level)) {
+		message_level = DEFAULT_MSG_LEVEL;
+		MSG("Message_level is invalid.\n");
+		return FALSE;
+	}
+	if ((info->flag_compress && info->flag_elf_dumpfile)
+	    || (info->flag_read_vmcoreinfo && info->name_vmlinux)
+	    || (info->flag_read_vmcoreinfo && info->name_xen_syms))
+		return FALSE;
+
+	if ((argc == optind + 2) && !info->flag_flatten) {
+		/*
+		 * Parameters for creating the dumpfile from vmcore.
+		 */
+		info->name_memory   = argv[optind];
+		info->name_dumpfile = argv[optind+1];
+
+	} else if ((argc == optind + 1) && info->flag_flatten) {
+		/*
+		 * Parameters for outputting the dump data of the
+		 * flattened format to STDOUT.
+		 */
+		info->name_memory   = argv[optind];
+
+	} else
+		return FALSE;
+
+	return TRUE;
+}
+
 static struct option longopts[] = {
 	{"xen-syms", required_argument, NULL, 'y'},
 	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
 	{"message-level", required_argument, NULL, 'm'},
+	{"help", no_argument, NULL, 'h'},
 	{0, 0, 0, 0}
 };
 
@@ -6132,7 +6227,7 @@ main(int argc, char *argv[])
 			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");
-			print_usage();
+			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
 	}
@@ -6147,80 +6242,6 @@ main(int argc, char *argv[])
 		show_version();
 		return COMPLETED;
 	}
-	if (info->flag_generate_vmcoreinfo) {
-		/*
-		 * Check parameters to generate the vmcoreinfo file.
-		 */
-		if (argc != optind) {
-			MSG("Commandline parameter is invalid.\n");
-			print_usage();
-			goto out;
-		}
-		if (info->flag_compress || info->dump_level
-		    || info->flag_elf_dumpfile || info->flag_read_vmcoreinfo
-		    || (!info->name_vmlinux && !info->name_xen_syms)
-		    || info->flag_flatten  || info->flag_rearrange) {
-			MSG("Commandline parameter is invalid.\n");
-			print_usage();
-			goto out;
-		}
-	} else {
-		/*
-		 * Check parameters to create the dump file.
-		 */
-		if ((info->dump_level < MIN_DUMP_LEVEL)
-		    || (MAX_DUMP_LEVEL < info->dump_level)) {
-			MSG("Dump_level is invalid.\n");
-			print_usage();
-			goto out;
-		}
-		if ((message_level < MIN_MSG_LEVEL)
-		    || (MAX_MSG_LEVEL < message_level)) {
-			message_level = DEFAULT_MSG_LEVEL;
-			MSG("Message_level is invalid.\n");
-			print_usage();
-			goto out;
-		}
-		if ((info->flag_compress && info->flag_elf_dumpfile)
-		    || (info->flag_read_vmcoreinfo && info->name_vmlinux)
-		    || (info->flag_read_vmcoreinfo && info->name_xen_syms)) {
-			MSG("Commandline parameter is invalid.\n");
-			print_usage();
-			goto out;
-		}
-		if ((argc == optind + 2)
-		    && !info->flag_flatten && !info->flag_rearrange) {
-			/*
-			 * Parameters for creating the dumpfile from vmcore.
-			 */
-			info->name_memory   = argv[optind];
-			info->name_dumpfile = argv[optind+1];
-
-		} else if ((argc == optind + 1)
-		    && info->flag_flatten && !info->flag_rearrange) {
-			/*
-			 * Parameters for outputting the dump data of the
-			 * flattened format to STDOUT.
-			 */
-			info->name_memory   = argv[optind];
-
-		} else if ((argc == optind + 1)
-		    && !info->flag_flatten && info->flag_rearrange
-		    && !info->dump_level   && !info->flag_compress
-		    && !info->name_vmlinux && !info->name_xen_syms
-		    && !info->flag_read_vmcoreinfo && !info->flag_elf_dumpfile){
-			/*
-			 * Parameters for creating dumpfile from the dump data
-			 * of flattened format by rearranging the dump data.
-			 */
-			info->name_dumpfile = argv[optind];
-
-		} else {
-			MSG("Commandline parameter is invalid.\n");
-			print_usage();
-			goto out;
-		}
-	}
 
 	if (elf_version(EV_CURRENT) == EV_NONE ) {
 		/*
@@ -6230,6 +6251,11 @@ main(int argc, char *argv[])
 		goto out;
 	}
 	if (info->flag_generate_vmcoreinfo) {
+		if (!check_param_for_generating_vmcoreinfo(argc, argv)) {
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
+			goto out;
+		}
 		if (!open_files_for_generating_vmcoreinfo())
 			goto out;
 
@@ -6248,6 +6274,11 @@ main(int argc, char *argv[])
 		MSG("The vmcoreinfo is saved to %s.\n", info->name_vmcoreinfo);
 
 	} else if (info->flag_rearrange) {
+		if (!check_param_for_rearranging_dumpdata(argc, argv)) {
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
+			goto out;
+		}
 		if (!open_files_for_rearranging_dumpdata())
 			goto out;
 
@@ -6260,6 +6291,11 @@ main(int argc, char *argv[])
 		MSG("\n");
 		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
 	} else {
+		if (!check_param_for_creating_dumpfile(argc, argv)) {
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
+			goto out;
+		}
 		if (!create_dumpfile())
 			goto out;
 

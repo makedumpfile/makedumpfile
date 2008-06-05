@@ -39,7 +39,7 @@
     # make; make install
 
 * SUPPORTED KERNELS
-  makedumpfile (version 1.2.5) supports the following kernels.
+  makedumpfile (version 1.2.6) supports the following kernels.
 
          |      FLATMEM      |   DISCONTIGMEM    |     SPARSEMEM
          |-------------------+-------------------+-------------------
@@ -88,6 +88,12 @@
      contains vmcoreinfo data. So it is possible to create a dumpfile without
      -x option (or -i option) like the following:
      # makedumpfile -d 31 /proc/vmcore dumpfile
+
+  3. On makedumpfile-1.2.5 or before, both '--xen-syms' and '--xen-vmcoreinfo'
+     excluded Xen user domain pages. Since makedumpfile-1.2.6, '-X' option
+     have been added for excluding Xen user domain pages, and these options
+     does not excluded Xen user domain pages. So user should specify '-X'
+     option for excluding Xen user domain pages.
 
 * FAQ
   001: It cannot be compiled with the following messages:

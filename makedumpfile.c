@@ -330,7 +330,7 @@ check_release()
 	if (info->kernel_version == FALSE) {
 		if (!info->flag_read_vmcoreinfo)
 			ERRMSG("Or %s and %s don't match.\n",
-			    dwarf_info.vmlinux_name, info->name_memory);
+			    info->name_vmlinux, info->name_memory);
 		return FALSE;
 	}
 
@@ -500,12 +500,22 @@ open_kernel_file()
 {
 	int fd;
 
-	if ((fd = open(dwarf_info.vmlinux_name, O_RDONLY)) < 0) {
-		ERRMSG("Can't open the kernel file(%s). %s\n",
-		    dwarf_info.vmlinux_name, strerror(errno));
-		return FALSE;
+	if (info->name_vmlinux) {
+		if ((fd = open(info->name_vmlinux, O_RDONLY)) < 0) {
+			ERRMSG("Can't open the kernel file(%s). %s\n",
+			    info->name_vmlinux, strerror(errno));
+			return FALSE;
+		}
+		info->fd_vmlinux = fd;
 	}
-	dwarf_info.vmlinux_fd = fd;
+	if (info->name_xen_syms) {
+		if ((fd = open(info->name_xen_syms, O_RDONLY)) < 0) {
+			ERRMSG("Can't open the kernel file(%s). %s\n",
+			    info->name_xen_syms, strerror(errno));
+			return FALSE;
+		}
+		info->fd_xen_syms = fd;
+	}
 	return TRUE;
 }
 
@@ -620,7 +630,7 @@ open_files_for_creating_dumpfile()
 	if (info->flag_read_vmcoreinfo) {
 		if (!open_vmcoreinfo("r"))
 			return FALSE;
-	} else if (dwarf_info.vmlinux_name) {
+	} else {
 		if (!open_kernel_file())
 			return FALSE;
 	}
@@ -950,14 +960,14 @@ get_symbol_addr(char *symname)
 	char *sym_name = NULL;
 	const off_t failed = (off_t)-1;
 
-	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
+	if (lseek(dwarf_info.fd_debuginfo, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the kernel file(%s). %s\n",
-		    dwarf_info.vmlinux_name, strerror(errno));
+		    dwarf_info.name_debuginfo, strerror(errno));
 		return NOT_FOUND_SYMBOL;
 	}
-	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ, NULL))) {
+	if (!(elfd = elf_begin(dwarf_info.fd_debuginfo, ELF_C_READ, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
-		    dwarf_info.vmlinux_name);
+		    dwarf_info.name_debuginfo);
 		return NOT_FOUND_SYMBOL;
 	}
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
@@ -1016,14 +1026,14 @@ get_next_symbol_addr(char *symname)
 	char *sym_name = NULL;
 	const off_t failed = (off_t)-1;
 
-	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
+	if (lseek(dwarf_info.fd_debuginfo, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the kernel file(%s). %s\n",
-		    dwarf_info.vmlinux_name, strerror(errno));
+		    dwarf_info.name_debuginfo, strerror(errno));
 		return NOT_FOUND_SYMBOL;
 	}
-	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ, NULL))) {
+	if (!(elfd = elf_begin(dwarf_info.fd_debuginfo, ELF_C_READ, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
-		    dwarf_info.vmlinux_name);
+		    dwarf_info.name_debuginfo);
 		return NOT_FOUND_SYMBOL;
 	}
 	while ((scn = elf_nextscn(elfd, scn)) != NULL) {
@@ -1603,14 +1613,14 @@ get_debug_info(void)
 
 	int ret = FALSE;
 
-	if (lseek(dwarf_info.vmlinux_fd, 0, SEEK_SET) == failed) {
+	if (lseek(dwarf_info.fd_debuginfo, 0, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the kernel file(%s). %s\n",
-		    dwarf_info.vmlinux_name, strerror(errno));
+		    dwarf_info.name_debuginfo, strerror(errno));
 		return FALSE;
 	}
-	if (!(elfd = elf_begin(dwarf_info.vmlinux_fd, ELF_C_READ_MMAP, NULL))) {
+	if (!(elfd = elf_begin(dwarf_info.fd_debuginfo, ELF_C_READ_MMAP, NULL))) {
 		ERRMSG("Can't get first elf header of %s.\n",
-		    dwarf_info.vmlinux_name);
+		    dwarf_info.name_debuginfo);
 		return FALSE;
 	}
 	if (!(dwarfd = dwarf_begin_elf(elfd, DWARF_C_READ, NULL))) {
@@ -1931,22 +1941,22 @@ get_str_osrelease_from_vmlinux()
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
-	offset = vaddr_to_offset_slow(dwarf_info.vmlinux_fd,
-	    dwarf_info.vmlinux_name, utsname);
+	offset = vaddr_to_offset_slow(dwarf_info.fd_debuginfo,
+	    dwarf_info.name_debuginfo, utsname);
 
 	if (!offset) {
 		ERRMSG("Can't convert vaddr (%lx) of utsname to an offset.\n",
 		    utsname);
 		return FALSE;
 	}
-	if (lseek(dwarf_info.vmlinux_fd, offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek %s. %s\n", dwarf_info.vmlinux_name,
+	if (lseek(dwarf_info.fd_debuginfo, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek %s. %s\n", dwarf_info.name_debuginfo,
 		    strerror(errno));
 		return FALSE;
 	}
-	if (read(dwarf_info.vmlinux_fd, &system_utsname, sizeof system_utsname)
+	if (read(dwarf_info.fd_debuginfo, &system_utsname, sizeof system_utsname)
 	    != sizeof system_utsname) {
-		ERRMSG("Can't read %s. %s\n", dwarf_info.vmlinux_name,
+		ERRMSG("Can't read %s. %s\n", dwarf_info.name_debuginfo,
 		    strerror(errno));
 		return FALSE;
 	}
@@ -2012,6 +2022,9 @@ generate_vmcoreinfo()
 		ERRMSG("Can't get the size of page.\n");
 		return FALSE;
 	}
+	dwarf_info.fd_debuginfo   = info->fd_vmlinux;
+	dwarf_info.name_debuginfo = info->name_vmlinux;
+
 	if (!get_symbol_info())
 		return FALSE;
 
@@ -3223,7 +3236,10 @@ initial()
 	/*
 	 * Get the debug information for analysis from the kernel file 
 	 */
-	} else if (info->flag_vmlinux) {
+	} else if (info->name_vmlinux) {
+		dwarf_info.fd_debuginfo   = info->fd_vmlinux;
+		dwarf_info.name_debuginfo = info->name_vmlinux;
+
 		if (!get_symbol_info())
 			return FALSE;
 
@@ -5217,9 +5233,18 @@ close_dump_bitmap()
 void
 close_kernel_file()
 {
-	if ((dwarf_info.vmlinux_fd = close(dwarf_info.vmlinux_fd)) < 0)
-		ERRMSG("Can't close the kernel file(%s). %s\n",
-			dwarf_info.vmlinux_name, strerror(errno));
+	if (info->name_vmlinux) {
+		if ((info->fd_vmlinux = close(info->fd_vmlinux)) < 0) {
+			ERRMSG("Can't close the kernel file(%s). %s\n",
+			    info->name_vmlinux, strerror(errno));
+		}
+	}
+	if (info->name_xen_syms) {
+		if ((info->fd_xen_syms = close(info->fd_xen_syms)) < 0) {
+			ERRMSG("Can't close the kernel file(%s). %s\n",
+			    info->name_xen_syms, strerror(errno));
+		}
+	}
 }
 
 /*
@@ -5503,6 +5528,8 @@ generate_vmcoreinfo_xen()
 		ERRMSG("Can't get the size of page.\n");
 		return FALSE;
 	}
+	dwarf_info.fd_debuginfo   = info->fd_xen_syms;
+	dwarf_info.name_debuginfo = info->name_xen_syms;
 
 	if (!get_symbol_info_xen())
 		return FALSE;
@@ -5801,6 +5828,9 @@ initial_xen()
 		if (!read_vmcoreinfo_xen())
 			return FALSE;
 	} else {
+		dwarf_info.fd_debuginfo   = info->fd_xen_syms;
+		dwarf_info.name_debuginfo = info->name_xen_syms;
+
 		if (!get_symbol_info_xen())
 			return FALSE;
 		if (!get_structure_info_xen())
@@ -6008,11 +6038,11 @@ main(int argc, char *argv[])
 			break;
 		case 'X':
 			info->flag_xen = 1;
-			dwarf_info.vmlinux_name = optarg;
+			info->name_xen_syms = optarg;
 			break;
 		case 'x':
-			info->flag_vmlinux = 1;
-			dwarf_info.vmlinux_name = optarg;
+			info->flag_xen = 1;
+			info->name_vmlinux = optarg;
 			break;
 		case 'z':
 			info->flag_xen = 1;
@@ -6047,8 +6077,8 @@ main(int argc, char *argv[])
 		}
 		if (info->flag_compress || info->dump_level
 		    || info->flag_elf_dumpfile || info->flag_read_vmcoreinfo
-		    || !dwarf_info.vmlinux_name || info->flag_flatten
-		    || info->flag_rearrange) {
+		    || (!info->name_vmlinux && !info->name_xen_syms)
+		    || info->flag_flatten  || info->flag_rearrange) {
 			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
@@ -6071,7 +6101,8 @@ main(int argc, char *argv[])
 			goto out;
 		}
 		if ((info->flag_compress && info->flag_elf_dumpfile)
-		    || (info->flag_vmlinux && info->flag_read_vmcoreinfo)) {
+		    || (info->flag_read_vmcoreinfo && info->name_vmlinux)
+		    || (info->flag_read_vmcoreinfo && info->name_xen_syms)) {
 			MSG("Commandline parameter is invalid.\n");
 			print_usage();
 			goto out;
@@ -6095,8 +6126,8 @@ main(int argc, char *argv[])
 		} else if ((argc == optind + 1)
 		    && !info->flag_flatten && info->flag_rearrange
 		    && !info->dump_level   && !info->flag_compress
-		    && !info->flag_vmlinux && !info->flag_read_vmcoreinfo
-		    && !info->flag_elf_dumpfile) {
+		    && !info->name_vmlinux && !info->name_xen_syms
+		    && !info->flag_read_vmcoreinfo && !info->flag_elf_dumpfile){
 			/*
 			 * Parameters for creating dumpfile from the dump data
 			 * of flattened format by rearranging the dump data.
@@ -6121,7 +6152,7 @@ main(int argc, char *argv[])
 		if (!open_files_for_generating_vmcoreinfo())
 			goto out;
 
-		if (info->flag_xen) {
+		if (info->name_xen_syms) {
 			if (!generate_vmcoreinfo_xen())
 				goto out;
 		} else {

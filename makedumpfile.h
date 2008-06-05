@@ -688,7 +688,6 @@ struct DumpInfo {
 	int		flag_compress;       /* flag of compression */
 	int		flag_elf64;          /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
-	int		flag_vmlinux;	     /* flag of vmlinux */
 	int		flag_generate_vmcoreinfo;/* flag of generating vmcoreinfo file */
 	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */
 	int		flag_show_usage;     /* flag of showing usage */
@@ -731,6 +730,12 @@ struct DumpInfo {
 	 */
 	unsigned int		num_mem_map;
 	struct mem_map_data	*mem_map_data;
+
+	int			fd_vmlinux;
+	char			*name_vmlinux;
+
+	int			fd_xen_syms;
+	char			*name_xen_syms;
 
 	/*
 	 * Dump memory image info:
@@ -962,8 +967,8 @@ enum {
 
 struct dwarf_info {
 	unsigned int	cmd;		/* IN */
-	int	vmlinux_fd;		/* IN */
-	char	*vmlinux_name;		/* IN */
+	int	fd_debuginfo;		/* IN */
+	char	*name_debuginfo;	/* IN */
 	char	*struct_name;		/* IN */
 	char	*symbol_name;		/* IN */
 	char	*member_name;		/* IN */

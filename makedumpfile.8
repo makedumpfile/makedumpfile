@@ -275,6 +275,27 @@ it contains the xen's information.
 # makedumpfile \-E \-\-xen-vmcoreinfo \fIVMCOREINFO\fR /proc/vmcore dumpfile
 
 .TP
+\fB\-X\fR
+Exclude all the user domain pages from Xen kdump's \fIVMCORE\fR, and extracts the
+part of xen and domain-0. If \fIVMCORE\fR contains \fIVMCOREINFO\fR for Xen, it is
+not necessary to specify \fI\-\-xen-syms\fR and \fI\-\-xen-vmcoreinfo\fR.
+\-E option must be specified with this option.
+.br
+.B Example:
+.br
+# makedumpfile \-E \-X /proc/vmcore dumpfile
+
+.TP
+ \fB\-\-message-level\fR \fImessage_level\fR
+ Specify the message types.
+ .br
+diff -puN makedumpfile.org/makedumpfile.c makedumpfile/makedumpfile.c
+--- makedumpfile.org/makedumpfile.c	2008-04-09 15:48:19.000000000 +0900
++++ makedumpfile/makedumpfile.c	2008-04-09 15:48:34.000000000 +0900
+@@ -429,6 +429,10 @@ print_usage()
+ 	MSG("  [--xen-vmcoreinfo VMCOREINFO]:\n");
+ 	MSG("      Specify the VMCOREINFO of Xen to analyze Xen's memory usage.\n");
+.TP
 \fB\-\-message-level\fR \fImessage_level\fR
 Specify the message types.
 .br

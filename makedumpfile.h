@@ -148,9 +148,6 @@ isAnon(unsigned long mapping)
 				           with Private Pages */
 #define DL_EXCLUDE_USER_DATA	(0x008) /* Exclude UserProcessData Pages */
 #define DL_EXCLUDE_FREE		(0x010)	/* Exclude Free Pages */
-#define DL_EXCLUDE_XEN		(0x020) /* Exclude Domain-U from xen-kdump.
-					 * This defined value is internal,
-					 * and it can be changed. */
 
 /*
  * Message Level
@@ -434,6 +431,8 @@ do { \
 #define VMCOREINFO_NOTE_NAME		"VMCOREINFO"
 #define VMCOREINFO_NOTE_NAME_BYTES	(sizeof(VMCOREINFO_NOTE_NAME))
 #define FILENAME_VMCOREINFO		"/tmp/vmcoreinfoXXXXXX"
+#define VMCOREINFO_XEN_NOTE_NAME	"VMCOREINFO_XEN"
+#define VMCOREINFO_XEN_NOTE_NAME_BYTES	(sizeof(VMCOREINFO_XEN_NOTE_NAME))
 
 /*
  * field name of vmcoreinfo file
@@ -700,6 +699,7 @@ struct DumpInfo {
 	int		flag_rearrange;      /* flag of creating dumpfile from
 						flattened format */
 	int		flag_force;	     /* overwrite existing stuff */
+	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
 	long		page_size;           /* size of page */
 	long		page_shift;
 	unsigned long long	max_mapnr;   /* number of page descriptor */
@@ -772,6 +772,8 @@ struct DumpInfo {
 	 */
 	off_t			offset_vmcoreinfo;
 	unsigned long		size_vmcoreinfo;
+	off_t			offset_vmcoreinfo_xen;
+	unsigned long		size_vmcoreinfo_xen;
 
 	/*
 	 * for Xen extraction

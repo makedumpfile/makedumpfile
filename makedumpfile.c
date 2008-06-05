@@ -429,6 +429,10 @@ print_usage()
 	MSG("  [--xen-vmcoreinfo VMCOREINFO]:\n");
 	MSG("      Specify the VMCOREINFO of Xen to analyze Xen's memory usage.\n");
 	MSG("\n");
+	MSG("  [-X]:\n");
+	MSG("      Exclude all the user domain pages from Xen kdump's VMCORE, and extract\n");
+	MSG("      the part of Xen and domain-0.\n");
+	MSG("\n");
 	MSG("  [--message-level ML]:\n");
 	MSG("      Specify the message types.\n");
 	MSG("      Users can restrict output printed by specifying Message_Level (ML) with\n");
@@ -2390,7 +2394,7 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
 {
 	int n_type;
 	off_t offset;
-	char buf[VMCOREINFO_NOTE_NAME_BYTES];
+	char buf[VMCOREINFO_XEN_NOTE_NAME_BYTES];
 	Elf64_Nhdr note64;
 	Elf32_Nhdr note32;
 
@@ -2429,8 +2433,25 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
 		/*
 		 * Check whether /proc/vmcore contains vmcoreinfo,
 		 * and get both the offset and the size.
+		 *
+		 * NOTE: The owner name of xen should be checked at first,
+		 *       because its name is "VMCOREINFO_XEN" and the one
+		 *       of linux is "VMCOREINFO".
 		 */
-		if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
+		if (!strncmp(VMCOREINFO_XEN_NOTE_NAME, buf,
+		    VMCOREINFO_XEN_NOTE_NAME_BYTES)) {
+			if (info->flag_elf64) {
+				info->offset_vmcoreinfo_xen = offset
+				    + (sizeof(note64)
+				    + ((note64.n_namesz + 3) & ~3));
+				info->size_vmcoreinfo_xen = note64.n_descsz;
+			} else {
+				info->offset_vmcoreinfo_xen = offset
+				    + (sizeof(note32)
+				    + ((note32.n_namesz + 3) & ~3));
+				info->size_vmcoreinfo_xen = note32.n_descsz;
+			}
+		} else if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
 		    VMCOREINFO_NOTE_NAME_BYTES)) {
 			if (info->flag_elf64) {
 				info->offset_vmcoreinfo = offset
@@ -2471,13 +2492,13 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
  * Extract vmcoreinfo from /proc/vmcore and output it to /tmp/vmcoreinfo.tmp.
  */
 int
-copy_vmcoreinfo()
+copy_vmcoreinfo(off_t offset, unsigned long size)
 {
 	int fd;
 	char buf[VMCOREINFO_BYTES];
 	const off_t failed = (off_t)-1;
 
-	if (!info->offset_vmcoreinfo || !info->size_vmcoreinfo)
+	if (!offset || !size)
 		return FALSE;
 
 	if ((fd = mkstemp(info->name_vmcoreinfo)) < 0) {
@@ -2485,19 +2506,17 @@ copy_vmcoreinfo()
 		    info->name_vmcoreinfo, strerror(errno));
 		return FALSE;
 	}
-	if (lseek(info->fd_memory, info->offset_vmcoreinfo, SEEK_SET)
-	    == failed) {
+	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 		return FALSE;
 	}
-	if (read(info->fd_memory, &buf, info->size_vmcoreinfo)
-	    != info->size_vmcoreinfo) {
+	if (read(info->fd_memory, &buf, size) != size) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 		return FALSE;
 	}
-	if (write(fd, &buf, info->size_vmcoreinfo) != info->size_vmcoreinfo) {
+	if (write(fd, &buf, size) != size) {
 		ERRMSG("Can't write the vmcoreinfo file(%s). %s\n",
 		    info->name_vmcoreinfo, strerror(errno));
 		return FALSE;
@@ -3191,6 +3210,13 @@ get_mem_map()
 int
 initial()
 {
+	if (!(vt.mem_flags & MEMORY_XEN) && info->flag_exclude_xen_dom) {
+		MSG("'-X' option is disable,");
+		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
+		MSG("Commandline parameter is invalid.\n");
+		return FALSE;
+	}
+
 	if (!get_phys_base())
 		return FALSE;
 
@@ -3242,7 +3268,8 @@ initial()
 			return FALSE;
 		}
 		strcpy(info->name_vmcoreinfo, FILENAME_VMCOREINFO);
-		if (!copy_vmcoreinfo())
+		if (!copy_vmcoreinfo(info->offset_vmcoreinfo,
+		    info->size_vmcoreinfo))
 			return FALSE;
 		/*
 		 * Read vmcoreinfo from /tmp/vmcoreinfoXXXXXX.
@@ -4231,9 +4258,11 @@ create_2nd_bitmap()
 	/*
 	 * Exclude Xen user domain.
 	 */
-	if (!exclude_xen_user_domain()) {
-		ERRMSG("Can't exclude xen user domain.\n");
-		return FALSE;
+	if (info->flag_exclude_xen_dom) {
+		if (!exclude_xen_user_domain()) {
+			ERRMSG("Can't exclude xen user domain.\n");
+			return FALSE;
+		}
 	}
 
 	if (!sync_2nd_bitmap())
@@ -5868,12 +5897,17 @@ initial_xen()
 		print_usage();
 		return FALSE;
 	}
-	info->dump_level |= DL_EXCLUDE_XEN;
 
+	/*
+	 * Get the debug information for analysis from the vmcoreinfo file 
+	 */
 	if (info->flag_read_vmcoreinfo) {
 		if (!read_vmcoreinfo_xen())
 			return FALSE;
-	} else {
+	/*
+	 * Get the debug information for analysis from the xen-syms file
+	 */
+	} else if (info->name_xen_syms) {
 		dwarf_info.fd_debuginfo   = info->fd_xen_syms;
 		dwarf_info.name_debuginfo = info->name_xen_syms;
 
@@ -5881,6 +5915,45 @@ initial_xen()
 			return FALSE;
 		if (!get_structure_info_xen())
 			return FALSE;
+	/*
+	 * Get the debug information for analysis from /proc/vmcore
+	 */
+	} else {
+		/*
+		 * Check whether /proc/vmcore contains vmcoreinfo,
+		 * and get both the offset and the size.
+		 */
+		if (!info->offset_vmcoreinfo_xen || !info->size_vmcoreinfo_xen){
+			if (!info->flag_exclude_xen_dom)
+				return TRUE;
+
+			MSG("%s doesn't contain a vmcoreinfo for Xen.\n",
+			    info->name_memory);
+			MSG("'--xen-syms' or '--xen-vmcoreinfo' must be specified.\n");
+			return FALSE;
+		}
+
+		/*
+		 * Copy vmcoreinfo to /tmp/vmcoreinfoXXXXXX.
+		 */
+		if ((info->name_vmcoreinfo
+		    = malloc(sizeof(FILENAME_VMCOREINFO))) == NULL) {
+			ERRMSG("Can't allocate memory for the name(%s). %s\n",
+			    FILENAME_VMCOREINFO, strerror(errno));
+			return FALSE;
+		}
+		strcpy(info->name_vmcoreinfo, FILENAME_VMCOREINFO);
+		if (!copy_vmcoreinfo(info->offset_vmcoreinfo_xen,
+		    info->size_vmcoreinfo_xen))
+			return FALSE;
+		/*
+		 * Read vmcoreinfo from /tmp/vmcoreinfoXXXXXX.
+		 */
+		if (!open_vmcoreinfo("r"))
+			return FALSE;
+		if (!read_vmcoreinfo_xen())
+			return FALSE;
+		unlink(info->name_vmcoreinfo);
 	}
 	if (!get_xen_info())
 		return FALSE;
@@ -5975,7 +6048,7 @@ create_dumpfile()
 }
 
 static struct option longopts[] = {
-	{"xen-syms", required_argument, NULL, 'X'},
+	{"xen-syms", required_argument, NULL, 'y'},
 	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
 	{"message-level", required_argument, NULL, 'm'},
 	{0, 0, 0, 0}
@@ -6000,7 +6073,7 @@ main(int argc, char *argv[])
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:Rvx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:RvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
 		case 'b':
@@ -6045,10 +6118,13 @@ main(int argc, char *argv[])
 			info->flag_show_version = 1;
 			break;
 		case 'X':
-			info->name_xen_syms = optarg;
+			info->flag_exclude_xen_dom = 1;
 			break;
 		case 'x':
 			info->name_vmlinux = optarg;
+			break;
+		case 'y':
+			info->name_xen_syms = optarg;
 			break;
 		case 'z':
 			info->flag_read_vmcoreinfo = 1;

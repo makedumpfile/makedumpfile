@@ -5855,7 +5855,7 @@ handle_xen()
 	MSG("\n");
 	MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
 
-	return COMPLETED;
+	return TRUE;
 out:
 	return FALSE;
 #endif
@@ -6146,7 +6146,8 @@ main(int argc, char *argv[])
 			goto out;
 		}
 		info->dump_level |= DL_EXCLUDE_XEN;
-		return handle_xen();
+		if (!handle_xen())
+			goto out;
 
 	} else if (info->flag_rearrange) {
 		if (!open_files_for_rearranging_dumpdata())

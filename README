@@ -57,6 +57,7 @@
   2.6.22 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
   2.6.23 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
   2.6.24 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
+  2.6.25 | OK | ** | -- |    |    | ** |TODO| -- | OK | OK | OK | 
 
   OK    : Support.
   --    : Not support.
@@ -64,6 +65,9 @@
   TODO  : TODO.
   KP    : Both kexec/kdump does not work with PPC64 2.6.20 kernels. 
           This is a known problem fixed with later kernels.
+  **    : The deleted memory model.
+          On x86_64, both FLATMEM and DISCONTIGMEM have been deleted since
+          linux-2.6.25.
 
 * USAGE
   Please see "man makedumpfile" or "makedumpfile -h".

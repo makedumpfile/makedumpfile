@@ -73,6 +73,7 @@ enum {
 #define MEMORY_PAGETABLE_4L	(1 << 0)
 #define MEMORY_PAGETABLE_3L	(1 << 1)
 #define MEMORY_X86_PAE		(1 << 2)
+#define MEMORY_XEN		(1 << 3)
 
 /*
  * Type of address
@@ -466,6 +467,8 @@ do { \
 #define ELF64		(2)
 #define STRLEN_OSRELEASE (65)	/* same length as diskdump.h */
 
+#define XEN_ELFNOTE_CRASH_INFO	(0x1000001)
+
 /*
  * The value of dependence on machine
  */
@@ -697,7 +700,6 @@ struct DumpInfo {
 	int		flag_rearrange;      /* flag of creating dumpfile from
 						flattened format */
 	int		flag_force;	     /* overwrite existing stuff */
-	int		flag_xen;
 	long		page_size;           /* size of page */
 	long		page_shift;
 	unsigned long long	max_mapnr;   /* number of page descriptor */
@@ -714,6 +716,8 @@ struct DumpInfo {
 	int		block_order;
 	off_t		offset_bitmap1;
 	unsigned long	len_bitmap;          /* size of bitmap(1st and 2nd) */
+	struct dump_bitmap 		*bitmap1;
+	struct dump_bitmap 		*bitmap2;
 	struct disk_dump_header		*dump_header; 
 
 	/*
@@ -989,6 +993,9 @@ int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
 int get_str_osrelease_from_vmlinux();
+int get_pt_note_info(off_t off_note, unsigned long sz_note);
+int exclude_xen_user_domain();
+
 
 /*
  * for Xen extraction

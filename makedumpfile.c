@@ -843,9 +843,10 @@ int
 get_elf_info()
 {
 	int i, j, phnum, num_load, elf_format;
-	unsigned long tmp;
-	Elf64_Phdr load64;
-	Elf32_Phdr load32;
+	off_t offset_note;
+	unsigned long tmp, size_note;
+	Elf64_Phdr phdr64;
+	Elf32_Phdr phdr32;
 
 	int ret = FALSE;
 
@@ -875,18 +876,24 @@ get_elf_info()
 		    strerror(errno));
 		goto out;
 	}
+	offset_note = 0;
+	size_note   = 0;
 	for (i = 0, j = 0; i < phnum; i++) {
 		if (info->flag_elf64) { /* ELF64 */
 			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
-			    i, &load64)) {
+			    i, &phdr64)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
-			if (load64.p_type != PT_LOAD)
+			if (phdr64.p_type == PT_NOTE) {
+				offset_note = phdr64.p_offset;
+				size_note   = phdr64.p_filesz;
+			}
+			if (phdr64.p_type != PT_LOAD)
 				continue;
 
 			if (j == 0) {
-				info->offset_load_memory = load64.p_offset;
+				info->offset_load_memory = phdr64.p_offset;
 				if (!info->offset_load_memory) {
 					ERRMSG("Can't get the offset of page data.\n");
 					goto out;
@@ -894,20 +901,24 @@ get_elf_info()
 			}
 			if (j >= info->num_load_memory)
 				goto out;
-			if(!dump_Elf64_load(&load64, j))
+			if(!dump_Elf64_load(&phdr64, j))
 				goto out;
 			j++;
 		} else {                /* ELF32 */
 			if (!get_elf32_phdr(info->fd_memory, info->name_memory,
-			    i, &load32)) {
+			    i, &phdr32)) {
 				ERRMSG("Can't find Phdr %d.\n", i);
 				goto out;
 			}
-			if (load32.p_type != PT_LOAD)
+			if (phdr32.p_type == PT_NOTE) {
+				offset_note = phdr32.p_offset;
+				size_note   = phdr32.p_filesz;
+			}
+			if (phdr32.p_type != PT_LOAD)
 				continue;
 
 			if (j == 0) {
-				info->offset_load_memory = load32.p_offset;
+				info->offset_load_memory = phdr32.p_offset;
 				if (!info->offset_load_memory) {
 					ERRMSG("Can't get the offset of page data.\n");
 					goto out;
@@ -915,10 +926,18 @@ get_elf_info()
 			}
 			if (j >= info->num_load_memory)
 				goto out;
-			if(!dump_Elf32_load(&load32, j))
+			if(!dump_Elf32_load(&phdr32, j))
 				goto out;
 			j++;
 		}
+	}
+	if (offset_note == 0 || size_note == 0) {
+		ERRMSG("Can't find PT_NOTE Phdr.\n");
+		goto out;
+	}
+	if (!get_pt_note_info(offset_note, size_note)) {
+		ERRMSG("Can't get PT_NOTE information.\n");
+		goto out;
 	}
 
 	/*
@@ -2367,93 +2386,32 @@ read_vmcoreinfo()
 }
 
 int
-get_pt_note_info(int *flag_elf64, off_t *offset, unsigned long *size)
+get_pt_note_info(off_t off_note, unsigned long sz_note)
 {
-	Elf64_Phdr phdr64;
-	Elf32_Phdr phdr32;
-	int i, phnum, num_load, elf_format;
-
-	(*offset) = 0;
-	(*size)   = 0;
-
-	elf_format = check_elf_format(info->fd_memory, info->name_memory,
-	    &phnum, &num_load);
-
-	if (elf_format == ELF64)
-		(*flag_elf64) = TRUE;
-	else if (elf_format == ELF32)
-		(*flag_elf64) = FALSE;
-	else
-		return FALSE;
-
-	for (i = 0; i < phnum; i++) {
-		if (*flag_elf64) { /* ELF64 */
-			if (!get_elf64_phdr(info->fd_memory, info->name_memory,
-			    i, &phdr64)) {
-				ERRMSG("Can't find Phdr %d.\n", i);
-				return FALSE;
-			}
-			if (phdr64.p_type != PT_NOTE)
-				continue;
-
-			(*offset) = phdr64.p_offset;
-			(*size)   = phdr64.p_filesz;
-			break;
-		} else {         /* ELF32 */
-			if (!get_elf32_phdr(info->fd_memory, info->name_memory,
-			    i, &phdr32)) {
-				ERRMSG("Can't find Phdr %d.\n", i);
-				return FALSE;
-			}
-			if (phdr32.p_type != PT_NOTE)
-				continue;
-
-			(*offset) = phdr32.p_offset;
-			(*size)   = phdr32.p_filesz;
-			break;
-		}
-	}
-	if (*offset == 0 || *size == 0) {
-		ERRMSG("Can't find PT_NOTE Phdr.\n");
-		return FALSE;
-	}
-	return TRUE;
-}
-
-int
-is_vmcoreinfo_in_vmcore(int *flag_found)
-{
-	off_t offset, off_note;
-	int flag_elf64;
-	unsigned long sz_note;
+	int n_type;
+	off_t offset;
 	char buf[VMCOREINFO_NOTE_NAME_BYTES];
 	Elf64_Nhdr note64;
 	Elf32_Nhdr note32;
 
 	const off_t failed = (off_t)-1;
 
-	(*flag_found) = FALSE;
-
-	/*
-	 * Get information about PT_NOTE segment.
-	 */
-	if (!get_pt_note_info(&flag_elf64, &off_note, &sz_note))
-		return FALSE;
-
 	offset = off_note;
+	n_type = 0;
 	while (offset < off_note + sz_note) {
 		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 			ERRMSG("Can't seek the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
 			return FALSE;
 		}
-		if (flag_elf64) {
+		if (info->flag_elf64) {
 			if (read(info->fd_memory, &note64, sizeof(note64))
 			    != sizeof(note64)) {
 				ERRMSG("Can't read the dump memory(%s). %s\n",
 				    info->name_memory, strerror(errno));
 				return FALSE;
 			}
+			n_type = note64.n_type;
 		} else {
 			if (read(info->fd_memory, &note32, sizeof(note32))
 			    != sizeof(note32)) {
@@ -2461,37 +2419,51 @@ is_vmcoreinfo_in_vmcore(int *flag_found)
 				    info->name_memory, strerror(errno));
 				return FALSE;
 			}
+			n_type = note32.n_type;
 		}
 		if (read(info->fd_memory, &buf, sizeof(buf)) != sizeof(buf)) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
 			return FALSE;
 		}
-		if (strncmp(VMCOREINFO_NOTE_NAME, buf,
+		/*
+		 * Check whether /proc/vmcore contains vmcoreinfo,
+		 * and get both the offset and the size.
+		 */
+		if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
 		    VMCOREINFO_NOTE_NAME_BYTES)) {
-			if (flag_elf64) {
-				offset += sizeof(Elf64_Nhdr)
-				    + ((note64.n_namesz + 3) & ~3)
-				    + ((note64.n_descsz + 3) & ~3);
+			if (info->flag_elf64) {
+				info->offset_vmcoreinfo = offset
+				    + (sizeof(note64)
+				    + ((note64.n_namesz + 3) & ~3));
+				info->size_vmcoreinfo = note64.n_descsz;
 			} else {
-				offset += sizeof(Elf32_Nhdr)
-				    + ((note32.n_namesz + 3) & ~3)
-				    + ((note32.n_descsz + 3) & ~3);
+				info->offset_vmcoreinfo = offset
+				    + (sizeof(note32)
+				    + ((note32.n_namesz + 3) & ~3));
+				info->size_vmcoreinfo = note32.n_descsz;
 			}
-			continue;
-		}
-		if (flag_elf64) {
-			info->offset_vmcoreinfo = offset + (sizeof(note64)
-			    + ((note64.n_namesz + 3) & ~3));
-			info->size_vmcoreinfo = note64.n_descsz;
+		/*
+		 * Check whether /proc/vmcore contains xen's note.
+		 */
+		} else if (n_type == XEN_ELFNOTE_CRASH_INFO)
+			vt.mem_flags |= MEMORY_XEN;
+
+		if (info->flag_elf64) {
+			offset += sizeof(Elf64_Nhdr)
+			    + ((note64.n_namesz + 3) & ~3)
+			    + ((note64.n_descsz + 3) & ~3);
 		} else {
-			info->offset_vmcoreinfo = offset + (sizeof(note32)
-			    + ((note32.n_namesz + 3) & ~3));
-			info->size_vmcoreinfo = note32.n_descsz;
+			offset += sizeof(Elf32_Nhdr)
+			    + ((note32.n_namesz + 3) & ~3)
+			    + ((note32.n_descsz + 3) & ~3);
 		}
-		(*flag_found) = TRUE;
-		break;
 	}
+	if (vt.mem_flags & MEMORY_XEN)
+		DEBUG_MSG("Xen kdump\n");
+	else
+		DEBUG_MSG("Linux kdump\n");
+
 	return TRUE;
 }
 
@@ -3219,11 +3191,6 @@ get_mem_map()
 int
 initial()
 {
-	int vmcoreinfo_in_vmcore = FALSE;
-
-	if (!get_elf_info())
-		return FALSE;
-
 	if (!get_phys_base())
 		return FALSE;
 
@@ -3256,10 +3223,7 @@ initial()
 		 * Check whether /proc/vmcore contains vmcoreinfo,
 		 * and get both the offset and the size.
 		 */
-		if (!is_vmcoreinfo_in_vmcore(&vmcoreinfo_in_vmcore))
-			return FALSE;
-
-		if (!vmcoreinfo_in_vmcore) {
+		if (!info->offset_vmcoreinfo || !info->size_vmcoreinfo) {
 			if (info->dump_level <= DL_EXCLUDE_ZERO)
 				goto out;
 
@@ -3314,18 +3278,116 @@ out:
 	return TRUE;
 }
 
-static inline void
-set_bitmap(char *bitmap, unsigned long long pfn, int val)
+int
+set_bitmap(struct dump_bitmap *bitmap, unsigned long long pfn,
+    int val)
 {
 	int byte, bit;
+	off_t old_offset, new_offset;
+	old_offset = bitmap->offset + BUFSIZE_BITMAP * bitmap->no_block;
+	new_offset = bitmap->offset + BUFSIZE_BITMAP * (pfn / PFN_BUFBITMAP);
 
-	byte = pfn>>3;
-	bit  = pfn & 7;
-
+	if (0 <= bitmap->no_block && old_offset != new_offset) {
+		if (lseek(bitmap->fd, old_offset, SEEK_SET) < 0 ) {
+			ERRMSG("Can't seek the bitmap(%s). %s\n",
+			    bitmap->file_name, strerror(errno));
+			return FALSE;
+		}
+		if (write(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP)
+		    != BUFSIZE_BITMAP) {
+			ERRMSG("Can't write the bitmap(%s). %s\n",
+			    bitmap->file_name, strerror(errno));
+			return FALSE;
+		}
+	}
+	if (old_offset != new_offset) {
+		if (lseek(bitmap->fd, new_offset, SEEK_SET) < 0 ) {
+			ERRMSG("Can't seek the bitmap(%s). %s\n",
+			    bitmap->file_name, strerror(errno));
+			return FALSE;
+		}
+		if (read(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP)
+		    != BUFSIZE_BITMAP) {
+			ERRMSG("Can't read the bitmap(%s). %s\n",
+			    bitmap->file_name, strerror(errno));
+			return FALSE;
+		}
+		bitmap->no_block = pfn / PFN_BUFBITMAP;
+	}
+	/*
+	 * If val is 0, clear bit on the bitmap.
+	 */
+	byte = (pfn%PFN_BUFBITMAP)>>3;
+	bit  = (pfn%PFN_BUFBITMAP) & 7;
 	if (val)
-		bitmap[byte] |= 1<<bit;
+		bitmap->buf[byte] |= 1<<bit;
 	else
-		bitmap[byte] &= ~(1<<bit);
+		bitmap->buf[byte] &= ~(1<<bit);
+
+	return TRUE;
+}
+
+int
+sync_bitmap(struct dump_bitmap *bitmap)
+{
+	off_t offset;
+	offset = bitmap->offset + BUFSIZE_BITMAP * bitmap->no_block;
+
+	/*
+	 * The bitmap buffer is not dirty, and it is not necessary
+	 * to write out it.
+	 */
+	if (bitmap->no_block < 0)
+		return TRUE;
+
+	if (lseek(bitmap->fd, offset, SEEK_SET) < 0 ) {
+		ERRMSG("Can't seek the bitmap(%s). %s\n",
+		    bitmap->file_name, strerror(errno));
+		return FALSE;
+	}
+	if (write(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP)
+	    != BUFSIZE_BITMAP) {
+		ERRMSG("Can't write the bitmap(%s). %s\n",
+		    bitmap->file_name, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+sync_1st_bitmap()
+{
+	return sync_bitmap(info->bitmap1);
+}
+
+int
+sync_2nd_bitmap()
+{
+	return sync_bitmap(info->bitmap2);
+}
+
+int
+set_bit_on_1st_bitmap(unsigned long long pfn)
+{
+	return set_bitmap(info->bitmap1, pfn, 1);
+}
+
+int
+set_bit_on_2nd_bitmap(unsigned long long pfn)
+{
+	return set_bitmap(info->bitmap2, pfn, 1);
+}
+
+int
+clear_bit_on_1st_bitmap(unsigned long long pfn)
+{
+	return set_bitmap(info->bitmap1, pfn, 0);
+}
+
+int
+clear_bit_on_2nd_bitmap(unsigned long long pfn)
+{
+	return set_bitmap(info->bitmap2, pfn, 0);
 }
 
 static inline int
@@ -3707,36 +3769,6 @@ page_to_pfn(unsigned long page)
 }
 
 int
-reset_2nd_bitmap(unsigned long long pfn)
-{
-	off_t offset_pfn;
-	unsigned int buf_size;
-	struct cache_data *bm2 = info->bm2;
-
-	offset_pfn  = (info->len_bitmap/2) + (pfn/PFN_BUFBITMAP)*BUFSIZE_BITMAP;
-	bm2->offset = offset_pfn;
-	buf_size    = info->len_bitmap - bm2->offset;
-	if (buf_size >= BUFSIZE_BITMAP) {
-		bm2->cache_size = BUFSIZE_BITMAP;
-		bm2->buf_size   = BUFSIZE_BITMAP;
-	} else {
-		bm2->cache_size = buf_size;
-		bm2->buf_size   = buf_size;
-	}
-
-	if (!read_cache(bm2))
-		return FALSE;
-
-	set_bitmap(bm2->buf, pfn%PFN_BUFBITMAP, 0);
-
-	bm2->offset = offset_pfn;
-	if (!write_cache_bufsz(bm2))
-		return FALSE;
-
-	return TRUE;
-}
-
-int
 reset_bitmap_of_free_pages(unsigned long node_zones)
 {
 
@@ -3783,7 +3815,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 				}
 				for (i = 0; i < (1<<order); i++) {
 					pfn = start_pfn + i;
-					reset_2nd_bitmap(pfn);
+					clear_bit_on_2nd_bitmap(pfn);
 				}
 				found_free_pages += i;
 
@@ -3881,21 +3913,12 @@ _exclude_free_page()
 			}
 		}
 	}
-
-	/*
-	 * Flush 2nd-bitmap.
-	 * info->bm2->buf_size is set at reset_2nd_bitmap().
-	 */
-	info->bm2->offset  -= info->bm2->buf_size;
-	if (!write_cache_bufsz(info->bm2))
-		return FALSE;
 	return TRUE;
 }
 
 int
-exclude_free_page(struct cache_data *bm2)
+exclude_free_page()
 {
-
 	/*
 	 * Check having necessary information.
 	 */
@@ -3922,8 +3945,6 @@ exclude_free_page(struct cache_data *bm2)
 		return FALSE;
 	}
 
-	info->bm2 = bm2;
-
 	/*
 	 * Detect free pages and update 2nd-bitmap.
 	 */
@@ -3934,58 +3955,115 @@ exclude_free_page(struct cache_data *bm2)
 }
 
 int
-create_dump_bitmap()
+create_1st_bitmap()
 {
-	int val, not_found_mem_map;
-	unsigned int i, mm, remain_size;
-	unsigned long mem_map;
-	unsigned long long pfn, paddr, pfn_mm;
-	unsigned char *page_cache = NULL, *buf = NULL, *pcache;
-	unsigned int _count;
-	unsigned long flags, mapping;
-	struct cache_data bm1, bm2;
-	struct mem_map_data *mmd;
+	char *buf = NULL;
+	unsigned long long pfn, paddr;
 	off_t offset_page;
-	const off_t failed = (off_t)-1;
+	int ret = FALSE;
+
+	/*
+	 * At first, clear all the bits on the 1st-bitmap.
+	 */
+	if ((buf = malloc(info->page_size)) == NULL) {
+		ERRMSG("Can't allocate memory for the page. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	memset(buf, 0, info->page_size);
+
+	if (lseek(info->bitmap1->fd, info->bitmap1->offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the bitmap(%s). %s\n",
+		    info->bitmap1->file_name, strerror(errno));
+		goto out;
+	}
+	offset_page = 0;
+	while (offset_page < (info->len_bitmap / 2)) {
+		if (write(info->bitmap1->fd, buf, info->page_size)
+		    != info->page_size) {
+			ERRMSG("Can't write the bitmap(%s). %s\n",
+			    info->bitmap1->file_name, strerror(errno));
+			goto out;
+		}
+		offset_page += info->page_size;
+	}
+
+	/*
+	 * If page is on memory hole, set bit on the 1st-bitmap.
+	 */
+	for (pfn = 0, paddr = 0; pfn < info->max_mapnr;
+	    pfn++, paddr += info->page_size) {
+		if (is_in_segs(paddr))
+			set_bit_on_1st_bitmap(pfn);
+		else
+			pfn_memhole++;
+	}
+	if (!sync_1st_bitmap())
+		goto out;
+
+	ret = TRUE;
+out:
+	if (buf != NULL)
+		free(buf);
+
+	return ret;
+}
+
+/*
+ * Exclude the page filled with zero in case of creating an elf dumpfile.
+ */
+int
+exclude_zero_pages()
+{
+	unsigned long long pfn, paddr;
+	unsigned char *buf = NULL;
 
 	int ret = FALSE;
 
-	bm1.fd         = info->fd_bitmap;
-	bm1.file_name  = info->name_bitmap;
-	bm1.cache_size = BUFSIZE_BITMAP;
-	bm1.buf_size   = 0;
-	bm1.offset     = 0;
-	bm1.buf        = NULL;
-
-	bm2.fd         = info->fd_bitmap;
-	bm2.file_name  = info->name_bitmap;
-	bm2.cache_size = BUFSIZE_BITMAP;
-	bm2.buf_size   = 0;
-	bm2.offset     = info->len_bitmap/2;
-	bm2.buf        = NULL;
-
-	if ((bm1.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for 1st-bitmap buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((bm2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for 2nd-bitmap buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((info->dump_level > DL_EXCLUDE_ZERO)
-	    && (page_cache = malloc(SIZE(page)*PGMM_CACHED)) == NULL) {
-		ERRMSG("Can't allocate memory for the pagedesc cache. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	if ((buf = malloc(info->page_size)) == NULL) {
 		ERRMSG("Can't allocate memory for the page. %s\n",
 		    strerror(errno));
 		goto out;
 	}
+	for (pfn = paddr = 0; pfn < info->max_mapnr;
+	    pfn++, paddr += info->page_size) {
+		if (!is_in_segs(paddr))
+			continue;
 
+		if (!readmem(PADDR, paddr, buf, info->page_size))
+			goto out;
+
+		if (is_zero_page(buf, info->page_size)) {
+			clear_bit_on_2nd_bitmap(pfn);
+			pfn_zero++;
+		}
+	}
+	ret = TRUE;
+out:
+	if (buf != NULL)
+		free(buf);
+
+	return ret;
+}
+
+int
+exclude_unnecessary_pages()
+{
+	unsigned int mm;
+	unsigned long mem_map;
+	unsigned long long pfn, paddr, pfn_mm;
+	unsigned char *page_cache = NULL, *pcache;
+	unsigned int _count;
+	unsigned long flags, mapping;
+	struct mem_map_data *mmd;
+
+	int ret = FALSE;
+
+	if ((page_cache = malloc(SIZE(page)*PGMM_CACHED)) == NULL) {
+		ERRMSG("Can't allocate memory for the pagedesc cache. %s\n",
+		    strerror(errno));
+		goto out;
+	}
 	for (mm = 0; mm < info->num_mem_map; mm++) {
 		mmd = &info->mem_map_data[mm];
 		pfn   = mmd->pfn_start;
@@ -3993,98 +4071,17 @@ create_dump_bitmap()
 		mem_map = mmd->mem_map;
 
 		if (mem_map == NOT_MEMMAP_ADDR)
-			not_found_mem_map = TRUE;
-		else
-			not_found_mem_map = FALSE;
+			continue;
 
 		for (; pfn < mmd->pfn_end;
 		    pfn++, mem_map += SIZE(page),
 		    paddr += info->page_size) {
 
-			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
-				/*
-				 * Write the 1st-bitmap and the 2nd-bitmap.
-				 */
-				bm1.buf_size = BUFSIZE_BITMAP;
-				bm2.buf_size = BUFSIZE_BITMAP;
-				if (!write_cache_bufsz(&bm1))
-					goto out;
-				if (!write_cache_bufsz(&bm2))
-					goto out;
-
-				/*
-				 * Clear the remainder of the bitmap.
-				 */
-				if ((info->max_mapnr - pfn) <= PFN_BUFBITMAP) {
-					for (i = 0; i < PFN_BUFBITMAP; i++) {
-						set_bitmap(bm1.buf, i, 0);
-						set_bitmap(bm2.buf, i, 0);
-					}
-				}
-			}
-			/*
-			 * val  1: dump Page
-			 *      0: not dump Page
-			 */
-			val = 1;
-
 			/*
 			 * Exclude the memory hole.
 			 */
-			if (!is_in_segs(paddr)) {
-				val = 0;
-				pfn_memhole++;
-			}
-			/*
-			 * Set the 1st-bitmap.
-			 *  val  1: not memory hole
-			 *       0: memory hole
-			 */
-			set_bitmap(bm1.buf, pfn%PFN_BUFBITMAP, val);
-
-			if (val == 0) {
-				/*
-				 * If the bit of 1st-bitmap is 0,
-				 * also 2nd-bitmap's must be 0.
-				 */
-				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, val);
+			if (!is_in_segs(paddr))
 				continue;
-			}
-
-			/*
-			 * Exclude the page filled with zero in case of creating
-			 * the elf dumpfile.
-			 */
-			if (info->flag_elf_dumpfile
-			    && (info->dump_level & DL_EXCLUDE_ZERO)) {
-				offset_page = paddr_to_offset(paddr);
-				if (!offset_page) {
-					ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
-					    paddr);
-					goto out;
-				}
-				if (lseek(info->fd_memory, offset_page,
-				    SEEK_SET) == failed) {
-					ERRMSG("Can't seek the dump memory(%s). %s\n",
-					    info->name_memory, strerror(errno));
-					goto out;
-				}
-				if (read(info->fd_memory, buf, info->page_size)
-				    != info->page_size) {
-					ERRMSG("Can't read the dump memory(%s). %s\n",
-					    info->name_memory, strerror(errno));
-					goto out;
-				}
-				if (is_zero_page(buf, info->page_size)) {
-					val = 0;
-					pfn_zero++;
-				}
-			}
-			if ((info->dump_level <= DL_EXCLUDE_ZERO)
-			    || not_found_mem_map) {
-				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, val);
-				continue;
-			}
 
 			if ((pfn % PGMM_CACHED) == 0) {
 				if (pfn + PGMM_CACHED < mmd->pfn_end)
@@ -4106,7 +4103,7 @@ create_dump_bitmap()
 			if ((info->dump_level & DL_EXCLUDE_CACHE)
 			    && (isLRU(flags) || isSwapCache(flags))
 			    && !isPrivate(flags) && !isAnon(mapping)) {
-				val = 0;
+				clear_bit_on_2nd_bitmap(pfn);
 				pfn_cache++;
 			}
 			/*
@@ -4115,7 +4112,7 @@ create_dump_bitmap()
 			else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
 			    && (isLRU(flags) || isSwapCache(flags))
 			    && !isAnon(mapping)) {
-				val = 0;
+				clear_bit_on_2nd_bitmap(pfn);
 				pfn_cache_private++;
 			}
 			/*
@@ -4123,45 +4120,179 @@ create_dump_bitmap()
 			 */
 			else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
 			    && isAnon(mapping)) {
-				val = 0;
+				clear_bit_on_2nd_bitmap(pfn);
 				pfn_user++;
 			}
-			/*
-			 * Set the 2nd-bitmap.
-			 *  val  1: dump page
-			 *       0: not dump page(memory hole, or page excluded)
-			 */
-			set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, val);
 		}
 	}
-
-	/*
-	 * Write the remainder of the bitmap.
-	 */
-	remain_size = info->len_bitmap/2 - bm1.offset;
-	bm1.buf_size = remain_size;
-	bm2.buf_size = remain_size;
-	if (!write_cache_bufsz(&bm1))
-		goto out;
-	if (!write_cache_bufsz(&bm2))
-		goto out;
-
 	if (info->dump_level & DL_EXCLUDE_FREE)
-		if (!exclude_free_page(&bm2))
+		if (!exclude_free_page())
 			goto out;
 
 	ret = TRUE;
 out:
 	if (page_cache != NULL)
 		free(page_cache);
-	if (buf != NULL)
-		free(buf);
-	if (bm1.buf != NULL)
-		free(bm1.buf);
-	if (bm2.buf != NULL)
-		free(bm2.buf);
 
 	return ret;
+}
+
+int
+copy_bitmap()
+{
+	off_t offset;
+	unsigned char *buf = NULL;
+ 	const off_t failed = (off_t)-1;
+
+	int ret = FALSE;
+
+	if ((buf = malloc(info->page_size)) == NULL) {
+		ERRMSG("Can't allocate memory for the page. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	offset = 0;
+	while (offset < (info->len_bitmap / 2)) {
+		if (lseek(info->bitmap1->fd, info->bitmap1->offset + offset,
+		    SEEK_SET) == failed) {
+			ERRMSG("Can't seek the bitmap(%s). %s\n",
+			    info->name_bitmap, strerror(errno));
+			goto out;
+		}
+		if (read(info->bitmap1->fd, buf, info->page_size)
+		    != info->page_size) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			goto out;
+		}
+		if (lseek(info->bitmap2->fd, info->bitmap2->offset + offset,
+		    SEEK_SET) == failed) {
+			ERRMSG("Can't seek the bitmap(%s). %s\n",
+			    info->name_bitmap, strerror(errno));
+			goto out;
+		}
+		if (write(info->bitmap2->fd, buf, info->page_size)
+		    != info->page_size) {
+			ERRMSG("Can't write the bitmap(%s). %s\n",
+		    	info->name_bitmap, strerror(errno));
+			goto out;
+		}
+		offset += info->page_size;
+	}
+	ret = TRUE;
+out:
+	if (buf != NULL)
+		free(buf);
+
+	return ret;
+}
+
+int
+create_2nd_bitmap()
+{
+	/*
+	 * Copy 1st-bitmap to 2nd-bitmap.
+	 */
+	if (!copy_bitmap()) {
+		ERRMSG("Can't copy 1st-bitmap to 2nd-bitmap.\n");
+		return FALSE;
+	}
+
+	/*
+	 * Exclude pages filled with zero for creating an ELF dumpfile.
+	 *
+	 * Note: If creating a kdump-compressed dumpfile, makedumpfile
+	 *	 checks zero-pages while copying dumpable pages to a
+	 *	 dumpfile from /proc/vmcore. That is valuable for the
+	 *	 speed, because each page is read one time only.
+	 *	 Otherwise (if creating an ELF dumpfile), makedumpfile
+	 *	 should check zero-pages at this time because 2nd-bitmap
+	 *	 should be fixed for creating an ELF header. That is slow
+	 *	 due to reading each page two times, but it is necessary.
+	 */
+	if ((info->dump_level & DL_EXCLUDE_ZERO) && info->flag_elf_dumpfile) {
+		if (!exclude_zero_pages()) {
+			ERRMSG("Can't exclude pages filled with zero");
+			ERRMSG("for creating an ELF dumpfile.\n");
+			return FALSE;
+		}
+	}
+
+	/*
+	 * Exclude unnecessary pages (free pages, cache pages, etc.)
+	 */
+	if (DL_EXCLUDE_ZERO < info->dump_level) {
+		if (!exclude_unnecessary_pages()) {
+			ERRMSG("Can't exclude unnecessary pages.\n");
+			return FALSE;
+		}
+	}
+
+	/*
+	 * Exclude Xen user domain.
+	 */
+	if (!exclude_xen_user_domain()) {
+		ERRMSG("Can't exclude xen user domain.\n");
+		return FALSE;
+	}
+
+	if (!sync_2nd_bitmap())
+		return FALSE;
+
+	return TRUE;
+}
+
+int
+prepare_dump_bitmap()
+{
+	if ((info->bitmap1 = malloc(sizeof(struct dump_bitmap))) == NULL) {
+		ERRMSG("Can't allocate memory for the 1st-bitmap. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	if ((info->bitmap2 = malloc(sizeof(struct dump_bitmap))) == NULL) {
+		ERRMSG("Can't allocate memory for the 2nd-bitmap. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	info->bitmap1->fd        = info->fd_bitmap;
+	info->bitmap1->file_name = info->name_bitmap;
+	info->bitmap1->no_block  = -1;
+	info->bitmap1->buf       = NULL;
+	info->bitmap1->offset    = 0;
+
+	info->bitmap2->fd        = info->fd_bitmap;
+	info->bitmap2->file_name = info->name_bitmap;
+	info->bitmap2->no_block  = -1;
+	info->bitmap2->buf       = NULL;
+	info->bitmap2->offset    = info->len_bitmap/2;
+
+	if ((info->bitmap1->buf = malloc(BUFSIZE_BITMAP)) == NULL) {
+		ERRMSG("Can't allocate buffer for the 1st-bitmap. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	if ((info->bitmap2->buf = malloc(BUFSIZE_BITMAP)) == NULL) {
+		ERRMSG("Can't allocate buffer for the 2nd-bitmap. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+create_dump_bitmap()
+{
+	if (!prepare_dump_bitmap())
+		return FALSE;
+
+	if (!create_1st_bitmap())
+		return FALSE;
+
+	if (!create_2nd_bitmap())
+		return FALSE;
+
+	return TRUE;
 }
 
 int
@@ -4175,19 +4306,7 @@ get_loads_dumpfile()
 	Elf64_Phdr load64;
 	Elf32_Ehdr ehdr32;
 	Elf32_Phdr load32;
-	struct dump_bitmap bitmap2;
 
-	bitmap2.fd        = info->fd_bitmap;
-	bitmap2.file_name = info->name_bitmap;
-	bitmap2.no_block  = -1;
-	bitmap2.buf       = NULL;
-	bitmap2.offset    = info->len_bitmap/2;
-
-	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	if (info->flag_elf64) { /* ELF64 */
 		if (!get_elf64_ehdr(&ehdr64)) {
 			ERRMSG("Can't get ehdr64.\n");
@@ -4236,7 +4355,7 @@ get_loads_dumpfile()
 			pfn_end++;
 
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
-			if (!is_dumpable(&bitmap2, pfn)) {
+			if (!is_dumpable(info->bitmap2, pfn)) {
 				num_excluded++;
 				continue;
 			}
@@ -4253,8 +4372,6 @@ get_loads_dumpfile()
 		}
 	}
 out:
-	if (bitmap2.buf != NULL)
-		free(bitmap2.buf);
 	return num_new_load;
 }
 
@@ -4907,7 +5024,7 @@ write_kdump_pages()
  	unsigned long long pfn, per, num_dumpable = 0, num_dumped = 0;
 	unsigned long size_out;
 	struct page_desc pd, pd_zero;
-	off_t offset_data = 0, offset_memory = 0;
+	off_t offset_data = 0;
 	struct disk_dump_header *dh = info->dump_header;
 	unsigned char *buf = NULL, *buf_out = NULL;
 	unsigned long len_buf_out;
@@ -5055,19 +5172,8 @@ write_kdump_pages()
 
 		num_dumped++;
 
-		offset_memory = paddr_to_offset(info->page_size*pfn);
-		if (lseek(info->fd_memory, offset_memory, SEEK_SET)
-		    == failed) {
-			ERRMSG("Can't seek the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			goto out;
-		}
-		if (read(info->fd_memory, buf, info->page_size)
-		    != info->page_size) {
-			ERRMSG("Can't read the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			goto out;
-		}
+		if (!readmem(PADDR, info->page_size*pfn, buf, info->page_size))
+  			goto out;
 
 		/*
 		 * Exclude the page filled with zeros.
@@ -5690,71 +5796,33 @@ is_select_domain(unsigned int id)
 }
 
 int
-create_dump_bitmap_xen()
+exclude_xen_user_domain()
 {
 	int i, ret = FALSE;
-	unsigned int remain_size, count_info, _domain;
+	unsigned int count_info, _domain;
 	unsigned long page_info_addr;
-	unsigned long long paddr, pfn, pfn_start, pfn_end;
-	struct cache_data bm2;
+	unsigned long long pfn, pfn_end;
 	struct pt_load_segment *pls;
-	unsigned char *buf = NULL;
-	off_t offset_page;
-	const off_t failed = (off_t)-1;
 
 	/*
 	 * NOTE: the first half of bitmap is not used for Xen extraction
 	 */
-	bm2.fd         = info->fd_bitmap;
-	bm2.file_name  = info->name_bitmap;
-	bm2.cache_size = BUFSIZE_BITMAP;
-	bm2.buf_size   = 0;
-	bm2.offset     = info->len_bitmap/2;
-	bm2.buf        = NULL;
-
-	if ((bm2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for 2nd-bitmap buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((buf = malloc(info->page_size)) == NULL) {
-		ERRMSG("Can't allocate memory for the page. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-
-	pfn = 0;
 	for (i = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
-		pfn_start = pls->phys_start >> PAGESHIFT();
-		pfn_end   = pls->phys_end >> PAGESHIFT();
+		pfn     = pls->phys_start >> PAGESHIFT();
+		pfn_end = pls->phys_end >> PAGESHIFT();
 
-		/*
-		 * Pad the bits for memory hole.
-		 */
-		for (; pfn < pfn_start; pfn++) {
-			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
-				bm2.buf_size = BUFSIZE_BITMAP;
-				if (!write_cache_bufsz(&bm2))
-					goto out;
-				memset(bm2.buf, 0, BUFSIZE_BITMAP);
-			}
-		}
 		for (; pfn < pfn_end; pfn++) {
-			if ((pfn != 0) && (pfn%PFN_BUFBITMAP) == 0) {
-				bm2.buf_size = BUFSIZE_BITMAP;
-				if (!write_cache_bufsz(&bm2))
-					goto out;
-				memset(bm2.buf, 0, BUFSIZE_BITMAP);
-			}
-
-			if (!allocated_in_map(pfn))
+			if (!allocated_in_map(pfn)) {
+				clear_bit_on_2nd_bitmap(pfn);
 				continue;
+			}
 
 			page_info_addr = info->frame_table_vaddr + pfn * SIZE(page_info);
 			if (!readmem(VADDR_XEN,
 			      page_info_addr + OFFSET(page_info.count_info),
 		 	      &count_info, sizeof(count_info))) {
+				clear_bit_on_2nd_bitmap(pfn);
 				continue;	/* page_info may not exist */
 			}
 			if (!readmem(VADDR_XEN,
@@ -5763,66 +5831,44 @@ create_dump_bitmap_xen()
 				ERRMSG("Can't get page_info._domain.\n");
 				goto out;
 			}
-			if (info->dump_level & DL_EXCLUDE_ZERO) {
-				paddr = (unsigned long long)pfn * info->page_size;
-				offset_page = paddr_to_offset(paddr);
-				if (!offset_page) {
-					ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
-					    paddr);
-					goto out;
-				}
-				if (lseek(info->fd_memory, offset_page,
-				    SEEK_SET) == failed) {
-					ERRMSG("Can't seek the dump memory(%s). %s\n",
-					    info->name_memory, strerror(errno));
-					goto out;
-				}
-				if (read(info->fd_memory, buf, info->page_size)
-				    != info->page_size) {
-					ERRMSG("Can't read the dump memory(%s). %s\n",
-					    info->name_memory, strerror(errno));
-					goto out;
-				}
-				if (is_zero_page(buf, info->page_size))
-					continue;
-			}
 			/*
 			 * select:
 			 *  - anonymous (_domain == 0), or
 			 *  - xen heap area, or
 			 *  - selected domain page
 			 */
-			if (_domain == 0
-			    || (info->xen_heap_start <= pfn && pfn < info->xen_heap_end)
-			    || ((count_info & 0xffff) && is_select_domain(_domain))) {
-				set_bitmap(bm2.buf, pfn%PFN_BUFBITMAP, 1);
-			}
+			if (_domain == 0)
+				continue;
+			if (info->xen_heap_start <= pfn && pfn < info->xen_heap_end)
+				continue;
+			if ((count_info & 0xffff) && is_select_domain(_domain))
+				continue;
+			clear_bit_on_2nd_bitmap(pfn);
 		}
 	}
-
-	/*
-	 * Write the remainder of the bitmap.
-	 */
-	remain_size = info->len_bitmap - bm2.offset;
-	bm2.buf_size = remain_size;
-	if (!write_cache_bufsz(&bm2))
-		goto out;
-
 	ret = TRUE;
 out:
-	if (bm2.buf != NULL)
-		free(bm2.buf);
-	if (buf != NULL)
-		free(buf);
-
 	return ret;
 }
 
 int
 initial_xen()
 {
-	if (!get_elf_info())
+#ifdef __powerpc__
+	MSG("\n");
+	MSG("ppc64 xen is not supported.\n");
+	return FALSE;
+#else
+	if(!info->flag_elf_dumpfile) {
+		MSG("-E must be specified for Xen.\n");
 		return FALSE;
+	}
+	if (DL_EXCLUDE_ZERO < info->dump_level) {
+		MSG("Dump_level is invalid. It should be 0 or 1.\n");
+		print_usage();
+		return FALSE;
+	}
+	info->dump_level |= DL_EXCLUDE_XEN;
 
 	if (info->flag_read_vmcoreinfo) {
 		if (!read_vmcoreinfo_xen())
@@ -5843,51 +5889,6 @@ initial_xen()
 		show_data_xen();
 
 	return TRUE;
-}
-
-int
-handle_xen()
-{
-#ifdef __powerpc__
-	MSG("\n");
-	MSG("ppc64 xen is not supported.\n");
-
-	return FALSE;
-#else
-	if (!open_files_for_creating_dumpfile())
-		goto out;
-
-	if (!initial_xen())
-		goto out;
-
-	if (!create_dump_bitmap_xen())
-		goto out;
-
-	if (info->flag_flatten) {
-		if (!write_start_flat_header())
-			goto out;
-	}
-
-	if (!write_elf_header())
-		goto out;
-
-	if (!write_elf_pages())
-		goto out;
-
-	if (info->flag_flatten) {
-		if (!write_end_flat_header())
-			goto out;
-	}
-
-	if (!close_files_for_creating_dumpfile())
-		goto out;
-
-	MSG("\n");
-	MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
-
-	return TRUE;
-out:
-	return FALSE;
 #endif
 }
 
@@ -5930,9 +5931,16 @@ create_dumpfile()
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
-	if (!initial())
+	if (!get_elf_info())
 		return FALSE;
 
+	if (vt.mem_flags & MEMORY_XEN) {
+		if (!initial_xen())
+			return FALSE;
+	} else {
+		if (!initial())
+			return FALSE;
+	}
 	if (!create_dump_bitmap())
 		return FALSE;
 
@@ -6037,15 +6045,12 @@ main(int argc, char *argv[])
 			info->flag_show_version = 1;
 			break;
 		case 'X':
-			info->flag_xen = 1;
 			info->name_xen_syms = optarg;
 			break;
 		case 'x':
-			info->flag_xen = 1;
 			info->name_vmlinux = optarg;
 			break;
 		case 'z':
-			info->flag_xen = 1;
 			info->flag_read_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
 			break;
@@ -6165,20 +6170,6 @@ main(int argc, char *argv[])
 
 		MSG("\n");
 		MSG("The vmcoreinfo is saved to %s.\n", info->name_vmcoreinfo);
-
-	} else if (info->flag_xen) {
-		if (!info->flag_elf_dumpfile) {
-			MSG("-E must be specified with --xen-syms or --xen-vmcoreinfo.\n");
-			goto out;
-		}
-		if (DL_EXCLUDE_ZERO < info->dump_level) {
-			MSG("Dump_level is invalid. It should be 0 or 1.\n");
-			print_usage();
-			goto out;
-		}
-		info->dump_level |= DL_EXCLUDE_XEN;
-		if (!handle_xen())
-			goto out;
 
 	} else if (info->flag_rearrange) {
 		if (!open_files_for_rearranging_dumpdata())

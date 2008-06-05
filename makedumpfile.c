@@ -5050,6 +5050,66 @@ out:
 	return ret;
 }
 
+/*
+ * This function is specific for reading page.
+ * 
+ * If reading the separated page on different PT_LOAD segments,
+ * this function gets the page data from both segments. This is
+ * worthy of ia64 /proc/vmcore. In ia64 /proc/vmcore, region 5
+ * segment is overlapping to region 7 segment. The following is
+ * example (page_size is 16KBytes):
+ *
+ *  region |       paddr        |       memsz
+ * --------+--------------------+--------------------
+ *     5   | 0x0000000004000000 | 0x0000000000638ce0
+ *     7   | 0x0000000004000000 | 0x0000000000db3000
+ *
+ * In the above example, the last page of region 5 is 0x4638000
+ * and the segment does not contain complete data of this page.
+ * Then this function gets the data of 0x4638000 - 0x4638ce0
+ * from region 5, and gets the remaining data from region 7.
+ */
+int
+read_pfn(unsigned long long pfn, unsigned char *buf)
+{
+	unsigned long long paddr;
+	off_t offset1, offset2;
+	size_t size1, size2;
+
+	paddr = info->page_size * pfn;
+	offset1 = paddr_to_offset(paddr);
+	offset2 = paddr_to_offset(paddr + info->page_size);
+
+	/*
+	 * Check the separated page on different PT_LOAD segments.
+	 */
+	if (offset1 + info->page_size == offset2) {
+		size1 = info->page_size;
+	} else {
+		for (size1 = 1; size1 < info->page_size; size1++) {
+			offset2 = paddr_to_offset(paddr + size1);
+			if (offset1 + size1 != offset2)
+				break;
+		}
+	}
+	if (!readmem(PADDR, paddr, buf, size1)) {
+		ERRMSG("Can't get the page data.\n");
+		return FALSE;
+	}
+	if (size1 != info->page_size) {
+		size2 = info->page_size - size1;
+		if (!offset2) {
+			memset(buf + size1, 0, size2);
+		} else {
+			if (!readmem(PADDR, paddr + size1, buf + size1, size2)) {
+				ERRMSG("Can't get the page data.\n");
+				return FALSE;
+			}
+		}
+	}
+	return TRUE;
+}
+
 int
 write_kdump_pages()
 {
@@ -5204,8 +5264,8 @@ write_kdump_pages()
 
 		num_dumped++;
 
-		if (!readmem(PADDR, info->page_size*pfn, buf, info->page_size))
-  			goto out;
+		if (!read_pfn(pfn, buf))
+			goto out;
 
 		/*
 		 * Exclude the page filled with zeros.

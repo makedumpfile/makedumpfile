@@ -448,6 +448,11 @@ print_usage()
 	MSG("  [--xen-vmcoreinfo VMCOREINFO]:\n");
 	MSG("      Specify the VMCOREINFO of Xen to analyze Xen's memory usage.\n");
 	MSG("\n");
+	MSG("  [--xen_phys_start XEN_PHYS_START_ADDRESS]:\n");
+	MSG("      This option is only for x86_64.\n");
+	MSG("      Specify the XEN_PHYS_START_ADDRESS, if the xen code/data is relocatable\n");
+	MSG("      and VMCORE does not contain XEN_PHYS_START_ADDRESS in the CRASHINFO.\n");
+	MSG("\n");
 	MSG("  [-X]:\n");
 	MSG("      Exclude all the user domain pages from Xen kdump's VMCORE, and extract\n");
 	MSG("      the part of Xen and domain-0.\n");
@@ -2494,8 +2499,20 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
 		/*
 		 * Check whether /proc/vmcore contains xen's note.
 		 */
-		} else if (n_type == XEN_ELFNOTE_CRASH_INFO)
+		} else if (n_type == XEN_ELFNOTE_CRASH_INFO) {
 			vt.mem_flags |= MEMORY_XEN;
+			if (info->flag_elf64) {
+				info->offset_xen_crash_info = offset
+				    + (sizeof(note64)
+				    + ((note64.n_namesz + 3) & ~3));
+				info->size_xen_crash_info = note64.n_descsz;
+			} else {
+				info->offset_xen_crash_info = offset
+				    + (sizeof(note32)
+				    + ((note32.n_namesz + 3) & ~3));
+				info->size_xen_crash_info = note32.n_descsz;
+			}
+		}
 
 		if (info->flag_elf64) {
 			offset += sizeof(Elf64_Nhdr)
@@ -5615,6 +5632,36 @@ get_structure_info_xen()
 }
 
 int
+get_xen_phys_start(void)
+{
+	off_t offset;
+	unsigned long xen_phys_start;
+	const off_t failed = (off_t)-1;
+
+	if (info->xen_phys_start)
+		return TRUE;
+
+	if (info->size_xen_crash_info >= SIZE_XEN_CRASH_INFO_V2) {
+		offset = info->offset_xen_crash_info + info->size_xen_crash_info
+			 - sizeof(unsigned long) * 2;
+		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+			ERRMSG("Can't seek the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			return FALSE;
+		}
+		if (read(info->fd_memory, &xen_phys_start, sizeof(unsigned long))
+		    != sizeof(unsigned long)) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			return FALSE;
+		}
+		info->xen_phys_start = xen_phys_start;
+	}
+
+	return TRUE;
+}
+
+int
 get_xen_info()
 {
 	unsigned long domain;
@@ -5774,6 +5821,7 @@ show_data_xen()
 	MSG("OFFSET(domain.next_in_list): %ld\n", OFFSET(domain.next_in_list));
 
 	MSG("\n");
+	MSG("xen_phys_start: %lx\n", info->xen_phys_start);
 	MSG("frame_table_vaddr: %lx\n", info->frame_table_vaddr);
 	MSG("xen_heap_start: %lx\n", info->xen_heap_start);
 	MSG("xen_heap_end:%lx\n", info->xen_heap_end);
@@ -6107,6 +6155,8 @@ initial_xen()
 			return FALSE;
 		unlink(info->name_vmcoreinfo);
 	}
+	if (!get_xen_phys_start())
+		return FALSE;
 	if (!get_xen_info())
 		return FALSE;
 
@@ -6288,6 +6338,7 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 static struct option longopts[] = {
 	{"xen-syms", required_argument, NULL, 'y'},
 	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
+	{"xen_phys_start", required_argument, NULL, 'P'},
 	{"message-level", required_argument, NULL, 'm'},
 	{"help", no_argument, NULL, 'h'},
 	{0, 0, 0, 0}
@@ -6349,6 +6400,9 @@ main(int argc, char *argv[])
 			break;
 		case 'm':
 			message_level = atoi(optarg);
+			break;
+		case 'P':
+			info->xen_phys_start = strtoul(optarg, NULL, 0);
 			break;
 		case 'R':
 			info->flag_rearrange = 1;

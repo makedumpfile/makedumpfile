@@ -467,6 +467,7 @@ do { \
 #define STRLEN_OSRELEASE (65)	/* same length as diskdump.h */
 
 #define XEN_ELFNOTE_CRASH_INFO	(0x1000001)
+#define SIZE_XEN_CRASH_INFO_V2	(sizeof(unsigned long) * 10)
 
 /*
  * The value of dependence on machine
@@ -778,6 +779,9 @@ struct DumpInfo {
 	/*
 	 * for Xen extraction
 	 */
+	off_t			offset_xen_crash_info;
+	unsigned long		size_xen_crash_info;
+	unsigned long xen_phys_start;
 	unsigned long xen_heap_start;	/* start mfn of xen heap area */
 	unsigned long xen_heap_end;	/* end mfn(+1) of xen heap area */
 	unsigned long frame_table_vaddr;
@@ -1051,11 +1055,14 @@ int get_xen_info_x86();
 #define HYPERVISOR_VIRT_END   (0xffff880000000000)
 #define DIRECTMAP_VIRT_START  (0xffff830000000000)
 #define DIRECTMAP_VIRT_END    (0xffff840000000000)
+#define XEN_VIRT_START        (0xffff828c80000000)
 
 #define is_xen_vaddr(x) \
         ((x) >= HYPERVISOR_VIRT_START && (x) < HYPERVISOR_VIRT_END)
 #define is_direct(x) \
         ((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
+#define is_xen_text(x) \
+        ((x) >= XEN_VIRT_START && (x) < DIRECTMAP_VIRT_START)
 
 unsigned long long kvtop_xen_x86_64(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_x86_64(X)

@@ -286,6 +286,26 @@ not necessary to specify \fI\-\-xen-syms\fR and \fI\-\-xen-vmcoreinfo\fR.
 # makedumpfile \-E \-X /proc/vmcore dumpfile
 
 .TP
+\fB\-\-xen_phys_start\fR \fIxen_phys_start_address\fR
+This option is only for x86_64.
+Specify the \fIxen_phys_start_address\fR, if the xen code/data is relocatable
+and \fIVMCORE\fR does not contain \fIxen_phys_start_address\fR in the CRASHINFO.
+\fIxen_phys_start_address\fR can be token from the line of "Hypervisor code
+and data" in /proc/iomem. For example, specify 0xcee00000 as \fIxen_phys_start_address\fR
+if /proc/iomem is the following:
+  -------------------------------------------------------
+  # cat /proc/iomem
+  ...
+    cee00000-cfd99999 : Hypervisor code and data
+  ...
+  -------------------------------------------------------
+
+.br
+.B Example:
+.br
+# makedumpfile \-E \-X \-\-xen_phys_start 0xcee00000 /proc/vmcore dumpfile
+
+.TP
  \fB\-\-message-level\fR \fImessage_level\fR
  Specify the message types.
  .br

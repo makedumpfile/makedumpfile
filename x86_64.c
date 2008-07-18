@@ -190,6 +190,9 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	if (!is_xen_vaddr(kvaddr))
 		return NOT_PADDR;
 
+	if (is_xen_text(kvaddr))
+		return (unsigned long)kvaddr - XEN_VIRT_START + info->xen_phys_start;
+
 	if (is_direct(kvaddr))
 		return (unsigned long)kvaddr - DIRECTMAP_VIRT_START;
 

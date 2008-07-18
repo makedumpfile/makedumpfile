@@ -32,6 +32,20 @@ int message_level;
 /*
  * Forward declarations
  */
+void print_progress(const char 		*msg,
+		    unsigned long 	current,
+		    unsigned long 	end);
+
+/*
+ * Message texts
+ */
+#define PROGRESS_COPY   	"Copying data"
+#define PROGRESS_HOLES		"Checking for memory holes"
+#define PROGRESS_UNN_PAGES 	"Excluding unnecessary pages"
+#define PROGRESS_FREE_PAGES 	"Excluding free pages"
+#define PROGRESS_ZERO_PAGES 	"Excluding zero pages"
+#define PROGRESS_XEN_DOMAIN 	"Excluding xen user domain"
+#define PROGRESS_MAXLEN		"35"
 
 /*
  * The numbers of the excluded pages
@@ -3917,6 +3931,8 @@ _exclude_free_page()
 	}
 	for (num_nodes = 1; num_nodes <= vt.numnodes; num_nodes++) {
 
+		print_progress(PROGRESS_FREE_PAGES, num_nodes - 1, vt.numnodes);
+
 		node_zones = pgdat + OFFSET(pglist_data.node_zones);
 
 		if (!readmem(VADDR, pgdat + OFFSET(pglist_data.nr_zones),
@@ -3926,6 +3942,10 @@ _exclude_free_page()
 		}
 
 		for (i = 0; i < nr_zones; i++) {
+
+			print_progress(PROGRESS_FREE_PAGES, i + nr_zones * (num_nodes - 1),
+					nr_zones * vt.numnodes);
+
 			zone = node_zones + (i * SIZE(zone));
 			if (!readmem(VADDR, zone + OFFSET(zone.spanned_pages),
 			    &spanned_pages, sizeof spanned_pages)) {
@@ -3948,6 +3968,12 @@ _exclude_free_page()
 			}
 		}
 	}
+
+	/*
+	 * print [100 %]
+	 */
+	print_progress(PROGRESS_FREE_PAGES, vt.numnodes, vt.numnodes);
+
 	return TRUE;
 }
 
@@ -4028,11 +4054,20 @@ create_1st_bitmap()
 	 */
 	for (pfn = 0, paddr = 0; pfn < info->max_mapnr;
 	    pfn++, paddr += info->page_size) {
+
+		print_progress(PROGRESS_HOLES, pfn, info->max_mapnr);
+
 		if (is_in_segs(paddr))
 			set_bit_on_1st_bitmap(pfn);
 		else
 			pfn_memhole++;
 	}
+
+	/*
+	 * print 100 %
+	 */
+	print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr);
+
 	if (!sync_1st_bitmap())
 		goto out;
 
@@ -4062,6 +4097,9 @@ exclude_zero_pages()
 	}
 	for (pfn = paddr = 0; pfn < info->max_mapnr;
 	    pfn++, paddr += info->page_size) {
+
+		print_progress(PROGRESS_ZERO_PAGES, pfn, info->max_mapnr);
+
 		if (!is_in_segs(paddr))
 			continue;
 
@@ -4073,6 +4111,12 @@ exclude_zero_pages()
 			pfn_zero++;
 		}
 	}
+
+	/*
+	 * print [100 %]
+	 */
+	print_progress(PROGRESS_ZERO_PAGES, info->max_mapnr, info->max_mapnr);
+
 	ret = TRUE;
 out:
 	if (buf != NULL)
@@ -4100,6 +4144,8 @@ exclude_unnecessary_pages()
 		goto out;
 	}
 	for (mm = 0; mm < info->num_mem_map; mm++) {
+		print_progress(PROGRESS_UNN_PAGES, mm, info->num_mem_map);
+
 		mmd = &info->mem_map_data[mm];
 		pfn   = mmd->pfn_start;
 		paddr = pfn*info->page_size;
@@ -4160,6 +4206,12 @@ exclude_unnecessary_pages()
 			}
 		}
 	}
+
+	/*
+	 * print [100 %]
+	 */
+	print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
+
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		if (!exclude_free_page())
 			goto out;
@@ -4670,7 +4722,7 @@ write_kdump_header()
 }
 
 void
-print_progress(unsigned long current, unsigned long end)
+print_progress(const char *msg, unsigned long current, unsigned long end)
 {
 	int progress;
 	time_t tm;
@@ -4686,7 +4738,7 @@ print_progress(unsigned long current, unsigned long end)
 		progress = 100;
 
 	PROGRESS_MSG("\r");
-	PROGRESS_MSG("[%3d %%]", progress);
+	PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3d %%] ", msg, progress);
 }
 
 int
@@ -4912,7 +4964,7 @@ write_elf_pages()
 
 			while (bufsz_remain > 0) {
 				if ((num_dumped % per) == 0)
-					print_progress(num_dumped, num_dumpable);
+					print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
 
 				if (bufsz_remain >= page_size)
 					bufsz_write = page_size;
@@ -5009,7 +5061,7 @@ write_elf_pages()
 
 		while (bufsz_remain > 0) {
 			if ((num_dumped % per) == 0)
-				print_progress(num_dumped, num_dumpable);
+				print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
 
 			if (bufsz_remain >= page_size)
 				bufsz_write = page_size;
@@ -5038,7 +5090,10 @@ write_elf_pages()
 	if (!write_cache_bufsz(&cd_seg))
 		goto out;
 
-	print_progress(num_dumpable, num_dumpable);
+	/*
+	 * print [100 %]
+	 */
+	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
 	PROGRESS_MSG("\n");
 
 	ret = TRUE;
@@ -5247,7 +5302,7 @@ write_kdump_pages()
 	for (pfn = 0; pfn < info->max_mapnr; pfn++) {
 
 		if ((num_dumped % per) == 0)
-			print_progress(num_dumped, num_dumpable);
+			print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
 
 		if ((pfn % PFN_BUFBITMAP) == 0) {
 			if (info->len_bitmap - bm2.offset < BUFSIZE_BITMAP)
@@ -5323,9 +5378,9 @@ write_kdump_pages()
 		goto out;
 
 	/*
-	 * Print the progress of the end.
+	 * print [100 %]
 	 */
-	print_progress(num_dumpable, num_dumpable);
+	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
 	PROGRESS_MSG("\n");
 
 	ret = TRUE;
@@ -5899,17 +5954,25 @@ exclude_xen_user_domain()
 	unsigned int count_info, _domain;
 	unsigned long page_info_addr;
 	unsigned long long pfn, pfn_end;
+	unsigned long long j, size;
 	struct pt_load_segment *pls;
 
 	/*
 	 * NOTE: the first half of bitmap is not used for Xen extraction
 	 */
 	for (i = 0; i < info->num_load_memory; i++) {
+
+		print_progress(PROGRESS_XEN_DOMAIN, i, info->num_load_memory);
+
 		pls = &info->pt_load_segments[i];
 		pfn     = pls->phys_start >> PAGESHIFT();
 		pfn_end = pls->phys_end >> PAGESHIFT();
+		size    = pfn_end - pfn;
 
-		for (; pfn < pfn_end; pfn++) {
+		for (j = 0; pfn < pfn_end; pfn++, j++) {
+			print_progress(PROGRESS_XEN_DOMAIN, j + (size * i),
+					size * info->num_load_memory);
+
 			if (!allocated_in_map(pfn)) {
 				clear_bit_on_2nd_bitmap(pfn);
 				continue;
@@ -5943,6 +6006,12 @@ exclude_xen_user_domain()
 			clear_bit_on_2nd_bitmap(pfn);
 		}
 	}
+
+	/*
+	 * print [100 %]
+	 */
+	print_progress(PROGRESS_XEN_DOMAIN, info->num_load_memory, info->num_load_memory);
+
 	ret = TRUE;
 out:
 	return ret;

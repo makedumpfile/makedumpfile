@@ -665,9 +665,6 @@ open_files_for_creating_dumpfile()
 	if (!open_dump_memory())
 		return FALSE;
 
-	if (!open_dump_file())
-		return FALSE;
-
 	if (!open_dump_bitmap())
 		return FALSE;
 
@@ -6255,6 +6252,9 @@ create_dumpfile()
 			return FALSE;
 	}
 	if (!create_dump_bitmap())
+		return FALSE;
+
+	if (!open_dump_file())
 		return FALSE;
 
 	if (info->flag_flatten) {

@@ -2586,6 +2586,11 @@ get_nodes_online()
 	    && (SYMBOL(node_states) == NOT_FOUND_SYMBOL))
 		return 0;
 
+	if (SIZE(nodemask_t) == NOT_FOUND_LONG_VALUE) {
+		ERRMSG("Can't get the size of nodemask_t.\n");
+		return 0;
+	}
+
 	len = SIZE(nodemask_t);
 	vt.node_online_map_len = len/sizeof(unsigned long);
 	if (!(vt.node_online_map = (unsigned long *)malloc(len))) {

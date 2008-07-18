@@ -4111,12 +4111,24 @@ int
 exclude_zero_pages()
 {
 	unsigned long long pfn, paddr;
+	struct dump_bitmap bitmap2;
 	unsigned char *buf = NULL;
 
 	int ret = FALSE;
 
+	bitmap2.fd        = info->fd_bitmap;
+	bitmap2.file_name = info->name_bitmap;
+	bitmap2.no_block  = -1;
+	bitmap2.buf       = NULL;
+	bitmap2.offset    = info->len_bitmap/2;
+
 	if ((buf = malloc(info->page_size)) == NULL) {
 		ERRMSG("Can't allocate memory for the page. %s\n",
+		    strerror(errno));
+		goto out;
+	}
+	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
+		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
 		    strerror(errno));
 		goto out;
 	}
@@ -4126,6 +4138,9 @@ exclude_zero_pages()
 		print_progress(PROGRESS_ZERO_PAGES, pfn, info->max_mapnr);
 
 		if (!is_in_segs(paddr))
+			continue;
+
+		if (!is_dumpable(&bitmap2, pfn))
 			continue;
 
 		if (!readmem(PADDR, paddr, buf, info->page_size))
@@ -4146,6 +4161,9 @@ exclude_zero_pages()
 out:
 	if (buf != NULL)
 		free(buf);
+
+	if (bitmap2.buf != NULL)
+		free(bitmap2.buf);
 
 	return ret;
 }
@@ -4311,26 +4329,6 @@ create_2nd_bitmap()
 	}
 
 	/*
-	 * Exclude pages filled with zero for creating an ELF dumpfile.
-	 *
-	 * Note: If creating a kdump-compressed dumpfile, makedumpfile
-	 *	 checks zero-pages while copying dumpable pages to a
-	 *	 dumpfile from /proc/vmcore. That is valuable for the
-	 *	 speed, because each page is read one time only.
-	 *	 Otherwise (if creating an ELF dumpfile), makedumpfile
-	 *	 should check zero-pages at this time because 2nd-bitmap
-	 *	 should be fixed for creating an ELF header. That is slow
-	 *	 due to reading each page two times, but it is necessary.
-	 */
-	if ((info->dump_level & DL_EXCLUDE_ZERO) && info->flag_elf_dumpfile) {
-		if (!exclude_zero_pages()) {
-			ERRMSG("Can't exclude pages filled with zero");
-			ERRMSG("for creating an ELF dumpfile.\n");
-			return FALSE;
-		}
-	}
-
-	/*
 	 * Exclude unnecessary pages (free pages, cache pages, etc.)
 	 */
 	if (DL_EXCLUDE_ZERO < info->dump_level) {
@@ -4346,6 +4344,33 @@ create_2nd_bitmap()
 	if (info->flag_exclude_xen_dom) {
 		if (!exclude_xen_user_domain()) {
 			ERRMSG("Can't exclude xen user domain.\n");
+			return FALSE;
+		}
+	}
+
+	/*
+	 * Exclude pages filled with zero for creating an ELF dumpfile.
+	 *
+	 * Note: If creating a kdump-compressed dumpfile, makedumpfile
+	 *	 checks zero-pages while copying dumpable pages to a
+	 *	 dumpfile from /proc/vmcore. That is valuable for the
+	 *	 speed, because each page is read one time only.
+	 *	 Otherwise (if creating an ELF dumpfile), makedumpfile
+	 *	 should check zero-pages at this time because 2nd-bitmap
+	 *	 should be fixed for creating an ELF header. That is slow
+	 *	 due to reading each page two times, but it is necessary.
+	 */
+	if ((info->dump_level & DL_EXCLUDE_ZERO) && info->flag_elf_dumpfile) {
+		/*
+		 * 2nd-bitmap should be flushed at this time, because
+		 * exclude_zero_pages() checks 2nd-bitmap.
+		 */
+		if (!sync_2nd_bitmap())
+			return FALSE;
+
+		if (!exclude_zero_pages()) {
+			ERRMSG("Can't exclude pages filled with zero");
+			ERRMSG("for creating an ELF dumpfile.\n");
 			return FALSE;
 		}
 	}

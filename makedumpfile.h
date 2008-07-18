@@ -718,7 +718,7 @@ struct DumpInfo {
 	unsigned long	len_bitmap;          /* size of bitmap(1st and 2nd) */
 	struct dump_bitmap 		*bitmap1;
 	struct dump_bitmap 		*bitmap2;
-	struct disk_dump_header		*dump_header; 
+	struct disk_dump_header		*dump_header;
 
 	/*
 	 * ELF header info:

@@ -1,4 +1,4 @@
-/* 
+/*
  * x86.c
  *
  * Copyright (C) 2006, 2007  NEC Corporation
@@ -59,7 +59,7 @@ kvtop_xen_x86(unsigned long kvaddr)
 	dirp += ((kvaddr >> PGDIR_SHIFT_3LEVEL) & (PTRS_PER_PGD_3LEVEL - 1)) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
- 
+
 	if (!(entry & _PAGE_PRESENT))
 		return NOT_PADDR;
 

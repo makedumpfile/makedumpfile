@@ -1,4 +1,4 @@
-/* 
+/*
  * x86_64.c
  *
  * Copyright (C) 2006, 2007  NEC Corporation
@@ -206,7 +206,7 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	dirp += pgd_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
- 
+
 	if (!(entry & _PAGE_PRESENT))
 		return NOT_PADDR;
 

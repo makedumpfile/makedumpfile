@@ -1,4 +1,4 @@
-/* 
+/*
  * ia64.c
  *
  * Copyright (C) 2006, 2007  NEC Corporation
@@ -293,7 +293,7 @@ kvtop_xen_ia64(unsigned long kvaddr)
 	dirp += ((addr >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)) * sizeof(unsigned long long);
 	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
- 
+
 	dirp = entry & _PFN_MASK;
 	if (!dirp)
 		return NOT_PADDR;

@@ -1,4 +1,4 @@
-/* 
+/*
  * diskdump.h
  *
  * Copyright (C) 2004, 2005 David Anderson

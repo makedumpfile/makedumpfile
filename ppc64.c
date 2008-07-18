@@ -1,4 +1,4 @@
-/* 
+/*
  * ppc64.c
  *
  * Created by: Sachin Sant (sachinp@in.ibm.com)

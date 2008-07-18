@@ -30,6 +30,10 @@ struct DumpInfo		*info = NULL;
 int message_level;
 
 /*
+ * Forward declarations
+ */
+
+/*
  * The numbers of the excluded pages
  */
 unsigned long long pfn_zero;

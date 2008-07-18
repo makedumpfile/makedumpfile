@@ -422,7 +422,8 @@ do { \
 #define KVER_MIN_SHIFT 16
 #define KERNEL_VERSION(x,y,z) (((x) << KVER_MAJ_SHIFT) | ((y) << KVER_MIN_SHIFT) | (z))
 #define OLDEST_VERSION		(0x0206000f)	/* linux-2.6.15 */
-#define LATEST_VERSION		(0x02060019)	/* linux-2.6.25 */
+#define LATEST_VERSION		(0x0206001a)	/* linux-2.6.26 */
+#define VERSION_LINUX_2_6_26	(0x0206001a)	/* linux-2.6.26 */
 
 /*
  * vmcoreinfo in /proc/vmcore
@@ -496,7 +497,8 @@ do { \
 #define MODULES_END		(0xfffffffffff00000)
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
-#define _MAX_PHYSMEM_BITS	(40)
+#define _MAX_PHYSMEM_BITS_ORIG		(40)
+#define _MAX_PHYSMEM_BITS_2_6_26	(44)
 
 /*
  * 4 Levels paging

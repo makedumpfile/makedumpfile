@@ -58,6 +58,7 @@
   2.6.23 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
   2.6.24 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
   2.6.25 | OK | ** | -- |    |    | ** |TODO| -- | OK | OK | OK | 
+  2.6.26 | OK | ** | -- |    |    | ** |TODO| -- | OK | OK | OK | 
 
   OK    : Support.
   --    : Not support.

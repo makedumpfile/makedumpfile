@@ -5606,7 +5606,12 @@ get_symbol_info_xen()
 	 */
 	SYMBOL_INIT(pgd_l2, "idle_pg_table_l2");	/* x86 */
 	SYMBOL_INIT(pgd_l3, "idle_pg_table_l3");	/* x86-PAE */
+	if (SYMBOL(pgd_l3) == NOT_FOUND_SYMBOL)
+		SYMBOL_INIT(pgd_l3, "idle_pg_table");	/* x86-PAE */
 	SYMBOL_INIT(pgd_l4, "idle_pg_table_4");		/* x86_64 */
+	if (SYMBOL(pgd_l4) == NOT_FOUND_SYMBOL)
+		SYMBOL_INIT(pgd_l4, "idle_pg_table");		/* x86_64 */
+
 	SYMBOL_INIT(xen_heap_start, "xen_heap_start");	/* ia64 */
 	SYMBOL_INIT(xen_pstart, "xen_pstart");		/* ia64 */
 	SYMBOL_INIT(frametable_pg_dir, "frametable_pg_dir");	/* ia64 */

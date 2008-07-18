@@ -2206,6 +2206,8 @@ read_vmcoreinfo_basic_info()
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
+		if (!i)
+			break;
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, STR_OSRELEASE, strlen(STR_OSRELEASE)) == 0) {
@@ -2263,6 +2265,8 @@ read_vmcoreinfo_symbol(char *str_symbol)
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
+		if (!i)
+			break;
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, str_symbol, strlen(str_symbol)) == 0) {
@@ -2294,6 +2298,8 @@ read_vmcoreinfo_long(char *str_structure)
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
+		if (!i)
+			break;
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, str_structure, strlen(str_structure)) == 0) {
@@ -2323,6 +2329,8 @@ read_vmcoreinfo_string(char *str_in, char *str_out)
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
+		if (!i)
+			break;
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, str_in, strlen(str_in)) == 0) {
@@ -5850,6 +5858,8 @@ read_vmcoreinfo_basic_info_xen()
 
 	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
+		if (!i)
+			break;
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, STR_PAGESIZE, strlen(STR_PAGESIZE)) == 0) {

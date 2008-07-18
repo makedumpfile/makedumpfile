@@ -258,7 +258,7 @@ do { \
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \
 	if (SYMBOL(symbol) != NOT_FOUND_SYMBOL) { \
-		fprintf(info->file_vmcoreinfo, "%s%lx\n", \
+		fprintf(info->file_vmcoreinfo, "%s%llx\n", \
 		    STR_SYMBOL(str_symbol), SYMBOL(symbol)); \
 	} \
 } while (0)
@@ -802,39 +802,39 @@ struct vm_table {
 extern struct vm_table		vt;
 
 struct symbol_table {
-	unsigned long	mem_map;
-	unsigned long	mem_section;
-	unsigned long	pkmap_count;
-	unsigned long	pkmap_count_next;
-	unsigned long	system_utsname;
-	unsigned long	init_uts_ns;
-	unsigned long	_stext;
-	unsigned long	swapper_pg_dir;
-	unsigned long	init_level4_pgt;
-	unsigned long	phys_base;
-	unsigned long	node_online_map;
-	unsigned long	node_states;
-	unsigned long	node_memblk;
-	unsigned long	node_data;
-	unsigned long	pgdat_list;
-	unsigned long	contig_page_data;
+	unsigned long long	mem_map;
+	unsigned long long	mem_section;
+	unsigned long long	pkmap_count;
+	unsigned long long	pkmap_count_next;
+	unsigned long long	system_utsname;
+	unsigned long long	init_uts_ns;
+	unsigned long long 	_stext;
+	unsigned long long 	swapper_pg_dir;
+	unsigned long long 	init_level4_pgt;
+	unsigned long long 	phys_base;
+	unsigned long long 	node_online_map;
+	unsigned long long 	node_states;
+	unsigned long long 	node_memblk;
+	unsigned long long 	node_data;
+	unsigned long long 	pgdat_list;
+	unsigned long long 	contig_page_data;
 
 	/*
 	 * for Xen extraction
 	 */
-	unsigned long	dom_xen;
-	unsigned long	dom_io;
-	unsigned long	domain_list;
-	unsigned long	frame_table;
-	unsigned long	xen_heap_start;
-	unsigned long	pgd_l2;
-	unsigned long	pgd_l3;
-	unsigned long	pgd_l4;
-	unsigned long	xenheap_phys_end;
-	unsigned long	xen_pstart;
-	unsigned long	frametable_pg_dir;
-	unsigned long	max_page;
-	unsigned long	alloc_bitmap;
+	unsigned long long	dom_xen;
+	unsigned long long	dom_io;
+	unsigned long long	domain_list;
+	unsigned long long	frame_table;
+	unsigned long long	xen_heap_start;
+	unsigned long long	pgd_l2;
+	unsigned long long	pgd_l3;
+	unsigned long long	pgd_l4;
+	unsigned long long	xenheap_phys_end;
+	unsigned long long	xen_pstart;
+	unsigned long long	frametable_pg_dir;
+	unsigned long long	max_page;
+	unsigned long long	alloc_bitmap;
 };
 
 struct size_table {

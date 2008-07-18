@@ -123,7 +123,7 @@ vaddr_to_offset_general(unsigned long long vaddr)
  * It is useful at few calls like get_str_osrelease_from_vmlinux().
  */
 off_t
-vaddr_to_offset_slow(int fd, char *filename, unsigned long vaddr)
+vaddr_to_offset_slow(int fd, char *filename, unsigned long long vaddr)
 {
 	off_t offset = 0;
 	int i, phnum, num_load, flag_elf64, elf_format;
@@ -170,6 +170,7 @@ vaddr_to_offset_slow(int fd, char *filename, unsigned long vaddr)
 			break;
 		}
 	}
+
 	return offset;
 }
 
@@ -970,11 +971,11 @@ out:
 	return ret;
 }
 
-unsigned long
+unsigned long long
 get_symbol_addr(char *symname)
 {
 	int i;
-	unsigned long symbol = NOT_FOUND_SYMBOL;
+	unsigned long long symbol = NOT_FOUND_SYMBOL;
 	Elf *elfd = NULL;
 	GElf_Shdr shdr;
 	GElf_Sym sym;
@@ -1949,7 +1950,7 @@ int
 get_str_osrelease_from_vmlinux()
 {
 	struct utsname system_utsname;
-	unsigned long utsname;
+	unsigned long long utsname;
 	off_t offset;
 	const off_t failed = (off_t)-1;
 
@@ -1968,7 +1969,7 @@ get_str_osrelease_from_vmlinux()
 	    dwarf_info.name_debuginfo, utsname);
 
 	if (!offset) {
-		ERRMSG("Can't convert vaddr (%lx) of utsname to an offset.\n",
+		ERRMSG("Can't convert vaddr (%llx) of utsname to an offset.\n",
 		    utsname);
 		return FALSE;
 	}
@@ -5684,19 +5685,19 @@ show_data_xen()
 	 * Show data for debug
 	 */
 	MSG("\n");
-	MSG("SYMBOL(dom_xen): %lx\n", SYMBOL(dom_xen));
-	MSG("SYMBOL(dom_io): %lx\n", SYMBOL(dom_io));
-	MSG("SYMBOL(domain_list): %lx\n", SYMBOL(domain_list));
-	MSG("SYMBOL(xen_heap_start): %lx\n", SYMBOL(xen_heap_start));
-	MSG("SYMBOL(frame_table): %lx\n", SYMBOL(frame_table));
-	MSG("SYMBOL(alloc_bitmap): %lx\n", SYMBOL(alloc_bitmap));
-	MSG("SYMBOL(max_page): %lx\n", SYMBOL(max_page));
-	MSG("SYMBOL(pgd_l2): %lx\n", SYMBOL(pgd_l2));
-	MSG("SYMBOL(pgd_l3): %lx\n", SYMBOL(pgd_l3));
-	MSG("SYMBOL(pgd_l4): %lx\n", SYMBOL(pgd_l4));
-	MSG("SYMBOL(xenheap_phys_end): %lx\n", SYMBOL(xenheap_phys_end));
-	MSG("SYMBOL(xen_pstart): %lx\n", SYMBOL(xen_pstart));
-	MSG("SYMBOL(frametable_pg_dir): %lx\n", SYMBOL(frametable_pg_dir));
+	MSG("SYMBOL(dom_xen): %llx\n", SYMBOL(dom_xen));
+	MSG("SYMBOL(dom_io): %llx\n", SYMBOL(dom_io));
+	MSG("SYMBOL(domain_list): %llx\n", SYMBOL(domain_list));
+	MSG("SYMBOL(xen_heap_start): %llx\n", SYMBOL(xen_heap_start));
+	MSG("SYMBOL(frame_table): %llx\n", SYMBOL(frame_table));
+	MSG("SYMBOL(alloc_bitmap): %llx\n", SYMBOL(alloc_bitmap));
+	MSG("SYMBOL(max_page): %llx\n", SYMBOL(max_page));
+	MSG("SYMBOL(pgd_l2): %llx\n", SYMBOL(pgd_l2));
+	MSG("SYMBOL(pgd_l3): %llx\n", SYMBOL(pgd_l3));
+	MSG("SYMBOL(pgd_l4): %llx\n", SYMBOL(pgd_l4));
+	MSG("SYMBOL(xenheap_phys_end): %llx\n", SYMBOL(xenheap_phys_end));
+	MSG("SYMBOL(xen_pstart): %llx\n", SYMBOL(xen_pstart));
+	MSG("SYMBOL(frametable_pg_dir): %llx\n", SYMBOL(frametable_pg_dir));
 
 	MSG("SIZE(page_info): %ld\n", SIZE(page_info));
 	MSG("OFFSET(page_info.count_info): %ld\n", OFFSET(page_info.count_info));

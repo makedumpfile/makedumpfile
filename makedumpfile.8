@@ -306,16 +306,6 @@ if /proc/iomem is the following:
 # makedumpfile \-E \-X \-\-xen_phys_start 0xcee00000 /proc/vmcore dumpfile
 
 .TP
- \fB\-\-message-level\fR \fImessage_level\fR
- Specify the message types.
- .br
-diff -puN makedumpfile.org/makedumpfile.c makedumpfile/makedumpfile.c
---- makedumpfile.org/makedumpfile.c	2008-04-09 15:48:19.000000000 +0900
-+++ makedumpfile/makedumpfile.c	2008-04-09 15:48:34.000000000 +0900
-@@ -429,6 +429,10 @@ print_usage()
- 	MSG("  [--xen-vmcoreinfo VMCOREINFO]:\n");
- 	MSG("      Specify the VMCOREINFO of Xen to analyze Xen's memory usage.\n");
-.TP
 \fB\-\-message-level\fR \fImessage_level\fR
 Specify the message types.
 .br

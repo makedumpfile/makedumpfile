@@ -3348,6 +3348,9 @@ out:
 	if (!check_release())
 		return FALSE;
 
+	if (!get_max_physmem_size())
+		return FALSE;
+
 	if (!get_numnodes())
 		return FALSE;
 

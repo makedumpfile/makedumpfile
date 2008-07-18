@@ -18,7 +18,7 @@
 #include "makedumpfile.h"
 
 int
-get_machdep_info_x86()
+get_max_physmem_size_x86(void)
 {
 	/* PAE */
 	if ((vt.mem_flags & MEMORY_X86_PAE)
@@ -89,7 +89,7 @@ kvtop_xen_x86(unsigned long kvaddr)
 	return entry;
 }
 
-int get_xen_info_x86()
+int get_xen_info_x86(void)
 {
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;

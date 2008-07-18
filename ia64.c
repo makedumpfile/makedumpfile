@@ -30,7 +30,7 @@ is_vmalloc_addr_ia64(unsigned long vaddr)
 }
 
 int
-get_phys_base_ia64()
+get_phys_base_ia64(void)
 {
 	int i;
 	struct pt_load_segment *pls;
@@ -52,11 +52,8 @@ get_phys_base_ia64()
 }
 
 int
-get_machdep_info_ia64()
+get_machdep_info_ia64(void)
 {
-	info->section_size_bits = _SECTION_SIZE_BITS;
-	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
-
 	/*
 	 * Get kernel_start and vmalloc_start.
 	 */
@@ -85,6 +82,15 @@ get_machdep_info_ia64()
 
 	else
 		MSG("Can't distinguish the pgtable.\n");
+
+	return TRUE;
+}
+
+int
+get_max_physmem_size_ia64(void)
+{
+	info->section_size_bits = _SECTION_SIZE_BITS;
+	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 
 	return TRUE;
 }
@@ -319,7 +325,7 @@ kvtop_xen_ia64(unsigned long kvaddr)
 }
 
 int
-get_xen_info_ia64()
+get_xen_info_ia64(void)
 {
 	unsigned long xen_start, xen_end, xen_heap_start;
 	int i;

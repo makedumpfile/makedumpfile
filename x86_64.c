@@ -29,7 +29,7 @@ is_vmalloc_addr(ulong vaddr)
 }
 
 int
-get_phys_base_x86_64()
+get_phys_base_x86_64(void)
 {
 	int i;
 	struct pt_load_segment *pls;
@@ -55,7 +55,7 @@ get_phys_base_x86_64()
 }
 
 int
-get_machdep_info_x86_64()
+get_max_physmem_size_x86_64(void)
 {
 	info->section_size_bits = _SECTION_SIZE_BITS;
 	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
@@ -239,7 +239,7 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	return entry;
 }
 
-int get_xen_info_x86_64()
+int get_xen_info_x86_64(void)
 {
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;

@@ -4048,8 +4048,10 @@ exclude_free_page()
 int
 create_1st_bitmap()
 {
-	char *buf = NULL;
-	unsigned long long pfn, paddr;
+	int i;
+ 	char *buf = NULL;
+	unsigned long long pfn, pfn_start, pfn_end, pfn_bitmap1;
+	struct pt_load_segment *pls;
 	off_t offset_page;
 	int ret = FALSE;
 
@@ -4082,16 +4084,21 @@ create_1st_bitmap()
 	/*
 	 * If page is on memory hole, set bit on the 1st-bitmap.
 	 */
-	for (pfn = 0, paddr = 0; pfn < info->max_mapnr;
-	    pfn++, paddr += info->page_size) {
+	for (i = pfn_bitmap1 = 0; i < info->num_load_memory; i++) {
 
-		print_progress(PROGRESS_HOLES, pfn, info->max_mapnr);
+		print_progress(PROGRESS_HOLES, i, info->num_load_memory);
 
-		if (is_in_segs(paddr))
+		pls = &info->pt_load_segments[i];
+		pfn_start = pls->phys_start >> PAGESHIFT();
+		pfn_end   = pls->phys_end >> PAGESHIFT();
+		if (!is_in_segs(pfn_start << PAGESHIFT()))
+			pfn_start++;
+		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
 			set_bit_on_1st_bitmap(pfn);
-		else
-			pfn_memhole++;
+			pfn_bitmap1++;
+		}
 	}
+	pfn_memhole = info->max_mapnr - pfn_bitmap1;
 
 	/*
 	 * print 100 %

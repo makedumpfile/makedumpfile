@@ -1,0 +1,91 @@
+* The kdump-compressed format
+  makedumpfile provides two DUMPFILE formats (the ELF format and the
+  kdump-compressed format). By default, makedumpfile makes a DUMPFILE
+  in the kdump-compressed format. The kdump-compressed format is readable
+  only with the crash utility, and it can be smaller than the ELF format
+  because of the compression support.
+
+  - The file structure
+                                                 File offset
+    +------------------------------------------+ 0x0
+    |    main header (struct disk_dump_header) |
+    |------------------------------------------+ block 1
+    |    sub header (struct kdump_sub_header)  |
+    |------------------------------------------+ block 2
+    |            1st-bitmap                    |
+    |------------------------------------------+ block 2 + X blocks (aligned by block)
+    |            2nd-bitmap                    |
+    |------------------------------------------+ block 2 + 2 * X blocks (aligned by block)
+    | page header for pfn 0 (struct page_desc) |
+    | page header for pfn 1 (struct page_desc) |
+    |                     :                    |
+    | page header for pfn Z (struct page_desc) |
+    |------------------------------------------| (not aligned by block)
+    |         page data (pfn 0)                |
+    |         page data (pfn 1)                |
+    |                        :                 |
+    |         page data (pfn Z)                |
+    +------------------------------------------+
+
+
+  - main header
+    The main header of the kdump compressed format is the almost same as the
+    one of diskdump. This header has the following members, and the member
+    signature and header_version are different from diskdump.
+
+    struct disk_dump_header {
+        char                    signature[SIG_LEN];     /* = "KDUMP   " */
+        int                     header_version; /* Dump header version */
+        struct new_utsname      utsname;        /* copy of system_utsname */
+        struct timeval          timestamp;      /* Time stamp */
+        unsigned int            status;         /* Above flags */
+        int                     block_size;     /* Size of a block in byte */
+        int                     sub_hdr_size;   /* Size of arch dependent
+                                                   header in blocks */
+        unsigned int            bitmap_blocks;  /* Size of Memory bitmap in
+                                                   block */
+        unsigned int            max_mapnr;      /* = max_mapnr */
+        unsigned int            total_ram_blocks;/* Number of blocks should be
+                                                   written */
+        unsigned int            device_blocks;  /* Number of total blocks in
+                                                 * the dump device */
+        unsigned int            written_blocks; /* Number of written blocks */
+        unsigned int            current_cpu;    /* CPU# which handles dump */
+        int                     nr_cpus;        /* Number of CPUs */
+        struct task_struct      *tasks[0];
+    };
+
+  - sub header
+    The sub header of the kdump compressed format is orignal. This header
+    has the member phys_base and dump_level. The member phys_base is for
+    an x86_64 relocatable kernel, and the member dump_level has '-d' option's
+    value of makedumpfile command.
+
+    struct kdump_sub_header {
+        unsigned long   phys_base;
+        int             dump_level;     /* header_version 1 and later */
+    };
+
+  - 1st-bitmap
+    The bit of 1st-bitmap presents either a page on memory hole, or not.
+    If a page is on memory hole, the corresponding bit is off. Otherwise,
+    it is on.
+
+
+  - 2nd-bitmap
+    The bit of 2nd-bitmap presents either a dumpable page, or not.
+    If a page is on memory hole or excluded by makedumpfile command, the
+    corresponding bit is off. Otherwise, it is on.
+
+
+  - page header
+    There are page headers corresponding to dumpable pages.
+    This header presents the corresponding page information (compressed, or not. etc.)
+
+    typedef struct page_desc {
+        off_t                   offset;         /* the offset of the page data*/
+        unsigned int            size;           /* the size of this dump page */
+        unsigned int            flags;          /* flags */
+        unsigned long long      page_flags;     /* page flags */
+    } page_desc_t;
+

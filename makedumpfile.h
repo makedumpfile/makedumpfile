@@ -264,9 +264,11 @@ do { \
 } while (0)
 #define READ_SYMBOL(str_symbol, symbol) \
 do { \
-	SYMBOL(symbol) = read_vmcoreinfo_symbol(STR_SYMBOL(str_symbol)); \
-	if (SYMBOL(symbol) == INVALID_SYMBOL_DATA) \
-		return FALSE; \
+	if (SYMBOL(symbol) == NOT_FOUND_SYMBOL) { \
+		SYMBOL(symbol) = read_vmcoreinfo_symbol(STR_SYMBOL(str_symbol)); \
+		if (SYMBOL(symbol) == INVALID_SYMBOL_DATA) \
+			return FALSE; \
+	} \
 } while (0)
 
 /*
@@ -342,21 +344,27 @@ do { \
 } while (0)
 #define READ_STRUCTURE_SIZE(str_structure, structure) \
 do { \
-	SIZE(structure) = read_vmcoreinfo_long(STR_SIZE(str_structure)); \
-	if (SIZE(structure) == INVALID_STRUCTURE_DATA) \
-		return FALSE; \
+	if (SIZE(structure) == NOT_FOUND_STRUCTURE) { \
+		SIZE(structure) = read_vmcoreinfo_long(STR_SIZE(str_structure)); \
+		if (SIZE(structure) == INVALID_STRUCTURE_DATA) \
+			return FALSE; \
+	} \
 } while (0)
 #define READ_MEMBER_OFFSET(str_member, member) \
 do { \
-	OFFSET(member) = read_vmcoreinfo_long(STR_OFFSET(str_member)); \
-	if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
-		return FALSE; \
+	if (OFFSET(member) == NOT_FOUND_STRUCTURE) { \
+		OFFSET(member) = read_vmcoreinfo_long(STR_OFFSET(str_member)); \
+		if (OFFSET(member) == INVALID_STRUCTURE_DATA) \
+			return FALSE; \
+	} \
 } while (0)
 #define READ_ARRAY_LENGTH(str_array, array) \
 do { \
-	ARRAY_LENGTH(array) = read_vmcoreinfo_long(STR_LENGTH(str_array)); \
-	if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
-		return FALSE; \
+	if (ARRAY_LENGTH(array) == NOT_FOUND_STRUCTURE) { \
+		ARRAY_LENGTH(array) = read_vmcoreinfo_long(STR_LENGTH(str_array)); \
+		if (ARRAY_LENGTH(array) == INVALID_STRUCTURE_DATA) \
+			return FALSE; \
+	} \
 } while (0)
 
 /*
@@ -380,9 +388,11 @@ do { \
 } while (0)
 #define READ_NUMBER(str_number, number) \
 do { \
-	NUMBER(number) = read_vmcoreinfo_long(STR_NUMBER(str_number)); \
-	if (NUMBER(number) == INVALID_STRUCTURE_DATA) \
-		return FALSE; \
+	if (NUMBER(number) == NOT_FOUND_NUMBER) { \
+		NUMBER(number) = read_vmcoreinfo_long(STR_NUMBER(str_number)); \
+		if (NUMBER(number) == INVALID_STRUCTURE_DATA) \
+			return FALSE; \
+	} \
 } while (0)
 
 /*
@@ -404,8 +414,10 @@ do { \
 
 #define READ_SRCFILE(str_decl_name, decl_name) \
 do { \
-	if (!read_vmcoreinfo_string(STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
-		return FALSE; \
+	if (strlen(SRCFILE(decl_name)) == 0) { \
+		if (!read_vmcoreinfo_string(STR_SRCFILE(str_decl_name), SRCFILE(decl_name))) \
+			return FALSE; \
+	} \
 } while (0)
 
 /*

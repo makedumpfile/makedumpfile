@@ -66,6 +66,39 @@ show_version(void)
 	MSG("\n");
 }
 
+#define INITIALIZE_LONG_TABLE(table, value) \
+do { \
+	size_member = sizeof(long); \
+	num_member  = sizeof(table) / size_member; \
+	ptr_long_table = (long *)&table; \
+	for (i = 0; i < num_member; i++, ptr_long_table++) \
+		*ptr_long_table = value; \
+} while (0)
+
+void
+initialize_tables(void)
+{
+	int i, size_member, num_member;
+	unsigned long long *ptr_symtable;
+	long *ptr_long_table;
+
+	/*
+	 * Initialize the symbol table.
+	 */
+	size_member = sizeof(symbol_table.mem_map);
+	num_member  = sizeof(symbol_table) / size_member;
+
+	ptr_symtable = (unsigned long long *)&symbol_table;
+
+	for (i = 0; i < num_member; i++, ptr_symtable++)
+		*ptr_symtable = NOT_FOUND_SYMBOL;
+
+	INITIALIZE_LONG_TABLE(size_table, NOT_FOUND_STRUCTURE);
+	INITIALIZE_LONG_TABLE(offset_table, NOT_FOUND_STRUCTURE);
+	INITIALIZE_LONG_TABLE(array_table, NOT_FOUND_STRUCTURE);
+	INITIALIZE_LONG_TABLE(number_table, NOT_FOUND_NUMBER);
+}
+
 /*
  * Convert Physical Address to File Offset.
  *  If this function returns 0x0, File Offset isn't found.
@@ -2152,8 +2185,11 @@ read_vmcoreinfo_basic_info(void)
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
 		if (strncmp(buf, STR_OSRELEASE, strlen(STR_OSRELEASE)) == 0) {
-			strcpy(info->release, buf + strlen(STR_OSRELEASE));
 			get_release = TRUE;
+			/* if the release have been stored, skip this time. */
+			if (strlen(info->release))
+				continue;
+			strcpy(info->release, buf + strlen(STR_OSRELEASE));
 		}
 		if (strncmp(buf, STR_PAGESIZE, strlen(STR_PAGESIZE)) == 0) {
 			page_size = strtol(buf+strlen(STR_PAGESIZE),&endp,10);
@@ -3249,9 +3285,6 @@ initial(void)
 
 		if (!get_srcfile_info())
 			return FALSE;
-	/*
-	 * Get the debug information for analysis from /proc/vmcore
-	 */
 	} else {
 		/*
 		 * Check whether /proc/vmcore contains vmcoreinfo,
@@ -3268,6 +3301,12 @@ initial(void)
 			MSG("Try `makedumpfile --help' for more information.\n");
 			return FALSE;
 		}
+	}
+
+	/*
+	 * Get the debug information from /proc/vmcore
+	 */
+	if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
 		/*
 		 * Copy vmcoreinfo to /tmp/vmcoreinfoXXXXXX.
 		 */
@@ -3290,6 +3329,7 @@ initial(void)
 			return FALSE;
 		unlink(info->name_vmcoreinfo);
 	}
+
 	if (!get_value_for_old_linux())
 		return FALSE;
 out:
@@ -6113,6 +6153,7 @@ main(int argc, char *argv[])
 		    strerror(errno));
 		goto out;
 	}
+	initialize_tables();
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;

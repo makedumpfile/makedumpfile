@@ -3658,23 +3658,15 @@ read_buf_from_stdin(void *buf, int buf_size)
 int
 read_start_flat_header()
 {
-	char *buf = NULL;
+	char buf[MAX_SIZE_MDF_HEADER];
 	struct makedumpfile_header fh;
-
-	int ret = FALSE;
-
-	if ((buf = malloc(MAX_SIZE_MDF_HEADER)) == NULL) {
-		ERRMSG("Can't allocate memory for buffer of flat header. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
 
 	/*
 	 * Get flat header.
 	 */
 	if (!read_buf_from_stdin(buf, MAX_SIZE_MDF_HEADER)) {
 		ERRMSG("Can't get header of flattened format.\n");
-		goto out;
+		return FALSE;
 	}
 	memcpy(&fh, buf, sizeof(fh));
 
@@ -3688,19 +3680,14 @@ read_start_flat_header()
 	 */
 	if (strcmp(fh.signature, MAKEDUMPFILE_SIGNATURE)) {
 		ERRMSG("Can't get signature of flattened format.\n");
-		goto out;
+		return FALSE;
 	}
 	if (fh.type != TYPE_FLAT_HEADER) {
 		ERRMSG("Can't get type of flattened format.\n");
-		goto out;
+		return FALSE;
 	}
 
-	ret = TRUE;
-out:
-	if (buf != NULL)
-		free(buf);
-
-	return ret;
+	return TRUE;
 }
 
 int
@@ -3721,25 +3708,15 @@ read_flat_data_header(struct makedumpfile_data_header *fdh)
 int
 rearrange_dumpdata()
 {
-	int buf_size, read_size, tmp_read_size;
-	char *buf = NULL;
+	int read_size, tmp_read_size;
+	char buf[SIZE_BUF_STDIN];
 	struct makedumpfile_data_header fdh;
-
-	int ret = FALSE;
-
-	buf_size = SIZE_BUF_STDIN;
 
 	/*
 	 * Get flat header.
 	 */
 	if (!read_start_flat_header()) {
 		ERRMSG("Can't get header of flattened format.\n");
-		goto out;
-	}
-
-	if ((buf = malloc(buf_size)) == NULL) {
-		ERRMSG("Can't allocate memory for buffer of flattened format. %s\n",
-		    strerror(errno));
 		return FALSE;
 	}
 
@@ -3748,25 +3725,25 @@ rearrange_dumpdata()
 	 */
 	if (!read_flat_data_header(&fdh)) {
 		ERRMSG("Can't get header of flattened format.\n");
-		goto out;
+		return FALSE;
 	}
 
 	do {
 		read_size = 0;
 		while (read_size < fdh.buf_size) {
-			if (buf_size < (fdh.buf_size - read_size))
-				tmp_read_size = buf_size;
+			if (sizeof(buf) < (fdh.buf_size - read_size))
+				tmp_read_size = sizeof(buf);
 			else
 				tmp_read_size = fdh.buf_size - read_size;
 
 			if (!read_buf_from_stdin(buf, tmp_read_size)) {
 				ERRMSG("Can't get data of flattened format.\n");
-				goto out;
+				return FALSE;
 			}
 			if (!write_buffer(info->fd_dumpfile,
 			    fdh.offset + read_size, buf, tmp_read_size,
 			    info->name_dumpfile))
-				goto out;
+				return FALSE;
 
 			read_size += tmp_read_size;
 		}
@@ -3775,7 +3752,7 @@ rearrange_dumpdata()
 		 */
 		if (!read_flat_data_header(&fdh)) {
 			ERRMSG("Can't get data header of flattened format.\n");
-			goto out;
+			return FALSE;
 		}
 
 	} while ((0 <= fdh.offset) && (0 < fdh.buf_size));
@@ -3783,15 +3760,10 @@ rearrange_dumpdata()
 	if ((fdh.offset != END_FLAG_FLAT_HEADER)
 	    || (fdh.buf_size != END_FLAG_FLAT_HEADER)) {
 		ERRMSG("Can't get valid end header of flattened format.\n");
-		goto out;
+		return FALSE;
 	}
 
-	ret = TRUE;
-out:
-	if (buf != NULL)
-		free(buf);
-
-	return ret;
+	return TRUE;
 }
 
 /*
@@ -4049,26 +4021,20 @@ int
 create_1st_bitmap()
 {
 	int i;
- 	char *buf = NULL;
+ 	char buf[info->page_size];
 	unsigned long long pfn, pfn_start, pfn_end, pfn_bitmap1;
 	struct pt_load_segment *pls;
 	off_t offset_page;
-	int ret = FALSE;
 
 	/*
 	 * At first, clear all the bits on the 1st-bitmap.
 	 */
-	if ((buf = malloc(info->page_size)) == NULL) {
-		ERRMSG("Can't allocate memory for the page. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
-	memset(buf, 0, info->page_size);
+	memset(buf, 0, sizeof(buf));
 
 	if (lseek(info->bitmap1->fd, info->bitmap1->offset, SEEK_SET) < 0) {
 		ERRMSG("Can't seek the bitmap(%s). %s\n",
 		    info->bitmap1->file_name, strerror(errno));
-		goto out;
+		return FALSE;
 	}
 	offset_page = 0;
 	while (offset_page < (info->len_bitmap / 2)) {
@@ -4076,7 +4042,7 @@ create_1st_bitmap()
 		    != info->page_size) {
 			ERRMSG("Can't write the bitmap(%s). %s\n",
 			    info->bitmap1->file_name, strerror(errno));
-			goto out;
+			return FALSE;
 		}
 		offset_page += info->page_size;
 	}
@@ -4106,14 +4072,9 @@ create_1st_bitmap()
 	print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr);
 
 	if (!sync_1st_bitmap())
-		goto out;
+		return FALSE;
 
-	ret = TRUE;
-out:
-	if (buf != NULL)
-		free(buf);
-
-	return ret;
+	return TRUE;
 }
 
 /*
@@ -4124,7 +4085,7 @@ exclude_zero_pages()
 {
 	unsigned long long pfn, paddr;
 	struct dump_bitmap bitmap2;
-	unsigned char *buf = NULL;
+	unsigned char buf[info->page_size];
 
 	int ret = FALSE;
 
@@ -4134,11 +4095,6 @@ exclude_zero_pages()
 	bitmap2.buf       = NULL;
 	bitmap2.offset    = info->len_bitmap/2;
 
-	if ((buf = malloc(info->page_size)) == NULL) {
-		ERRMSG("Can't allocate memory for the page. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
 		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
 		    strerror(errno));
@@ -4171,9 +4127,6 @@ exclude_zero_pages()
 
 	ret = TRUE;
 out:
-	if (buf != NULL)
-		free(buf);
-
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
 
@@ -4283,50 +4236,37 @@ int
 copy_bitmap()
 {
 	off_t offset;
-	unsigned char *buf = NULL;
+	unsigned char buf[info->page_size];
  	const off_t failed = (off_t)-1;
 
-	int ret = FALSE;
-
-	if ((buf = malloc(info->page_size)) == NULL) {
-		ERRMSG("Can't allocate memory for the page. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
 	offset = 0;
 	while (offset < (info->len_bitmap / 2)) {
 		if (lseek(info->bitmap1->fd, info->bitmap1->offset + offset,
 		    SEEK_SET) == failed) {
 			ERRMSG("Can't seek the bitmap(%s). %s\n",
 			    info->name_bitmap, strerror(errno));
-			goto out;
+			return FALSE;
 		}
-		if (read(info->bitmap1->fd, buf, info->page_size)
-		    != info->page_size) {
+		if (read(info->bitmap1->fd, buf, sizeof(buf)) != sizeof(buf)) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
-			goto out;
+			return FALSE;
 		}
 		if (lseek(info->bitmap2->fd, info->bitmap2->offset + offset,
 		    SEEK_SET) == failed) {
 			ERRMSG("Can't seek the bitmap(%s). %s\n",
 			    info->name_bitmap, strerror(errno));
-			goto out;
+			return FALSE;
 		}
-		if (write(info->bitmap2->fd, buf, info->page_size)
-		    != info->page_size) {
+		if (write(info->bitmap2->fd, buf, sizeof(buf)) != sizeof(buf)) {
 			ERRMSG("Can't write the bitmap(%s). %s\n",
 		    	info->name_bitmap, strerror(errno));
-			goto out;
+			return FALSE;
 		}
-		offset += info->page_size;
+		offset += sizeof(buf);
 	}
-	ret = TRUE;
-out:
-	if (buf != NULL)
-		free(buf);
 
-	return ret;
+	return TRUE;
 }
 
 int
@@ -4529,10 +4469,8 @@ out:
 int
 write_start_flat_header()
 {
-	char *buf = NULL;
+	char buf[MAX_SIZE_MDF_HEADER];
 	struct makedumpfile_header fh;
-
-	int ret = FALSE;
 
 	if (!info->flag_flatten)
 		return FALSE;
@@ -4551,24 +4489,17 @@ write_start_flat_header()
 		fh.version = bswap_64(VERSION_FLAT_HEADER);
 	}
 
-	if ((buf = calloc(1, MAX_SIZE_MDF_HEADER)) == NULL) {
-		ERRMSG("Can't allocate memory for header of flattened format. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
+	memset(buf, 0, sizeof(buf));
 	memcpy(buf, &fh, sizeof(fh));
+
 	if (write(info->fd_dumpfile, buf, MAX_SIZE_MDF_HEADER)
 	    != MAX_SIZE_MDF_HEADER) {
 		ERRMSG("Can't write the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
-		goto out;
+		return FALSE;
 	}
-	ret = TRUE;
-out:
-	if (buf != NULL)
-		free(buf);
 
-	return ret;
+	return TRUE;
 }
 
 int
@@ -4818,7 +4749,7 @@ write_elf_pages()
 	Elf64_Phdr load64;
 	Elf32_Ehdr ehdr32;
 	Elf32_Phdr load32;
-	char *buf = NULL;
+	char buf[info->page_size];
 	struct dump_bitmap bitmap2;
 	struct cache_data cd_hdr, cd_seg;
 	const off_t failed = (off_t)-1;
@@ -4845,11 +4776,6 @@ write_elf_pages()
 	cd_seg.buf_size   = 0;
 	cd_seg.buf        = NULL;
 
-	if ((buf = malloc(info->page_size)) == NULL) {
-		ERRMSG("Can't allocate memory for buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
 		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
 		    strerror(errno));
@@ -5160,8 +5086,6 @@ write_elf_pages()
 
 	ret = TRUE;
 out:
-	if (buf != NULL)
-		free(buf);
 	if (bitmap2.buf != NULL)
 		free(bitmap2.buf);
 	if (cd_hdr.buf != NULL)
@@ -5240,7 +5164,7 @@ write_kdump_pages()
 	struct page_desc pd, pd_zero;
 	off_t offset_data = 0;
 	struct disk_dump_header *dh = info->dump_header;
-	unsigned char *buf = NULL, *buf_out = NULL;
+	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
 	struct cache_data bm2, pdesc, pdata;
 	struct dump_bitmap bitmap1, bitmap2;
@@ -5282,11 +5206,6 @@ write_kdump_pages()
 	bitmap2.buf       = NULL;
 	bitmap2.offset    = info->len_bitmap/2;
 
-	if ((buf = malloc(info->page_size)) == NULL) {
-		ERRMSG("Can't allocate memory for the page. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	len_buf_out = compressBound(info->page_size);
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
@@ -5447,8 +5366,6 @@ write_kdump_pages()
 
 	ret = TRUE;
 out:
-	if (buf != NULL)
-		free(buf);
 	if (buf_out != NULL)
 		free(buf_out);
 	if (bm2.buf != NULL)

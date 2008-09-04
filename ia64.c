@@ -67,21 +67,20 @@ get_machdep_info_ia64(void)
 	else
 		info->vmalloc_start = KERNEL_VMALLOC_BASE;
 
-	if ((vt.mem_flags & MEMORY_PAGETABLE_4L)
-	    || (vt.mem_flags & MEMORY_PAGETABLE_3L))
-		return TRUE;
-
 	/*
 	 * Check the pgtable (3 Levels or 4 Levels).
 	 */
-	if (!strncmp(SRCFILE(pud_t), STR_PUD_T_4L, strlen(STR_PUD_T_4L)))
+	if ((vt.mem_flags & MEMORY_PAGETABLE_4L)
+	    || !strncmp(SRCFILE(pud_t), STR_PUD_T_4L, strlen(STR_PUD_T_4L))) {
 		vt.mem_flags |= MEMORY_PAGETABLE_4L;
-
-	else if (!strncmp(SRCFILE(pud_t), STR_PUD_T_3L, strlen(STR_PUD_T_3L)))
+		DEBUG_MSG("PAGETABLE_4L : ON\n");
+	} else if ((vt.mem_flags & MEMORY_PAGETABLE_3L)
+	    || !strncmp(SRCFILE(pud_t), STR_PUD_T_3L, strlen(STR_PUD_T_3L))) {
 		vt.mem_flags |= MEMORY_PAGETABLE_3L;
-
-	else
+		DEBUG_MSG("PAGETABLE_3L : ON\n");
+	} else {
 		MSG("Can't distinguish the pgtable.\n");
+	}
 
 	return TRUE;
 }

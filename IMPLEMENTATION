@@ -13,10 +13,10 @@
     |    sub header (struct kdump_sub_header)  |
     |------------------------------------------+ block 2
     |            1st-bitmap                    |
-    |------------------------------------------+ block 2 + X blocks (aligned by block)
-    |            2nd-bitmap                    |
-    |------------------------------------------+ block 2 + 2 * X blocks (aligned by block)
-    | page header for pfn 0 (struct page_desc) |
+    |------------------------------------------+ block 2 + X blocks
+    |            2nd-bitmap                    | (aligned by block)
+    |------------------------------------------+ block 2 + 2 * X blocks
+    | page header for pfn 0 (struct page_desc) | (aligned by block)
     | page header for pfn 1 (struct page_desc) |
     |                     :                    |
     | page header for pfn Z (struct page_desc) |
@@ -80,7 +80,8 @@
 
   - page header
     There are page headers corresponding to dumpable pages.
-    This header presents the corresponding page information (compressed, or not. etc.)
+    This header presents the corresponding page information (compressed, or not.
+    etc.)
 
     typedef struct page_desc {
         off_t                   offset;         /* the offset of the page data*/

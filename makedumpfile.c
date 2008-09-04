@@ -5172,7 +5172,7 @@ write_kdump_pages()
 	struct disk_dump_header *dh = info->dump_header;
 	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
-	struct cache_data bm2, pdesc, pdata;
+	struct cache_data pdesc, pdata;
 	struct dump_bitmap bitmap1, bitmap2;
 	const off_t failed = (off_t)-1;
 
@@ -5180,13 +5180,6 @@ write_kdump_pages()
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
-
-	bm2.fd         = info->fd_bitmap;
-	bm2.file_name  = info->name_bitmap;
-	bm2.cache_size = BUFSIZE_BITMAP;
-	bm2.buf_size   = 0;
-	bm2.offset     = info->len_bitmap/2;
-	bm2.buf        = NULL;
 
 	pdesc.fd         = info->fd_dumpfile;
 	pdesc.file_name  = info->name_dumpfile;
@@ -5215,11 +5208,6 @@ write_kdump_pages()
 	len_buf_out = compressBound(info->page_size);
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((bm2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for 2nd-bitmap buffer. %s\n",
 		    strerror(errno));
 		goto out;
 	}
@@ -5284,13 +5272,6 @@ write_kdump_pages()
 
 		if ((num_dumped % per) == 0)
 			print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
-
-		if ((pfn % PFN_BUFBITMAP) == 0) {
-			if (info->len_bitmap - bm2.offset < BUFSIZE_BITMAP)
-				bm2.cache_size = info->len_bitmap - bm2.offset;
-			if (!read_cache(&bm2))
-				goto out;
-		}
 
 		/*
 		 * Check the memory hole.
@@ -5368,8 +5349,6 @@ write_kdump_pages()
 out:
 	if (buf_out != NULL)
 		free(buf_out);
-	if (bm2.buf != NULL)
-		free(bm2.buf);
 	if (pdesc.buf != NULL)
 		free(pdesc.buf);
 	if (pdata.buf != NULL)

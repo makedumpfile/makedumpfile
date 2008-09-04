@@ -18,7 +18,7 @@
 #include "makedumpfile.h"
 
 int
-get_max_physmem_size_x86(void)
+get_machdep_info_x86(void)
 {
 	/* PAE */
 	if ((vt.mem_flags & MEMORY_X86_PAE)

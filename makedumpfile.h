@@ -594,39 +594,39 @@ do { \
  * The function of dependence on machine
  */
 #ifdef __x86__
-int get_max_physmem_size_x86(void);
+int get_machdep_info_x86(void);
 #define get_phys_base()		TRUE
-#define get_machdep_info()	TRUE
-#define get_max_physmem_size()	get_max_physmem_size_x86()
+#define get_machdep_info()	get_machdep_info_x86()
+#define get_versiondep_info()	TRUE
 #define vaddr_to_paddr(X)	vaddr_to_paddr_general(X)
 #endif /* x86 */
 
 #ifdef __x86_64__
 int get_phys_base_x86_64(void);
-int get_max_physmem_size_x86_64(void);
+int get_machdep_info_x86_64(void);
+int get_versiondep_info_x86_64(void);
 unsigned long long vaddr_to_paddr_x86_64(unsigned long vaddr);
 #define get_phys_base()		get_phys_base_x86_64()
-#define get_machdep_info()	TRUE
-#define get_max_physmem_size()	get_max_physmem_size_x86_64()
+#define get_machdep_info()	get_machdep_info_x86_64()
+#define get_versiondep_info()	get_versiondep_info_x86_64()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_x86_64(X)
 #endif /* x86_64 */
 
 #ifdef __powerpc__ /* powerpc */
-int get_max_physmem_size_ppc64(void);
+int get_machdep_info_ppc64(void);
 #define get_phys_base()		TRUE
-#define get_machdep_info()	TRUE
-#define get_max_physmem_size()	get_max_physmem_size_ppc64()
+#define get_machdep_info()	get_machdep_info_ppc64()
+#define get_versiondep_info()	TRUE
 #define vaddr_to_paddr(X)	vaddr_to_paddr_general(X)
 #endif          /* powerpc */
 
 #ifdef __ia64__ /* ia64 */
 int get_phys_base_ia64(void);
 int get_machdep_info_ia64(void);
-int get_max_physmem_size_ia64(void);
 unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define get_machdep_info()	get_machdep_info_ia64()
 #define get_phys_base()		get_phys_base_ia64()
-#define get_max_physmem_size()	get_max_physmem_size_ia64()
+#define get_versiondep_info()	TRUE
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ia64(X)
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */

@@ -3306,7 +3306,7 @@ out:
 	if (!check_release())
 		return FALSE;
 
-	if (!get_max_physmem_size())
+	if (!get_versiondep_info())
 		return FALSE;
 
 	if (!get_numnodes())

@@ -23,7 +23,7 @@
 #include "makedumpfile.h"
 
 int
-get_max_physmem_size_ppc64(void)
+get_machdep_info_ppc64(void)
 {
 	info->section_size_bits = _SECTION_SIZE_BITS;
 	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;

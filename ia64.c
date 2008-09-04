@@ -82,12 +82,6 @@ get_machdep_info_ia64(void)
 		MSG("Can't distinguish the pgtable.\n");
 	}
 
-	return TRUE;
-}
-
-int
-get_max_physmem_size_ia64(void)
-{
 	info->section_size_bits = _SECTION_SIZE_BITS;
 	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 

@@ -55,10 +55,16 @@ get_phys_base_x86_64(void)
 }
 
 int
-get_max_physmem_size_x86_64(void)
+get_machdep_info_x86_64(void)
 {
 	info->section_size_bits = _SECTION_SIZE_BITS;
 
+	return TRUE;
+}
+
+int
+get_versiondep_info_x86_64(void)
+{
 	/*
 	 * On linux-2.6.26, MAX_PHYSMEM_BITS is changed to 44 from 40.
 	 */

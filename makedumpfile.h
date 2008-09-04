@@ -766,7 +766,6 @@ struct DumpInfo {
 	 */
 	int			fd_bitmap;
 	char			*name_bitmap;
-	struct cache_data	*bm2;
 
 	/*
 	 * vmcoreinfo file info:

@@ -649,7 +649,7 @@ struct dump_bitmap {
 	int		fd;
 	int		no_block;
 	char		*file_name;
-	char		*buf;
+	char		buf[BUFSIZE_BITMAP];
 	off_t		offset;
 };
 

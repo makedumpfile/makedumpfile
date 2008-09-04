@@ -4087,19 +4087,12 @@ exclude_zero_pages()
 	struct dump_bitmap bitmap2;
 	unsigned char buf[info->page_size];
 
-	int ret = FALSE;
-
 	bitmap2.fd        = info->fd_bitmap;
 	bitmap2.file_name = info->name_bitmap;
 	bitmap2.no_block  = -1;
-	bitmap2.buf       = NULL;
 	bitmap2.offset    = info->len_bitmap/2;
+	memset(bitmap2.buf, 0, sizeof(bitmap2.buf));
 
-	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	for (pfn = paddr = 0; pfn < info->max_mapnr;
 	    pfn++, paddr += info->page_size) {
 
@@ -4112,7 +4105,7 @@ exclude_zero_pages()
 			continue;
 
 		if (!readmem(PADDR, paddr, buf, info->page_size))
-			goto out;
+			return FALSE;
 
 		if (is_zero_page(buf, info->page_size)) {
 			clear_bit_on_2nd_bitmap(pfn);
@@ -4125,12 +4118,7 @@ exclude_zero_pages()
 	 */
 	print_progress(PROGRESS_ZERO_PAGES, info->max_mapnr, info->max_mapnr);
 
-	ret = TRUE;
-out:
-	if (bitmap2.buf != NULL)
-		free(bitmap2.buf);
-
-	return ret;
+	return TRUE;
 }
 
 int
@@ -4349,25 +4337,15 @@ prepare_dump_bitmap()
 	info->bitmap1->fd        = info->fd_bitmap;
 	info->bitmap1->file_name = info->name_bitmap;
 	info->bitmap1->no_block  = -1;
-	info->bitmap1->buf       = NULL;
 	info->bitmap1->offset    = 0;
+	memset(info->bitmap1->buf, 0, sizeof(info->bitmap1->buf));
 
 	info->bitmap2->fd        = info->fd_bitmap;
 	info->bitmap2->file_name = info->name_bitmap;
 	info->bitmap2->no_block  = -1;
-	info->bitmap2->buf       = NULL;
 	info->bitmap2->offset    = info->len_bitmap/2;
+	memset(info->bitmap2->buf, 0, sizeof(info->bitmap2->buf));
 
-	if ((info->bitmap1->buf = malloc(BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate buffer for the 1st-bitmap. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
-	if ((info->bitmap2->buf = malloc(BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate buffer for the 2nd-bitmap. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
 	return TRUE;
 }
 
@@ -4773,8 +4751,8 @@ write_elf_pages()
 	bitmap2.fd        = info->fd_bitmap;
 	bitmap2.file_name = info->name_bitmap;
 	bitmap2.no_block  = -1;
-	bitmap2.buf       = NULL;
-	bitmap2.offset    = info->len_bitmap/2;
+	bitmap2.offset    = info->len_bitmap / 2;
+	memset(bitmap2.buf, 0, sizeof(bitmap2.buf));
 
 	cd_hdr.fd         = info->fd_dumpfile;
 	cd_hdr.file_name  = info->name_dumpfile;
@@ -4788,11 +4766,6 @@ write_elf_pages()
 	cd_seg.buf_size   = 0;
 	cd_seg.buf        = NULL;
 
-	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	if ((cd_hdr.buf = malloc(cd_hdr.cache_size + info->page_size))
 	    == NULL) {
 		ERRMSG("Can't allocate memory for the page data buffer. %s\n",
@@ -5092,8 +5065,6 @@ write_elf_pages()
 
 	ret = TRUE;
 out:
-	if (bitmap2.buf != NULL)
-		free(bitmap2.buf);
 	if (cd_hdr.buf != NULL)
 		free(cd_hdr.buf);
 	if (cd_seg.buf != NULL)
@@ -5196,14 +5167,14 @@ write_kdump_pages()
 	bitmap1.fd        = info->fd_bitmap;
 	bitmap1.file_name = info->name_bitmap;
 	bitmap1.no_block  = -1;
-	bitmap1.buf       = NULL;
 	bitmap1.offset    = 0;
+	memset(bitmap1.buf, 0, sizeof(bitmap1.buf));
 
 	bitmap2.fd        = info->fd_bitmap;
 	bitmap2.file_name = info->name_bitmap;
 	bitmap2.no_block  = -1;
-	bitmap2.buf       = NULL;
 	bitmap2.offset    = info->len_bitmap/2;
+	memset(bitmap2.buf, 0, sizeof(bitmap2.buf));
 
 	len_buf_out = compressBound(info->page_size);
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
@@ -5220,16 +5191,6 @@ write_kdump_pages()
 	if ((pdata.buf = malloc(pdata.cache_size + info->page_size))
 	    == NULL) {
 		ERRMSG("Can't allocate memory for the page data buffer. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((bitmap1.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for the 1st bitmap. %s\n",
-		    strerror(errno));
-		goto out;
-	}
-	if ((bitmap2.buf = calloc(1, BUFSIZE_BITMAP)) == NULL) {
-		ERRMSG("Can't allocate memory for the 2nd bitmap. %s\n",
 		    strerror(errno));
 		goto out;
 	}
@@ -5353,10 +5314,6 @@ out:
 		free(pdesc.buf);
 	if (pdata.buf != NULL)
 		free(pdata.buf);
-	if (bitmap1.buf != NULL)
-		free(bitmap1.buf);
-	if (bitmap2.buf != NULL)
-		free(bitmap2.buf);
 
 	return ret;
 }

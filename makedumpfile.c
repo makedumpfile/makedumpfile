@@ -60,7 +60,7 @@ unsigned long long pfn_free;
 int retcd = FAILED;	/* return code */
 
 void
-show_version()
+show_version(void)
 {
 	MSG("makedumpfile: version " VERSION " (released on " RELEASE_DATE ")\n");
 	MSG("\n");
@@ -196,7 +196,7 @@ vaddr_to_offset_slow(int fd, char *filename, unsigned long long vaddr)
  * Get the number of the page descriptors from the ELF info.
  */
 unsigned long long
-get_max_mapnr()
+get_max_mapnr(void)
 {
 	int i;
 	unsigned long long max_paddr;
@@ -315,7 +315,7 @@ is_page_size(long page_size)
 }
 
 int
-check_release()
+check_release(void)
 {
 	struct utsname system_utsname;
 	unsigned long utsname;
@@ -357,7 +357,7 @@ check_release()
 }
 
 void
-print_usage()
+print_usage(void)
 {
 	MSG("\n");
 	MSG("Usage:\n");
@@ -524,7 +524,7 @@ open_vmcoreinfo(char *mode)
 }
 
 int
-open_kernel_file()
+open_kernel_file(void)
 {
 	int fd;
 
@@ -548,7 +548,7 @@ open_kernel_file()
 }
 
 int
-open_dump_memory()
+open_dump_memory(void)
 {
 	int fd;
 
@@ -562,7 +562,7 @@ open_dump_memory()
 }
 
 int
-open_dump_file()
+open_dump_file(void)
 {
 	int fd;
 	int open_flags = O_RDWR|O_CREAT;
@@ -591,7 +591,7 @@ open_dump_file()
 }
 
 int
-open_dump_bitmap()
+open_dump_bitmap(void)
 {
 	int fd;
 
@@ -618,7 +618,7 @@ open_dump_bitmap()
  * - vmcoreinfo file
  */
 int
-open_files_for_generating_vmcoreinfo()
+open_files_for_generating_vmcoreinfo(void)
 {
 	if (!open_kernel_file())
 		return FALSE;
@@ -634,7 +634,7 @@ open_files_for_generating_vmcoreinfo()
  * - dump file
  */
 int
-open_files_for_rearranging_dumpdata()
+open_files_for_rearranging_dumpdata(void)
 {
 	if (!open_dump_file())
 		return FALSE;
@@ -653,7 +653,7 @@ open_files_for_rearranging_dumpdata()
  *   - vmlinux
  */
 int
-open_files_for_creating_dumpfile()
+open_files_for_creating_dumpfile(void)
 {
 	if (info->flag_read_vmcoreinfo) {
 		if (!open_vmcoreinfo("r"))
@@ -869,7 +869,7 @@ check_elf_format(int fd, char *filename, int *phnum, int *num_load)
 }
 
 int
-get_elf_info()
+get_elf_info(void)
 {
 	int i, j, phnum, num_load, elf_format;
 	off_t offset_note;
@@ -1783,7 +1783,7 @@ get_source_filename(char *structname, char *src_name, int cmd)
 }
 
 int
-get_symbol_info()
+get_symbol_info(void)
 {
 	/*
 	 * Get symbol info.
@@ -1818,7 +1818,7 @@ get_symbol_info()
 }
 
 int
-get_structure_info()
+get_structure_info(void)
 {
 	/*
 	 * Get offsets of the page_discriptor's members.
@@ -1917,7 +1917,7 @@ get_structure_info()
 }
 
 int
-get_srcfile_info()
+get_srcfile_info(void)
 {
 	TYPEDEF_SRCFILE_INIT(pud_t, "pud_t");
 
@@ -1925,7 +1925,7 @@ get_srcfile_info()
 }
 
 int
-get_value_for_old_linux()
+get_value_for_old_linux(void)
 {
 	if (NUMBER(PG_lru) == NOT_FOUND_NUMBER)
 		NUMBER(PG_lru) = PG_lru_ORIGINAL;
@@ -1937,7 +1937,7 @@ get_value_for_old_linux()
 }
 
 int
-get_str_osrelease_from_vmlinux()
+get_str_osrelease_from_vmlinux(void)
 {
 	struct utsname system_utsname;
 	unsigned long long utsname;
@@ -1982,7 +1982,7 @@ get_str_osrelease_from_vmlinux()
 }
 
 int
-is_sparsemem_extreme()
+is_sparsemem_extreme(void)
 {
 	if (ARRAY_LENGTH(mem_section)
 	     == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
@@ -1992,7 +1992,7 @@ is_sparsemem_extreme()
 }
 
 int
-get_mem_type()
+get_mem_type(void)
 {
 	int ret;
 
@@ -2030,7 +2030,7 @@ get_mem_type()
 }
 
 int
-generate_vmcoreinfo()
+generate_vmcoreinfo(void)
 {
 	if ((info->page_size = sysconf(_SC_PAGE_SIZE)) <= 0) {
 		ERRMSG("Can't get the size of page.\n");
@@ -2164,7 +2164,7 @@ generate_vmcoreinfo()
 }
 
 int
-read_vmcoreinfo_basic_info()
+read_vmcoreinfo_basic_info(void)
 {
 	long page_size = FALSE;
 	char buf[BUFSIZE_FGETS], *endp;
@@ -2314,7 +2314,7 @@ read_vmcoreinfo_string(char *str_in, char *str_out)
 }
 
 int
-read_vmcoreinfo()
+read_vmcoreinfo(void)
 {
 	if (!read_vmcoreinfo_basic_info())
 		return FALSE;
@@ -2544,7 +2544,7 @@ copy_vmcoreinfo(off_t offset, unsigned long size)
  * Get the number of online nodes.
  */
 int
-get_nodes_online()
+get_nodes_online(void)
 {
 	int len, i, j, online;
 	unsigned long node_online_map = 0, bitbuf, *maskptr;
@@ -2591,7 +2591,7 @@ get_nodes_online()
 }
 
 int
-get_numnodes()
+get_numnodes(void)
 {
 	if (!(vt.numnodes = get_nodes_online())) {
 		vt.numnodes = 1;
@@ -2737,7 +2737,7 @@ dump_mem_map(unsigned long long pfn_start,
 }
 
 int
-get_mm_flatmem()
+get_mm_flatmem(void)
 {
 	unsigned long mem_map;
 
@@ -2791,7 +2791,7 @@ get_node_memblk(int num_memblk,
 }
 
 int
-get_num_mm_discontigmem()
+get_num_mm_discontigmem(void)
 {
 	int i, nid;
 	unsigned long start_paddr, size;
@@ -2878,7 +2878,7 @@ separate_mem_map(struct mem_map_data *mmd, int *id_mm, int nid_pgdat,
 }
 
 int
-get_mm_discontigmem()
+get_mm_discontigmem(void)
 {
 	int i, j, id_mm, node, num_mem_map, separate_mm = FALSE;
 	unsigned long pgdat, mem_map, pfn_start, pfn_end, node_spanned_pages;
@@ -3113,7 +3113,7 @@ sparse_decode_mem_map(unsigned long coded_mem_map, unsigned long section_nr)
 }
 
 int
-get_mm_sparsemem()
+get_mm_sparsemem(void)
 {
 	unsigned int section_nr, mem_section_size, num_section;
 	unsigned long long pfn_start, pfn_end;
@@ -3171,7 +3171,7 @@ out:
 }
 
 int
-get_mem_map_without_mm()
+get_mem_map_without_mm(void)
 {
 	info->num_mem_map = 1;
 	if ((info->mem_map_data = (struct mem_map_data *)
@@ -3186,7 +3186,7 @@ get_mem_map_without_mm()
 }
 
 int
-get_mem_map()
+get_mem_map(void)
 {
 	int ret;
 
@@ -3224,7 +3224,7 @@ get_mem_map()
 }
 
 int
-initial()
+initial(void)
 {
 	if (!(vt.mem_flags & MEMORY_XEN) && info->flag_exclude_xen_dom) {
 		MSG("'-X' option is disable,");
@@ -3404,13 +3404,13 @@ sync_bitmap(struct dump_bitmap *bitmap)
 }
 
 int
-sync_1st_bitmap()
+sync_1st_bitmap(void)
 {
 	return sync_bitmap(info->bitmap1);
 }
 
 int
-sync_2nd_bitmap()
+sync_2nd_bitmap(void)
 {
 	return sync_bitmap(info->bitmap2);
 }
@@ -3507,7 +3507,7 @@ read_cache(struct cache_data *cd)
 }
 
 int
-is_bigendian()
+is_bigendian(void)
 {
 	int i = 0x12345678;
 
@@ -3626,7 +3626,7 @@ read_buf_from_stdin(void *buf, int buf_size)
 }
 
 int
-read_start_flat_header()
+read_start_flat_header(void)
 {
 	char buf[MAX_SIZE_MDF_HEADER];
 	struct makedumpfile_header fh;
@@ -3676,7 +3676,7 @@ read_flat_data_header(struct makedumpfile_data_header *fdh)
 }
 
 int
-rearrange_dumpdata()
+rearrange_dumpdata(void)
 {
 	int read_size, tmp_read_size;
 	char buf[SIZE_BUF_STDIN];
@@ -3888,7 +3888,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 }
 
 int
-_exclude_free_page()
+_exclude_free_page(void)
 {
 	int i, nr_zones, num_nodes, node;
 	unsigned long node_zones, zone, spanned_pages, pgdat;
@@ -3950,7 +3950,7 @@ _exclude_free_page()
 }
 
 int
-exclude_free_page()
+exclude_free_page(void)
 {
 	/*
 	 * Check having necessary information.
@@ -3988,7 +3988,7 @@ exclude_free_page()
 }
 
 int
-create_1st_bitmap()
+create_1st_bitmap(void)
 {
 	int i;
  	char buf[info->page_size];
@@ -4051,7 +4051,7 @@ create_1st_bitmap()
  * Exclude the page filled with zero in case of creating an elf dumpfile.
  */
 int
-exclude_zero_pages()
+exclude_zero_pages(void)
 {
 	unsigned long long pfn, paddr;
 	struct dump_bitmap bitmap2;
@@ -4092,7 +4092,7 @@ exclude_zero_pages()
 }
 
 int
-exclude_unnecessary_pages()
+exclude_unnecessary_pages(void)
 {
 	unsigned int mm;
 	unsigned long mem_map;
@@ -4191,7 +4191,7 @@ out:
 }
 
 int
-copy_bitmap()
+copy_bitmap(void)
 {
 	off_t offset;
 	unsigned char buf[info->page_size];
@@ -4228,7 +4228,7 @@ copy_bitmap()
 }
 
 int
-create_2nd_bitmap()
+create_2nd_bitmap(void)
 {
 	/*
 	 * Copy 1st-bitmap to 2nd-bitmap.
@@ -4292,7 +4292,7 @@ create_2nd_bitmap()
 }
 
 int
-prepare_dump_bitmap()
+prepare_dump_bitmap(void)
 {
 	if ((info->bitmap1 = malloc(sizeof(struct dump_bitmap))) == NULL) {
 		ERRMSG("Can't allocate memory for the 1st-bitmap. %s\n",
@@ -4320,7 +4320,7 @@ prepare_dump_bitmap()
 }
 
 int
-create_dump_bitmap()
+create_dump_bitmap(void)
 {
 	if (!prepare_dump_bitmap())
 		return FALSE;
@@ -4359,7 +4359,7 @@ get_phnum_memory(void)
 }
 
 int
-get_loads_dumpfile()
+get_loads_dumpfile(void)
 {
 	int i, phnum, num_new_load = 0;
 	long page_size = info->page_size;
@@ -4469,7 +4469,7 @@ write_start_flat_header()
 }
 
 int
-write_end_flat_header()
+write_end_flat_header(void)
 {
 	struct makedumpfile_data_header fdh;
 
@@ -4643,7 +4643,7 @@ out:
 }
 
 int
-write_kdump_header()
+write_kdump_header(void)
 {
 	size_t size;
 	struct disk_dump_header *dh = info->dump_header;
@@ -5150,7 +5150,7 @@ out:
 }
 
 int
-write_kdump_bitmap()
+write_kdump_bitmap(void)
 {
 	struct cache_data bm;
 	long buf_size;
@@ -5199,7 +5199,7 @@ out:
 }
 
 void
-close_vmcoreinfo()
+close_vmcoreinfo(void)
 {
 	if(fclose(info->file_vmcoreinfo) < 0)
 		ERRMSG("Can't close the vmcoreinfo file(%s). %s\n",
@@ -5207,7 +5207,7 @@ close_vmcoreinfo()
 }
 
 void
-close_dump_memory()
+close_dump_memory(void)
 {
 	if ((info->fd_memory = close(info->fd_memory)) < 0)
 		ERRMSG("Can't close the dump memory(%s). %s\n",
@@ -5215,7 +5215,7 @@ close_dump_memory()
 }
 
 void
-close_dump_file()
+close_dump_file(void)
 {
 	if (info->flag_flatten)
 		return;
@@ -5226,7 +5226,7 @@ close_dump_file()
 }
 
 void
-close_dump_bitmap()
+close_dump_bitmap(void)
 {
 	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
@@ -5235,7 +5235,7 @@ close_dump_bitmap()
 }
 
 void
-close_kernel_file()
+close_kernel_file(void)
 {
 	if (info->name_vmlinux) {
 		if ((info->fd_vmlinux = close(info->fd_vmlinux)) < 0) {
@@ -5257,7 +5257,7 @@ close_kernel_file()
  * - vmcoreinfo file
  */
 int
-close_files_for_generating_vmcoreinfo()
+close_files_for_generating_vmcoreinfo(void)
 {
 	close_kernel_file();
 
@@ -5271,7 +5271,7 @@ close_files_for_generating_vmcoreinfo()
  * - dump file
  */
 int
-close_files_for_rearranging_dumpdata()
+close_files_for_rearranging_dumpdata(void)
 {
 	close_dump_file();
 
@@ -5289,7 +5289,7 @@ close_files_for_rearranging_dumpdata()
  *   - vmlinux
  */
 int
-close_files_for_creating_dumpfile()
+close_files_for_creating_dumpfile(void)
 {
 	if (info->flag_read_vmcoreinfo)
 		close_vmcoreinfo();
@@ -5309,7 +5309,7 @@ close_files_for_creating_dumpfile()
  * for Xen extraction
  */
 int
-get_symbol_info_xen()
+get_symbol_info_xen(void)
 {
 	/*
 	 * Common symbol
@@ -5341,7 +5341,7 @@ get_symbol_info_xen()
 }
 
 int
-get_structure_info_xen()
+get_structure_info_xen(void)
 {
 	SIZE_INIT(page_info, "page_info");
 	OFFSET_INIT(page_info.count_info, "page_info", "count_info");
@@ -5388,7 +5388,7 @@ get_xen_phys_start(void)
 }
 
 int
-get_xen_info()
+get_xen_info(void)
 {
 	unsigned long domain;
 	unsigned int domain_id;
@@ -5517,7 +5517,7 @@ get_xen_info()
 }
 
 void
-show_data_xen()
+show_data_xen(void)
 {
 	int i;
 
@@ -5562,7 +5562,7 @@ show_data_xen()
 }
 
 int
-generate_vmcoreinfo_xen()
+generate_vmcoreinfo_xen(void)
 {
 	if ((info->page_size = sysconf(_SC_PAGE_SIZE)) <= 0) {
 		ERRMSG("Can't get the size of page.\n");
@@ -5618,7 +5618,7 @@ generate_vmcoreinfo_xen()
 }
 
 int
-read_vmcoreinfo_basic_info_xen()
+read_vmcoreinfo_basic_info_xen(void)
 {
 	long page_size = FALSE;
 	char buf[BUFSIZE_FGETS], *endp;
@@ -5662,7 +5662,7 @@ read_vmcoreinfo_basic_info_xen()
 }
 
 int
-read_vmcoreinfo_xen()
+read_vmcoreinfo_xen(void)
 {
 	if (!read_vmcoreinfo_basic_info_xen())
 		return FALSE;
@@ -5732,7 +5732,7 @@ is_select_domain(unsigned int id)
 }
 
 int
-exclude_xen_user_domain()
+exclude_xen_user_domain(void)
 {
 	int i;
 	unsigned int count_info, _domain;
@@ -5800,7 +5800,7 @@ exclude_xen_user_domain()
 }
 
 int
-initial_xen()
+initial_xen(void)
 {
 #ifdef __powerpc__
 	MSG("\n");
@@ -5892,7 +5892,7 @@ initial_xen()
 }
 
 void
-print_report()
+print_report(void)
 {
 	unsigned long long pfn_original, pfn_excluded, shrinking;
 
@@ -5925,7 +5925,7 @@ print_report()
 }
 
 int
-create_dumpfile()
+create_dumpfile(void)
 {
 	struct cache_data cd_header, cd_page;
 

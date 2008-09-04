@@ -999,14 +999,14 @@ struct dwarf_info {
 extern struct dwarf_info	dwarf_info;
 
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
-off_t paddr_to_offset();
-unsigned long long vaddr_to_paddr();
+off_t paddr_to_offset(unsigned long long paddr);
+unsigned long long vaddr_to_paddr(unsigned long long vaddr);
 int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
-int get_str_osrelease_from_vmlinux();
+int get_str_osrelease_from_vmlinux(void);
 int get_pt_note_info(off_t off_note, unsigned long sz_note);
-int exclude_xen_user_domain();
+int exclude_xen_user_domain(void);
 
 
 /*
@@ -1048,7 +1048,7 @@ struct domain_list {
 unsigned long long kvtop_xen_x86(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_x86(X)
 
-int get_xen_info_x86();
+int get_xen_info_x86(void);
 #define get_xen_info_arch(X) get_xen_info_x86(X)
 
 #endif	/* __x86__ */
@@ -1073,7 +1073,7 @@ int get_xen_info_x86();
 unsigned long long kvtop_xen_x86_64(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_x86_64(X)
 
-int get_xen_info_x86_64();
+int get_xen_info_x86_64(void);
 #define get_xen_info_arch(X) get_xen_info_x86_64(X)
 
 #endif	/* __x86_64__ */
@@ -1108,7 +1108,7 @@ int get_xen_info_x86_64();
 unsigned long long kvtop_xen_ia64(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_ia64(X)
 
-int get_xen_info_ia64();
+int get_xen_info_ia64(void);
 #define get_xen_info_arch(X) get_xen_info_ia64(X)
 
 #endif	/* __ia64 */

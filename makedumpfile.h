@@ -696,7 +696,7 @@ struct DumpInfo {
 	 */
 	int		dump_level;          /* dump level */
 	int		flag_compress;       /* flag of compression */
-	int		flag_elf64;          /* flag of ELF64 memory */
+	int		flag_elf64_memory;   /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_generate_vmcoreinfo;/* flag of generating vmcoreinfo file */
 	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */

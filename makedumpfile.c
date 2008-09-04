@@ -3082,7 +3082,8 @@ section_mem_map_addr(unsigned long addr)
 		return NOT_KV_ADDR;
 	}
 	if (!readmem(VADDR, addr, mem_section, SIZE(mem_section))) {
-		ERRMSG("Can't get a struct mem_section.\n");
+		ERRMSG("Can't get a struct mem_section(%lx).\n", addr);
+		free(mem_section);
 		return NOT_KV_ADDR;
 	}
 	map = ULONG(mem_section + OFFSET(mem_section.section_mem_map));

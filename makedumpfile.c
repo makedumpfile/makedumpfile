@@ -4734,6 +4734,18 @@ print_progress(const char *msg, unsigned long current, unsigned long end)
 	PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3d %%] ", msg, progress);
 }
 
+unsigned long long
+get_num_dumpable(struct dump_bitmap *bitmap2)
+{
+	unsigned long long pfn, num_dumpable;
+
+	for (pfn = 0, num_dumpable = 0; pfn < info->max_mapnr; pfn++) {
+		if (is_dumpable(bitmap2, pfn))
+			num_dumpable++;
+	}
+	return num_dumpable;
+}
+
 int
 write_elf_pages()
 {
@@ -4794,13 +4806,7 @@ write_elf_pages()
 		goto out;
 	}
 
-	/*
-	 * Count the number of dumpable pages.
-	 */
-	for (pfn = 0 ; pfn < info->max_mapnr; pfn++) {
-		if (is_dumpable(&bitmap2, pfn))
-			num_dumpable++;
-	}
+	num_dumpable = get_num_dumpable(&bitmap2);
 	per = num_dumpable / 100;
 
 	off_seg_load  = info->offset_load_dumpfile;
@@ -5240,13 +5246,7 @@ write_kdump_pages()
 		goto out;
 	}
 
-	/*
-	 * Count the number of dumpable pages.
-	 */
-	for (pfn = 0 ; pfn < info->max_mapnr; pfn++) {
-		if (is_dumpable(&bitmap2, pfn))
-			num_dumpable++;
-	}
+	num_dumpable = get_num_dumpable(&bitmap2);
 	per = num_dumpable / 100;
 
 	/*

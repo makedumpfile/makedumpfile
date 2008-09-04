@@ -73,6 +73,11 @@ get_versiondep_info_x86_64(void)
 	else
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_26;
 
+	if (info->kernel_version < VERSION_LINUX_2_6_27)
+		info->page_offset = __PAGE_OFFSET_ORIG;
+	else
+		info->page_offset = __PAGE_OFFSET_2_6_27;
+
 	return TRUE;
 }
 

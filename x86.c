@@ -36,6 +36,7 @@ get_machdep_info_x86(void)
 		info->section_size_bits = _SECTION_SIZE_BITS;
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 	}
+	info->page_offset = __PAGE_OFFSET;
 
 	return TRUE;
 }

@@ -424,6 +424,7 @@ do { \
 #define OLDEST_VERSION		(0x0206000f)	/* linux-2.6.15 */
 #define LATEST_VERSION		(0x0206001a)	/* linux-2.6.26 */
 #define VERSION_LINUX_2_6_26	(0x0206001a)	/* linux-2.6.26 */
+#define VERSION_LINUX_2_6_27	(0x0206001b)	/* linux-2.6.27 */
 
 /*
  * vmcoreinfo in /proc/vmcore
@@ -473,8 +474,10 @@ do { \
 /*
  * The value of dependence on machine
  */
+#define PAGE_OFFSET		(info->page_offset)
+
 #ifdef __x86__
-#define PAGE_OFFSET		(0xc0000000)
+#define __PAGE_OFFSET		(0xc0000000)
 #define __VMALLOC_RESERVE       (128 << 20)
 #define MAXMEM                  (-PAGE_OFFSET-__VMALLOC_RESERVE)
 #define KVBASE_MASK		(0x7fffff)
@@ -486,7 +489,8 @@ do { \
 #endif /* x86 */
 
 #ifdef __x86_64__
-#define PAGE_OFFSET		(0xffff810000000000) /* Direct mapping */
+#define __PAGE_OFFSET_ORIG	(0xffff810000000000) /* linux-2.6.26, or former */
+#define __PAGE_OFFSET_2_6_27	(0xffff880000000000) /* linux-2.6.27, or later */
 #define VMALLOC_START		(0xffffc20000000000)
 #define VMALLOC_END		(0xffffe1ffffffffff)
 #define VMEMMAP_START		(0xffffe20000000000)
@@ -527,7 +531,7 @@ do { \
 #endif /* x86_64 */
 
 #ifdef __powerpc__
-#define PAGE_OFFSET		(0xc000000000000000)
+#define __PAGE_OFFSET		(0xc000000000000000)
 #define KERNELBASE		PAGE_OFFSET
 #define VMALLOCBASE     	(0xD000000000000000)
 #define KVBASE			(SYMBOL(_stext))
@@ -712,6 +716,7 @@ struct DumpInfo {
 	long		page_size;           /* size of page */
 	long		page_shift;
 	unsigned long long	max_mapnr;   /* number of page descriptor */
+	unsigned long   page_offset;
 	unsigned long   section_size_bits;
 	unsigned long   max_physmem_bits;
 	unsigned long   sections_per_root;

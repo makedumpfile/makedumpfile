@@ -92,7 +92,7 @@ paddr_to_offset(unsigned long long paddr)
 }
 
 unsigned long long
-vaddr_to_paddr(unsigned long long vaddr)
+vaddr_to_paddr_general(unsigned long long vaddr)
 {
 	int i;
 	unsigned long long paddr = NOT_PADDR;
@@ -111,32 +111,6 @@ vaddr_to_paddr(unsigned long long vaddr)
 }
 
 /*
- * Convert Virtual Address to File Offset.
- *  If this function returns 0x0, File Offset isn't found.
- *  The File Offset 0x0 is the ELF header.
- *  It is not in the memory image.
- */
-off_t
-vaddr_to_offset_general(unsigned long long vaddr)
-{
-	int i;
-	off_t offset;
-	struct pt_load_segment *pls;
-
-	for (i = offset = 0; i < info->num_load_memory; i++) {
-		pls = &info->pt_load_segments[i];
-		if ((vaddr >= pls->virt_start)
-		    && (vaddr < pls->virt_end)) {
-			offset = (off_t)(vaddr - pls->virt_start) +
-				pls->file_offset;
-				break;
-		}
-	}
-	return offset;
-}
-
-/*
- * vaddr_to_offset_slow() is almost same as vaddr_to_offset_general().
  * This function is slow because it doesn't use the memory.
  * It is useful at few calls like get_str_osrelease_from_vmlinux().
  */
@@ -222,34 +196,27 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		/*
 		 * Convert Virtual Address to File Offset.
 		 */
-		if (!(offset = vaddr_to_offset(addr))) {
-			ERRMSG("Can't convert a virtual address(%llx) to offset.\n",
+		if ((paddr = vaddr_to_paddr(addr)) == NOT_PADDR) {
+			ERRMSG("Can't convert a virtual address(%llx) to physical address.\n",
 			    addr);
 			return FALSE;
 		}
 		break;
 	case PADDR:
-		/*
-		 * Convert Physical Address to File Offset.
-		 */
-		if (!(offset = paddr_to_offset(addr))) {
-			ERRMSG("Can't convert a physical address(%llx) to offset.\n",
-			    addr);
-			return FALSE;
-		}
+		paddr = addr;
 		break;
 	case VADDR_XEN:
 		if (!(paddr = kvtop_xen(addr)))
 			return FALSE;
-
-		if (!(offset = paddr_to_offset(paddr))) {
-			ERRMSG("Can't convert a physical address(%llx) to offset.\n",
-			    paddr);
-			return FALSE;
-		}
 		break;
 	default:
 		ERRMSG("Invalid address type (%d).\n", type_addr);
+		return FALSE;
+	}
+
+	if (!(offset = paddr_to_offset(paddr))) {
+		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
+		    paddr);
 		return FALSE;
 	}
 

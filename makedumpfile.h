@@ -598,17 +598,17 @@ int get_max_physmem_size_x86(void);
 #define get_phys_base()		TRUE
 #define get_machdep_info()	TRUE
 #define get_max_physmem_size()	get_max_physmem_size_x86()
-#define vaddr_to_offset(X)	vaddr_to_offset_general(X)
+#define vaddr_to_paddr(X)	vaddr_to_paddr_general(X)
 #endif /* x86 */
 
 #ifdef __x86_64__
 int get_phys_base_x86_64(void);
 int get_max_physmem_size_x86_64(void);
-off_t vaddr_to_offset_x86_64(unsigned long vaddr);
+unsigned long long vaddr_to_paddr_x86_64(unsigned long vaddr);
 #define get_phys_base()		get_phys_base_x86_64()
 #define get_machdep_info()	TRUE
 #define get_max_physmem_size()	get_max_physmem_size_x86_64()
-#define vaddr_to_offset(X)	vaddr_to_offset_x86_64(X)
+#define vaddr_to_paddr(X)	vaddr_to_paddr_x86_64(X)
 #endif /* x86_64 */
 
 #ifdef __powerpc__ /* powerpc */
@@ -616,18 +616,18 @@ int get_max_physmem_size_ppc64(void);
 #define get_phys_base()		TRUE
 #define get_machdep_info()	TRUE
 #define get_max_physmem_size()	get_max_physmem_size_ppc64()
-#define vaddr_to_offset(X)	vaddr_to_offset_general(X)
+#define vaddr_to_paddr(X)	vaddr_to_paddr_general(X)
 #endif          /* powerpc */
 
 #ifdef __ia64__ /* ia64 */
 int get_phys_base_ia64(void);
 int get_machdep_info_ia64(void);
 int get_max_physmem_size_ia64(void);
-off_t vaddr_to_offset_ia64(unsigned long vaddr);
+unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define get_machdep_info()	get_machdep_info_ia64()
 #define get_phys_base()		get_phys_base_ia64()
 #define get_max_physmem_size()	get_max_physmem_size_ia64()
-#define vaddr_to_offset(X)	vaddr_to_offset_ia64(X)
+#define vaddr_to_paddr(X)	vaddr_to_paddr_ia64(X)
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
 
@@ -1001,7 +1001,7 @@ extern struct dwarf_info	dwarf_info;
 
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 off_t paddr_to_offset(unsigned long long paddr);
-unsigned long long vaddr_to_paddr(unsigned long long vaddr);
+unsigned long long vaddr_to_paddr_general(unsigned long long vaddr);
 int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
 int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);

@@ -145,14 +145,11 @@ vtop4_x86_64(unsigned long vaddr)
 	return (PAGEBASE(pte) & PHYSICAL_PAGE_MASK) + PAGEOFFSET(vaddr);
 }
 
-off_t
-vaddr_to_offset_x86_64(unsigned long vaddr)
+unsigned long long
+vaddr_to_paddr_x86_64(unsigned long vaddr)
 {
-	int i;
-	off_t offset;
 	unsigned long phys_base;
 	unsigned long long paddr;
-	struct pt_load_segment *pls;
 
 	/*
 	 * Check the relocatable kernel.
@@ -166,7 +163,7 @@ vaddr_to_offset_x86_64(unsigned long vaddr)
 		if ((paddr = vtop4_x86_64(vaddr)) == NOT_PADDR) {
 			ERRMSG("Can't convert a virtual address(%lx) to " \
 			    "physical address.\n", vaddr);
-			return 0x0;
+			return NOT_PADDR;
 		}
 	}
 	else if (vaddr >= __START_KERNEL_map)
@@ -174,16 +171,7 @@ vaddr_to_offset_x86_64(unsigned long vaddr)
 	else
 		paddr = vaddr - PAGE_OFFSET;
 
-	for (i = offset = 0; i < info->num_load_memory; i++) {
-		pls = &info->pt_load_segments[i];
-		if ((paddr >= pls->phys_start)
-		    && (paddr < pls->phys_end)) {
-			offset = (off_t)(paddr - pls->phys_start) +
-				pls->file_offset;
-				break;
-		}
-	}
-	return offset;
+	return paddr;
 }
 
 /*

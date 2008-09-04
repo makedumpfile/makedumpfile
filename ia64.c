@@ -226,7 +226,7 @@ vtop_ia64(unsigned long vaddr)
 		ERRMSG("vaddr(%lx) is not KERNEL_VMALLOC_REGION.\n", vaddr);
 		return NOT_PADDR;
 	}
-	paddr = vaddr_to_paddr(vaddr);
+	paddr = vaddr_to_paddr_general(vaddr);
 	if (paddr != NOT_PADDR)
 		return paddr;
 
@@ -243,10 +243,10 @@ vtop_ia64(unsigned long vaddr)
 }
 
 /*
- * Translate a virtual address to a file offset.
+ * Translate a virtual address to physical address.
  */
-off_t
-vaddr_to_offset_ia64(unsigned long vaddr)
+unsigned long long
+vaddr_to_paddr_ia64(unsigned long vaddr)
 {
 	unsigned long long paddr;
 
@@ -267,12 +267,7 @@ vaddr_to_offset_ia64(unsigned long vaddr)
 			ERRMSG("Unknown region (%ld)\n", VADDR_REGION(vaddr));
 			return 0x0;
 	}
-	if (paddr == NOT_PADDR) {
-		ERRMSG("Can't convert a virtual address(%lx) to offset.\n",
-		    vaddr);
-		return 0x0;
-	}
-	return paddr_to_offset(paddr);
+	return paddr;
 }
 
 /*

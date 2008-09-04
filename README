@@ -34,7 +34,7 @@
   2.Uncompress the tar file:
     # tar -zxvf makedumpfile-x.y.z.tar.gz
   3.Enter the makedumpfile subdirectory:
-    # cd makedumpfile
+    # cd makedumpfile-x.y.z
   4.Build, and install:
     # make; make install
 

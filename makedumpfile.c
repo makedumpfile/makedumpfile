@@ -478,6 +478,11 @@ print_usage(void)
 	MSG("           16 |                                              X\n");
 	MSG("           31 |     X          X         X         X         X\n");
 	MSG("\n");
+	MSG("  [--vtop VIRTUAL_ADDRESS]:\n");
+	MSG("      This option is useful, when user debugs the translation problem\n");
+	MSG("      of virtual address. If specifing the VIRTUAL_ADDRESS, its physical\n");
+	MSG("      address is printed.\n");
+	MSG("\n");
 	MSG("  [-D]:\n");
 	MSG("      Print debugging message.\n");
 	MSG("\n");

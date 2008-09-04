@@ -355,6 +355,16 @@ value of \fImessage_level\fR is 31.
       31 |    X     |    X    |    X    |    X    |    X
 
 .TP
+\fB\-\-vtop\fR \fIvirtual_address\fR
+This option is useful, when user debugs the translation problem
+of virtual address. If specifing \fIvirtual_address\fR, its physical
+address is printed. It makes debugging easy by comparing the
+output of this option with the one of "vtop" subcommand of the
+crash utility.
+"--vtop" option only prints the translation output, and it does
+not affect the dumpfile creation.
+
+.TP
 \fB\-D\fR
 Print debugging message.
 

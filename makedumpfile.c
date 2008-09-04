@@ -4717,20 +4717,56 @@ get_num_dumpable(struct dump_bitmap *bitmap2)
 }
 
 int
+write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
+		       off_t off_memory, long long size)
+{
+	long page_size = info->page_size;
+	long long bufsz_write;
+	char buf[info->page_size];
+
+	off_memory = paddr_to_offset2(paddr, off_memory);
+	if (!off_memory) {
+		ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
+		    paddr);
+		return FALSE;
+	}
+	if (lseek(info->fd_memory, off_memory, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	while (size > 0) {
+		if (size >= page_size)
+			bufsz_write = page_size;
+		else
+			bufsz_write = size;
+
+		if (read(info->fd_memory, buf, bufsz_write) != bufsz_write) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			return FALSE;
+		}
+		if (!write_cache(cd_page, buf, bufsz_write))
+			return FALSE;
+
+		size -= page_size;
+	}
+	return TRUE;
+}
+
+int
 write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 {
 	int i, phnum;
 	long page_size = info->page_size;
-	long long bufsz_write, bufsz_remain;
 	unsigned long long pfn, pfn_start, pfn_end, paddr, num_excluded;
 	unsigned long long num_dumpable = 0, num_dumped = 0, per;
 	unsigned long long memsz, filesz;
 	unsigned long frac_head, frac_tail;
 	off_t off_seg_load, off_memory;
 	Elf64_Phdr load;
-	char buf[info->page_size];
 	struct dump_bitmap bitmap2;
-	const off_t failed = (off_t)-1;
 
 	if (!info->flag_elf_dumpfile)
 		return FALSE;
@@ -4786,6 +4822,11 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 				continue;
 			}
 
+			if ((num_dumped % per) == 0)
+				print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
+
+			num_dumped++;
+
 			/*
 			 * The dumpable pages are continuous.
 			 */
@@ -4834,41 +4875,9 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			/*
 			 * Write a PT_LOAD segment.
 			 */
-			off_memory = paddr_to_offset2(paddr, off_memory);
-			if (!off_memory) {
-				ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
-				    paddr);
+			if (!write_elf_load_segment(cd_page, paddr, off_memory,
+			    load.p_filesz))
 				return FALSE;
-			}
-			if (lseek(info->fd_memory, off_memory, SEEK_SET)
-			    == failed) {
-				ERRMSG("Can't seek the dump memory(%s). %s\n",
-				    info->name_memory, strerror(errno));
-				return FALSE;
-			}
-			bufsz_remain = load.p_filesz;
-
-			while (bufsz_remain > 0) {
-				if ((num_dumped % per) == 0)
-					print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
-
-				if (bufsz_remain >= page_size)
-					bufsz_write = page_size;
-				else
-					bufsz_write = bufsz_remain;
-
-				if (read(info->fd_memory, buf, bufsz_write)
-				    != bufsz_write) {
-					ERRMSG("Can't read the dump memory(%s). %s\n",
-					    info->name_memory, strerror(errno));
-					return FALSE;
-				}
-				if (!write_cache(cd_page, buf, bufsz_write))
-					return FALSE;
-
-				bufsz_remain -= page_size;
-				num_dumped++;
-			}
 
 			load.p_paddr += load.p_memsz;
 #ifdef __x86__
@@ -4905,41 +4914,9 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		/*
 		 * Write a PT_LOAD segment.
 		 */
-		off_memory = paddr_to_offset2(paddr, off_memory);
-		if (!off_memory) {
-			ERRMSG("Can't convert physaddr(%llx) to an offset.\n",
-			    paddr);
+		if (!write_elf_load_segment(cd_page, paddr, off_memory, load.p_filesz))
 			return FALSE;
-		}
-		if (lseek(info->fd_memory, off_memory, SEEK_SET)
-		    == failed) {
-			ERRMSG("Can't seek the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			return FALSE;
-		}
-		bufsz_remain = load.p_filesz;
 
-		while (bufsz_remain > 0) {
-			if ((num_dumped % per) == 0)
-				print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
-
-			if (bufsz_remain >= page_size)
-				bufsz_write = page_size;
-			else
-				bufsz_write = bufsz_remain;
-
-			if (read(info->fd_memory, buf, bufsz_write)
-			    != bufsz_write) {
-				ERRMSG("Can't read the dump memory(%s). %s\n",
-				    info->name_memory, strerror(errno));
-				return FALSE;
-			}
-			if (!write_cache(cd_page, buf, bufsz_write))
-				return FALSE;
-
-			bufsz_remain -= page_size;
-			num_dumped++;
-		}
 		off_seg_load += load.p_filesz;
 	}
 	if (!write_cache_bufsz(cd_header))

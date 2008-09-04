@@ -1789,6 +1789,7 @@ get_symbol_info(void)
 	 * Get symbol info.
 	 */
 	SYMBOL_INIT(mem_map, "mem_map");
+	SYMBOL_INIT(vmem_map, "vmem_map");
 	SYMBOL_INIT(mem_section, "mem_section");
 	SYMBOL_INIT(pkmap_count, "pkmap_count");
 	SYMBOL_INIT_NEXT(pkmap_count_next, "pkmap_count");
@@ -2080,6 +2081,7 @@ generate_vmcoreinfo(void)
 	 * write the symbol of 1st kernel
 	 */
 	WRITE_SYMBOL("mem_map", mem_map);
+	WRITE_SYMBOL("vmem_map", vmem_map);
 	WRITE_SYMBOL("mem_section", mem_section);
 	WRITE_SYMBOL("pkmap_count", pkmap_count);
 	WRITE_SYMBOL("pkmap_count_next", pkmap_count_next);
@@ -2320,6 +2322,7 @@ read_vmcoreinfo(void)
 		return FALSE;
 
 	READ_SYMBOL("mem_map", mem_map);
+	READ_SYMBOL("vmem_map", vmem_map);
 	READ_SYMBOL("mem_section", mem_section);
 	READ_SYMBOL("pkmap_count", pkmap_count);
 	READ_SYMBOL("pkmap_count_next", pkmap_count_next);
@@ -2882,6 +2885,7 @@ get_mm_discontigmem(void)
 {
 	int i, j, id_mm, node, num_mem_map, separate_mm = FALSE;
 	unsigned long pgdat, mem_map, pfn_start, pfn_end, node_spanned_pages;
+	unsigned long vmem_map;
 	struct mem_map_data temp_mmd;
 
 	num_mem_map = get_num_mm_discontigmem();
@@ -2892,6 +2896,21 @@ get_mm_discontigmem(void)
 	struct mem_map_data mmd[num_mem_map];
 	if (vt.numnodes < num_mem_map) {
 		separate_mm = TRUE;
+	}
+
+	/*
+	 * Note:
+	 *  This note is only for ia64 discontigmem kernel.
+	 *  It is better to take mem_map information from a symbol vmem_map
+	 *  instead of pglist_data.node_mem_map, because some node_mem_map
+	 *  sometimes does not have mem_map information corresponding to its
+	 *  node_start_pfn.
+	 */
+	if (SYMBOL(vmem_map) != NOT_FOUND_SYMBOL) {
+		if (!readmem(VADDR, SYMBOL(vmem_map), &vmem_map, sizeof vmem_map)) {
+			ERRMSG("Can't get vmem_map.\n");
+			return FALSE;
+		}
 	}
 
 	/*
@@ -2907,11 +2926,6 @@ get_mm_discontigmem(void)
 	}
 	id_mm = 0;
 	for (i = 0; i < vt.numnodes; i++) {
-		if (!readmem(VADDR, pgdat + OFFSET(pglist_data.node_mem_map),
-		    &mem_map, sizeof mem_map)) {
-			ERRMSG("Can't get mem_map.\n");
-			return FALSE;
-		}
 		if (!readmem(VADDR, pgdat + OFFSET(pglist_data.node_start_pfn),
 		    &pfn_start, sizeof pfn_start)) {
 			ERRMSG("Can't get node_start_pfn.\n");
@@ -2923,6 +2937,15 @@ get_mm_discontigmem(void)
 			return FALSE;
 		}
 		pfn_end = pfn_start + node_spanned_pages;
+
+		if (SYMBOL(vmem_map) == NOT_FOUND_SYMBOL) {
+			if (!readmem(VADDR, pgdat + OFFSET(pglist_data.node_mem_map),
+			    &mem_map, sizeof mem_map)) {
+				ERRMSG("Can't get mem_map.\n");
+				return FALSE;
+			}
+		} else
+			mem_map = vmem_map + (SIZE(page) * pfn_start);
 
 		if (separate_mm) {
 			/*

@@ -50,15 +50,15 @@
   2.6.16 | OK | OK | -- |    | -- | OK | OK | -- | -- |    | -- |
   2.6.17 | OK | OK | -- |    | -- | OK | -- | -- | -- | OK | -- |
   2.6.18 | OK | OK | -- | OK | -- | OK | OK | -- | -- | OK | OK | OK
-  2.6.19 | OK | OK | -- | OK | OK | OK |TODO| -- | OK | OK | OK | OK
-  2.6.20 | OK | OK | -- | KP | OK | OK |TODO| -- | OK | OK | OK | KP
-  21-rc5 | OK | OK | -- | OK | OK | OK |TODO| -- | OK | OK | OK | OK
-  2.6.21 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
-  2.6.22 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
-  2.6.23 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
-  2.6.24 | OK | OK | -- |    | OK | OK |TODO| -- | OK | OK | OK | 
-  2.6.25 | OK | ** | -- |    |    | ** |TODO| -- | OK | OK | OK | 
-  2.6.26 | OK | ** | -- |    |    | ** |TODO| -- | OK | OK | OK | 
+  2.6.19 | OK | OK | -- | OK | OK | OK |    | -- | OK | OK | OK | OK
+  2.6.20 | OK | OK | -- | KP | OK | OK | OK | -- | OK | OK | OK | KP
+  21-rc5 | OK | OK | -- | OK | OK | OK | OK | -- | OK | OK | OK | OK
+  2.6.21 | OK | OK | -- |    | OK | OK | OK | -- | OK | OK | OK | 
+  2.6.22 | OK | OK | -- |    | OK | OK | OK | -- | OK | OK | OK | 
+  2.6.23 | OK | OK | -- |    | OK | OK | OK | -- | OK | OK | OK | 
+  2.6.24 | OK | OK | -- |    | OK | OK | OK | -- | OK | OK | OK | 
+  2.6.25 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
+  2.6.26 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
 
   OK    : Support.
   --    : Not support.

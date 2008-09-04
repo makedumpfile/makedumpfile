@@ -813,6 +813,7 @@ extern struct vm_table		vt;
 
 struct symbol_table {
 	unsigned long long	mem_map;
+	unsigned long long	vmem_map;
 	unsigned long long	mem_section;
 	unsigned long long	pkmap_count;
 	unsigned long long	pkmap_count_next;

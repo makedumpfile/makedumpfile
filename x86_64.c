@@ -93,6 +93,9 @@ vtop4_x86_64(unsigned long vaddr)
 		ERRMSG("Can't get pml4 (page_dir:%lx).\n", page_dir);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PGD : %16lx => %16lx\n", page_dir, pml4);
+
 	if (!(pml4 & _PAGE_PRESENT)) {
 		ERRMSG("Can't get a valid pml4.\n");
 		return NOT_PADDR;
@@ -107,6 +110,9 @@ vtop4_x86_64(unsigned long vaddr)
 		ERRMSG("Can't get pgd_pte (pgd_paddr:%lx).\n", pgd_paddr);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PUD : %16lx => %16lx\n", pgd_paddr, pgd_pte);
+
 	if (!(pgd_pte & _PAGE_PRESENT)) {
 		ERRMSG("Can't get a valid pgd_pte.\n");
 		return NOT_PADDR;
@@ -121,6 +127,9 @@ vtop4_x86_64(unsigned long vaddr)
 		ERRMSG("Can't get pmd_pte (pmd_paddr:%lx).\n", pmd_paddr);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PMD : %16lx => %16lx\n", pmd_paddr, pmd_pte);
+
 	if (!(pmd_pte & _PAGE_PRESENT)) {
 		ERRMSG("Can't get a valid pmd_pte.\n");
 		return NOT_PADDR;
@@ -138,6 +147,9 @@ vtop4_x86_64(unsigned long vaddr)
 		ERRMSG("Can't get pte (pte_paddr:%lx).\n", pte_paddr);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PTE : %16lx => %16lx\n", pte_paddr, pte);
+
 	if (!(pte & _PAGE_PRESENT)) {
 		ERRMSG("Can't get a valid pte.\n");
 		return NOT_PADDR;

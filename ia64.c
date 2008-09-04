@@ -118,6 +118,8 @@ vtop3_ia64(unsigned long vaddr)
 		ERRMSG("Can't get pgd_pte (page_dir:%llx).\n", page_dir);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PGD : %16llx => %16llx\n", page_dir, pgd_pte);
 
 	/*
 	 * Get PMD
@@ -129,6 +131,8 @@ vtop3_ia64(unsigned long vaddr)
 		ERRMSG("Can't get pmd_pte (page_middle:%llx).\n", page_middle);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PMD : %16llx => %16llx\n", page_middle, pmd_pte);
 
 	/*
 	 * Get PTE
@@ -140,6 +144,8 @@ vtop3_ia64(unsigned long vaddr)
 		ERRMSG("Can't get pte (page_table:%llx).\n", page_table);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PTE : %16llx => %16llx\n", page_table, pte);
 
 	/*
 	 * Get physical address
@@ -174,6 +180,8 @@ vtop4_ia64(unsigned long vaddr)
 		ERRMSG("Can't get pgd_pte (page_dir:%llx).\n", page_dir);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PGD : %16llx => %16llx\n", page_dir, pgd_pte);
 
 	/*
 	 * Get PUD
@@ -185,6 +193,8 @@ vtop4_ia64(unsigned long vaddr)
 		ERRMSG("Can't get pud_pte (page_upper:%llx).\n", page_upper);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PUD : %16llx => %16llx\n", page_upper, pud_pte);
 
 	/*
 	 * Get PMD
@@ -196,6 +206,8 @@ vtop4_ia64(unsigned long vaddr)
 		ERRMSG("Can't get pmd_pte (page_middle:%llx).\n", page_middle);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PMD : %16llx => %16llx\n", page_middle, pmd_pte);
 
 	/*
 	 * Get PTE
@@ -207,6 +219,8 @@ vtop4_ia64(unsigned long vaddr)
 		ERRMSG("Can't get pte (page_table:%llx).\n", page_table);
 		return NOT_PADDR;
 	}
+	if (info->vaddr_for_vtop == vaddr)
+		MSG("  PTE : %16llx => %16llx\n", page_table, pte);
 
 	/*
 	 * Get physical address

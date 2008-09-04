@@ -708,6 +708,7 @@ struct DumpInfo {
 						flattened format */
 	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
+	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
 	unsigned long long	max_mapnr;   /* number of page descriptor */

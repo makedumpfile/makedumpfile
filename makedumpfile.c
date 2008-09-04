@@ -5882,6 +5882,28 @@ initial_xen(void)
 }
 
 void
+print_vtop(void)
+{
+	unsigned long long paddr;
+
+	if (!info->vaddr_for_vtop)
+		return;
+
+	MSG("\n");
+	MSG("Translating virtual address %lx to physical address.\n", info->vaddr_for_vtop);
+
+	paddr = vaddr_to_paddr(info->vaddr_for_vtop);
+
+	MSG("VIRTUAL           PHYSICAL\n");
+	MSG("%16lx  %llx\n", info->vaddr_for_vtop, paddr);
+	MSG("\n");
+
+	info->vaddr_for_vtop = 0;
+
+	return;
+}
+
+void
 print_report(void)
 {
 	unsigned long long pfn_original, pfn_excluded, shrinking;
@@ -5932,6 +5954,8 @@ create_dumpfile(void)
 		if (!initial())
 			return FALSE;
 	}
+	print_vtop();
+
 	if (!create_dump_bitmap())
 		return FALSE;
 
@@ -6067,6 +6091,7 @@ static struct option longopts[] = {
 	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
 	{"xen_phys_start", required_argument, NULL, 'P'},
 	{"message-level", required_argument, NULL, 'm'},
+	{"vtop", required_argument, NULL, 'V'},
 	{"help", no_argument, NULL, 'h'},
 	{0, 0, 0, 0}
 };
@@ -6090,7 +6115,7 @@ main(int argc, char *argv[])
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:RvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:RVvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
 		case 'b':
@@ -6133,6 +6158,9 @@ main(int argc, char *argv[])
 			break;
 		case 'R':
 			info->flag_rearrange = 1;
+			break;
+		case 'V':
+			info->vaddr_for_vtop = strtoul(optarg, NULL, 0);
 			break;
 		case 'v':
 			info->flag_show_version = 1;

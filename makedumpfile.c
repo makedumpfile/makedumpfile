@@ -4147,6 +4147,7 @@ exclude_unnecessary_pages(void)
 	unsigned int mm;
 	unsigned long mem_map;
 	unsigned long long pfn, paddr, pfn_mm;
+	unsigned long long pfn_read_start, pfn_read_end, index_pg;
 	unsigned char *page_cache = NULL, *pcache;
 	unsigned int _count;
 	unsigned long flags, mapping;
@@ -4170,6 +4171,12 @@ exclude_unnecessary_pages(void)
 		if (mem_map == NOT_MEMMAP_ADDR)
 			continue;
 
+		/*
+		 * Refresh the buffer of struct page, when changing mem_map.
+		 */
+		pfn_read_start = ULONGLONG_MAX;
+		pfn_read_end   = 0;
+
 		for (; pfn < mmd->pfn_end;
 		    pfn++, mem_map += SIZE(page),
 		    paddr += info->page_size) {
@@ -4180,16 +4187,24 @@ exclude_unnecessary_pages(void)
 			if (!is_in_segs(paddr))
 				continue;
 
-			if ((pfn % PGMM_CACHED) == 0) {
-				if (pfn + PGMM_CACHED < mmd->pfn_end)
-					pfn_mm = PGMM_CACHED;
+			index_pg = pfn % PGMM_CACHED;
+			if (pfn < pfn_read_start || pfn_read_end < pfn) {
+				if (roundup(pfn + 1, PGMM_CACHED) < mmd->pfn_end)
+					pfn_mm = PGMM_CACHED - index_pg;
 				else
 					pfn_mm = mmd->pfn_end - pfn;
-				if (!readmem(VADDR, mem_map, page_cache,
-				    SIZE(page) * pfn_mm))
+
+				if (!readmem(VADDR, mem_map,
+				    page_cache + (index_pg * SIZE(page)),
+				    SIZE(page) * pfn_mm)) {
+					ERRMSG("Can't read the buffer of struct page.\n");
 					goto out;
+				}
+				pfn_read_start = pfn;
+				pfn_read_end   = pfn + pfn_mm - 1;
 			}
-			pcache  = page_cache + ((pfn%PGMM_CACHED) * SIZE(page));
+			pcache  = page_cache + (index_pg * SIZE(page));
+
 			flags   = ULONG(pcache + OFFSET(page.flags));
 			_count  = UINT(pcache + OFFSET(page._count));
 			mapping = ULONG(pcache + OFFSET(page.mapping));

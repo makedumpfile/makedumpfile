@@ -79,9 +79,10 @@ enum {
  * Type of address
  */
 enum {
-	PADDR,
 	VADDR,
-	VADDR_XEN
+	PADDR,
+	VADDR_XEN,
+	MADDR_XEN
 };
 
 

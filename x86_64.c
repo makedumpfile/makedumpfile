@@ -217,7 +217,7 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	if ((dirp = kvtop_xen_x86_64(SYMBOL(pgd_l4))) == NOT_PADDR)
 		return NOT_PADDR;
 	dirp += pml4_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -225,7 +225,7 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 
 	dirp = entry & ENTRY_MASK;
 	dirp += pgd_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -233,7 +233,7 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 
 	dirp = entry & ENTRY_MASK;
 	dirp += pmd_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -245,7 +245,7 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	}
 	dirp = entry & ENTRY_MASK;
 	dirp += pte_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
+	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT)) {

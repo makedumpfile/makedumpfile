@@ -242,6 +242,9 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		if (!(paddr = kvtop_xen(addr)))
 			return FALSE;
 		break;
+	case MADDR_XEN:
+		paddr = addr;
+  		break;
 	default:
 		ERRMSG("Invalid address type (%d).\n", type_addr);
 		return FALSE;
@@ -4110,9 +4113,13 @@ exclude_zero_pages(void)
 		if (!is_dumpable(&bitmap2, pfn))
 			continue;
 
-		if (!readmem(PADDR, paddr, buf, info->page_size))
-			return FALSE;
-
+		if (vt.mem_flags & MEMORY_XEN) {
+			if (!readmem(MADDR_XEN, paddr, buf, info->page_size))
+				return FALSE;
+		} else {
+			if (!readmem(PADDR, paddr, buf, info->page_size))
+				return FALSE;
+		}
 		if (is_zero_page(buf, info->page_size)) {
 			clear_bit_on_2nd_bitmap(pfn);
 			pfn_zero++;

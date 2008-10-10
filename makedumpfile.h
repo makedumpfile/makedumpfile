@@ -668,7 +668,7 @@ unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #endif          /* ia64 */
 
 struct pt_load_segment {
-	loff_t			file_offset;
+	off_t			file_offset;
 	unsigned long long	phys_start;
 	unsigned long long	phys_end;
 	unsigned long long	virt_start;

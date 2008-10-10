@@ -5276,6 +5276,14 @@ close_dump_bitmap(void)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));
 	free(info->name_bitmap);
+
+	/* free 1st bitmap */
+	free(info->bitmap1);
+	info->bitmap1 = NULL;
+
+	/* free 2nd bitmap */
+	free(info->bitmap2);
+	info->bitmap2 = NULL;
 }
 
 void
@@ -5340,6 +5348,11 @@ close_files_for_creating_dumpfile(void)
 	else if (info->dump_level > DL_EXCLUDE_ZERO)
 		close_kernel_file();
 
+	/* free name for vmcoreinfo */
+	if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
+		free(info->name_vmcoreinfo);
+		info->name_vmcoreinfo = NULL;
+	}
 	close_dump_memory();
 
 	close_dump_file();

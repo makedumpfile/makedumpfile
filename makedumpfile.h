@@ -55,7 +55,8 @@ enum {
 /*
  * Page flags
  *
- * TODO: _ORIGINAL should be changed to _2_6_XX.
+ * The flag values of page.flags have been defined by enum since linux-2.6.26.
+ * The following values are for linux-2.6.25 or former.
  */
 #define PG_lru_ORIGINAL	 	(5)
 #define PG_private_ORIGINAL	(11)	/* Has something at ->private */

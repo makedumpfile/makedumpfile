@@ -31,7 +31,7 @@ $(OBJ_ARCH): $(SRC_ARCH)
 
 makedumpfile: $(SRC) $(OBJ_ARCH)
 	$(CC) $(CFLAGS) $(OBJ_ARCH) -o $@ $< -static -ldw -lelf -lz
-	zip ./makedumpfile.8.gz ./makedumpfile.8
+	gzip -c ./makedumpfile.8 > ./makedumpfile.8.gz
 
 clean:
 	rm -f $(OBJ) $(OBJ_ARCH) makedumpfile makedumpfile.8.gz

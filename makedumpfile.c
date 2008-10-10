@@ -4714,9 +4714,10 @@ write_kdump_header(void)
 	/*
 	 * Write sub header
 	 */
+	size = sizeof(struct kdump_sub_header);
+	memset(&sub_dump_header, 0, size);
 	sub_dump_header.phys_base  = info->phys_base;
 	sub_dump_header.dump_level = info->dump_level;
-	size = sizeof(struct kdump_sub_header);
 	if (!write_buffer(info->fd_dumpfile, dh->block_size, &sub_dump_header,
 	    size, info->name_dumpfile))
 		return FALSE;

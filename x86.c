@@ -174,7 +174,7 @@ kvtop_xen_x86(unsigned long kvaddr)
 
 	if ((dirp = kvtop_xen_x86(SYMBOL(pgd_l3))) == NOT_PADDR)
 		return NOT_PADDR;
-	dirp += ((kvaddr >> PGDIR_SHIFT_3LEVEL) & (PTRS_PER_PGD_3LEVEL - 1)) * sizeof(unsigned long long);
+	dirp += pgd_index_PAE(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
@@ -182,7 +182,7 @@ kvtop_xen_x86(unsigned long kvaddr)
 		return NOT_PADDR;
 
 	dirp = entry & ENTRY_MASK;
-	dirp += ((kvaddr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)) * sizeof(unsigned long long);
+	dirp += pmd_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
@@ -193,8 +193,9 @@ kvtop_xen_x86(unsigned long kvaddr)
 		entry = (entry & ENTRY_MASK) + (kvaddr & ((1UL << PMD_SHIFT) - 1));
 		return entry;
 	}
+
 	dirp = entry & ENTRY_MASK;
-	dirp += ((kvaddr >> PTE_SHIFT) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
+	dirp += pte_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 

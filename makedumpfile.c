@@ -226,9 +226,6 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 
 	switch (type_addr) {
 	case VADDR:
-		/*
-		 * Convert Virtual Address to File Offset.
-		 */
 		if ((paddr = vaddr_to_paddr(addr)) == NOT_PADDR) {
 			ERRMSG("Can't convert a virtual address(%llx) to physical address.\n",
 			    addr);

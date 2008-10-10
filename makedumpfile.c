@@ -239,8 +239,11 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		paddr = addr;
 		break;
 	case VADDR_XEN:
-		if (!(paddr = kvtop_xen(addr)))
+		if ((paddr = kvtop_xen(addr)) == NOT_PADDR) {
+			ERRMSG("Can't convert a virtual address(%llx) to machine address.\n",
+			    addr);
 			goto error;
+		}
 		break;
 	case MADDR_XEN:
 		paddr = addr;

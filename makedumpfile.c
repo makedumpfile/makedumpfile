@@ -1806,6 +1806,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(_stext, "_stext");
 	SYMBOL_INIT(swapper_pg_dir, "swapper_pg_dir");
 	SYMBOL_INIT(init_level4_pgt, "init_level4_pgt");
+	SYMBOL_INIT(vmlist, "vmlist");
 	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
 	SYMBOL_INIT(node_states, "node_states");
@@ -1912,6 +1913,8 @@ get_structure_info(void)
 	OFFSET_INIT(node_memblk_s.start_paddr, "node_memblk_s", "start_paddr");
 	OFFSET_INIT(node_memblk_s.size, "node_memblk_s", "size");
 	OFFSET_INIT(node_memblk_s.nid, "node_memblk_s", "nid");
+
+	OFFSET_INIT(vm_struct.addr, "vm_struct", "addr");
 
 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
 	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");
@@ -2098,6 +2101,7 @@ generate_vmcoreinfo(void)
 	WRITE_SYMBOL("_stext", _stext);
 	WRITE_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	WRITE_SYMBOL("init_level4_pgt", init_level4_pgt);
+	WRITE_SYMBOL("vmlist", vmlist);
 	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
 	WRITE_SYMBOL("node_states", node_states);
@@ -2145,6 +2149,7 @@ generate_vmcoreinfo(void)
 	WRITE_MEMBER_OFFSET("node_memblk_s.start_paddr", node_memblk_s.start_paddr);
 	WRITE_MEMBER_OFFSET("node_memblk_s.size", node_memblk_s.size);
 	WRITE_MEMBER_OFFSET("node_memblk_s.nid", node_memblk_s.nid);
+	WRITE_MEMBER_OFFSET("vm_struct.addr", vm_struct.addr);
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("node_data", node_data);
@@ -2342,6 +2347,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("_stext", _stext);
 	READ_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	READ_SYMBOL("init_level4_pgt", init_level4_pgt);
+	READ_SYMBOL("vmlist", vmlist);
 	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
 	READ_SYMBOL("node_states", node_states);
@@ -2382,6 +2388,7 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("node_memblk_s.start_paddr", node_memblk_s.start_paddr);
 	READ_MEMBER_OFFSET("node_memblk_s.size", node_memblk_s.size);
 	READ_MEMBER_OFFSET("node_memblk_s.nid", node_memblk_s.nid);
+	READ_MEMBER_OFFSET("vm_struct.addr", vm_struct.addr);
 
 	READ_ARRAY_LENGTH("node_data", node_data);
 	READ_ARRAY_LENGTH("pgdat_list", pgdat_list);

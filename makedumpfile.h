@@ -499,6 +499,24 @@ do { \
 #define _SECTION_SIZE_BITS_PAE	(30)
 #define _MAX_PHYSMEM_BITS	(32)
 #define _MAX_PHYSMEM_BITS_PAE	(36)
+
+#define PGDIR_SHIFT_3LEVEL	(30)
+#define PTRS_PER_PTE_3LEVEL	(512)
+#define PTRS_PER_PGD_3LEVEL	(4)
+#define PMD_SHIFT		(21)  /* only used by PAE translators */
+#define PTRS_PER_PMD		(512) /* only used by PAE translators */
+#define PTE_SHIFT		(12)  /* only used by PAE translators */
+#define PTRS_PER_PTE		(512) /* only used by PAE translators */
+
+#define pgd_index_PAE(address)  (((address) >> PGDIR_SHIFT_3LEVEL) & (PTRS_PER_PGD_3LEVEL - 1))
+#define pmd_index(address)  (((address) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+#define pte_index(address)  (((address) >> PTE_SHIFT) & (PTRS_PER_PTE - 1))
+
+#define _PAGE_PRESENT		(0x001)
+#define _PAGE_PSE		(0x080)
+
+#define ENTRY_MASK		(~0x8000000000000fffULL)
+
 #endif /* x86 */
 
 #ifdef __x86_64__
@@ -612,10 +630,11 @@ do { \
  */
 #ifdef __x86__
 int get_machdep_info_x86(void);
+unsigned long long vaddr_to_paddr_x86(unsigned long vaddr);
 #define get_phys_base()		TRUE
 #define get_machdep_info()	get_machdep_info_x86()
 #define get_versiondep_info()	TRUE
-#define vaddr_to_paddr(X)	vaddr_to_paddr_general(X)
+#define vaddr_to_paddr(X)	vaddr_to_paddr_x86(X)
 #endif /* x86 */
 
 #ifdef __x86_64__
@@ -841,6 +860,7 @@ struct symbol_table {
 	unsigned long long 	_stext;
 	unsigned long long 	swapper_pg_dir;
 	unsigned long long 	init_level4_pgt;
+	unsigned long long 	vmlist;
 	unsigned long long 	phys_base;
 	unsigned long long 	node_online_map;
 	unsigned long long 	node_states;
@@ -920,6 +940,9 @@ struct offset_table {
 		long	size;
 		long	nid;
 	} node_memblk_s;
+	struct vm_struct {
+		long	addr;
+	} vm_struct;
 
 	/*
 	 * for Xen extraction
@@ -1051,19 +1074,6 @@ struct domain_list {
 	((x) >= HYPERVISOR_VIRT_START_PAE && (x) < HYPERVISOR_VIRT_END)
 #define is_direct(x) \
 	((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
-
-#define PGDIR_SHIFT_3LEVEL   (30)
-#define PTRS_PER_PTE_3LEVEL  (512)
-#define PTRS_PER_PGD_3LEVEL  (4)
-#define PMD_SHIFT            (21)    /* only used by PAE translators */
-#define PTRS_PER_PMD         (512)   /* only used by PAE translators */
-#define PTE_SHIFT            (12)    /* only used by PAE translators */
-#define PTRS_PER_PTE         (512)   /* only used by PAE translators */
-
-#define _PAGE_PRESENT   0x001
-#define _PAGE_PSE       0x080
-
-#define ENTRY_MASK	(~0x8000000000000fffULL)
 
 unsigned long long kvtop_xen_x86(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_x86(X)

@@ -218,10 +218,22 @@ get_max_mapnr(void)
 }
 
 int
+is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
+{
+	if (round(vaddr1, info->page_size) == round(vaddr2, info->page_size))
+		return TRUE;
+
+	return FALSE;
+}
+
+int
 readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 {
+	size_t read_size, next_size;
 	off_t offset = 0;
+	unsigned long long next_addr;
 	unsigned long long paddr;
+	char *next_ptr;
 	const off_t failed = (off_t)-1;
 
 	switch (type_addr) {
@@ -250,6 +262,22 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		goto error;
 	}
 
+	read_size = size;
+
+	/*
+	 * Read each page, because pages are not necessarily continuous.
+	 * Ex) pages in vmalloc area
+	 */
+	if (!is_in_same_page(addr, addr + size - 1)) {
+		read_size = info->page_size - (addr % info->page_size);
+		next_addr = roundup(addr + 1, info->page_size);
+		next_size = size - read_size;
+		next_ptr  = (char *)bufptr + read_size;
+
+		if (!readmem(type_addr, next_addr, next_ptr, next_size))
+			goto error;
+	}
+
 	if (!(offset = paddr_to_offset(paddr))) {
 		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
 		    paddr);
@@ -262,7 +290,7 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		goto error;
 	}
 
-	if (read(info->fd_memory, bufptr, size) != size) {
+	if (read(info->fd_memory, bufptr, read_size) != read_size) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
 		goto error;

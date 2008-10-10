@@ -232,7 +232,7 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		if ((paddr = vaddr_to_paddr(addr)) == NOT_PADDR) {
 			ERRMSG("Can't convert a virtual address(%llx) to physical address.\n",
 			    addr);
-			return FALSE;
+			goto error;
 		}
 		break;
 	case PADDR:
@@ -240,35 +240,38 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		break;
 	case VADDR_XEN:
 		if (!(paddr = kvtop_xen(addr)))
-			return FALSE;
+			goto error;
 		break;
 	case MADDR_XEN:
 		paddr = addr;
   		break;
 	default:
 		ERRMSG("Invalid address type (%d).\n", type_addr);
-		return FALSE;
+		goto error;
 	}
 
 	if (!(offset = paddr_to_offset(paddr))) {
 		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
 		    paddr);
-		return FALSE;
+		goto error;
 	}
 
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
-		return FALSE;
+		goto error;
 	}
 
 	if (read(info->fd_memory, bufptr, size) != size) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
-		return FALSE;
+		goto error;
 	}
 
 	return size;
+error:
+	ERRMSG("addr:%llx, size:%zd\n", addr, size);
+	return FALSE;
 }
 
 int32_t
@@ -4121,11 +4124,17 @@ exclude_zero_pages(void)
 			continue;
 
 		if (vt.mem_flags & MEMORY_XEN) {
-			if (!readmem(MADDR_XEN, paddr, buf, info->page_size))
+			if (!readmem(MADDR_XEN, paddr, buf, info->page_size)) {
+				ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
+				    pfn, info->max_mapnr);
 				return FALSE;
+			}
 		} else {
-			if (!readmem(PADDR, paddr, buf, info->page_size))
+			if (!readmem(PADDR, paddr, buf, info->page_size)) {
+				ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
+				    pfn, info->max_mapnr);
 				return FALSE;
+			}
 		}
 		if (is_zero_page(buf, info->page_size)) {
 			clear_bit_on_2nd_bitmap(pfn);
@@ -4344,8 +4353,7 @@ create_2nd_bitmap(void)
 			return FALSE;
 
 		if (!exclude_zero_pages()) {
-			ERRMSG("Can't exclude pages filled with zero");
-			ERRMSG("for creating an ELF dumpfile.\n");
+			ERRMSG("Can't exclude pages filled with zero for creating an ELF dumpfile.\n");
 			return FALSE;
 		}
 	}

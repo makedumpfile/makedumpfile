@@ -51,7 +51,7 @@
   2.6.17 | OK | OK | -- |    | -- | OK | -- | -- | -- | OK | -- |
   2.6.18 | OK | OK | -- | OK | -- | OK | OK | -- | -- | OK | OK | OK
   2.6.19 | OK | OK | -- | OK | OK | OK |    | -- | OK | OK | OK | OK
-  2.6.20 | OK | OK | -- | KP | OK | OK | OK | -- | OK | OK | OK | KP
+  2.6.20 | OK | OK | -- | #1 | OK | OK | OK | -- | OK | OK | OK | #1
   21-rc5 | OK | OK | -- | OK | OK | OK | OK | -- | OK | OK | OK | OK
   2.6.21 | OK | OK | -- |    | OK | OK | OK | -- | OK | OK | OK | 
   2.6.22 | OK | OK | -- |    | OK | OK | OK | -- | OK | OK | OK | 
@@ -59,12 +59,16 @@
   2.6.24 | OK | OK | -- |    | OK | OK | OK | -- | OK | OK | OK | 
   2.6.25 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
   2.6.26 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
+  2.6.27 | OK | ** | -- |    |    | ** | OK | -- | #2 | OK | OK | 
+  28-rc4 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
 
   OK    : Support.
   --    : Not support.
   Empty : Not test yet.
   TODO  : TODO.
-  KP    : Both kexec/kdump does not work with PPC64 2.6.20 kernels. 
+  #1    : Both kexec/kdump does not work with PPC64 2.6.20 kernels. 
+          This is a known problem fixed with later kernels.
+  #2    : kdump does not work with i386 sparsemem 2.6.27 kernels. 
           This is a known problem fixed with later kernels.
   **    : The deleted memory model.
           On x86_64, both FLATMEM and DISCONTIGMEM have been deleted since

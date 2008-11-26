@@ -497,7 +497,8 @@ do { \
 #define KVBASE_MASK		(0x7fffff)
 #define KVBASE			(SYMBOL(_stext) & ~KVBASE_MASK)
 #define _SECTION_SIZE_BITS	(26)
-#define _SECTION_SIZE_BITS_PAE	(30)
+#define _SECTION_SIZE_BITS_PAE_ORIG	(30)
+#define _SECTION_SIZE_BITS_PAE_2_6_26	(29)
 #define _MAX_PHYSMEM_BITS	(32)
 #define _MAX_PHYSMEM_BITS_PAE	(36)
 
@@ -631,10 +632,11 @@ do { \
  */
 #ifdef __x86__
 int get_machdep_info_x86(void);
+int get_versiondep_info_x86(void);
 unsigned long long vaddr_to_paddr_x86(unsigned long vaddr);
 #define get_phys_base()		TRUE
 #define get_machdep_info()	get_machdep_info_x86()
-#define get_versiondep_info()	TRUE
+#define get_versiondep_info()	get_versiondep_info_x86()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_x86(X)
 #endif /* x86 */
 

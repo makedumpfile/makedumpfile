@@ -31,12 +31,10 @@ get_machdep_info_x86(void)
 		DEBUG_MSG("\n");
 		DEBUG_MSG("PAE          : ON\n");
 		vt.mem_flags |= MEMORY_X86_PAE;
-		info->section_size_bits = _SECTION_SIZE_BITS_PAE;
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_PAE;
 	} else {
 		DEBUG_MSG("\n");
 		DEBUG_MSG("PAE          : OFF\n");
-		info->section_size_bits = _SECTION_SIZE_BITS;
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 	}
 	info->page_offset = __PAGE_OFFSET;
@@ -67,6 +65,24 @@ get_machdep_info_x86(void)
 	}
 	info->vmalloc_start = vmalloc_start;
 	DEBUG_MSG("vmalloc_start: %lx\n", vmalloc_start);
+
+	return TRUE;
+}
+
+int
+get_versiondep_info_x86(void)
+{
+	/*
+	 * SECTION_SIZE_BITS of PAE has been changed to 29 from 30 since
+	 * linux-2.6.26.
+	 */
+	if (vt.mem_flags & MEMORY_X86_PAE) {
+		if (info->kernel_version < VERSION_LINUX_2_6_26)
+			info->section_size_bits = _SECTION_SIZE_BITS_PAE_ORIG;
+		else
+			info->section_size_bits = _SECTION_SIZE_BITS_PAE_2_6_26;
+	} else
+		info->section_size_bits = _SECTION_SIZE_BITS;
 
 	return TRUE;
 }

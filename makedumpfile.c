@@ -297,7 +297,7 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 
 	return size;
 error:
-	ERRMSG("addr:%llx, size:%zd\n", addr, size);
+	ERRMSG("type_addr: %d, addr:%llx, size:%zd\n", type_addr, addr, size);
 	return FALSE;
 }
 

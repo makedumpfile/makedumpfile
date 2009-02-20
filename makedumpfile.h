@@ -747,6 +747,7 @@ struct DumpInfo {
 						flattened format */
 	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
+	int             flag_dmesg;          /* dump the dmesg log out of the vmcore file */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
@@ -871,6 +872,9 @@ struct symbol_table {
 	unsigned long long 	node_data;
 	unsigned long long 	pgdat_list;
 	unsigned long long 	contig_page_data;
+	unsigned long long   	log_buf;
+	unsigned long long   	log_buf_len;
+	unsigned long long   	log_end;
 
 	/*
 	 * for Xen extraction
@@ -1053,6 +1057,7 @@ int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
 int get_str_osrelease_from_vmlinux(void);
 int get_pt_note_info(off_t off_note, unsigned long sz_note);
 int exclude_xen_user_domain(void);
+int close_files_for_creating_dumpfile(void);
 
 
 /*

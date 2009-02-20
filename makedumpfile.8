@@ -12,6 +12,8 @@ makedumpfile \- make a small dumpfile of kdump
 .br
 \fBmakedumpfile\fR \-E [\-\-xen-syms \fIXEN-SYMS\fR|\-\-xen-vmcoreinfo \fIVMCOREINFO\fR] \fIVMCORE\fR \fIDUMPFILE\fR
 .br
+\fBmakedumpfile\fR \-\-dump-dmesg [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR \fILOGFILE\fR
+.br
 .B makedumpfile
 \-h
 .br
@@ -363,6 +365,22 @@ output of this option with the one of "vtop" subcommand of the
 crash utility.
 "--vtop" option only prints the translation output, and it does
 not affect the dumpfile creation.
+
+.TP
+\fB\-\-dump-dmesg\fR
+This option overrides the normal behavior of makedumpfile.  Instead of
+compressing and filtering a \fIVMCORE\fR to make it smaller, it simply
+extracts the dmesg log from a \fIVMCORE\fR and writes it to the specified
+\fILOGFILE\fR. If a \fIVMCORE\fR does not contain \fIVMCOREINFO\fR for dmesg,
+it is necessary to specfiy [\-x \fIVMLINUX\fR] or [\-i \fIVMCOREINFO\fR].
+
+.br
+.B Example:
+.br
+# makedumpfile \-\-dump-dmesg /proc/vmcore dmesgfile
+.br
+# makedumpfile \-\-dump-dmesg -x vmlinux /proc/vmcore dmesgfile
+.br
 
 .TP
 \fB\-D\fR

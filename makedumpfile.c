@@ -1844,6 +1844,9 @@ get_symbol_info(void)
 	SYMBOL_INIT(node_data, "node_data");
 	SYMBOL_INIT(pgdat_list, "pgdat_list");
 	SYMBOL_INIT(contig_page_data, "contig_page_data");
+	SYMBOL_INIT(log_buf, "log_buf");
+	SYMBOL_INIT(log_buf_len, "log_buf_len");
+	SYMBOL_INIT(log_end, "log_end");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -2138,6 +2141,9 @@ generate_vmcoreinfo(void)
 	WRITE_SYMBOL("node_data", node_data);
 	WRITE_SYMBOL("pgdat_list", pgdat_list);
 	WRITE_SYMBOL("contig_page_data", contig_page_data);
+	WRITE_SYMBOL("log_buf", log_buf);
+	WRITE_SYMBOL("log_buf_len", log_buf_len);
+	WRITE_SYMBOL("log_end", log_end);
 
 	/*
 	 * write the structure size of 1st kernel
@@ -2384,6 +2390,9 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("node_data", node_data);
 	READ_SYMBOL("pgdat_list", pgdat_list);
 	READ_SYMBOL("contig_page_data", contig_page_data);
+	READ_SYMBOL("log_buf", log_buf);
+	READ_SYMBOL("log_buf_len", log_buf_len);
+	READ_SYMBOL("log_end", log_end);
 
 	READ_STRUCTURE_SIZE("page", page);
 	READ_STRUCTURE_SIZE("mem_section", mem_section);
@@ -3298,6 +3307,8 @@ get_mem_map(void)
 int
 initial(void)
 {
+	int flag_need_debuginfo;
+
 	if (!(vt.mem_flags & MEMORY_XEN) && info->flag_exclude_xen_dom) {
 		MSG("'-X' option is disable,");
 		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
@@ -3378,7 +3389,12 @@ initial(void)
 	if (!get_value_for_old_linux())
 		return FALSE;
 out:
-	if (info->dump_level <= DL_EXCLUDE_ZERO) {
+	if ((info->dump_level <= DL_EXCLUDE_ZERO) && !info->flag_dmesg)
+		flag_need_debuginfo = FALSE;
+	else 
+		flag_need_debuginfo = TRUE;
+
+	if (!flag_need_debuginfo) {
 		if (!get_mem_map_without_mm())
 			return FALSE;
 		else
@@ -3962,6 +3978,93 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 
 	return TRUE;
 }
+
+int
+dump_dmesg()
+{
+	int log_buf_len, length_log, length_oldlog, ret = FALSE;
+	unsigned long log_buf, log_end, index;
+	char *log_buffer = NULL;
+
+	if (!open_files_for_creating_dumpfile())
+		return FALSE;
+
+	if (!get_elf_info())
+		return FALSE;
+
+	if (!initial())
+		return FALSE;
+
+	if ((SYMBOL(log_buf) == NOT_FOUND_SYMBOL)
+	    || (SYMBOL(log_buf_len) == NOT_FOUND_SYMBOL)
+	    || (SYMBOL(log_end) == NOT_FOUND_SYMBOL)) {
+		ERRMSG("Can't find some symbols for log_buf.\n");
+		return FALSE;
+	}
+	if (!readmem(VADDR, SYMBOL(log_buf), &log_buf, sizeof(log_buf))) {
+		ERRMSG("Can't get log_buf.\n");
+		return FALSE;
+	}
+	if (!readmem(VADDR, SYMBOL(log_end), &log_end, sizeof(log_end))) {
+		ERRMSG("Can't to get log_end.\n");
+		return FALSE;
+	}
+	if (!readmem(VADDR, SYMBOL(log_buf_len), &log_buf_len,
+	    sizeof(log_buf_len))) {
+		ERRMSG("Can't get log_buf_len.\n");
+		return FALSE;
+	}
+	DEBUG_MSG("\n");
+	DEBUG_MSG("log_buf      : %lx\n", log_buf);
+	DEBUG_MSG("log_end      : %lx\n", log_end);
+	DEBUG_MSG("log_buf_len  : %d\n", log_buf_len);
+
+	if ((log_buffer = malloc(log_buf_len)) == NULL) {
+		ERRMSG("Can't allocate memory for log_buf. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+
+	if (log_end < log_buf_len) {
+		length_log = log_end;
+		if(!readmem(VADDR, log_buf, log_buffer, length_log)) {
+			ERRMSG("Can't read dmesg log.\n");
+			goto out;
+		}
+	} else {
+		index = log_end & (log_buf_len - 1);
+		DEBUG_MSG("index        : %lx\n", index);
+		length_log = log_buf_len;
+		length_oldlog = log_buf_len - index;
+		if(!readmem(VADDR, log_buf + index, log_buffer, length_oldlog)) {
+			ERRMSG("Can't read old dmesg log.\n");
+			goto out;
+		}
+		if(!readmem(VADDR, log_buf, log_buffer + length_oldlog, index)) {
+			ERRMSG("Can't read new dmesg log.\n");
+			goto out;
+		}
+	}
+	DEBUG_MSG("length_log   : %d\n", length_log);
+
+	if (!open_dump_file()) {
+		ERRMSG("Can't open output file.\n");
+		goto out;
+	}
+	if (write(info->fd_dumpfile, log_buffer, length_log) < 0)
+		goto out;
+
+	if (!close_files_for_creating_dumpfile())
+		goto out;
+
+	ret = TRUE;
+out:
+	if (log_buffer)
+		free(log_buffer);
+
+	return ret;
+}
+
 
 int
 _exclude_free_page(void)
@@ -6216,6 +6319,7 @@ static struct option longopts[] = {
 	{"xen_phys_start", required_argument, NULL, 'P'},
 	{"message-level", required_argument, NULL, 'm'},
 	{"vtop", required_argument, NULL, 'V'},
+	{"dump-dmesg", no_argument, NULL, 'M'}, 
 	{"help", no_argument, NULL, 'h'},
 	{0, 0, 0, 0}
 };
@@ -6240,7 +6344,7 @@ main(int argc, char *argv[])
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:RVvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:MRVvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
 		case 'b':
@@ -6277,6 +6381,9 @@ main(int argc, char *argv[])
 			break;
 		case 'm':
 			message_level = atoi(optarg);
+			break;
+		case 'M':
+			info->flag_dmesg = 1;
 			break;
 		case 'P':
 			info->xen_phys_start = strtoul(optarg, NULL, 0);
@@ -6368,6 +6475,17 @@ main(int argc, char *argv[])
 
 		MSG("\n");
 		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
+	} else if (info->flag_dmesg) {
+		if (!check_param_for_creating_dumpfile(argc, argv)) {
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
+			goto out;
+		}
+		if (!dump_dmesg())
+			goto out;
+
+		MSG("\n");
+		MSG("The dmesg log is saved to %s.\n", info->name_dumpfile);
 	} else {
 		if (!check_param_for_creating_dumpfile(argc, argv)) {
 			MSG("Commandline parameter is invalid.\n");

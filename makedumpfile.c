@@ -13,7 +13,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-#include <stdlib.h>
 #include "makedumpfile.h"
 
 struct symbol_table	symbol_table;

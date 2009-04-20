@@ -4496,8 +4496,11 @@ create_2nd_bitmap(void)
 }
 
 int
-prepare_dump_bitmap(void)
+prepare_bitmap_buffer(void)
 {
+	/*
+	 * Prepare bitmap buffers for creating dump bitmap.
+	 */
 	if ((info->bitmap1 = malloc(sizeof(struct dump_bitmap))) == NULL) {
 		ERRMSG("Can't allocate memory for the 1st-bitmap. %s\n",
 		    strerror(errno));
@@ -4514,19 +4517,35 @@ prepare_dump_bitmap(void)
 	return TRUE;
 }
 
+void
+free_bitmap_buffer(void)
+{
+	free(info->bitmap1);
+	free(info->bitmap2);
+
+	info->bitmap1 = NULL;
+	info->bitmap2 = NULL;
+}
+
 int
 create_dump_bitmap(void)
 {
-	if (!prepare_dump_bitmap())
+	int ret = FALSE;
+
+	if (!prepare_bitmap_buffer())
 		return FALSE;
 
 	if (!create_1st_bitmap())
-		return FALSE;
+		goto out;
 
 	if (!create_2nd_bitmap())
-		return FALSE;
+		goto out;
 
-	return TRUE;
+	ret = TRUE;
+out:
+	free_bitmap_buffer();
+
+	return ret;
 }
 
 int
@@ -4561,6 +4580,9 @@ get_loads_dumpfile(void)
 	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
 	unsigned long frac_head, frac_tail;
 	Elf64_Phdr load;
+	struct dump_bitmap bitmap2;
+
+	initialize_2nd_bitmap(&bitmap2);
 
 	if (!(phnum = get_phnum_memory()))
 		return FALSE;
@@ -4585,7 +4607,7 @@ get_loads_dumpfile(void)
 			pfn_end++;
 
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
-			if (!is_dumpable(info->bitmap2, pfn)) {
+			if (!is_dumpable(&bitmap2, pfn)) {
 				num_excluded++;
 				continue;
 			}
@@ -5412,14 +5434,6 @@ close_dump_bitmap(void)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));
 	free(info->name_bitmap);
-
-	/* free 1st bitmap */
-	free(info->bitmap1);
-	info->bitmap1 = NULL;
-
-	/* free 2nd bitmap */
-	free(info->bitmap2);
-	info->bitmap2 = NULL;
 }
 
 void

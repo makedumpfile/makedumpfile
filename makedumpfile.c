@@ -2653,6 +2653,8 @@ read_vmcoreinfo_from_vmcore(off_t offset, unsigned long size, int flag_xen_hv)
 		if (!read_vmcoreinfo())
 			goto out;
 	}
+	close_vmcoreinfo();
+
 	ret = TRUE;
 out:
 	free(info->name_vmcoreinfo);
@@ -3387,6 +3389,7 @@ initial(void)
 	if (info->flag_read_vmcoreinfo) {
 		if (!read_vmcoreinfo())
 			return FALSE;
+		close_vmcoreinfo();
 	/*
 	 * Get the debug information for analysis from the kernel file
 	 */
@@ -5551,9 +5554,7 @@ close_files_for_rearranging_dumpdata(void)
 int
 close_files_for_creating_dumpfile(void)
 {
-	if (info->flag_read_vmcoreinfo)
-		close_vmcoreinfo();
-	else if (info->dump_level > DL_EXCLUDE_ZERO)
+	if (info->dump_level > DL_EXCLUDE_ZERO)
 		close_kernel_file();
 
 	/* free name for vmcoreinfo */
@@ -6089,6 +6090,7 @@ initial_xen(void)
 	if (info->flag_read_vmcoreinfo) {
 		if (!read_vmcoreinfo_xen())
 			return FALSE;
+		close_vmcoreinfo();
 	/*
 	 * Get the debug information for analysis from the xen-syms file
 	 */

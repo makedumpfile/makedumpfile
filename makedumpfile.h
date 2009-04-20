@@ -1056,6 +1056,7 @@ int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
 int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
 int get_str_osrelease_from_vmlinux(void);
 int get_pt_note_info(off_t off_note, unsigned long sz_note);
+int read_vmcoreinfo_xen(void);
 int exclude_xen_user_domain(void);
 unsigned long long get_num_dumpable(void);
 int close_files_for_creating_dumpfile(void);

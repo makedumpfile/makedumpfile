@@ -2600,6 +2600,44 @@ copy_vmcoreinfo(off_t offset, unsigned long size)
 	return TRUE;
 }
 
+int
+read_vmcoreinfo_from_vmcore(off_t offset, unsigned long size, int flag_xen_hv)
+{
+	int ret = FALSE;
+
+	/*
+	 * Copy vmcoreinfo to /tmp/vmcoreinfoXXXXXX.
+	 */
+	if (!(info->name_vmcoreinfo = strdup(FILENAME_VMCOREINFO))) {
+		MSG("Can't duplicate strings(%s).\n", FILENAME_VMCOREINFO);
+		return FALSE;
+	}
+	if (!copy_vmcoreinfo(offset, size))
+		goto out;
+
+	/*
+	 * Read vmcoreinfo from /tmp/vmcoreinfoXXXXXX.
+	 */
+	if (!open_vmcoreinfo("r"))
+		goto out;
+
+	unlink(info->name_vmcoreinfo);
+
+	if (flag_xen_hv) {
+		if (!read_vmcoreinfo_xen())
+			goto out;
+	} else {
+		if (!read_vmcoreinfo())
+			goto out;
+	}
+	ret = TRUE;
+out:
+	free(info->name_vmcoreinfo);
+	info->name_vmcoreinfo = NULL;
+
+	return ret;
+}
+
 /*
  * Get the number of online nodes.
  */
@@ -3363,27 +3401,9 @@ initial(void)
 	 * Get the debug information from /proc/vmcore
 	 */
 	if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
-		/*
-		 * Copy vmcoreinfo to /tmp/vmcoreinfoXXXXXX.
-		 */
-		if ((info->name_vmcoreinfo
-		    = malloc(sizeof(FILENAME_VMCOREINFO))) == NULL) {
-			ERRMSG("Can't allocate memory for the name(%s). %s\n",
-			    FILENAME_VMCOREINFO, strerror(errno));
+		if (!read_vmcoreinfo_from_vmcore(info->offset_vmcoreinfo,
+		    info->size_vmcoreinfo, FALSE))
 			return FALSE;
-		}
-		strcpy(info->name_vmcoreinfo, FILENAME_VMCOREINFO);
-		if (!copy_vmcoreinfo(info->offset_vmcoreinfo,
-		    info->size_vmcoreinfo))
-			return FALSE;
-		/*
-		 * Read vmcoreinfo from /tmp/vmcoreinfoXXXXXX.
-		 */
-		if (!open_vmcoreinfo("r"))
-			return FALSE;
-		if (!read_vmcoreinfo())
-			return FALSE;
-		unlink(info->name_vmcoreinfo);
 	}
 
 	if (!get_value_for_old_linux())
@@ -6063,28 +6083,12 @@ initial_xen(void)
 			MSG("Try `makedumpfile --help' for more information.\n");
 			return FALSE;
 		}
-
 		/*
-		 * Copy vmcoreinfo to /tmp/vmcoreinfoXXXXXX.
+		 * Get the debug information from /proc/vmcore
 		 */
-		if ((info->name_vmcoreinfo
-		    = malloc(sizeof(FILENAME_VMCOREINFO))) == NULL) {
-			ERRMSG("Can't allocate memory for the name(%s). %s\n",
-			    FILENAME_VMCOREINFO, strerror(errno));
+		if (!read_vmcoreinfo_from_vmcore(info->offset_vmcoreinfo_xen,
+		    info->size_vmcoreinfo_xen, TRUE))
 			return FALSE;
-		}
-		strcpy(info->name_vmcoreinfo, FILENAME_VMCOREINFO);
-		if (!copy_vmcoreinfo(info->offset_vmcoreinfo_xen,
-		    info->size_vmcoreinfo_xen))
-			return FALSE;
-		/*
-		 * Read vmcoreinfo from /tmp/vmcoreinfoXXXXXX.
-		 */
-		if (!open_vmcoreinfo("r"))
-			return FALSE;
-		if (!read_vmcoreinfo_xen())
-			return FALSE;
-		unlink(info->name_vmcoreinfo);
 	}
 	if (!get_xen_phys_start())
 		return FALSE;
@@ -6504,6 +6508,8 @@ out:
 		close(info->fd_bitmap);
 	if (info->pt_load_segments != NULL)
 		free(info->pt_load_segments);
+	if (vt.node_online_map != NULL)
+		free(vt.node_online_map);
 	if (info->mem_map_data != NULL)
 		free(info->mem_map_data);
 	if (info->dump_header != NULL)

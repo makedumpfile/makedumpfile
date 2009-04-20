@@ -3419,7 +3419,7 @@ initial(void)
 		 * and get both the offset and the size.
 		 */
 		if (!info->offset_vmcoreinfo || !info->size_vmcoreinfo) {
-			if (info->dump_level <= DL_EXCLUDE_ZERO)
+			if (info->max_dump_level <= DL_EXCLUDE_ZERO)
 				goto out;
 
 			MSG("%s doesn't contain vmcoreinfo.\n",
@@ -3454,7 +3454,7 @@ out:
 	if (!get_max_mapnr())
 		return FALSE;
 
-	if ((info->dump_level <= DL_EXCLUDE_ZERO) && !info->flag_dmesg)
+	if ((info->max_dump_level <= DL_EXCLUDE_ZERO) && !info->flag_dmesg)
 		flag_need_debuginfo = FALSE;
 	else 
 		flag_need_debuginfo = TRUE;
@@ -3680,6 +3680,27 @@ is_bigendian(void)
 }
 
 int
+write_and_check_space(int fd, void *buf, size_t buf_size, char *file_name)
+{
+	int status, written_size = 0;
+
+	while (written_size < buf_size) {
+		status = write(fd, buf + written_size,
+				   buf_size - written_size);
+		if (0 < status) {
+			written_size += status;
+			continue;
+		}
+		if (errno == ENOSPC)
+			info->flag_nospace = TRUE;
+		MSG("\nCan't write the dump file(%s). %s\n",
+		    file_name, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
 write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 {
 	struct makedumpfile_data_header fdh;
@@ -3698,11 +3719,8 @@ write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 			fdh.offset   = bswap_64(offset);
 			fdh.buf_size = bswap_64(buf_size);
 		}
-		if (write(fd, &fdh, sizeof(fdh)) != sizeof(fdh)) {
-			ERRMSG("Can't write the dump file(%s). %s\n",
-			    file_name, strerror(errno));
+		if (!write_and_check_space(fd, &fdh, sizeof(fdh), file_name))
 			return FALSE;
-		}
 	} else {
 		if (lseek(fd, offset, SEEK_SET) == failed) {
 			ERRMSG("Can't seek the dump file(%s). %s\n",
@@ -3710,11 +3728,9 @@ write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 			return FALSE;
 		}
 	}
-	if (write(fd, buf, buf_size) != buf_size) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    file_name, strerror(errno));
+	if (!write_and_check_space(fd, buf, buf_size, file_name))
 		return FALSE;
-	}
+
 	return TRUE;
 }
 
@@ -4722,6 +4738,7 @@ void
 free_cache_data(struct cache_data *cd)
 {
 	free(cd->buf);
+	cd->buf = NULL;
 }
 
 int
@@ -4750,12 +4767,9 @@ write_start_flat_header()
 	memset(buf, 0, sizeof(buf));
 	memcpy(buf, &fh, sizeof(fh));
 
-	if (write(info->fd_dumpfile, buf, MAX_SIZE_MDF_HEADER)
-	    != MAX_SIZE_MDF_HEADER) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
+	if (!write_and_check_space(info->fd_dumpfile, buf, MAX_SIZE_MDF_HEADER,
+	    info->name_dumpfile))
 		return FALSE;
-	}
 
 	return TRUE;
 }
@@ -4771,11 +4785,10 @@ write_end_flat_header(void)
 	fdh.offset   = END_FLAG_FLAT_HEADER;
 	fdh.buf_size = END_FLAG_FLAT_HEADER;
 
-	if (write(info->fd_dumpfile, &fdh, sizeof(fdh)) != sizeof(fdh)) {
-		ERRMSG("Can't write the dump file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
+	if (!write_and_check_space(info->fd_dumpfile, &fdh, sizeof(fdh),
+	    info->name_dumpfile))
 		return FALSE;
-	}
+
 	return TRUE;
 }
 
@@ -5583,7 +5596,7 @@ close_files_for_rearranging_dumpdata(void)
 int
 close_files_for_creating_dumpfile(void)
 {
-	if (info->dump_level > DL_EXCLUDE_ZERO)
+	if (info->max_dump_level > DL_EXCLUDE_ZERO)
 		close_kernel_file();
 
 	/* free name for vmcoreinfo */
@@ -6104,7 +6117,7 @@ initial_xen(void)
 		MSG("Try `makedumpfile --help' for more information.\n");
 		return FALSE;
 	}
-	if (DL_EXCLUDE_ZERO < info->dump_level) {
+	if (DL_EXCLUDE_ZERO < info->max_dump_level) {
 		MSG("Dump_level is invalid. It should be 0 or 1.\n");
 		MSG("Commandline parameter is invalid.\n");
 		MSG("Try `makedumpfile --help' for more information.\n");
@@ -6233,6 +6246,8 @@ writeout_dumpfile(void)
 	int ret = FALSE;
 	struct cache_data cd_header, cd_page;
 
+	info->flag_nospace = FALSE;
+
 	if (!open_dump_file())
 		return FALSE;
 
@@ -6272,7 +6287,10 @@ out:
 
 	close_dump_file();
 
-	return ret;
+	if ((ret == FALSE) && info->flag_nospace)
+		return NOSPACE;
+	else
+		return ret;
 }
 
 int
@@ -6328,6 +6346,32 @@ reopen_dump_memory()
 }
 
 int
+get_next_dump_level(int index)
+{
+	if (info->num_dump_level <= index)
+		return -1;
+
+	return info->array_dump_level[index];
+}
+
+int
+delete_dumpfile(void)
+{
+	int i;
+
+	if (info->flag_flatten)
+		return TRUE;
+
+	if (info->flag_split) {
+		for (i = 0; i < info->num_dumpfile; i++)
+			unlink(SPLITTING_DUMPFILE(i));
+	} else {
+		unlink(info->name_dumpfile);
+	}
+	return TRUE;
+}
+
+int
 writeout_multiple_dumpfiles(void)
 {
 	int i, status, ret = TRUE;
@@ -6340,6 +6384,7 @@ writeout_multiple_dumpfiles(void)
 	for (i = 0; i < info->num_dumpfile; i++) {
 		if ((pid = fork()) < 0) {
 			return FALSE;
+
 		} else if (pid == 0) { /* Child */
 			info->name_dumpfile   = SPLITTING_DUMPFILE(i);
 			info->fd_bitmap       = SPLITTING_FD_BITMAP(i);
@@ -6348,19 +6393,22 @@ writeout_multiple_dumpfiles(void)
 
 			if (!reopen_dump_memory())
 				exit(1);
-			if (!writeout_dumpfile())
+			if ((status = writeout_dumpfile()) == FALSE)
 				exit(1);
+			else if (status == NOSPACE)
+				exit(2);
 			exit(0);
 		}
 		array_pid[i] = pid;
 	}
 	for (i = 0; i < info->num_dumpfile; i++) {
 		waitpid(array_pid[i], &status, WUNTRACED);
-		if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+		if (!WIFEXITED(status) || WEXITSTATUS(status) == 1) {
 			ERRMSG("Child process(%d) finished imcompletely.(%d)\n",
 			    array_pid[i], status);
 			ret = FALSE;
-		}
+		} else if ((ret == TRUE) && (WEXITSTATUS(status) == 2))
+			ret = NOSPACE;
 	}
 	return ret;
 }
@@ -6368,6 +6416,8 @@ writeout_multiple_dumpfiles(void)
 int
 create_dumpfile(void)
 {
+	int num_retry, status;
+
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
@@ -6383,15 +6433,31 @@ create_dumpfile(void)
 	}
 	print_vtop();
 
+	num_retry = 0;
+retry:
 	if (!create_dump_bitmap())
 		return FALSE;
 
 	if (info->flag_split) {
-		if (!writeout_multiple_dumpfiles())
+		if ((status = writeout_multiple_dumpfiles()) == FALSE)
 			return FALSE;
 	} else {
-		if (!writeout_dumpfile())
+		if ((status = writeout_dumpfile()) == FALSE)
 			return FALSE;
+	}
+	if (status == NOSPACE) {
+		/*
+		 * If specifying the other dump_level, makedumpfile tries
+		 * to create a dumpfile with it again.
+		 */
+		num_retry++;
+		if ((info->dump_level = get_next_dump_level(num_retry)) < 0)
+ 			return FALSE;
+		MSG("Retry to create a dumpfile by dump_level(%d).\n",
+		    info->dump_level);
+		if (!delete_dumpfile())
+ 			return FALSE;
+		goto retry;
 	}
 	print_report();
 
@@ -6941,11 +7007,6 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	if (info->flag_generate_vmcoreinfo || info->flag_rearrange)
 		return FALSE;
 
-	if ((info->dump_level < MIN_DUMP_LEVEL)
-	    || (MAX_DUMP_LEVEL < info->dump_level)) {
-		MSG("Dump_level is invalid.\n");
-		return FALSE;
-	}
 	if ((message_level < MIN_MSG_LEVEL)
 	    || (MAX_MSG_LEVEL < message_level)) {
 		message_level = DEFAULT_MSG_LEVEL;
@@ -7001,6 +7062,48 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	return TRUE;
 }
 
+int
+parse_dump_level(char *str_dump_level)
+{
+	int i, ret = FALSE;
+	char *buf, *ptr;
+
+	if (!(buf = strdup(str_dump_level))) {
+		MSG("Can't duplicate strings(%s).\n", str_dump_level);
+		return FALSE;
+	}
+	info->max_dump_level = 0;
+	info->num_dump_level = 0;
+	ptr = buf;
+	while(TRUE) {
+		ptr = strtok(ptr, ",");
+		if (!ptr)
+			break;
+
+		i = atoi(ptr);
+		if ((i < MIN_DUMP_LEVEL) || (MAX_DUMP_LEVEL < i)) {
+			MSG("Dump_level(%d) is invalid.\n", i);
+			goto out;
+		}
+		if (NUM_ARRAY_DUMP_LEVEL <= info->num_dump_level) {
+			MSG("Dump_level is invalid.\n");
+			goto out;
+		}
+		if (info->max_dump_level < i)
+			info->max_dump_level = i;
+		if (info->num_dump_level == 0)
+			info->dump_level = i;
+		info->array_dump_level[info->num_dump_level] = i;
+		info->num_dump_level++;
+		ptr = NULL;
+	}
+	ret = TRUE;
+out:
+	free(buf);
+
+	return ret;
+}
+
 static struct option longopts[] = {
 	{"split", no_argument, NULL, 's'}, 
 	{"reassemble", no_argument, NULL, 'r'},
@@ -7047,7 +7150,8 @@ main(int argc, char *argv[])
 			flag_debug = TRUE;
 			break;
 		case 'd':
-			info->dump_level = atoi(optarg);
+			if (!parse_dump_level(optarg))
+				goto out;
 			break;
 		case 'E':
 			info->flag_elf_dumpfile = 1;

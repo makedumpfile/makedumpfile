@@ -96,12 +96,18 @@ Specify the type of unnecessary page for analysis.
 Pages of the specified type are not copied to \fIDUMPFILE\fR. The page type
 marked in the following table is excluded. A user can specify multiple page
 types by setting the sum of each page type for dump_level. The maximum of
-dump_level is 31.
-Note that dump_level for Xen dump filtering is 0 or 1.
+dump_level is 31. Note that dump_level for Xen dump filtering is 0 or 1.
+.br
+If specifying multiple dump_levels with the delimiter ',', makedumpfile retries
+to create a \fIDUMPFILE\fR by other dump_level when "No space on device" error
+happens. For example, if dump_level is "11,31" and makedumpfile fails
+by dump_level 11, makedumpfile retries it by dump_level 31.
 .br
 .B Example:
 .br
 # makedumpfile \-d 11 \-x vmlinux /proc/vmcore dumpfile
+.br
+# makedumpfile \-d 11,31 \-x vmlinux /proc/vmcore dumpfile
 
   dump | zero | cache|cache  | user | free
  level | page | page |private| data | page

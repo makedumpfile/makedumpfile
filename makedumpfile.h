@@ -144,6 +144,8 @@ isAnon(unsigned long mapping)
  */
 #define MIN_DUMP_LEVEL		(0)
 #define MAX_DUMP_LEVEL		(31)
+#define NUM_ARRAY_DUMP_LEVEL	(MAX_DUMP_LEVEL + 1) /* enough to allocate
+							all the dump_level */
 #define DL_EXCLUDE_ZERO		(0x001) /* Exclude Pages filled with Zeros */
 #define DL_EXCLUDE_CACHE	(0x002) /* Exclude Cache Pages
 				           without Private Pages */
@@ -480,6 +482,7 @@ do { \
  */
 #define TRUE		(1)
 #define FALSE		(0)
+#define NOSPACE		(-1)    /* code of write-error due to nospace */
 #define MAX(a,b)	((a) > (b) ? (a) : (b))
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #define LONG_MAX	((long)(~0UL>>1))
@@ -751,7 +754,10 @@ struct DumpInfo {
 	/*
 	 * General info:
 	 */
-	int		dump_level;          /* dump level */
+	int		dump_level;          /* current dump level */
+	int		max_dump_level;      /* maximum dump level */
+	int		num_dump_level;      /* number of dump level */
+	int		array_dump_level[NUM_ARRAY_DUMP_LEVEL];
 	int		flag_compress;       /* flag of compression */
 	int		flag_elf64_memory;   /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
@@ -768,6 +774,7 @@ struct DumpInfo {
 	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
 	int             flag_dmesg;          /* dump the dmesg log out of the vmcore file */
+	int		flag_nospace;	     /* the flag of "No space on device" error */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;

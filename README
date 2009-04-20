@@ -60,7 +60,8 @@
   2.6.25 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
   2.6.26 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
   2.6.27 | OK | ** | -- |    |    | ** | OK | -- | #2 | OK | OK | 
-  28-rc4 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
+  2.6.28 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
+  29-rc7 | OK | ** | -- |    |    | ** | OK | -- | OK | OK | OK | 
 
   OK    : Support.
   --    : Not support.

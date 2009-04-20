@@ -6154,6 +6154,7 @@ print_report(void)
 int
 create_dumpfile(void)
 {
+	int ret = FALSE;
 	struct cache_data cd_header, cd_page;
 
 	if (!open_files_for_creating_dumpfile())
@@ -6184,26 +6185,30 @@ create_dumpfile(void)
 	if (!prepare_cache_data(&cd_header))
 		return FALSE;
 
-	if (!prepare_cache_data(&cd_page))
+	if (!prepare_cache_data(&cd_page)) {
+		free_cache_data(&cd_header);
 		return FALSE;
-
+	}
 	if (info->flag_elf_dumpfile) {
 		if (!write_elf_header(&cd_header))
-			return FALSE;
+			goto out;
 		if (!write_elf_pages(&cd_header, &cd_page))
-			return FALSE;
+			goto out;
 	} else {
 		if (!write_kdump_header())
-			return FALSE;
+			goto out;
 		if (!write_kdump_pages(&cd_header, &cd_page))
-			return FALSE;
+			goto out;
 		if (!write_kdump_bitmap())
-			return FALSE;
+			goto out;
 	}
 	if (info->flag_flatten) {
 		if (!write_end_flat_header())
-			return FALSE;
+			goto out;
 	}
+
+	ret = TRUE;
+out:
 	free_cache_data(&cd_header);
 	free_cache_data(&cd_page);
 
@@ -6212,7 +6217,7 @@ create_dumpfile(void)
 
 	print_report();
 
-	return TRUE;
+	return ret;
 }
 
 int

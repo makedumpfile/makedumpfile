@@ -4913,12 +4913,15 @@ print_progress(const char *msg, unsigned long current, unsigned long end)
 }
 
 unsigned long long
-get_num_dumpable(struct dump_bitmap *bitmap2)
+get_num_dumpable(void)
 {
 	unsigned long long pfn, num_dumpable;
+	struct dump_bitmap bitmap2;
+
+	initialize_2nd_bitmap(&bitmap2);
 
 	for (pfn = 0, num_dumpable = 0; pfn < info->max_mapnr; pfn++) {
-		if (is_dumpable(bitmap2, pfn))
+		if (is_dumpable(&bitmap2, pfn))
 			num_dumpable++;
 	}
 	return num_dumpable;
@@ -4969,7 +4972,7 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	int i, phnum;
 	long page_size = info->page_size;
 	unsigned long long pfn, pfn_start, pfn_end, paddr, num_excluded;
-	unsigned long long num_dumpable = 0, num_dumped = 0, per;
+	unsigned long long num_dumpable, num_dumped = 0, per;
 	unsigned long long memsz, filesz;
 	unsigned long frac_head, frac_tail;
 	off_t off_seg_load, off_memory;
@@ -4981,7 +4984,7 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 
 	initialize_2nd_bitmap(&bitmap2);
 
-	num_dumpable = get_num_dumpable(&bitmap2);
+	num_dumpable = get_num_dumpable();
 	per = num_dumpable / 100;
 
 	off_seg_load    = info->offset_load_dumpfile;
@@ -5200,7 +5203,7 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 int
 write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 {
- 	unsigned long long pfn, per, num_dumpable = 0, num_dumped = 0;
+ 	unsigned long long pfn, per, num_dumpable, num_dumped = 0;
 	unsigned long size_out;
 	struct page_desc pd, pd_zero;
 	off_t offset_data = 0;
@@ -5224,7 +5227,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		goto out;
 	}
 
-	num_dumpable = get_num_dumpable(&bitmap2);
+	num_dumpable = get_num_dumpable();
 	per = num_dumpable / 100;
 
 	/*

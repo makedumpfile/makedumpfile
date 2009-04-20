@@ -3537,18 +3537,6 @@ set_bit_on_1st_bitmap(unsigned long long pfn)
 }
 
 int
-set_bit_on_2nd_bitmap(unsigned long long pfn)
-{
-	return set_bitmap(info->bitmap2, pfn, 1);
-}
-
-int
-clear_bit_on_1st_bitmap(unsigned long long pfn)
-{
-	return set_bitmap(info->bitmap1, pfn, 0);
-}
-
-int
 clear_bit_on_2nd_bitmap(unsigned long long pfn)
 {
 	return set_bitmap(info->bitmap2, pfn, 0);

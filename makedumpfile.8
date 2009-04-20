@@ -8,6 +8,8 @@ makedumpfile \- make a small dumpfile of kdump
 .br
 \fBmakedumpfile\fR \-R \fIDUMPFILE\fR
 .br
+\fBmakedumpfile\fR \-\-split [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR \fIDUMPFILE1\fR \fIDUMPFILE2\fR [\fIDUMPFILE3\fR ..]
+.br
 \fBmakedumpfile\fR \-g \fIVMCOREINFO\fR \-x \fIVMLINUX\fR
 .br
 \fBmakedumpfile\fR \-E [\-\-xen-syms \fIXEN-SYMS\fR|\-\-xen-vmcoreinfo \fIVMCOREINFO\fR] \fIVMCORE\fR \fIDUMPFILE\fR
@@ -253,6 +255,19 @@ host by running this script.
 # makedumpfile \-F \-d 31 \-x vmlinux /proc/vmcore \e
 .br
 | ssh user@host "makedumpfile\-R.pl dumpfile"
+
+.TP
+\fB\-\-split\fR
+Split the dump data to multiple \fIDUMPFILE\fRs in parallel. If specifying
+\fIDUMPFILE\fRs on different storage devices, a device can share I/O load
+with other devices and it reduces time for saving the dump data. The file
+size of each \fIDUMPFILE\fR is smaller than the system memory size which
+is divided by the number of \fIDUMPFILE\fRs. This feature supports only
+the kdump\-compressed format.
+.br
+.B Example:
+.br
+# makedumpfile \-\-split \-d 31 \-x vmlinux /proc/vmcore dumpfile1 dumpfile2
 
 .TP
 \fB\-\-xen-syms\fR \fIXEN-SYMS\fR

@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <time.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 #include <zlib.h>
 #include <elfutils/libdw.h>
 #include <libelf.h>
@@ -423,6 +424,14 @@ do { \
 } while (0)
 
 /*
+ * Macro for getting splitting info.
+ */
+#define SPLITTING_DUMPFILE(i)	info->splitting_info[i].name_dumpfile
+#define SPLITTING_FD_BITMAP(i)	info->splitting_info[i].fd_bitmap
+#define SPLITTING_START_PFN(i)	info->splitting_info[i].start_pfn
+#define SPLITTING_END_PFN(i)	info->splitting_info[i].end_pfn
+
+/*
  * kernel version
  *
  * NOTE: the format of kernel_version is as follows
@@ -455,6 +464,7 @@ do { \
  */
 #define STR_OSRELEASE		"OSRELEASE="
 #define STR_PAGESIZE		"PAGESIZE="
+#define STR_CRASHTIME		"CRASHTIME="
 #define STR_SYMBOL(X)		"SYMBOL("X")="
 #define STR_SIZE(X)		"SIZE("X")="
 #define STR_OFFSET(X)		"OFFSET("X")="
@@ -727,8 +737,16 @@ struct makedumpfile_data_header {
 	int64_t	buf_size;
 };
 
+struct splitting_info {
+	char			*name_dumpfile;
+	int 			fd_bitmap;
+	unsigned long long	start_pfn;
+	unsigned long long	end_pfn;
+} splitting_info_t;
+
 struct DumpInfo {
 	int32_t		kernel_version;      /* version of first kernel*/
+	struct timeval	timestamp;
 
 	/*
 	 * General info:
@@ -745,6 +763,7 @@ struct DumpInfo {
 						format to a standard out */
 	int		flag_rearrange;      /* flag of creating dumpfile from
 						flattened format */
+	int		flag_split;	     /* splitting vmcore */
 	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
 	int             flag_dmesg;          /* dump the dmesg log out of the vmcore file */
@@ -802,6 +821,8 @@ struct DumpInfo {
 	 */
 	int			fd_dumpfile;
 	char			*name_dumpfile;
+	int			num_dumpfile;
+	struct splitting_info	*splitting_info;
 
 	/*
 	 * bitmap info:
@@ -839,6 +860,11 @@ struct DumpInfo {
 	int	num_domain;
 	struct domain_list *domain_list;
 
+	/*
+	 * for splitting
+	 */
+	unsigned long long split_start_pfn;  
+	unsigned long long split_end_pfn;  
 };
 extern struct DumpInfo		*info;
 

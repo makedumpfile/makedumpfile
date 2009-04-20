@@ -67,6 +67,9 @@ struct disk_dump_header {
 struct kdump_sub_header {
 	unsigned long	phys_base;
 	int		dump_level;	/* header_version 1 and later */
+	int		split;		/* header_version 2 and later */
+	unsigned long	start_pfn;	/* header_version 2 and later */
+	unsigned long	end_pfn;	/* header_version 2 and later */
 };
 
 /* page flags */

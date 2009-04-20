@@ -637,7 +637,7 @@ int
 open_dump_file(void)
 {
 	int fd;
-	int open_flags = O_RDWR|O_CREAT;
+	int open_flags = O_RDWR|O_CREAT|O_TRUNC;
 
 	if (!info->flag_force)
 		open_flags |= O_EXCL;

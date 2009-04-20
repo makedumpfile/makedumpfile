@@ -6368,6 +6368,464 @@ create_dumpfile(void)
 }
 
 int
+read_disk_dump_header(struct disk_dump_header *dh, char *filename)
+{
+	int fd, ret = FALSE;
+
+	if ((fd = open(filename, O_RDONLY)) < 0) {
+		ERRMSG("Can't open a file(%s). %s\n",
+		    filename, strerror(errno));
+		return FALSE;
+	}
+	if (lseek(fd, 0x0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a file(%s). %s\n",
+		    filename, strerror(errno));
+		goto out;
+	}
+	if (read(fd, dh, sizeof(struct disk_dump_header))
+	    != sizeof(struct disk_dump_header)) {
+		ERRMSG("Can't read a file(%s). %s\n",
+		    filename, strerror(errno));
+		goto out;
+	}
+	if (strncmp(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE))) {
+		ERRMSG("%s is not the kdump-compressed format.\n",
+		    filename);
+		goto out;
+	}
+	ret = TRUE;
+out:
+	close(fd);
+
+	return ret;
+}
+
+int
+read_kdump_sub_header(struct kdump_sub_header *ksh, char *filename)
+{
+	int fd, ret = FALSE;
+
+	if (!info->page_size)
+		return FALSE;
+
+	if ((fd = open(filename, O_RDONLY)) < 0) {
+		ERRMSG("Can't open a file(%s). %s\n",
+		    filename, strerror(errno));
+		return FALSE;
+	}
+	if (lseek(fd, info->page_size, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a file(%s). %s\n",
+		    filename, strerror(errno));
+		goto out;
+	}
+	if (read(fd, ksh, sizeof(struct kdump_sub_header))
+	     != sizeof(struct kdump_sub_header)) {
+		ERRMSG("Can't read a file(%s). %s\n",
+		    filename, strerror(errno));
+		goto out;
+	}
+	ret = TRUE;
+out:
+	close(fd);
+
+	return ret;
+}
+
+int
+store_splitting_info(void)
+{
+	int i;
+	struct disk_dump_header dh, tmp_dh;
+	struct kdump_sub_header ksh;
+
+	for (i = 0; i < info->num_dumpfile; i++) {
+		if (!read_disk_dump_header(&tmp_dh, SPLITTING_DUMPFILE(i)))
+			return FALSE;
+
+		if (i == 0) {
+			memcpy(&dh, &tmp_dh, sizeof(tmp_dh));
+			info->max_mapnr = dh.max_mapnr;
+			info->page_size = dh.block_size;
+			DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
+			DEBUG_MSG("page_size    : %ld\n", info->page_size);
+		}
+
+		/*
+		 * Check whether multiple dumpfiles are parts of
+		 * the same /proc/vmcore.
+		 */
+		if (memcmp(&dh, &tmp_dh, sizeof(tmp_dh))) {
+			ERRMSG("Invalid dumpfile(%s).\n",
+			    SPLITTING_DUMPFILE(i));
+			return FALSE;
+		}
+		if (!read_kdump_sub_header(&ksh, SPLITTING_DUMPFILE(i)))
+			return FALSE;
+
+		if (i == 0) {
+			info->dump_level = ksh.dump_level;
+			DEBUG_MSG("dump_level   : %d\n", info->dump_level);
+		}
+		SPLITTING_START_PFN(i) = ksh.start_pfn;
+		SPLITTING_END_PFN(i)   = ksh.end_pfn;
+	}
+	return TRUE;
+}
+
+void
+sort_splitting_info(void)
+{
+	int i, j;
+	unsigned long long start_pfn, end_pfn;
+	char *name_dumpfile;
+
+	/*
+	 * Sort splitting_info by start_pfn.
+	 */
+	for (i = 0; i < (info->num_dumpfile - 1); i++) {
+		for (j = i; j < info->num_dumpfile; j++) {
+			if (SPLITTING_START_PFN(i) < SPLITTING_START_PFN(j))
+				continue;
+			start_pfn     = SPLITTING_START_PFN(i);
+			end_pfn       = SPLITTING_END_PFN(i);
+			name_dumpfile = SPLITTING_DUMPFILE(i);
+
+			SPLITTING_START_PFN(i) = SPLITTING_START_PFN(j);
+			SPLITTING_END_PFN(i)   = SPLITTING_END_PFN(j);
+			SPLITTING_DUMPFILE(i)  = SPLITTING_DUMPFILE(j);
+
+			SPLITTING_START_PFN(j) = start_pfn;
+			SPLITTING_END_PFN(j)   = end_pfn;
+			SPLITTING_DUMPFILE(j)  = name_dumpfile;
+		}
+	}
+
+	DEBUG_MSG("num_dumpfile : %d\n", info->num_dumpfile);
+	for (i = 0; i < info->num_dumpfile; i++) {
+		DEBUG_MSG("dumpfile (%s)\n", SPLITTING_DUMPFILE(i));
+		DEBUG_MSG("  start_pfn  : %llx\n", SPLITTING_START_PFN(i));
+		DEBUG_MSG("  end_pfn    : %llx\n", SPLITTING_END_PFN(i));
+	}
+}
+
+int
+check_splitting_info(void)
+{
+	int i;
+	unsigned long long end_pfn;
+
+	/*
+	 * Check whether there are not lack of /proc/vmcore.
+	 */
+	if (SPLITTING_START_PFN(0) != 0) {
+		ERRMSG("There is not dumpfile corresponding to pfn 0x%x - 0x%llx.\n",
+		    0x0, SPLITTING_START_PFN(0));
+		return FALSE;
+	}
+	end_pfn = SPLITTING_END_PFN(0);
+
+	for (i = 1; i < info->num_dumpfile; i++) {
+		if (end_pfn != SPLITTING_START_PFN(i)) {
+			ERRMSG("There is not dumpfile corresponding to pfn 0x%llx - 0x%llx.\n",
+			    end_pfn, SPLITTING_START_PFN(i));
+			return FALSE;
+		}
+		end_pfn = SPLITTING_END_PFN(i);
+	}
+	if (end_pfn != info->max_mapnr) {
+		ERRMSG("There is not dumpfile corresponding to pfn 0x%llx - 0x%llx.\n",
+		    end_pfn, info->max_mapnr);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+int
+get_splitting_info(void)
+{
+	if (!store_splitting_info())
+		return FALSE;
+
+	sort_splitting_info();
+
+	if (!check_splitting_info())
+		return FALSE;
+
+	return TRUE;
+}
+
+int
+reassemble_kdump_header(void)
+{
+	int fd, ret = FALSE;
+	off_t offset_bitmap;
+	struct disk_dump_header dh;
+	struct kdump_sub_header ksh;
+	char *buf_bitmap;
+
+	/*
+	 * Write common header.
+	 */
+	if (!read_disk_dump_header(&dh, SPLITTING_DUMPFILE(0)))
+		return FALSE;
+
+	if (lseek(info->fd_dumpfile, 0x0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		return FALSE;
+	}
+	if (write(info->fd_dumpfile, &dh, sizeof(dh)) != sizeof(dh)) {
+		ERRMSG("Can't write a file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Write sub header.
+	 */
+	if (!read_kdump_sub_header(&ksh, SPLITTING_DUMPFILE(0)))
+		return FALSE;
+
+	ksh.split = 0;
+	ksh.start_pfn = 0;
+	ksh.end_pfn   = 0;
+
+	if (lseek(info->fd_dumpfile, info->page_size, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		return FALSE;
+	}
+	if (write(info->fd_dumpfile, &ksh, sizeof(ksh)) != sizeof(ksh)) {
+		ERRMSG("Can't write a file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Write dump bitmap to both a dumpfile and a bitmap file.
+	 */
+	offset_bitmap    = info->page_size * (1 + dh.sub_hdr_size);
+	info->len_bitmap = info->page_size * dh.bitmap_blocks;
+	if ((buf_bitmap = malloc(info->len_bitmap)) == NULL) {
+		ERRMSG("Can't allcate memory for bitmap.\n");
+		return FALSE;
+	}
+
+	if ((fd = open(SPLITTING_DUMPFILE(0), O_RDONLY)) < 0) {
+		ERRMSG("Can't open a file(%s). %s\n",
+		    SPLITTING_DUMPFILE(0), strerror(errno));
+		return FALSE;
+	}
+	if (lseek(fd, offset_bitmap, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a file(%s). %s\n",
+		    SPLITTING_DUMPFILE(0), strerror(errno));
+		goto out;
+	}
+	if (read(fd, buf_bitmap, info->len_bitmap) != info->len_bitmap) {
+		ERRMSG("Can't read a file(%s). %s\n",
+		    SPLITTING_DUMPFILE(0), strerror(errno));
+		goto out;
+	}
+
+	if (lseek(info->fd_dumpfile, offset_bitmap, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		goto out;
+	}
+	if (write(info->fd_dumpfile, buf_bitmap, info->len_bitmap)
+	    != info->len_bitmap) {
+		ERRMSG("Can't write a file(%s). %s\n",
+		    info->name_dumpfile, strerror(errno));
+		goto out;
+	}
+
+	if (lseek(info->fd_bitmap, 0x0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a file(%s). %s\n",
+		    info->name_bitmap, strerror(errno));
+		goto out;
+	}
+	if (write(info->fd_bitmap, buf_bitmap, info->len_bitmap)
+	    != info->len_bitmap) {
+		ERRMSG("Can't write a file(%s). %s\n",
+		    info->name_bitmap, strerror(errno));
+		goto out;
+	}
+
+	ret = TRUE;
+out:
+	close(fd);
+
+	return ret;
+}
+
+int
+reassemble_kdump_pages(void)
+{
+	int i, fd = 0, ret = FALSE;
+	off_t offset_first_ph, offset_ph_org;
+	off_t offset_data_new, offset_zero_page = 0;
+	unsigned long long pfn, start_pfn, end_pfn;
+	unsigned long long num_dumpable, num_dumped;
+	struct dump_bitmap bitmap2;
+	struct disk_dump_header dh;
+	struct page_desc pd, pd_zero;
+	struct cache_data cd_pd, cd_data;
+	char *data = NULL;
+
+	initialize_2nd_bitmap(&bitmap2);
+
+	if (!read_disk_dump_header(&dh, SPLITTING_DUMPFILE(0)))
+		return FALSE;
+
+	if (!prepare_cache_data(&cd_pd))
+		return FALSE;
+
+	if (!prepare_cache_data(&cd_data)) {
+		free_cache_data(&cd_pd);
+		return FALSE;
+	}
+	if ((data = malloc(info->page_size)) == NULL) {
+		ERRMSG("Can't allcate memory for page data.\n");
+		free_cache_data(&cd_pd);
+		free_cache_data(&cd_data);
+		return FALSE;
+	}
+	num_dumpable = get_num_dumpable();
+	num_dumped = 0;
+
+	offset_first_ph = (1 + dh.sub_hdr_size + dh.bitmap_blocks)
+	     * dh.block_size;
+	cd_pd.offset    = offset_first_ph;
+	offset_data_new = offset_first_ph + sizeof(page_desc_t) * num_dumpable;
+	cd_data.offset  = offset_data_new;
+
+	/*
+	 * Write page header of zero-filled page.
+	 */
+	if (info->dump_level & DL_EXCLUDE_ZERO) {
+		/*
+		 * makedumpfile outputs the data of zero-filled page at first
+		 * if excluding zero-filled page, so the offset of first data
+		 * is for zero-filled page in all dumpfiles.
+		 */
+		offset_zero_page = offset_data_new;
+
+		pd_zero.size = info->page_size;
+		pd_zero.flags = 0;
+		pd_zero.offset = offset_data_new;
+		pd_zero.page_flags = 0;
+		memset(data, 0, pd_zero.size);
+		if (!write_cache(&cd_data, data, pd_zero.size))
+			goto out;
+		offset_data_new  += pd_zero.size;
+	}
+	for (i = 0; i < info->num_dumpfile; i++) {
+		if ((fd = open(SPLITTING_DUMPFILE(i), O_RDONLY)) < 0) {
+			ERRMSG("Can't open a file(%s). %s\n",
+			    SPLITTING_DUMPFILE(i), strerror(errno));
+			goto out;
+		}
+		start_pfn = SPLITTING_START_PFN(i);
+		end_pfn   = SPLITTING_END_PFN(i);
+
+		offset_ph_org = offset_first_ph;
+		for (pfn = start_pfn; pfn < end_pfn; pfn++) {
+			if (!is_dumpable(&bitmap2, pfn))
+				continue;
+
+			num_dumped++;
+
+			print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
+
+			if (lseek(fd, offset_ph_org, SEEK_SET) < 0) {
+				ERRMSG("Can't seek a file(%s). %s\n",
+				    SPLITTING_DUMPFILE(i), strerror(errno));
+				goto out;
+			}
+			if (read(fd, &pd, sizeof(pd)) != sizeof(pd)) {
+				ERRMSG("Can't read a file(%s). %s\n",
+				    SPLITTING_DUMPFILE(i), strerror(errno));
+				goto out;
+			}
+			if (lseek(fd, pd.offset, SEEK_SET) < 0) {
+				ERRMSG("Can't seek a file(%s). %s\n",
+				    SPLITTING_DUMPFILE(i), strerror(errno));
+				goto out;
+			}
+			if (read(fd, data, pd.size) != pd.size) {
+				ERRMSG("Can't read a file(%s). %s\n",
+				    SPLITTING_DUMPFILE(i), strerror(errno));
+				goto out;
+			}
+			if ((info->dump_level & DL_EXCLUDE_ZERO)
+			    && (pd.offset == offset_zero_page)) {
+				/*
+			 	 * Handle the data of zero-filled page.
+				 */
+				if (!write_cache(&cd_pd, &pd_zero,
+				    sizeof(pd_zero)))
+					goto out;
+				offset_ph_org += sizeof(pd);
+				continue;
+			}
+			pd.offset = offset_data_new;
+			if (!write_cache(&cd_pd, &pd, sizeof(pd)))
+				goto out;
+			offset_ph_org += sizeof(pd);
+
+			if (!write_cache(&cd_data, data, pd.size))
+				goto out;
+
+			offset_data_new += pd.size;
+		}
+		close(fd);
+		fd = 0;
+	}
+	if (!write_cache_bufsz(&cd_pd))
+		goto out;
+	if (!write_cache_bufsz(&cd_data))
+		goto out;
+
+	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
+	ret = TRUE;
+out:
+	free_cache_data(&cd_pd);
+	free_cache_data(&cd_data);
+
+	if (data)
+		free(data);
+	if (fd > 0)
+		close(fd);
+
+	return ret;
+}
+
+int
+reassemble_dumpfile(void)
+{
+	if (!get_splitting_info())
+		return FALSE;
+
+	if (!open_dump_bitmap())
+		return FALSE;
+
+	if (!open_dump_file())
+		return FALSE;
+
+	if (!reassemble_kdump_header())
+		return FALSE;
+
+	if (!reassemble_kdump_pages())
+		return FALSE;
+
+	close_dump_file();
+	close_dump_bitmap();
+
+	return TRUE;
+}
+
+int
 check_param_for_generating_vmcoreinfo(int argc, char *argv[])
 {
 	if (argc != optind)
@@ -6402,6 +6860,38 @@ check_param_for_rearranging_dumpdata(int argc, char *argv[])
 		return FALSE;
 
 	info->name_dumpfile = argv[optind];
+	return TRUE;
+}
+
+/*
+ * Parameters for reassembling multiple dumpfiles into one dumpfile.
+ */
+int
+check_param_for_reassembling_dumpfile(int argc, char *argv[])
+{
+	int i;
+
+	info->num_dumpfile  = argc - optind - 1;
+	info->name_dumpfile = argv[argc - 1];
+
+	DEBUG_MSG("num_dumpfile : %d\n", info->num_dumpfile);
+
+	if (info->flag_compress        || info->dump_level
+	    || info->flag_elf_dumpfile || info->flag_read_vmcoreinfo
+	    || info->name_vmlinux      || info->name_xen_syms
+	    || info->flag_flatten      || info->flag_generate_vmcoreinfo
+	    || info->flag_exclude_xen_dom || info->flag_split)
+		return FALSE;
+
+	if ((info->splitting_info
+	    = malloc(sizeof(splitting_info_t) * info->num_dumpfile))
+	    == NULL) {
+		MSG("Can't allocate memory for splitting_info.\n");
+		return FALSE;
+	}
+	for (i = 0; i < info->num_dumpfile; i++)
+		SPLITTING_DUMPFILE(i) = argv[optind + i];
+
 	return TRUE;
 }
 
@@ -6478,6 +6968,7 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 
 static struct option longopts[] = {
 	{"split", no_argument, NULL, 's'}, 
+	{"reassemble", no_argument, NULL, 'r'},
 	{"xen-syms", required_argument, NULL, 'y'},
 	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
 	{"xen_phys_start", required_argument, NULL, 'P'},
@@ -6508,7 +6999,7 @@ main(int argc, char *argv[])
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:MRsVvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:MRrsVvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
 		case 'b':
@@ -6557,6 +7048,9 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			info->flag_split = 1;
+			break;
+		case 'r':
+			info->flag_reassemble = 1;
 			break;
 		case 'V':
 			info->vaddr_for_vtop = strtoul(optarg, NULL, 0);
@@ -6638,6 +7132,17 @@ main(int argc, char *argv[])
 			goto out;
 
 		if (!close_files_for_rearranging_dumpdata())
+			goto out;
+
+		MSG("\n");
+		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
+	} else if (info->flag_reassemble) {
+		if (!check_param_for_reassembling_dumpfile(argc, argv)) {
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
+			goto out;
+		}
+		if (!reassemble_dumpfile())
 			goto out;
 
 		MSG("\n");

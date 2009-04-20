@@ -26,6 +26,7 @@ struct dwarf_info	dwarf_info;
 struct vm_table		vt = { 0 };
 struct DumpInfo		*info = NULL;
 
+char filename_stdout[] = FILENAME_STDOUT;
 int message_level;
 
 /*
@@ -609,15 +610,8 @@ open_dump_file(void)
 		open_flags |= O_EXCL;
 
 	if (info->flag_flatten) {
-		if ((info->name_dumpfile
-		    = (char *)malloc(sizeof(FILENAME_STDOUT))) == NULL) {
-			ERRMSG("Can't allocate memory for the filename. %s\n",
-			    strerror(errno));
-			return FALSE;
-		}
 		fd = STDOUT_FILENO;
-		strcpy(info->name_dumpfile, FILENAME_STDOUT);
-
+		info->name_dumpfile = filename_stdout;
 	} else if ((fd = open(info->name_dumpfile, open_flags,
 	    S_IRUSR|S_IWUSR)) < 0) {
 		ERRMSG("Can't open the dump file(%s). %s\n",

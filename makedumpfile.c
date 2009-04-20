@@ -202,7 +202,7 @@ vaddr_to_offset_slow(int fd, char *filename, unsigned long long vaddr)
 /*
  * Get the number of the page descriptors from the ELF info.
  */
-unsigned long long
+int
 get_max_mapnr(void)
 {
 	int i;
@@ -214,7 +214,12 @@ get_max_mapnr(void)
 		if (max_paddr < pls->phys_end)
 			max_paddr = pls->phys_end;
 	}
-	return max_paddr / info->page_size;
+	info->max_mapnr = max_paddr / info->page_size;
+
+	DEBUG_MSG("\n");
+	DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
+
+	return TRUE;
 }
 
 int
@@ -346,6 +351,34 @@ is_page_size(long page_size)
 		return TRUE;
 
 	return FALSE;
+}
+
+int
+set_page_size(long page_size)
+{
+	if (!is_page_size(page_size)) {
+		ERRMSG("Invalid page_size: %ld", page_size);
+		return FALSE;
+	}
+	info->page_size = page_size;
+	info->page_shift = ffs(info->page_size) - 1;
+	DEBUG_MSG("page_size    : %ld\n", info->page_size);
+
+	return TRUE;
+}
+
+int
+fallback_to_current_page_size(void)
+{
+
+	if (!set_page_size(sysconf(_SC_PAGE_SIZE)))
+		return FALSE;
+
+	DEBUG_MSG("WARNING: Cannot determine page size (no vmcoreinfo).\n");
+	DEBUG_MSG("Using the dump kernel page size: %ld\n",
+	    info->page_size);
+
+	return TRUE;
 }
 
 int
@@ -923,7 +956,7 @@ get_elf_info(void)
 {
 	int i, j, phnum, num_load, elf_format;
 	off_t offset_note;
-	unsigned long tmp, size_note;
+	unsigned long size_note;
 	Elf64_Phdr phdr;
 
 	/*
@@ -986,27 +1019,6 @@ get_elf_info(void)
 		ERRMSG("Can't get PT_NOTE information.\n");
 		return FALSE;
 	}
-
-	/*
-	 * FIXME
-	 *   If the page_size of 1st kernel is different from the one of
-	 *   capture(2nd) kernel, the problem will happen.
-	 */
-	info->page_size = sysconf(_SC_PAGE_SIZE);
-	info->page_shift = ffs(info->page_size) - 1;
-
-	info->max_mapnr = get_max_mapnr();
-
-	DEBUG_MSG("\n");
-	DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
-
-	/*
-	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
-	 * The crash utility requires both of them to be aligned to block_size
-	 * boundary.
-	 */
-	tmp = divideup(divideup(info->max_mapnr, BITPERBYTE), info->page_size);
-	info->len_bitmap = tmp*info->page_size*2;
 
 	return TRUE;
 }
@@ -2089,10 +2101,9 @@ get_mem_type(void)
 int
 generate_vmcoreinfo(void)
 {
-	if ((info->page_size = sysconf(_SC_PAGE_SIZE)) <= 0) {
-		ERRMSG("Can't get the size of page.\n");
+	if (!set_page_size(sysconf(_SC_PAGE_SIZE)))
 		return FALSE;
-	}
+
 	dwarf_info.fd_debuginfo   = info->fd_vmlinux;
 	dwarf_info.name_debuginfo = info->name_vmlinux;
 
@@ -2261,7 +2272,7 @@ read_vmcoreinfo_basic_info(void)
 				    info->name_vmcoreinfo, buf);
 				return FALSE;
 			}
-			if (!is_page_size(page_size)) {
+			if (!set_page_size(page_size)) {
 				ERRMSG("Invalid data in %s: %s",
 				    info->name_vmcoreinfo, buf);
 				return FALSE;
@@ -2289,9 +2300,6 @@ read_vmcoreinfo_basic_info(void)
 		    strlen(STR_CONFIG_PGTABLE_4)) == 0)
 			vt.mem_flags |= MEMORY_PAGETABLE_4L;
 	}
-	info->page_size = page_size;
-	info->page_shift = ffs(info->page_size) - 1;
-
 	if (!get_release || !info->page_size) {
 		ERRMSG("Invalid format in %s", info->name_vmcoreinfo);
 		return FALSE;
@@ -3435,6 +3443,17 @@ initial(void)
 	if (!get_value_for_old_linux())
 		return FALSE;
 out:
+	if (!info->page_size) {
+		/*
+		 * If we cannot get page_size from a vmcoreinfo file,
+		 * fall back to the current kernel page size.
+		 */
+		if (!fallback_to_current_page_size())
+			return FALSE;
+	}
+	if (!get_max_mapnr())
+		return FALSE;
+
 	if ((info->dump_level <= DL_EXCLUDE_ZERO) && !info->flag_dmesg)
 		flag_need_debuginfo = FALSE;
 	else 
@@ -4544,6 +4563,16 @@ create_2nd_bitmap(void)
 int
 prepare_bitmap_buffer(void)
 {
+	unsigned long tmp;
+
+	/*
+	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
+	 * The crash utility requires both of them to be aligned to block_size
+	 * boundary.
+	 */
+	tmp = divideup(divideup(info->max_mapnr, BITPERBYTE), info->page_size);
+	info->len_bitmap = tmp*info->page_size*2;
+
 	/*
 	 * Prepare bitmap buffers for creating dump bitmap.
 	 */
@@ -5908,7 +5937,7 @@ read_vmcoreinfo_basic_info_xen(void)
 				    info->name_vmcoreinfo, buf);
 				return FALSE;
 			}
-			if (!is_page_size(page_size)) {
+			if (!set_page_size(page_size)) {
 				ERRMSG("Invalid data in %s: %s",
 				    info->name_vmcoreinfo, buf);
 				return FALSE;
@@ -5916,8 +5945,6 @@ read_vmcoreinfo_basic_info_xen(void)
 			break;
 		}
 	}
-	info->page_size = page_size;
-
 	if (!info->page_size) {
 		ERRMSG("Invalid format in %s", info->name_vmcoreinfo);
 		return FALSE;
@@ -6084,6 +6111,8 @@ initial_xen(void)
 		return FALSE;
 	}
 
+	if (!fallback_to_current_page_size())
+		return FALSE;
 	/*
 	 * Get the debug information for analysis from the vmcoreinfo file
 	 */
@@ -6112,7 +6141,7 @@ initial_xen(void)
 		 */
 		if (!info->offset_vmcoreinfo_xen || !info->size_vmcoreinfo_xen){
 			if (!info->flag_exclude_xen_dom)
-				return TRUE;
+				goto out;
 
 			MSG("%s doesn't contain a vmcoreinfo for Xen.\n",
 			    info->name_memory);
@@ -6135,6 +6164,9 @@ initial_xen(void)
 
 	if (message_level & ML_PRINT_DEBUG_MSG)
 		show_data_xen();
+out:
+	if (!get_max_mapnr())
+		return FALSE;
 
 	return TRUE;
 #endif
@@ -6447,7 +6479,8 @@ store_splitting_info(void)
 		if (i == 0) {
 			memcpy(&dh, &tmp_dh, sizeof(tmp_dh));
 			info->max_mapnr = dh.max_mapnr;
-			info->page_size = dh.block_size;
+			if (!set_page_size(dh.block_size))
+				return FALSE;
 			DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
 			DEBUG_MSG("page_size    : %ld\n", info->page_size);
 		}

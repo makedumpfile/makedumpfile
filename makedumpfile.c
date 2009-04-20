@@ -3554,12 +3554,6 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 }
 
 static inline int
-is_memory_hole(struct dump_bitmap *bitmap, unsigned long long pfn)
-{
-	return !is_dumpable(bitmap, pfn);
-}
-
-static inline int
 is_in_segs(unsigned long long paddr)
 {
 	if (paddr_to_offset(paddr))
@@ -5207,19 +5201,13 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	struct disk_dump_header *dh = info->dump_header;
 	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
-	struct dump_bitmap bitmap1, bitmap2;
+	struct dump_bitmap bitmap2;
 	const off_t failed = (off_t)-1;
 
 	int ret = FALSE;
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
-
-	bitmap1.fd        = info->fd_bitmap;
-	bitmap1.file_name = info->name_bitmap;
-	bitmap1.no_block  = -1;
-	bitmap1.offset    = 0;
-	memset(bitmap1.buf, 0, sizeof(bitmap1.buf));
 
 	bitmap2.fd        = info->fd_bitmap;
 	bitmap2.file_name = info->name_bitmap;
@@ -5273,11 +5261,6 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		if ((num_dumped % per) == 0)
 			print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
 
-		/*
-		 * Check the memory hole.
-		 */
-		if (is_memory_hole(&bitmap1, pfn))
-			continue;
 		/*
 		 * Check the excluded page.
 		 */

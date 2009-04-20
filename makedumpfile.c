@@ -3419,6 +3419,29 @@ out:
 	return TRUE;
 }
 
+void
+initialize_bitmap(struct dump_bitmap *bitmap)
+{
+	bitmap->fd        = info->fd_bitmap;
+	bitmap->file_name = info->name_bitmap;
+	bitmap->no_block  = -1;
+	memset(bitmap->buf, 0, BUFSIZE_BITMAP);
+}
+
+void
+initialize_1st_bitmap(struct dump_bitmap *bitmap)
+{
+	initialize_bitmap(bitmap);
+	bitmap->offset = 0;
+}
+
+void
+initialize_2nd_bitmap(struct dump_bitmap *bitmap)
+{
+	initialize_bitmap(bitmap);
+	bitmap->offset = info->len_bitmap / 2;
+}
+
 int
 set_bitmap(struct dump_bitmap *bitmap, unsigned long long pfn,
     int val)
@@ -4230,11 +4253,7 @@ exclude_zero_pages(void)
 	struct dump_bitmap bitmap2;
 	unsigned char buf[info->page_size];
 
-	bitmap2.fd        = info->fd_bitmap;
-	bitmap2.file_name = info->name_bitmap;
-	bitmap2.no_block  = -1;
-	bitmap2.offset    = info->len_bitmap/2;
-	memset(bitmap2.buf, 0, sizeof(bitmap2.buf));
+	initialize_2nd_bitmap(&bitmap2);
 
 	for (pfn = paddr = 0; pfn < info->max_mapnr;
 	    pfn++, paddr += info->page_size) {
@@ -4501,17 +4520,8 @@ prepare_dump_bitmap(void)
 		    strerror(errno));
 		return FALSE;
 	}
-	info->bitmap1->fd        = info->fd_bitmap;
-	info->bitmap1->file_name = info->name_bitmap;
-	info->bitmap1->no_block  = -1;
-	info->bitmap1->offset    = 0;
-	memset(info->bitmap1->buf, 0, sizeof(info->bitmap1->buf));
-
-	info->bitmap2->fd        = info->fd_bitmap;
-	info->bitmap2->file_name = info->name_bitmap;
-	info->bitmap2->no_block  = -1;
-	info->bitmap2->offset    = info->len_bitmap/2;
-	memset(info->bitmap2->buf, 0, sizeof(info->bitmap2->buf));
+	initialize_1st_bitmap(info->bitmap1);
+	initialize_2nd_bitmap(info->bitmap2);
 
 	return TRUE;
 }
@@ -4969,11 +4979,7 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	if (!info->flag_elf_dumpfile)
 		return FALSE;
 
-	bitmap2.fd        = info->fd_bitmap;
-	bitmap2.file_name = info->name_bitmap;
-	bitmap2.no_block  = -1;
-	bitmap2.offset    = info->len_bitmap / 2;
-	memset(bitmap2.buf, 0, sizeof(bitmap2.buf));
+	initialize_2nd_bitmap(&bitmap2);
 
 	num_dumpable = get_num_dumpable(&bitmap2);
 	per = num_dumpable / 100;
@@ -5209,11 +5215,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	if (info->flag_elf_dumpfile)
 		return FALSE;
 
-	bitmap2.fd        = info->fd_bitmap;
-	bitmap2.file_name = info->name_bitmap;
-	bitmap2.no_block  = -1;
-	bitmap2.offset    = info->len_bitmap/2;
-	memset(bitmap2.buf, 0, sizeof(bitmap2.buf));
+	initialize_2nd_bitmap(&bitmap2);
 
 	len_buf_out = compressBound(info->page_size);
 	if ((buf_out = malloc(len_buf_out)) == NULL) {

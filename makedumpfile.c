@@ -384,7 +384,6 @@ fallback_to_current_page_size(void)
 int
 check_release(void)
 {
-	struct utsname system_utsname;
 	unsigned long utsname;
 
 	/*
@@ -398,13 +397,14 @@ check_release(void)
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
 	}
-	if (!readmem(VADDR, utsname, &system_utsname, sizeof(struct utsname))){
+	if (!readmem(VADDR, utsname, &info->system_utsname,
+					sizeof(struct utsname))) {
 		ERRMSG("Can't get the address of system_utsname.\n");
 		return FALSE;
 	}
 
 	if (info->flag_read_vmcoreinfo) {
-		if (strcmp(system_utsname.release, info->release)) {
+		if (strcmp(info->system_utsname.release, info->release)) {
 			ERRMSG("%s and %s don't match.\n",
 			    info->name_vmcoreinfo, info->name_memory);
 			retcd = WRONG_RELEASE;
@@ -412,11 +412,9 @@ check_release(void)
 		}
 	}
 
-	info->kernel_version = get_kernel_version(system_utsname.release);
+	info->kernel_version = get_kernel_version(info->system_utsname.release);
 	if (info->kernel_version == FALSE) {
-		if (!info->flag_read_vmcoreinfo)
-			ERRMSG("Or %s and %s don't match.\n",
-			    info->name_vmlinux, info->name_memory);
+		ERRMSG("Can't get the kernel version.\n");
 		return FALSE;
 	}
 
@@ -4970,6 +4968,7 @@ write_kdump_header(void)
 	dh->bitmap_blocks
 	    = divideup(info->len_bitmap, dh->block_size);
 	memcpy(&dh->timestamp, &info->timestamp, sizeof(dh->timestamp));
+	memcpy(&dh->utsname, &info->system_utsname, sizeof(dh->utsname));
 
 	size = sizeof(struct disk_dump_header);
 	if (!write_buffer(info->fd_dumpfile, 0, dh, size, info->name_dumpfile))

@@ -750,6 +750,7 @@ struct splitting_info {
 struct DumpInfo {
 	int32_t		kernel_version;      /* version of first kernel*/
 	struct timeval	timestamp;
+	struct utsname	system_utsname;
 
 	/*
 	 * General info:

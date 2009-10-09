@@ -917,20 +917,20 @@ struct symbol_table {
 	unsigned long long	pkmap_count_next;
 	unsigned long long	system_utsname;
 	unsigned long long	init_uts_ns;
-	unsigned long long 	_stext;
-	unsigned long long 	swapper_pg_dir;
-	unsigned long long 	init_level4_pgt;
-	unsigned long long 	vmlist;
-	unsigned long long 	phys_base;
-	unsigned long long 	node_online_map;
-	unsigned long long 	node_states;
-	unsigned long long 	node_memblk;
-	unsigned long long 	node_data;
-	unsigned long long 	pgdat_list;
-	unsigned long long 	contig_page_data;
-	unsigned long long   	log_buf;
-	unsigned long long   	log_buf_len;
-	unsigned long long   	log_end;
+	unsigned long long	_stext;
+	unsigned long long	swapper_pg_dir;
+	unsigned long long	init_level4_pgt;
+	unsigned long long	vmlist;
+	unsigned long long	phys_base;
+	unsigned long long	node_online_map;
+	unsigned long long	node_states;
+	unsigned long long	node_memblk;
+	unsigned long long	node_data;
+	unsigned long long	pgdat_list;
+	unsigned long long	contig_page_data;
+	unsigned long long	log_buf;
+	unsigned long long	log_buf_len;
+	unsigned long long	log_end;
 	unsigned long long	max_pfn;
 
 	/*

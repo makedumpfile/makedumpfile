@@ -3378,8 +3378,6 @@ get_mem_map(void)
 int
 initial(void)
 {
-	int flag_need_debuginfo;
-
 	if (!(vt.mem_flags & MEMORY_XEN) && info->flag_exclude_xen_dom) {
 		MSG("'-X' option is disable,");
 		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
@@ -3432,7 +3430,11 @@ initial(void)
 	}
 
 	/*
-	 * Get the debug information from /proc/vmcore
+	 * Get the debug information from /proc/vmcore.
+	 * NOTE: Don't move this code to the above, because the debugging
+	 *       information token by -x/-i option is overwritten by vmcoreinfo
+	 *       in /proc/vmcore. vmcoreinfo in /proc/vmcore is more reliable
+	 *       than -x/-i option.
 	 */
 	if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
 		if (!read_vmcoreinfo_from_vmcore(info->offset_vmcoreinfo,
@@ -3454,12 +3456,11 @@ out:
 	if (!get_max_mapnr())
 		return FALSE;
 
-	if ((info->max_dump_level <= DL_EXCLUDE_ZERO) && !info->flag_dmesg)
-		flag_need_debuginfo = FALSE;
-	else 
-		flag_need_debuginfo = TRUE;
-
-	if (!flag_need_debuginfo) {
+	if ((info->max_dump_level <= DL_EXCLUDE_ZERO) && !info->flag_dmesg) {
+		/*
+		 * The debugging information is unnecessary, because the memory
+		 * management system will not be analazed.
+		 */
 		if (!get_mem_map_without_mm())
 			return FALSE;
 		else

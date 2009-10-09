@@ -112,6 +112,8 @@ isAnon(unsigned long mapping)
 #define PAGEOFFSET(X)		(((unsigned long)(X)) & (PAGESIZE() - 1))
 #define PAGEBASE(X)		(((unsigned long)(X)) & ~(PAGESIZE() - 1))
 #define _2MB_PAGE_MASK		(~((2*1048576)-1))
+#define paddr_to_pfn(X)		((unsigned long long)(X) >> PAGESHIFT())
+#define pfn_to_paddr(X)		((unsigned long long)(X) << PAGESHIFT())
 
 /*
  * for SPARSEMEM

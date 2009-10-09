@@ -352,8 +352,8 @@ get_xen_info_ia64(void)
 		ERRMSG("Can't get the value of xen_pstart.\n");
 		return FALSE;
 	}
-	info->xen_heap_end = (xen_end >> PAGESHIFT());
-	info->xen_heap_start = (xen_start >> PAGESHIFT());
+	info->xen_heap_start = paddr_to_pfn(xen_start);
+	info->xen_heap_end   = paddr_to_pfn(xen_end);
 
 	if (SYMBOL(xen_heap_start) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xen_heap_start.\n");

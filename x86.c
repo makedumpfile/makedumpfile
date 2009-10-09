@@ -261,8 +261,8 @@ int get_xen_info_x86(void)
 		ERRMSG("Can't get the value of xenheap_phys_end.\n");
 		return FALSE;
 	}
-	info->xen_heap_end = (xen_end >> PAGESHIFT());
 	info->xen_heap_start = 0;
+	info->xen_heap_end   = paddr_to_pfn(xen_end);
 
 	/*
 	 * pickled_id == domain addr for x86

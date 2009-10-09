@@ -214,7 +214,7 @@ get_max_mapnr(void)
 		if (max_paddr < pls->phys_end)
 			max_paddr = pls->phys_end;
 	}
-	info->max_mapnr = max_paddr / info->page_size;
+	info->max_mapnr = paddr_to_pfn(max_paddr);
 
 	DEBUG_MSG("\n");
 	DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
@@ -2977,8 +2977,8 @@ separate_mem_map(struct mem_map_data *mmd, int *id_mm, int nid_pgdat,
 		if (nid_pgdat != nid)
 			continue;
 
-		pfn_start = start_paddr / info->page_size;
-		pfn_end   = pfn_start + (size / info->page_size);
+		pfn_start = paddr_to_pfn(start_paddr);
+		pfn_end   = paddr_to_pfn(start_paddr + size);
 
 		if (pfn_start < pfn_start_pgdat) {
 			ERRMSG("node_memblk_s.start_paddr of node (%d) is invalid.\n", nid);
@@ -4289,9 +4289,10 @@ create_1st_bitmap(void)
 		print_progress(PROGRESS_HOLES, i, info->num_load_memory);
 
 		pls = &info->pt_load_segments[i];
-		pfn_start = pls->phys_start >> PAGESHIFT();
-		pfn_end   = pls->phys_end >> PAGESHIFT();
-		if (!is_in_segs(pfn_start << PAGESHIFT()))
+		pfn_start = paddr_to_pfn(pls->phys_start);
+		pfn_end   = paddr_to_pfn(pls->phys_end);
+
+		if (!is_in_segs(pfn_to_paddr(pfn_start)))
 			pfn_start++;
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
 			set_bit_on_1st_bitmap(pfn);
@@ -4385,7 +4386,7 @@ exclude_unnecessary_pages(void)
 
 		mmd = &info->mem_map_data[mm];
 		pfn   = mmd->pfn_start;
-		paddr = pfn*info->page_size;
+		paddr = pfn_to_paddr(pfn);
 		mem_map = mmd->mem_map;
 
 		if (mem_map == NOT_MEMMAP_ADDR)
@@ -4683,8 +4684,8 @@ get_loads_dumpfile(void)
 		if (load.p_type != PT_LOAD)
 			continue;
 
-		pfn_start = load.p_paddr / page_size;
-		pfn_end   = (load.p_paddr + load.p_memsz)/page_size;
+		pfn_start = paddr_to_pfn(load.p_paddr);
+		pfn_end   = paddr_to_pfn(load.p_paddr + load.p_memsz);
 		frac_head = page_size - (load.p_paddr % page_size);
 		frac_tail = (load.p_paddr + load.p_memsz) % page_size;
 
@@ -5106,8 +5107,8 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 
 		off_memory= load.p_offset;
 		paddr     = load.p_paddr;
-		pfn_start = load.p_paddr / page_size;
-		pfn_end   = (load.p_paddr + load.p_memsz) / page_size;
+		pfn_start = paddr_to_pfn(load.p_paddr);
+		pfn_end   = paddr_to_pfn(load.p_paddr + load.p_memsz);
 		frac_head = page_size - (load.p_paddr % page_size);
 		frac_tail = (load.p_paddr + load.p_memsz)%page_size;
 
@@ -5270,7 +5271,7 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 	off_t offset1, offset2;
 	size_t size1, size2;
 
-	paddr = info->page_size * pfn;
+	paddr = pfn_to_paddr(pfn);
 	offset1 = paddr_to_offset(paddr);
 	offset2 = paddr_to_offset(paddr + info->page_size);
 
@@ -6053,8 +6054,8 @@ exclude_xen_user_domain(void)
 		print_progress(PROGRESS_XEN_DOMAIN, i, info->num_load_memory);
 
 		pls = &info->pt_load_segments[i];
-		pfn     = pls->phys_start >> PAGESHIFT();
-		pfn_end = pls->phys_end >> PAGESHIFT();
+		pfn     = paddr_to_pfn(pls->phys_start);
+		pfn_end = paddr_to_pfn(pls->phys_end);
 		size    = pfn_end - pfn;
 
 		for (j = 0; pfn < pfn_end; pfn++, j++) {

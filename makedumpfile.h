@@ -678,10 +678,11 @@ unsigned long long vaddr_to_paddr_x86_64(unsigned long vaddr);
 
 #ifdef __powerpc__ /* powerpc */
 int get_machdep_info_ppc64(void);
+unsigned long long vaddr_to_paddr_ppc64(unsigned long vaddr);
 #define get_phys_base()		TRUE
 #define get_machdep_info()	get_machdep_info_ppc64()
 #define get_versiondep_info()	TRUE
-#define vaddr_to_paddr(X)	vaddr_to_paddr_general(X)
+#define vaddr_to_paddr(X)	vaddr_to_paddr_ppc64(X)
 #endif          /* powerpc */
 
 #ifdef __ia64__ /* ia64 */

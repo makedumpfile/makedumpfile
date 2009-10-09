@@ -6627,7 +6627,7 @@ retry:
 }
 
 int
-read_disk_dump_header(struct disk_dump_header *dh, char *filename)
+__read_disk_dump_header(struct disk_dump_header *dh, char *filename)
 {
 	int fd, ret = FALSE;
 
@@ -6647,11 +6647,6 @@ read_disk_dump_header(struct disk_dump_header *dh, char *filename)
 		    filename, strerror(errno));
 		goto out;
 	}
-	if (strncmp(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE))) {
-		ERRMSG("%s is not the kdump-compressed format.\n",
-		    filename);
-		goto out;
-	}
 	ret = TRUE;
 out:
 	close(fd);
@@ -6660,19 +6655,37 @@ out:
 }
 
 int
+read_disk_dump_header(struct disk_dump_header *dh, char *filename)
+{
+	if (!__read_disk_dump_header(dh, filename))
+		return FALSE;
+
+	if (strncmp(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE))) {
+		ERRMSG("%s is not the kdump-compressed format.\n",
+		    filename);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
 read_kdump_sub_header(struct kdump_sub_header *ksh, char *filename)
 {
 	int fd, ret = FALSE;
+	struct disk_dump_header dh;
+	off_t offset;
 
-	if (!info->page_size)
+	if (!read_disk_dump_header(&dh, filename))
 		return FALSE;
+
+	offset = 1 * dh.block_size;
 
 	if ((fd = open(filename, O_RDONLY)) < 0) {
 		ERRMSG("Can't open a file(%s). %s\n",
 		    filename, strerror(errno));
 		return FALSE;
 	}
-	if (lseek(fd, info->page_size, SEEK_SET) < 0) {
+	if (lseek(fd, offset, SEEK_SET) < 0) {
 		ERRMSG("Can't seek a file(%s). %s\n",
 		    filename, strerror(errno));
 		goto out;

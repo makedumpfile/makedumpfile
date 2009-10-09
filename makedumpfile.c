@@ -4395,100 +4395,99 @@ exclude_zero_pages(void)
 }
 
 int
+__exclude_unnecessary_pages(unsigned long mem_map,
+    unsigned long long pfn_start, unsigned long long pfn_end)
+{
+	unsigned long long pfn, pfn_mm;
+	unsigned long long pfn_read_start, pfn_read_end, index_pg;
+	unsigned char page_cache[SIZE(page) * PGMM_CACHED];
+	unsigned char *pcache;
+	unsigned int _count;
+	unsigned long flags, mapping;
+
+	/*
+	 * Refresh the buffer of struct page, when changing mem_map.
+	 */
+	pfn_read_start = ULONGLONG_MAX;
+	pfn_read_end   = 0;
+
+	for (pfn = pfn_start; pfn < pfn_end; pfn++, mem_map += SIZE(page)) {
+
+		/*
+		 * Exclude the memory hole.
+		 */
+		if (!is_in_segs(pfn_to_paddr(pfn)))
+			continue;
+
+		index_pg = pfn % PGMM_CACHED;
+		if (pfn < pfn_read_start || pfn_read_end < pfn) {
+			if (roundup(pfn + 1, PGMM_CACHED) < pfn_end)
+				pfn_mm = PGMM_CACHED - index_pg;
+			else
+				pfn_mm = pfn_end - pfn;
+
+			if (!readmem(VADDR, mem_map,
+			    page_cache + (index_pg * SIZE(page)),
+			    SIZE(page) * pfn_mm)) {
+				ERRMSG("Can't read the buffer of struct page.\n");
+				return FALSE;
+			}
+			pfn_read_start = pfn;
+			pfn_read_end   = pfn + pfn_mm - 1;
+		}
+		pcache  = page_cache + (index_pg * SIZE(page));
+
+		flags   = ULONG(pcache + OFFSET(page.flags));
+		_count  = UINT(pcache + OFFSET(page._count));
+		mapping = ULONG(pcache + OFFSET(page.mapping));
+
+		/*
+		 * Exclude the cache page without the private page.
+		 */
+		if ((info->dump_level & DL_EXCLUDE_CACHE)
+		    && (isLRU(flags) || isSwapCache(flags))
+		    && !isPrivate(flags) && !isAnon(mapping)) {
+			clear_bit_on_2nd_bitmap(pfn);
+			pfn_cache++;
+		}
+		/*
+		 * Exclude the cache page with the private page.
+		 */
+		else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
+		    && (isLRU(flags) || isSwapCache(flags))
+		    && !isAnon(mapping)) {
+			clear_bit_on_2nd_bitmap(pfn);
+			pfn_cache_private++;
+		}
+		/*
+		 * Exclude the data page of the user process.
+		 */
+		else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
+		    && isAnon(mapping)) {
+			clear_bit_on_2nd_bitmap(pfn);
+			pfn_user++;
+		}
+	}
+	return TRUE;
+}
+
+int
 exclude_unnecessary_pages(void)
 {
 	unsigned int mm;
-	unsigned long mem_map;
-	unsigned long long pfn, paddr, pfn_mm;
-	unsigned long long pfn_read_start, pfn_read_end, index_pg;
-	unsigned char *page_cache = NULL, *pcache;
-	unsigned int _count;
-	unsigned long flags, mapping;
 	struct mem_map_data *mmd;
 
-	int ret = FALSE;
-
-	if ((page_cache = malloc(SIZE(page)*PGMM_CACHED)) == NULL) {
-		ERRMSG("Can't allocate memory for the pagedesc cache. %s\n",
-		    strerror(errno));
-		goto out;
-	}
 	for (mm = 0; mm < info->num_mem_map; mm++) {
 		print_progress(PROGRESS_UNN_PAGES, mm, info->num_mem_map);
 
 		mmd = &info->mem_map_data[mm];
-		pfn   = mmd->pfn_start;
-		paddr = pfn_to_paddr(pfn);
-		mem_map = mmd->mem_map;
 
-		if (mem_map == NOT_MEMMAP_ADDR)
+		if (mmd->mem_map == NOT_MEMMAP_ADDR)
 			continue;
 
-		/*
-		 * Refresh the buffer of struct page, when changing mem_map.
-		 */
-		pfn_read_start = ULONGLONG_MAX;
-		pfn_read_end   = 0;
-
-		for (; pfn < mmd->pfn_end;
-		    pfn++, mem_map += SIZE(page),
-		    paddr += info->page_size) {
-
-			/*
-			 * Exclude the memory hole.
-			 */
-			if (!is_in_segs(paddr))
-				continue;
-
-			index_pg = pfn % PGMM_CACHED;
-			if (pfn < pfn_read_start || pfn_read_end < pfn) {
-				if (roundup(pfn + 1, PGMM_CACHED) < mmd->pfn_end)
-					pfn_mm = PGMM_CACHED - index_pg;
-				else
-					pfn_mm = mmd->pfn_end - pfn;
-
-				if (!readmem(VADDR, mem_map,
-				    page_cache + (index_pg * SIZE(page)),
-				    SIZE(page) * pfn_mm)) {
-					ERRMSG("Can't read the buffer of struct page.\n");
-					goto out;
-				}
-				pfn_read_start = pfn;
-				pfn_read_end   = pfn + pfn_mm - 1;
-			}
-			pcache  = page_cache + (index_pg * SIZE(page));
-
-			flags   = ULONG(pcache + OFFSET(page.flags));
-			_count  = UINT(pcache + OFFSET(page._count));
-			mapping = ULONG(pcache + OFFSET(page.mapping));
-
-			/*
-			 * Exclude the cache page without the private page.
-			 */
-			if ((info->dump_level & DL_EXCLUDE_CACHE)
-			    && (isLRU(flags) || isSwapCache(flags))
-			    && !isPrivate(flags) && !isAnon(mapping)) {
-				clear_bit_on_2nd_bitmap(pfn);
-				pfn_cache++;
-			}
-			/*
-			 * Exclude the cache page with the private page.
-			 */
-			else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
-			    && (isLRU(flags) || isSwapCache(flags))
-			    && !isAnon(mapping)) {
-				clear_bit_on_2nd_bitmap(pfn);
-				pfn_cache_private++;
-			}
-			/*
-			 * Exclude the data page of the user process.
-			 */
-			else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
-			    && isAnon(mapping)) {
-				clear_bit_on_2nd_bitmap(pfn);
-				pfn_user++;
-			}
-		}
+		if (!__exclude_unnecessary_pages(mmd->mem_map,
+						 mmd->pfn_start, mmd->pfn_end))
+			return FALSE;
 	}
 
 	/*
@@ -4498,14 +4497,9 @@ exclude_unnecessary_pages(void)
 
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		if (!exclude_free_page())
-			goto out;
+			return FALSE;
 
-	ret = TRUE;
-out:
-	if (page_cache != NULL)
-		free(page_cache);
-
-	return ret;
+	return TRUE;
 }
 
 int

@@ -131,6 +131,9 @@ vaddr_to_paddr_general(unsigned long long vaddr)
 	unsigned long long paddr = NOT_PADDR;
 	struct pt_load_segment *pls;
 
+	if (info->flag_refiltering)
+		return NOT_PADDR;
+
 	for (i = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
 		if ((vaddr >= pls->virt_start)
@@ -238,6 +241,11 @@ get_max_mapnr(void)
 	unsigned long long max_paddr;
 	struct pt_load_segment *pls;
 
+	if (info->flag_refiltering) {
+		info->max_mapnr = info->dh_memory->max_mapnr;
+		return TRUE;
+	}
+
 	for (i = 0, max_paddr = 0; i < info->num_load_memory; i++) {
 		pls = &info->pt_load_segments[i];
 		if (max_paddr < pls->phys_end)
@@ -276,6 +284,116 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 	if (round(vaddr1, info->page_size) == round(vaddr2, info->page_size))
 		return TRUE;
 
+	return FALSE;
+}
+
+#define BITMAP_SECT_LEN 4096
+static inline int is_dumpable(struct dump_bitmap *, unsigned long long);
+unsigned long
+pfn_to_pos(unsigned long long pfn)
+{
+	unsigned long desc_pos, i;
+
+	desc_pos = info->valid_pages[pfn / BITMAP_SECT_LEN];
+	for (i = round(pfn, BITMAP_SECT_LEN); i < pfn; i++)
+		if (is_dumpable(info->bitmap_memory, i))
+			desc_pos++;
+
+	return desc_pos;
+}
+
+int
+read_page_desc(unsigned long long paddr, page_desc_t *pd)
+{
+	struct disk_dump_header *dh;
+	unsigned long desc_pos;
+	unsigned long long pfn;
+	off_t offset;
+
+	/*
+	 * Find page descriptor
+	 */
+	dh = info->dh_memory;
+	offset = (1 + dh->sub_hdr_size + dh->bitmap_blocks) * dh->block_size;
+	pfn = paddr_to_pfn(paddr);
+	desc_pos = pfn_to_pos(pfn);
+	offset += (off_t)desc_pos * sizeof(page_desc_t);
+	if (lseek(info->fd_memory, offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n",
+				 info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Read page descriptor
+	 */
+	if (read(info->fd_memory, pd, sizeof(*pd)) != sizeof(*pd)) {
+		ERRMSG("Can't read %s. %s\n",
+				info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Sanity check
+	 */
+	if (pd->size > dh->block_size)
+		return FALSE;
+
+	return TRUE;
+}
+
+int
+readpmem_kdump_compressed(unsigned long long paddr, void *bufptr, size_t size)
+{
+	page_desc_t pd;
+	char buf[info->page_size];
+	char buf2[info->page_size];
+	int ret;
+	unsigned long retlen, page_offset;
+
+	page_offset = paddr % info->page_size;
+
+	if (!is_dumpable(info->bitmap_memory, paddr_to_pfn(paddr))) {
+		ERRMSG("pfn(%llx) is excluded from %s.\n",
+				paddr_to_pfn(paddr), info->name_memory);
+		goto error;
+	}
+
+	if (!read_page_desc(paddr, &pd)) {
+		ERRMSG("Can't read page_desc: %llx\n", paddr);
+		goto error;
+	}
+
+	if (lseek(info->fd_memory, pd.offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n",
+				info->name_memory, strerror(errno));
+		goto error;
+	}
+
+	/*
+	 * Read page data
+	 */
+	if (read(info->fd_memory, buf, pd.size) != pd.size) {
+		ERRMSG("Can't read %s. %s\n",
+				info->name_memory, strerror(errno));
+		goto error;
+	}
+
+	if (pd.flags & DUMP_DH_COMPRESSED) {
+		retlen = info->page_size;
+		ret = uncompress((unsigned char *)buf2, &retlen,
+					(unsigned char *)buf, pd.size);
+		if ((ret != Z_OK) || (retlen != info->page_size)) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			goto error;
+		}
+		memcpy(bufptr, buf2 + page_offset, size);
+	} else
+		memcpy(bufptr, buf + page_offset, size);
+
+	return size;
+error:
+	ERRMSG("type_addr: %d, addr:%llx, size:%zd\n", PADDR, paddr, size);
 	return FALSE;
 }
 
@@ -346,6 +464,9 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		if (!readmem(type_addr, next_addr, next_ptr, next_size))
 			goto error;
 	}
+
+	if (info->flag_refiltering)
+		return readpmem_kdump_compressed(paddr, bufptr, read_size);
 
 	if (!(offset = paddr_to_offset(paddr))) {
 		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
@@ -682,9 +803,84 @@ open_kernel_file(void)
 }
 
 int
+check_kdump_compressed(char *filename)
+{
+	struct disk_dump_header dh;
+
+	if (!__read_disk_dump_header(&dh, filename))
+		return ERROR;
+
+	if (strncmp(dh.signature, KDUMP_SIGNATURE, SIG_LEN))
+		return FALSE;
+
+	return TRUE;
+}
+
+int
+get_kdump_compressed_header_info(char *filename)
+{
+	struct disk_dump_header dh;
+	struct kdump_sub_header kh;
+
+	if (!read_disk_dump_header(&dh, filename))
+		return FALSE;
+
+	if (!read_kdump_sub_header(&kh, filename))
+		return FALSE;
+
+	if (dh.header_version < 1) {
+		ERRMSG("header does not have dump_level member\n");
+		return FALSE;
+	}
+	DEBUG_MSG("diskdump main header\n");
+	DEBUG_MSG("  signature        : %s\n", dh.signature);
+	DEBUG_MSG("  header_version   : %d\n", dh.header_version);
+	DEBUG_MSG("  status           : %d\n", dh.status);
+	DEBUG_MSG("  block_size       : %d\n", dh.block_size);
+	DEBUG_MSG("  sub_hdr_size     : %d\n", dh.sub_hdr_size);
+	DEBUG_MSG("  bitmap_blocks    : %d\n", dh.bitmap_blocks);
+	DEBUG_MSG("  max_mapnr        : 0x%x\n", dh.max_mapnr);
+	DEBUG_MSG("  total_ram_blocks : %d\n", dh.total_ram_blocks);
+	DEBUG_MSG("  device_blocks    : %d\n", dh.device_blocks);
+	DEBUG_MSG("  written_blocks   : %d\n", dh.written_blocks);
+	DEBUG_MSG("  current_cpu      : %d\n", dh.current_cpu);
+	DEBUG_MSG("  nr_cpus          : %d\n", dh.nr_cpus);
+	DEBUG_MSG("kdump sub header\n");
+	DEBUG_MSG("  phys_base        : 0x%lx\n", kh.phys_base);
+	DEBUG_MSG("  dump_level       : %d\n", kh.dump_level);
+	DEBUG_MSG("  split            : %d\n", kh.split);
+	DEBUG_MSG("  start_pfn        : 0x%lx\n", kh.start_pfn);
+	DEBUG_MSG("  end_pfn          : 0x%lx\n", kh.end_pfn);
+
+	info->dh_memory = malloc(sizeof(dh));
+	if (info->dh_memory == NULL) {
+		ERRMSG("Can't allocate memory for the header. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	memcpy(info->dh_memory, &dh, sizeof(dh));
+	memcpy(&info->timestamp, &dh.timestamp, sizeof(dh.timestamp));
+
+	info->kh_memory = malloc(sizeof(kh));
+	if (info->kh_memory == NULL) {
+		ERRMSG("Can't allocate memory for the sub header. %s\n",
+		    strerror(errno));
+		goto error;
+	}
+	memcpy(info->kh_memory, &kh, sizeof(kh));
+
+	return TRUE;
+error:
+	free(info->dh_memory);
+	info->dh_memory = NULL;
+
+	return FALSE;
+}
+
+int
 open_dump_memory(void)
 {
-	int fd;
+	int fd, status;
 
 	if ((fd = open(info->name_memory, O_RDONLY)) < 0) {
 		ERRMSG("Can't open the dump memory(%s). %s\n",
@@ -692,7 +888,16 @@ open_dump_memory(void)
 		return FALSE;
 	}
 	info->fd_memory = fd;
-	return TRUE;
+
+	status = check_kdump_compressed(info->name_memory);
+	if (status == TRUE) {
+		info->flag_refiltering = TRUE;
+		return get_kdump_compressed_header_info(info->name_memory);
+	} else if (status == FALSE) {
+		return TRUE;
+	} else {
+		return FALSE;
+	}
 }
 
 int
@@ -3509,6 +3714,54 @@ get_mem_map(void)
 }
 
 int
+initialize_bitmap_memory(void)
+{
+	struct disk_dump_header	*dh;
+	struct dump_bitmap *bmp;
+	off_t bitmap_offset;
+	int bitmap_len, max_sect_len;
+	unsigned long pfn;
+	int i, j;
+	long block_size;
+
+	dh = info->dh_memory;
+	block_size = dh->block_size;
+
+	bitmap_offset = block_size * (1 + dh->sub_hdr_size);
+	bitmap_len = block_size * dh->bitmap_blocks;
+
+	bmp = malloc(sizeof(struct dump_bitmap));
+	if (bmp == NULL) {
+		ERRMSG("Can't allocate memory for the memory-bitmap. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	bmp->fd        = info->fd_memory;
+	bmp->file_name = info->name_memory;
+	bmp->no_block  = -1;
+	memset(bmp->buf, 0, BUFSIZE_BITMAP);
+	bmp->offset = bitmap_offset + bitmap_len / 2;
+	info->bitmap_memory = bmp;
+
+	max_sect_len = divideup(dh->max_mapnr, BITMAP_SECT_LEN);
+	info->valid_pages = calloc(sizeof(ulong), max_sect_len);
+	if (info->valid_pages == NULL) {
+		ERRMSG("Can't allocate memory for the valid_pages. %s\n",
+		    strerror(errno));
+		free(bmp);
+		return FALSE;
+	}
+	for (i = 1, pfn = 0; i < max_sect_len; i++) {
+		info->valid_pages[i] = info->valid_pages[i - 1];
+		for (j = 0; j < BITMAP_SECT_LEN; j++, pfn++)
+			if (is_dumpable(info->bitmap_memory, pfn))
+				info->valid_pages[i]++;
+	}
+
+	return TRUE;
+}
+
+int
 initial(void)
 {
 	if (!(vt.mem_flags & MEMORY_XEN) && info->flag_exclude_xen_dom) {
@@ -3519,7 +3772,20 @@ initial(void)
 		return FALSE;
 	}
 
-	if (!get_phys_base())
+	if (info->flag_refiltering) {
+		if (info->flag_elf_dumpfile) {
+			MSG("'-E' option is disable, ");
+			MSG("because %s is kdump compressed format.\n",
+							info->name_memory);
+			return FALSE;
+		}
+		info->phys_base = info->kh_memory->phys_base;
+		info->max_dump_level |= info->kh_memory->dump_level;
+
+		if (!initialize_bitmap_memory())
+			return FALSE;
+
+	} else if (!get_phys_base())
 		return FALSE;
 
 	/*
@@ -3783,6 +4049,15 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 static inline int
 is_in_segs(unsigned long long paddr)
 {
+	if (info->flag_refiltering) {
+		static struct dump_bitmap bitmap1 = {0};
+
+		if (bitmap1.fd == 0)
+			initialize_1st_bitmap(&bitmap1);
+
+		return is_dumpable(&bitmap1, paddr_to_pfn(paddr));
+	}
+
 	if (paddr_to_offset(paddr))
 		return TRUE;
 	else
@@ -4226,9 +4501,10 @@ dump_dmesg()
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
-	if (!get_elf_info())
-		return FALSE;
-
+	if (!info->flag_refiltering) {
+		if (!get_elf_info())
+			return FALSE;
+	}
 	if (!initial())
 		return FALSE;
 
@@ -4403,6 +4679,48 @@ exclude_free_page(void)
 	return TRUE;
 }
 
+/*
+ * If using a dumpfile in kdump-compressed format as a source file
+ * instead of /proc/vmcore, 1st-bitmap of a new dumpfile must be
+ * the same as the one of a source file.
+ */
+int
+copy_1st_bitmap_from_memory(void)
+{
+	char buf[info->dh_memory->block_size];
+	off_t offset_page;
+	off_t bitmap_offset;
+	struct disk_dump_header *dh = info->dh_memory;
+
+	bitmap_offset = (1 + dh->sub_hdr_size) * dh->block_size;
+
+	if (lseek(info->fd_memory, bitmap_offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n",
+				info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (lseek(info->bitmap1->fd, info->bitmap1->offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the bitmap(%s). %s\n",
+		    info->bitmap1->file_name, strerror(errno));
+		return FALSE;
+	}
+	offset_page = 0;
+	while (offset_page < (info->len_bitmap / 2)) {
+		if (read(info->fd_memory, buf, sizeof(buf)) != sizeof(buf)) {
+			ERRMSG("Can't read %s. %s\n",
+					info->name_memory, strerror(errno));
+			return FALSE;
+		}
+		if (write(info->bitmap1->fd, buf, sizeof(buf)) != sizeof(buf)) {
+			ERRMSG("Can't write the bitmap(%s). %s\n",
+			    info->bitmap1->file_name, strerror(errno));
+			return FALSE;
+		}
+		offset_page += sizeof(buf);
+	}
+	return TRUE;
+}
+
 int
 create_1st_bitmap(void)
 {
@@ -4411,6 +4729,9 @@ create_1st_bitmap(void)
 	unsigned long long pfn, pfn_start, pfn_end, pfn_bitmap1;
 	struct pt_load_segment *pls;
 	off_t offset_page;
+
+	if (info->flag_refiltering)
+		return copy_1st_bitmap_from_memory();
 
 	/*
 	 * At first, clear all the bits on the 1st-bitmap.
@@ -5429,6 +5750,14 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 	size_t size1, size2;
 
 	paddr = pfn_to_paddr(pfn);
+	if (info->flag_refiltering) {
+		if (!readmem(PADDR, paddr, buf, info->page_size)) {
+			ERRMSG("Can't get the page data.\n");
+			return FALSE;
+		}
+		return TRUE;
+	}
+
 	offset1 = paddr_to_offset(paddr);
 	offset2 = paddr_to_offset(paddr + info->page_size);
 
@@ -6575,14 +6904,15 @@ writeout_multiple_dumpfiles(void)
 int
 create_dumpfile(void)
 {
-	int num_retry, status;
+	int num_retry, status, new_level;
 
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
-	if (!get_elf_info())
-		return FALSE;
-
+	if (!info->flag_refiltering) {
+		if (!get_elf_info())
+			return FALSE;
+	}
 	if (vt.mem_flags & MEMORY_XEN) {
 		if (!initial_xen())
 			return FALSE;
@@ -6594,6 +6924,18 @@ create_dumpfile(void)
 
 	num_retry = 0;
 retry:
+	if (info->flag_refiltering) {
+		/* Change dump level */
+		new_level = info->dump_level | info->kh_memory->dump_level;
+		if (new_level != info->dump_level) {
+			info->dump_level = new_level;
+			MSG("dump_level is changed to %d, " \
+				"because %s was created by dump_level(%d).",
+				new_level, info->name_memory,
+				info->kh_memory->dump_level);
+		}
+	}
+
 	if (!create_dump_bitmap())
 		return FALSE;
 
@@ -7499,6 +7841,14 @@ out:
 	else
 		MSG("makedumpfile Failed.\n");
 
+	if (info->dh_memory)
+		free(info->dh_memory);
+	if (info->kh_memory)
+		free(info->kh_memory);
+	if (info->valid_pages)
+		free(info->valid_pages);
+	if (info->bitmap_memory)
+		free(info->bitmap_memory);
 	if (info->fd_memory)
 		close(info->fd_memory);
 	if (info->fd_dumpfile)

@@ -482,6 +482,7 @@ do { \
  */
 #define TRUE		(1)
 #define FALSE		(0)
+#define ERROR		(-1)
 #define NOSPACE		(-1)    /* code of write-error due to nospace */
 #define MAX(a,b)	((a) > (b) ? (a) : (b))
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -783,6 +784,7 @@ struct DumpInfo {
 						flattened format */
 	int		flag_split;	     /* splitting vmcore */
 	int		flag_reassemble;     /* reassemble multiple dumpfiles into one */
+	int		flag_refiltering;    /* refilter from kdump-compressed file */
 	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
 	int             flag_dmesg;          /* dump the dmesg log out of the vmcore file */
@@ -838,6 +840,10 @@ struct DumpInfo {
 	 */
 	int			fd_memory;
 	char			*name_memory;
+	struct disk_dump_header	*dh_memory;
+	struct kdump_sub_header	*kh_memory;
+	struct dump_bitmap 		*bitmap_memory;
+	unsigned long			*valid_pages;
 
 	/*
 	 * Dump file info:
@@ -1116,6 +1122,9 @@ int get_pt_note_info(off_t off_note, unsigned long sz_note);
 int read_vmcoreinfo_xen(void);
 int exclude_xen_user_domain(void);
 unsigned long long get_num_dumpable(void);
+int __read_disk_dump_header(struct disk_dump_header *dh, char *filename);
+int read_disk_dump_header(struct disk_dump_header *dh, char *filename);
+int read_kdump_sub_header(struct kdump_sub_header *ksh, char *filename);
 void close_vmcoreinfo(void);
 int close_files_for_creating_dumpfile(void);
 

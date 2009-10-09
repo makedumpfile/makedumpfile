@@ -70,13 +70,27 @@ get_versiondep_info_x86_64(void)
 	 */
 	if (info->kernel_version < KERNEL_VERSION(2, 6, 26))
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_ORIG;
-	else
+	else if (info->kernel_version < KERNEL_VERSION(2, 6, 31))
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_26;
+	else
+		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_31;
 
 	if (info->kernel_version < KERNEL_VERSION(2, 6, 27))
 		info->page_offset = __PAGE_OFFSET_ORIG;
 	else
 		info->page_offset = __PAGE_OFFSET_2_6_27;
+
+	if (info->kernel_version < KERNEL_VERSION(2, 6, 31)) {
+		info->vmalloc_start = VMALLOC_START_ORIG;
+		info->vmalloc_end   = VMALLOC_END_ORIG;
+		info->vmemmap_start = VMEMMAP_START_ORIG;
+		info->vmemmap_end   = VMEMMAP_END_ORIG;
+	} else {
+		info->vmalloc_start = VMALLOC_START_2_6_31;
+		info->vmalloc_end   = VMALLOC_END_2_6_31;
+		info->vmemmap_start = VMEMMAP_START_2_6_31;
+		info->vmemmap_end   = VMEMMAP_END_2_6_31;
+	}
 
 	return TRUE;
 }

@@ -500,6 +500,10 @@ do { \
  * The value of dependence on machine
  */
 #define PAGE_OFFSET		(info->page_offset)
+#define VMALLOC_START		(info->vmalloc_start)
+#define VMALLOC_END		(info->vmalloc_end)
+#define VMEMMAP_START		(info->vmemmap_start)
+#define VMEMMAP_END		(info->vmemmap_end)
 
 #ifdef __x86__
 #define __PAGE_OFFSET		(0xc0000000)
@@ -533,12 +537,18 @@ do { \
 #endif /* x86 */
 
 #ifdef __x86_64__
-#define __PAGE_OFFSET_ORIG	(0xffff810000000000) /* linux-2.6.26, or former */
-#define __PAGE_OFFSET_2_6_27	(0xffff880000000000) /* linux-2.6.27, or later */
-#define VMALLOC_START		(0xffffc20000000000)
-#define VMALLOC_END		(0xffffe1ffffffffff)
-#define VMEMMAP_START		(0xffffe20000000000)
-#define VMEMMAP_END		(0xffffe2ffffffffff)
+#define __PAGE_OFFSET_ORIG	(0xffff810000000000) /* 2.6.26, or former */
+#define __PAGE_OFFSET_2_6_27	(0xffff880000000000) /* 2.6.27, or later  */
+
+#define VMALLOC_START_ORIG	(0xffffc20000000000) /* 2.6.30, or former */
+#define VMALLOC_START_2_6_31	(0xffffc90000000000) /* 2.6.31, or later  */
+#define VMALLOC_END_ORIG	(0xffffe1ffffffffff) /* 2.6.30, or former */
+#define VMALLOC_END_2_6_31	(0xffffe8ffffffffff) /* 2.6.31, or later  */
+
+#define VMEMMAP_START_ORIG	(0xffffe20000000000) /* 2.6.30, or former */
+#define VMEMMAP_START_2_6_31	(0xffffea0000000000) /* 2.6.31, or later  */
+#define VMEMMAP_END_ORIG	(0xffffe2ffffffffff) /* 2.6.30, or former */
+#define VMEMMAP_END_2_6_31	(0xffffeaffffffffff) /* 2.6.31, or later  */
 
 #define __START_KERNEL_map	(0xffffffff80000000)
 #define MODULES_VADDR		(0xffffffff88000000)
@@ -547,6 +557,7 @@ do { \
 #define _SECTION_SIZE_BITS	(27)
 #define _MAX_PHYSMEM_BITS_ORIG		(40)
 #define _MAX_PHYSMEM_BITS_2_6_26	(44)
+#define _MAX_PHYSMEM_BITS_2_6_31	(46)
 
 /*
  * 4 Levels paging
@@ -785,6 +796,9 @@ struct DumpInfo {
 	unsigned long	phys_base;
 	unsigned long   kernel_start;
 	unsigned long   vmalloc_start;
+	unsigned long   vmalloc_end;
+	unsigned long	vmemmap_start;
+	unsigned long	vmemmap_end;
 
 	/*
 	 * diskdimp info:

@@ -5093,11 +5093,16 @@ prepare_bitmap_buffer(void)
 void
 free_bitmap_buffer(void)
 {
-	free(info->bitmap1);
-	free(info->bitmap2);
+	if (info->bitmap1) {
+		free(info->bitmap1);
+		info->bitmap1 = NULL;
+	}
+	if (info->bitmap2) {
+		free(info->bitmap2);
+		info->bitmap2 = NULL;
+	}
 
-	info->bitmap1 = NULL;
-	info->bitmap2 = NULL;
+	return;
 }
 
 int
@@ -5106,7 +5111,7 @@ create_dump_bitmap(void)
 	int ret = FALSE;
 
 	if (!prepare_bitmap_buffer())
-		return FALSE;
+		goto out;
 
 	if (!create_1st_bitmap())
 		goto out;
@@ -6029,6 +6034,7 @@ close_dump_bitmap(void)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));
 	free(info->name_bitmap);
+	info->name_bitmap = NULL;
 }
 
 void
@@ -7236,6 +7242,7 @@ reassemble_kdump_header(void)
 	if ((fd = open(SPLITTING_DUMPFILE(0), O_RDONLY)) < 0) {
 		ERRMSG("Can't open a file(%s). %s\n",
 		    SPLITTING_DUMPFILE(0), strerror(errno));
+		free(buf_bitmap);
 		return FALSE;
 	}
 	if (lseek(fd, offset_bitmap, SEEK_SET) < 0) {
@@ -7848,34 +7855,34 @@ out:
 	else
 		MSG("makedumpfile Failed.\n");
 
-	if (info->dh_memory)
-		free(info->dh_memory);
-	if (info->kh_memory)
-		free(info->kh_memory);
-	if (info->valid_pages)
-		free(info->valid_pages);
-	if (info->bitmap_memory)
-		free(info->bitmap_memory);
-	if (info->fd_memory)
-		close(info->fd_memory);
-	if (info->fd_dumpfile)
-		close(info->fd_dumpfile);
-	if (info->fd_bitmap)
-		close(info->fd_bitmap);
-	if (info->pt_load_segments != NULL)
-		free(info->pt_load_segments);
-	if (vt.node_online_map != NULL)
-		free(vt.node_online_map);
-	if (info->mem_map_data != NULL)
-		free(info->mem_map_data);
-	if (info->dump_header != NULL)
-		free(info->dump_header);
-	if (info->splitting_info != NULL)
-		free(info->splitting_info);
-	if (info->p2m_mfn_frame_list != NULL)
-		free(info->p2m_mfn_frame_list);
-	if (info != NULL)
+	if (info) {
+		if (info->dh_memory)
+			free(info->dh_memory);
+		if (info->kh_memory)
+			free(info->kh_memory);
+		if (info->valid_pages)
+			free(info->valid_pages);
+		if (info->bitmap_memory)
+			free(info->bitmap_memory);
+		if (info->fd_memory)
+			close(info->fd_memory);
+		if (info->fd_dumpfile)
+			close(info->fd_dumpfile);
+		if (info->fd_bitmap)
+			close(info->fd_bitmap);
+		if (info->pt_load_segments != NULL)
+			free(info->pt_load_segments);
+		if (vt.node_online_map != NULL)
+			free(vt.node_online_map);
+		if (info->mem_map_data != NULL)
+			free(info->mem_map_data);
+		if (info->dump_header != NULL)
+			free(info->dump_header);
+		if (info->splitting_info != NULL)
+			free(info->splitting_info);
+		if (info->p2m_mfn_frame_list != NULL)
+			free(info->p2m_mfn_frame_list);
 		free(info);
-
+	}
 	return retcd;
 }

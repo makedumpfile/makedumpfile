@@ -33,6 +33,9 @@ $(OBJ_ARCH): $(SRC_ARCH)
 
 makedumpfile: $(SRC) $(OBJ_ARCH)
 	$(CC) $(CFLAGS) $(OBJ_ARCH) -o $@ $< -static -ldw -lelf -lz
+	echo .TH MAKEDUMPFILE 8 \"$(DATE)\" \"makedumpfile v$(VERSION)\" \"Linux System Administrator\'s Manual\" > temp.8
+	grep -v "^.TH MAKEDUMPFILE 8" makedumpfile.8 >> temp.8
+	mv temp.8 makedumpfile.8
 	gzip -c ./makedumpfile.8 > ./makedumpfile.8.gz
 
 clean:

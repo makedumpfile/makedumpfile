@@ -200,6 +200,35 @@ vaddr_to_offset_slow(int fd, char *filename, unsigned long long vaddr)
 }
 
 /*
+ * Translate a domain-0's physical address to machine address.
+ */
+unsigned long long
+ptom_xen(unsigned long long paddr)
+{
+	unsigned long mfn;
+	unsigned long long maddr, pfn, mfn_idx, frame_idx;
+
+	pfn = paddr_to_pfn(paddr);
+	mfn_idx   = pfn / MFNS_PER_FRAME;
+	frame_idx = pfn % MFNS_PER_FRAME;
+
+	if (mfn_idx >= info->p2m_frames) {
+		ERRMSG("Invalid mfn_idx(%llu).\n", mfn_idx);
+		return NOT_PADDR;
+	}
+	maddr = pfn_to_paddr(info->p2m_mfn_frame_list[mfn_idx])
+		+ sizeof(unsigned long) * frame_idx;
+	if (!readmem(MADDR_XEN, maddr, &mfn, sizeof(mfn))) {
+		ERRMSG("Can't get mfn.\n");
+		return NOT_PADDR;
+	}
+	maddr  = pfn_to_paddr(mfn);
+	maddr |= PAGEOFFSET(paddr);
+
+	return maddr;
+}
+
+/*
  * Get the number of the page descriptors from the ELF info.
  */
 int
@@ -222,6 +251,25 @@ get_max_mapnr(void)
 	return TRUE;
 }
 
+/*
+ * Get the number of the page descriptors for Xen.
+ */
+int
+get_dom0_mapnr()
+{
+	unsigned long max_pfn;
+
+	if (SYMBOL(max_pfn) == NOT_FOUND_SYMBOL)
+		return FALSE;
+
+	if (!readmem(VADDR, SYMBOL(max_pfn), &max_pfn, sizeof max_pfn))
+		return FALSE;
+
+	info->dom0_mapnr = max_pfn;
+
+	return TRUE;
+}
+
 int
 is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 {
@@ -237,7 +285,7 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 	size_t read_size, next_size;
 	off_t offset = 0;
 	unsigned long long next_addr;
-	unsigned long long paddr;
+	unsigned long long paddr, maddr = NOT_PADDR;
 	char *next_ptr;
 	const off_t failed = (off_t)-1;
 
@@ -248,9 +296,25 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 			    addr);
 			goto error;
 		}
+		if (vt.mem_flags & MEMORY_XEN) {
+			if ((maddr = ptom_xen(paddr)) == NOT_PADDR) {
+				ERRMSG("Can't convert a physical address(%llx) to machine address.\n",
+				    paddr);
+				return FALSE;
+			}
+			paddr = maddr;
+		}
 		break;
 	case PADDR:
 		paddr = addr;
+		if (vt.mem_flags & MEMORY_XEN) {
+			if ((maddr  = ptom_xen(paddr)) == NOT_PADDR) {
+				ERRMSG("Can't convert a physical address(%llx) to machine address.\n",
+				    paddr);
+				return FALSE;
+			}
+			paddr = maddr;
+		}
 		break;
 	case VADDR_XEN:
 		if ((paddr = kvtop_xen(addr)) == NOT_PADDR) {
@@ -1869,6 +1933,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(log_buf, "log_buf");
 	SYMBOL_INIT(log_buf_len, "log_buf_len");
 	SYMBOL_INIT(log_end, "log_end");
+	SYMBOL_INIT(max_pfn, "max_pfn");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -2165,6 +2230,7 @@ generate_vmcoreinfo(void)
 	WRITE_SYMBOL("log_buf", log_buf);
 	WRITE_SYMBOL("log_buf_len", log_buf_len);
 	WRITE_SYMBOL("log_end", log_end);
+	WRITE_SYMBOL("max_pfn", max_pfn);
 
 	/*
 	 * write the structure size of 1st kernel
@@ -2422,6 +2488,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("log_buf", log_buf);
 	READ_SYMBOL("log_buf_len", log_buf_len);
 	READ_SYMBOL("log_end", log_end);
+	READ_SYMBOL("max_pfn", max_pfn);
 
 	READ_STRUCTURE_SIZE("page", page);
 	READ_STRUCTURE_SIZE("mem_section", mem_section);
@@ -2559,7 +2626,8 @@ int
 get_pt_note_info(off_t off_note, unsigned long sz_note)
 {
 	int n_type, size_desc;
-	off_t offset, offset_desc;
+	unsigned long p2m_mfn;
+	off_t offset, offset_desc, off_p2m = 0;
 	char buf[VMCOREINFO_XEN_NOTE_NAME_BYTES];
 	char note[MAX_SIZE_NHDR];
 	const off_t failed = (off_t)-1;
@@ -2609,6 +2677,22 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
 			vt.mem_flags |= MEMORY_XEN;
 			info->offset_xen_crash_info = offset_desc;
 			info->size_xen_crash_info   = size_desc;
+
+			off_p2m = offset + offset_next_note(note)
+					 - sizeof(p2m_mfn);
+			if (lseek(info->fd_memory, off_p2m, SEEK_SET)
+			    == failed){
+				ERRMSG("Can't seek the dump memory(%s). %s\n",
+				    info->name_memory, strerror(errno));
+				return FALSE;
+			}
+			if (read(info->fd_memory, &p2m_mfn, sizeof(p2m_mfn))
+			     != sizeof(p2m_mfn)) {
+				ERRMSG("Can't read the dump memory(%s). %s\n",
+				    info->name_memory, strerror(errno));
+				return FALSE;
+			}
+			info->p2m_mfn = p2m_mfn;
 		}
 		offset += offset_next_note(note);
 	}
@@ -2917,7 +3001,10 @@ get_mm_flatmem(void)
 		    strerror(errno));
 		return FALSE;
 	}
-	dump_mem_map(0, info->max_mapnr, mem_map, 0);
+	if (vt.mem_flags & MEMORY_XEN)
+		dump_mem_map(0, info->dom0_mapnr, mem_map, 0);
+	else
+		dump_mem_map(0, info->max_mapnr, mem_map, 0);
 
 	return TRUE;
 }
@@ -3231,10 +3318,15 @@ get_mm_discontigmem(void)
 		}
 	}
 	i = num_mem_map - 1;
-	if (mmd[i].pfn_end < info->max_mapnr)
-		dump_mem_map(mmd[i].pfn_end, info->max_mapnr,
-		    NOT_MEMMAP_ADDR, id_mm);
-
+	if (vt.mem_flags & MEMORY_XEN) {
+		if (mmd[i].pfn_end < info->dom0_mapnr)
+			dump_mem_map(mmd[i].pfn_end, info->dom0_mapnr,
+			    NOT_MEMMAP_ADDR, id_mm);
+	} else {
+		if (mmd[i].pfn_end < info->max_mapnr)
+			dump_mem_map(mmd[i].pfn_end, info->max_mapnr,
+			    NOT_MEMMAP_ADDR, id_mm);
+	}
 	return TRUE;
 }
 
@@ -3362,7 +3454,10 @@ get_mem_map_without_mm(void)
 		    strerror(errno));
 		return FALSE;
 	}
-	dump_mem_map(0, info->max_mapnr, NOT_MEMMAP_ADDR, 0);
+	if (vt.mem_flags & MEMORY_XEN)
+		dump_mem_map(0, info->dom0_mapnr, NOT_MEMMAP_ADDR, 0);
+	else
+		dump_mem_map(0, info->max_mapnr, NOT_MEMMAP_ADDR, 0);
 
 	return TRUE;
 }
@@ -3371,6 +3466,14 @@ int
 get_mem_map(void)
 {
 	int ret;
+
+	if (vt.mem_flags & MEMORY_XEN) {
+		if (!get_dom0_mapnr()) {
+			ERRMSG("Can't domain-0 pfn.\n");
+			return FALSE;
+		}
+		DEBUG_MSG("domain-0 pfn : %llx\n", info->dom0_mapnr);
+	}
 
 	switch (get_mem_type()) {
 	case SPARSEMEM:
@@ -3636,6 +3739,23 @@ int
 clear_bit_on_2nd_bitmap(unsigned long long pfn)
 {
 	return set_bitmap(info->bitmap2, pfn, 0);
+}
+
+int
+clear_bit_on_2nd_bitmap_for_kernel(unsigned long long pfn)
+{
+	unsigned long long maddr;
+
+	if (vt.mem_flags & MEMORY_XEN) {
+		maddr = ptom_xen(pfn_to_paddr(pfn));
+		if (maddr == NOT_PADDR) {
+			ERRMSG("Can't convert a physical address(%llx) to machine address.\n",
+			    pfn_to_paddr(pfn));
+			return FALSE;
+		}
+		pfn = paddr_to_pfn(maddr);
+	}
+	return clear_bit_on_2nd_bitmap(pfn);
 }
 
 static inline int
@@ -4045,7 +4165,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 				}
 				for (i = 0; i < (1<<order); i++) {
 					pfn = start_pfn + i;
-					clear_bit_on_2nd_bitmap(pfn);
+					clear_bit_on_2nd_bitmap_for_kernel(pfn);
 				}
 				found_free_pages += i;
 
@@ -4398,7 +4518,7 @@ int
 __exclude_unnecessary_pages(unsigned long mem_map,
     unsigned long long pfn_start, unsigned long long pfn_end)
 {
-	unsigned long long pfn, pfn_mm;
+	unsigned long long pfn, pfn_mm, maddr;
 	unsigned long long pfn_read_start, pfn_read_end, index_pg;
 	unsigned char page_cache[SIZE(page) * PGMM_CACHED];
 	unsigned char *pcache;
@@ -4416,8 +4536,19 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		/*
 		 * Exclude the memory hole.
 		 */
-		if (!is_in_segs(pfn_to_paddr(pfn)))
-			continue;
+		if (vt.mem_flags & MEMORY_XEN) {
+			maddr = ptom_xen(pfn_to_paddr(pfn));
+			if (maddr == NOT_PADDR) {
+				ERRMSG("Can't convert a physical address(%llx) to machine address.\n",
+				    pfn_to_paddr(pfn));
+				return FALSE;
+			}
+			if (!is_in_segs(maddr))
+				continue;
+		} else {
+			if (!is_in_segs(pfn_to_paddr(pfn)))
+				continue;
+		}
 
 		index_pg = pfn % PGMM_CACHED;
 		if (pfn < pfn_read_start || pfn_read_end < pfn) {
@@ -4447,7 +4578,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		if ((info->dump_level & DL_EXCLUDE_CACHE)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isPrivate(flags) && !isAnon(mapping)) {
-			clear_bit_on_2nd_bitmap(pfn);
+			clear_bit_on_2nd_bitmap_for_kernel(pfn);
 			pfn_cache++;
 		}
 		/*
@@ -4456,7 +4587,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isAnon(mapping)) {
-			clear_bit_on_2nd_bitmap(pfn);
+			clear_bit_on_2nd_bitmap_for_kernel(pfn);
 			pfn_cache_private++;
 		}
 		/*
@@ -4464,7 +4595,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
 		    && isAnon(mapping)) {
-			clear_bit_on_2nd_bitmap(pfn);
+			clear_bit_on_2nd_bitmap_for_kernel(pfn);
 			pfn_user++;
 		}
 	}
@@ -6144,13 +6275,14 @@ initial_xen(void)
 		MSG("Try `makedumpfile --help' for more information.\n");
 		return FALSE;
 	}
+#ifndef __x86_64__
 	if (DL_EXCLUDE_ZERO < info->max_dump_level) {
 		MSG("Dump_level is invalid. It should be 0 or 1.\n");
 		MSG("Commandline parameter is invalid.\n");
 		MSG("Try `makedumpfile --help' for more information.\n");
 		return FALSE;
 	}
-
+#endif
 	if (!fallback_to_current_page_size())
 		return FALSE;
 	/*
@@ -6454,10 +6586,10 @@ create_dumpfile(void)
 	if (vt.mem_flags & MEMORY_XEN) {
 		if (!initial_xen())
 			return FALSE;
-	} else {
-		if (!initial())
-			return FALSE;
 	}
+	if (!initial())
+		return FALSE;
+
 	print_vtop();
 
 	num_retry = 0;
@@ -7370,6 +7502,8 @@ out:
 		free(info->dump_header);
 	if (info->splitting_info != NULL)
 		free(info->splitting_info);
+	if (info->p2m_mfn_frame_list != NULL)
+		free(info->p2m_mfn_frame_list);
 	if (info != NULL)
 		free(info);
 

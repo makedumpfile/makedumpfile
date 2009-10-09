@@ -873,6 +873,10 @@ struct DumpInfo {
 	 */
 	off_t			offset_xen_crash_info;
 	unsigned long		size_xen_crash_info;
+	unsigned long long	dom0_mapnr;  /* The number of page in domain-0.
+					      * Different from max_mapnr.
+					      * max_mapnr is the number of page
+					      * in system. */
 	unsigned long xen_phys_start;
 	unsigned long xen_heap_start;	/* start mfn of xen heap area */
 	unsigned long xen_heap_end;	/* end mfn(+1) of xen heap area */
@@ -880,6 +884,9 @@ struct DumpInfo {
 	unsigned long max_page;
 	unsigned long alloc_bitmap;
 	unsigned long dom0;
+	unsigned long p2m_frames;
+	unsigned long p2m_mfn;
+	unsigned long *p2m_mfn_frame_list;
 	int	num_domain;
 	struct domain_list *domain_list;
 
@@ -924,6 +931,7 @@ struct symbol_table {
 	unsigned long long   	log_buf;
 	unsigned long long   	log_buf_len;
 	unsigned long long   	log_end;
+	unsigned long long	max_pfn;
 
 	/*
 	 * for Xen extraction
@@ -1121,7 +1129,8 @@ struct domain_list {
 	unsigned int  pickled_id;
 };
 
-#define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
+#define PAGES_PER_MAPWORD 	(sizeof(unsigned long) * 8)
+#define MFNS_PER_FRAME		(info->page_size / sizeof(unsigned long))
 
 #ifdef __x86__
 #define HYPERVISOR_VIRT_START_PAE	(0xF5800000UL)
@@ -1145,8 +1154,10 @@ int get_xen_info_x86(void);
 
 #ifdef __x86_64__
 
-#define ENTRY_MASK	(~0x8000000000000fffULL)
+#define ENTRY_MASK		(~0x8000000000000fffULL)
+#define MAX_X86_64_FRAMES	(info->page_size / sizeof(unsigned long))
 
+#define PAGE_OFFSET_XEN_DOM0  (0xffff880000000000) /* different from linux */
 #define HYPERVISOR_VIRT_START (0xffff800000000000)
 #define HYPERVISOR_VIRT_END   (0xffff880000000000)
 #define DIRECTMAP_VIRT_START  (0xffff830000000000)

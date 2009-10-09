@@ -2477,47 +2477,114 @@ read_vmcoreinfo(void)
 	return TRUE;
 }
 
+#define MAX_SIZE_NHDR	MAX(sizeof(Elf64_Nhdr), sizeof(Elf32_Nhdr))
+
+off_t
+offset_next_note(void *note)
+{
+	off_t offset;
+	Elf64_Nhdr *note64;
+	Elf32_Nhdr *note32;
+
+	/*
+	 * Both name and desc in ELF Note elements are padded to
+	 * 4 byte boundary.
+	 */
+	if (info->flag_elf64_memory) {
+		note64 = (Elf64_Nhdr *)note;
+		offset = sizeof(Elf64_Nhdr)
+		    + roundup(note64->n_namesz, 4)
+		    + roundup(note64->n_descsz, 4);
+	} else {
+		note32 = (Elf32_Nhdr *)note;
+		offset = sizeof(Elf32_Nhdr)
+		    + roundup(note32->n_namesz, 4)
+		    + roundup(note32->n_descsz, 4);
+	}
+	return offset;
+}
+
+int
+note_type(void *note)
+{
+	int type;
+	Elf64_Nhdr *note64;
+	Elf32_Nhdr *note32;
+
+	if (info->flag_elf64_memory) {
+		note64 = (Elf64_Nhdr *)note;
+		type = note64->n_type;
+	} else {
+		note32 = (Elf32_Nhdr *)note;
+		type = note32->n_type;
+	}
+	return type;
+}
+
+int
+note_descsz(void *note)
+{
+	int size;
+	Elf64_Nhdr *note64;
+	Elf32_Nhdr *note32;
+
+	if (info->flag_elf64_memory) {
+		note64 = (Elf64_Nhdr *)note;
+		size = note64->n_descsz;
+	} else {
+		note32 = (Elf32_Nhdr *)note;
+		size = note32->n_descsz;
+	}
+	return size;
+}
+
+off_t
+offset_note_desc(void *note)
+{
+	off_t offset;
+	Elf64_Nhdr *note64;
+	Elf32_Nhdr *note32;
+
+	if (info->flag_elf64_memory) {
+		note64 = (Elf64_Nhdr *)note;
+		offset = sizeof(Elf64_Nhdr) + roundup(note64->n_namesz, 4);
+	} else {
+		note32 = (Elf32_Nhdr *)note;
+		offset = sizeof(Elf32_Nhdr) + roundup(note32->n_namesz, 4);
+	}
+	return offset;
+}
+
 int
 get_pt_note_info(off_t off_note, unsigned long sz_note)
 {
-	int n_type;
-	off_t offset;
+	int n_type, size_desc;
+	off_t offset, offset_desc;
 	char buf[VMCOREINFO_XEN_NOTE_NAME_BYTES];
-	Elf64_Nhdr note64;
-	Elf32_Nhdr note32;
-
+	char note[MAX_SIZE_NHDR];
 	const off_t failed = (off_t)-1;
 
 	offset = off_note;
-	n_type = 0;
 	while (offset < off_note + sz_note) {
 		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 			ERRMSG("Can't seek the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
 			return FALSE;
 		}
-		if (info->flag_elf64_memory) {
-			if (read(info->fd_memory, &note64, sizeof(note64))
-			    != sizeof(note64)) {
-				ERRMSG("Can't read the dump memory(%s). %s\n",
-				    info->name_memory, strerror(errno));
-				return FALSE;
-			}
-			n_type = note64.n_type;
-		} else {
-			if (read(info->fd_memory, &note32, sizeof(note32))
-			    != sizeof(note32)) {
-				ERRMSG("Can't read the dump memory(%s). %s\n",
-				    info->name_memory, strerror(errno));
-				return FALSE;
-			}
-			n_type = note32.n_type;
+		if (read(info->fd_memory, note, sizeof(note)) != sizeof(note)) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			return FALSE;
 		}
 		if (read(info->fd_memory, &buf, sizeof(buf)) != sizeof(buf)) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
 			return FALSE;
 		}
+		n_type = note_type(note);
+		offset_desc = offset + offset_note_desc(note);
+		size_desc   = note_descsz(note);
+
 		/*
 		 * Check whether /proc/vmcore contains vmcoreinfo,
 		 * and get both the offset and the size.
@@ -2528,57 +2595,22 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
 		 */
 		if (!strncmp(VMCOREINFO_XEN_NOTE_NAME, buf,
 		    VMCOREINFO_XEN_NOTE_NAME_BYTES)) {
-			if (info->flag_elf64_memory) {
-				info->offset_vmcoreinfo_xen = offset
-				    + (sizeof(note64)
-				    + ((note64.n_namesz + 3) & ~3));
-				info->size_vmcoreinfo_xen = note64.n_descsz;
-			} else {
-				info->offset_vmcoreinfo_xen = offset
-				    + (sizeof(note32)
-				    + ((note32.n_namesz + 3) & ~3));
-				info->size_vmcoreinfo_xen = note32.n_descsz;
-			}
+			info->offset_vmcoreinfo_xen = offset_desc;
+			info->size_vmcoreinfo_xen   = size_desc;
 		} else if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
 		    VMCOREINFO_NOTE_NAME_BYTES)) {
-			if (info->flag_elf64_memory) {
-				info->offset_vmcoreinfo = offset
-				    + (sizeof(note64)
-				    + ((note64.n_namesz + 3) & ~3));
-				info->size_vmcoreinfo = note64.n_descsz;
-			} else {
-				info->offset_vmcoreinfo = offset
-				    + (sizeof(note32)
-				    + ((note32.n_namesz + 3) & ~3));
-				info->size_vmcoreinfo = note32.n_descsz;
-			}
+			info->offset_vmcoreinfo = offset_desc;
+			info->size_vmcoreinfo   = size_desc;
+
 		/*
 		 * Check whether /proc/vmcore contains xen's note.
 		 */
 		} else if (n_type == XEN_ELFNOTE_CRASH_INFO) {
 			vt.mem_flags |= MEMORY_XEN;
-			if (info->flag_elf64_memory) {
-				info->offset_xen_crash_info = offset
-				    + (sizeof(note64)
-				    + ((note64.n_namesz + 3) & ~3));
-				info->size_xen_crash_info = note64.n_descsz;
-			} else {
-				info->offset_xen_crash_info = offset
-				    + (sizeof(note32)
-				    + ((note32.n_namesz + 3) & ~3));
-				info->size_xen_crash_info = note32.n_descsz;
-			}
+			info->offset_xen_crash_info = offset_desc;
+			info->size_xen_crash_info   = size_desc;
 		}
-
-		if (info->flag_elf64_memory) {
-			offset += sizeof(Elf64_Nhdr)
-			    + ((note64.n_namesz + 3) & ~3)
-			    + ((note64.n_descsz + 3) & ~3);
-		} else {
-			offset += sizeof(Elf32_Nhdr)
-			    + ((note32.n_namesz + 3) & ~3)
-			    + ((note32.n_descsz + 3) & ~3);
-		}
+		offset += offset_next_note(note);
 	}
 	if (vt.mem_flags & MEMORY_XEN)
 		DEBUG_MSG("Xen kdump\n");

@@ -68,12 +68,12 @@ get_versiondep_info_x86_64(void)
 	/*
 	 * On linux-2.6.26, MAX_PHYSMEM_BITS is changed to 44 from 40.
 	 */
-	if (info->kernel_version < VERSION_LINUX_2_6_26)
+	if (info->kernel_version < KERNEL_VERSION(2, 6, 26))
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_ORIG;
 	else
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_26;
 
-	if (info->kernel_version < VERSION_LINUX_2_6_27)
+	if (info->kernel_version < KERNEL_VERSION(2, 6, 27))
 		info->page_offset = __PAGE_OFFSET_ORIG;
 	else
 		info->page_offset = __PAGE_OFFSET_2_6_27;

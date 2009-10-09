@@ -446,10 +446,8 @@ do { \
 #define KVER_MAJ_SHIFT 24
 #define KVER_MIN_SHIFT 16
 #define KERNEL_VERSION(x,y,z) (((x) << KVER_MAJ_SHIFT) | ((y) << KVER_MIN_SHIFT) | (z))
-#define OLDEST_VERSION		(0x0206000f)	/* linux-2.6.15 */
-#define LATEST_VERSION		(0x0206001d)	/* linux-2.6.29 */
-#define VERSION_LINUX_2_6_26	(0x0206001a)	/* linux-2.6.26 */
-#define VERSION_LINUX_2_6_27	(0x0206001b)	/* linux-2.6.27 */
+#define OLDEST_VERSION		KERNEL_VERSION(2, 6, 15)/* linux-2.6.15 */
+#define LATEST_VERSION		KERNEL_VERSION(2, 6, 29)/* linux-2.6.29 */
 
 /*
  * vmcoreinfo in /proc/vmcore

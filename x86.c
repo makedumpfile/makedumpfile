@@ -77,7 +77,7 @@ get_versiondep_info_x86(void)
 	 * linux-2.6.26.
 	 */
 	if (vt.mem_flags & MEMORY_X86_PAE) {
-		if (info->kernel_version < VERSION_LINUX_2_6_26)
+		if (info->kernel_version < KERNEL_VERSION(2, 6, 26))
 			info->section_size_bits = _SECTION_SIZE_BITS_PAE_ORIG;
 		else
 			info->section_size_bits = _SECTION_SIZE_BITS_PAE_2_6_26;

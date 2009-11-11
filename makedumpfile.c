@@ -5449,12 +5449,11 @@ write_kdump_header(void)
 	 */
 	strcpy(dh->signature, KDUMP_SIGNATURE);
 	dh->header_version = 2;
-	dh->block_size   = info->page_size;
-	dh->sub_hdr_size = divideup(sizeof(sub_dump_header), dh->block_size);
-	dh->max_mapnr    = info->max_mapnr;
-	dh->nr_cpus      = 1;
-	dh->bitmap_blocks
-	    = divideup(info->len_bitmap, dh->block_size);
+	dh->block_size     = info->page_size;
+	dh->sub_hdr_size   = divideup(sizeof(sub_dump_header), dh->block_size);
+	dh->max_mapnr      = info->max_mapnr;
+	dh->nr_cpus        = 1;
+	dh->bitmap_blocks  = divideup(info->len_bitmap, dh->block_size);
 	memcpy(&dh->timestamp, &info->timestamp, sizeof(dh->timestamp));
 	memcpy(&dh->utsname, &info->system_utsname, sizeof(dh->utsname));
 

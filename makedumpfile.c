@@ -871,6 +871,11 @@ get_kdump_compressed_header_info(char *filename)
 	}
 	memcpy(info->kh_memory, &kh, sizeof(kh));
 
+	if (dh.header_version >= 3) {
+		/* A dumpfile contains vmcoreinfo data. */
+		info->offset_vmcoreinfo = kh.offset_vmcoreinfo;
+		info->size_vmcoreinfo   = kh.size_vmcoreinfo;
+	}
 	return TRUE;
 error:
 	free(info->dh_memory);

@@ -5439,7 +5439,7 @@ write_kdump_header(void)
 {
 	size_t size;
 	struct disk_dump_header *dh = info->dump_header;
-	struct kdump_sub_header sub_dump_header;
+	struct kdump_sub_header kh;
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
@@ -5450,7 +5450,7 @@ write_kdump_header(void)
 	strcpy(dh->signature, KDUMP_SIGNATURE);
 	dh->header_version = 2;
 	dh->block_size     = info->page_size;
-	dh->sub_hdr_size   = divideup(sizeof(sub_dump_header), dh->block_size);
+	dh->sub_hdr_size   = divideup(sizeof(kh), dh->block_size);
 	dh->max_mapnr      = info->max_mapnr;
 	dh->nr_cpus        = 1;
 	dh->bitmap_blocks  = divideup(info->len_bitmap, dh->block_size);
@@ -5465,15 +5465,15 @@ write_kdump_header(void)
 	 * Write sub header
 	 */
 	size = sizeof(struct kdump_sub_header);
-	memset(&sub_dump_header, 0, size);
-	sub_dump_header.phys_base  = info->phys_base;
-	sub_dump_header.dump_level = info->dump_level;
+	memset(&kh, 0, size);
+	kh.phys_base  = info->phys_base;
+	kh.dump_level = info->dump_level;
 	if (info->flag_split) {
-		sub_dump_header.split = 1;
-		sub_dump_header.start_pfn = info->split_start_pfn;
-		sub_dump_header.end_pfn   = info->split_end_pfn;
+		kh.split = 1;
+		kh.start_pfn = info->split_start_pfn;
+		kh.end_pfn   = info->split_end_pfn;
 	}
-	if (!write_buffer(info->fd_dumpfile, dh->block_size, &sub_dump_header,
+	if (!write_buffer(info->fd_dumpfile, dh->block_size, &kh,
 	    size, info->name_dumpfile))
 		return FALSE;
 
@@ -7021,7 +7021,7 @@ read_disk_dump_header(struct disk_dump_header *dh, char *filename)
 }
 
 int
-read_kdump_sub_header(struct kdump_sub_header *ksh, char *filename)
+read_kdump_sub_header(struct kdump_sub_header *kh, char *filename)
 {
 	int fd, ret = FALSE;
 	struct disk_dump_header dh;
@@ -7042,7 +7042,7 @@ read_kdump_sub_header(struct kdump_sub_header *ksh, char *filename)
 		    filename, strerror(errno));
 		goto out;
 	}
-	if (read(fd, ksh, sizeof(struct kdump_sub_header))
+	if (read(fd, kh, sizeof(struct kdump_sub_header))
 	     != sizeof(struct kdump_sub_header)) {
 		ERRMSG("Can't read a file(%s). %s\n",
 		    filename, strerror(errno));
@@ -7060,7 +7060,7 @@ store_splitting_info(void)
 {
 	int i;
 	struct disk_dump_header dh, tmp_dh;
-	struct kdump_sub_header ksh;
+	struct kdump_sub_header kh;
 
 	for (i = 0; i < info->num_dumpfile; i++) {
 		if (!read_disk_dump_header(&tmp_dh, SPLITTING_DUMPFILE(i)))
@@ -7084,15 +7084,15 @@ store_splitting_info(void)
 			    SPLITTING_DUMPFILE(i));
 			return FALSE;
 		}
-		if (!read_kdump_sub_header(&ksh, SPLITTING_DUMPFILE(i)))
+		if (!read_kdump_sub_header(&kh, SPLITTING_DUMPFILE(i)))
 			return FALSE;
 
 		if (i == 0) {
-			info->dump_level = ksh.dump_level;
+			info->dump_level = kh.dump_level;
 			DEBUG_MSG("dump_level   : %d\n", info->dump_level);
 		}
-		SPLITTING_START_PFN(i) = ksh.start_pfn;
-		SPLITTING_END_PFN(i)   = ksh.end_pfn;
+		SPLITTING_START_PFN(i) = kh.start_pfn;
+		SPLITTING_END_PFN(i)   = kh.end_pfn;
 	}
 	return TRUE;
 }
@@ -7186,7 +7186,7 @@ reassemble_kdump_header(void)
 	int fd, ret = FALSE;
 	off_t offset_bitmap;
 	struct disk_dump_header dh;
-	struct kdump_sub_header ksh;
+	struct kdump_sub_header kh;
 	char *buf_bitmap;
 
 	/*
@@ -7209,19 +7209,19 @@ reassemble_kdump_header(void)
 	/*
 	 * Write sub header.
 	 */
-	if (!read_kdump_sub_header(&ksh, SPLITTING_DUMPFILE(0)))
+	if (!read_kdump_sub_header(&kh, SPLITTING_DUMPFILE(0)))
 		return FALSE;
 
-	ksh.split = 0;
-	ksh.start_pfn = 0;
-	ksh.end_pfn   = 0;
+	kh.split = 0;
+	kh.start_pfn = 0;
+	kh.end_pfn   = 0;
 
 	if (lseek(info->fd_dumpfile, info->page_size, SEEK_SET) < 0) {
 		ERRMSG("Can't seek a file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 		return FALSE;
 	}
-	if (write(info->fd_dumpfile, &ksh, sizeof(ksh)) != sizeof(ksh)) {
+	if (write(info->fd_dumpfile, &kh, sizeof(kh)) != sizeof(kh)) {
 		ERRMSG("Can't write a file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 		return FALSE;

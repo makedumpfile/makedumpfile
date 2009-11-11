@@ -1125,7 +1125,7 @@ int exclude_xen_user_domain(void);
 unsigned long long get_num_dumpable(void);
 int __read_disk_dump_header(struct disk_dump_header *dh, char *filename);
 int read_disk_dump_header(struct disk_dump_header *dh, char *filename);
-int read_kdump_sub_header(struct kdump_sub_header *ksh, char *filename);
+int read_kdump_sub_header(struct kdump_sub_header *kh, char *filename);
 void close_vmcoreinfo(void);
 int close_files_for_creating_dumpfile(void);
 

@@ -5437,9 +5437,11 @@ out:
 int
 write_kdump_header(void)
 {
+	int ret = FALSE;
 	size_t size;
 	struct disk_dump_header *dh = info->dump_header;
 	struct kdump_sub_header kh;
+	char *buf = NULL;
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
@@ -5448,9 +5450,10 @@ write_kdump_header(void)
 	 * Write common header
 	 */
 	strcpy(dh->signature, KDUMP_SIGNATURE);
-	dh->header_version = 2;
-	dh->block_size     = info->page_size;
-	dh->sub_hdr_size   = divideup(sizeof(kh), dh->block_size);
+	dh->header_version = 3;
+  	dh->block_size     = info->page_size;
+	dh->sub_hdr_size   = sizeof(kh) + info->size_vmcoreinfo;
+	dh->sub_hdr_size   = divideup(dh->sub_hdr_size, dh->block_size);
 	dh->max_mapnr      = info->max_mapnr;
 	dh->nr_cpus        = 1;
 	dh->bitmap_blocks  = divideup(info->len_bitmap, dh->block_size);
@@ -5473,14 +5476,49 @@ write_kdump_header(void)
 		kh.start_pfn = info->split_start_pfn;
 		kh.end_pfn   = info->split_end_pfn;
 	}
+	if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
+		/*
+		 * Write vmcoreinfo data
+		 */
+		kh.offset_vmcoreinfo
+			= DISKDUMP_HDADER_BLOCKS * dh->block_size + sizeof(kh);
+		kh.size_vmcoreinfo = info->size_vmcoreinfo;
+
+		buf = malloc(info->size_vmcoreinfo);
+		if (buf == NULL) {
+			ERRMSG("Can't allocate memory for vmcoreinfo. %s\n",
+			    strerror(errno));
+			return FALSE;
+		}
+		if (lseek(info->fd_memory, info->offset_vmcoreinfo, SEEK_SET)
+		    < 0) {
+			ERRMSG("Can't seek the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			goto out;
+		}
+		if (read(info->fd_memory, buf, info->size_vmcoreinfo)
+		    != info->size_vmcoreinfo) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			    info->name_memory, strerror(errno));
+			goto out;
+		}
+		if (!write_buffer(info->fd_dumpfile, kh.offset_vmcoreinfo, buf,
+		    kh.size_vmcoreinfo, info->name_dumpfile))
+			goto out;
+	}
 	if (!write_buffer(info->fd_dumpfile, dh->block_size, &kh,
 	    size, info->name_dumpfile))
-		return FALSE;
+		goto out;
 
 	info->offset_bitmap1
 	    = (DISKDUMP_HDADER_BLOCKS + dh->sub_hdr_size) * dh->block_size;
 
-	return TRUE;
+	ret = TRUE;
+out:
+	if (buf)
+		free(buf);
+
+	return ret;
 }
 
 void

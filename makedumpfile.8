@@ -31,8 +31,9 @@ be taken as /proc/vmcore while the second kernel (called "kdump kernel" or
 "capture kernel") is running. This document represents /proc/vmcore as
 \fIVMCORE\fR. makedumpfile makes a small \fIDUMPFILE\fR by compressing dump
 data or by excluding unnecessary pages for analysis, or both. makedumpfile
-needs the first kernel's \fIVMLINUX\fR with debug information, so that it can
-distinguish unnecessary pages by analyzing how the first kernel uses the memory.
+needs the first kernel's debug information, so that it can distinguish
+unnecessary pages by analyzing how the first kernel uses the memory.
+The information can be taken from \fIVMLINUX\fR or \fIVMCOREINFO\fR.
 .PP
 makedumpfile can exclude the following types of pages while copying
 \fIVMCORE\fR to \fIDUMPFILE\fR, and a user can choose which type of pages will
@@ -64,6 +65,9 @@ system, makedumpfile cannot refer to \fIVMLINUX\fR because the second kernel's
 initrd cannot include a large file like \fIVMLINUX\fR. To solve the problem,
 makedumpfile makes \fIVMCOREINFO\fR beforehand, and it refers to
 \fIVMCOREINFO\fR instead of \fIVMLINUX\fR while the second kernel is running.
+.br
+\fIVMCORE\fR has contained \fIVMCOREINFO\fR since linux-2.6.24, and a user does
+not need to specify neither -x nor -i option.
 .PP
 If the second kernel is running on its initrd without mounting any file system,
 a user needs to transport the dump data to a remote host. To transport the dump
@@ -190,6 +194,9 @@ This command overwrites \fIDUMPFILE\fR even if it already exists.
 Specify the first kernel's \fIVMLINUX\fR with debug information to analyze the
 first kernel's memory usage.
 .br
+This option is necessary if \fIVMCORE\fR does not contain \fIVMCOREINFO\fR,
+[\-i \fIVMCOREINFO\fR] is not specified, and dump_level is 2 or more.
+.br
 The page size of the first kernel and the second kernel should match.
 .br
 .B Example:
@@ -201,8 +208,10 @@ The page size of the first kernel and the second kernel should match.
 Specify \fIVMCOREINFO\fR instead of \fIVMLINUX\fR for analyzing the first kernel's memory usage.
 .br
 \fIVMCOREINFO\fR should be made beforehand by makedumpfile with \-g option, and
-it contains the first kernel's information. If dump_level is 2 or more and
-[\-x \fIVMLINUX\fR] is not specified, this option is necessary.
+it contains the first kernel's information.
+.br
+This option is necessary if \fIVMCORE\fR does not contain \fIVMCOREINFO\fR,
+[\-x \fIVMLINUX\fR] is not specified, and dump_level is 2 or more.
 .br
 .B Example:
 .br
@@ -342,7 +351,7 @@ not necessary to specify \fI\-\-xen-syms\fR and \fI\-\-xen-vmcoreinfo\fR.
 This option is only for x86_64.
 Specify the \fIxen_phys_start_address\fR, if the xen code/data is relocatable
 and \fIVMCORE\fR does not contain \fIxen_phys_start_address\fR in the CRASHINFO.
-\fIxen_phys_start_address\fR can be token from the line of "Hypervisor code
+\fIxen_phys_start_address\fR can be taken from the line of "Hypervisor code
 and data" in /proc/iomem. For example, specify 0xcee00000 as \fIxen_phys_start_address\fR
 if /proc/iomem is the following:
   -------------------------------------------------------

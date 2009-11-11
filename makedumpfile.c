@@ -315,7 +315,7 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 	 */
 	dh = info->dh_memory;
 	offset
-	    = (DISKDUMP_HDADER_BLOCKS + dh->sub_hdr_size + dh->bitmap_blocks)
+	    = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size + dh->bitmap_blocks)
 		* dh->block_size;
 	pfn = paddr_to_pfn(paddr);
 	desc_pos = pfn_to_pos(pfn);
@@ -3735,7 +3735,7 @@ initialize_bitmap_memory(void)
 	block_size = dh->block_size;
 
 	bitmap_offset
-	    = (DISKDUMP_HDADER_BLOCKS + dh->sub_hdr_size) * block_size;
+	    = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size) * block_size;
 	bitmap_len = block_size * dh->bitmap_blocks;
 
 	bmp = malloc(sizeof(struct dump_bitmap));
@@ -4700,7 +4700,7 @@ copy_1st_bitmap_from_memory(void)
 	off_t bitmap_offset;
 	struct disk_dump_header *dh = info->dh_memory;
 
-	bitmap_offset = (DISKDUMP_HDADER_BLOCKS + dh->sub_hdr_size)
+	bitmap_offset = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size)
 			 * dh->block_size;
 
 	if (lseek(info->fd_memory, bitmap_offset, SEEK_SET) < 0) {
@@ -5486,7 +5486,7 @@ write_kdump_header(void)
 		 * Write vmcoreinfo data
 		 */
 		kh.offset_vmcoreinfo
-			= DISKDUMP_HDADER_BLOCKS * dh->block_size + sizeof(kh);
+			= DISKDUMP_HEADER_BLOCKS * dh->block_size + sizeof(kh);
 		kh.size_vmcoreinfo = info->size_vmcoreinfo;
 
 		buf = malloc(info->size_vmcoreinfo);
@@ -5516,7 +5516,7 @@ write_kdump_header(void)
 		goto out;
 
 	info->offset_bitmap1
-	    = (DISKDUMP_HDADER_BLOCKS + dh->sub_hdr_size) * dh->block_size;
+	    = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size) * dh->block_size;
 
 	ret = TRUE;
 out:
@@ -5877,7 +5877,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	 * Calculate the offset of the page data.
 	 */
 	cd_header->offset
-	    = (DISKDUMP_HDADER_BLOCKS + dh->sub_hdr_size + dh->bitmap_blocks)
+	    = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size + dh->bitmap_blocks)
 		* dh->block_size;
 	cd_page->offset = cd_header->offset + sizeof(page_desc_t)*num_dumpable;
 	offset_data  = cd_page->offset;
@@ -7073,7 +7073,7 @@ read_kdump_sub_header(struct kdump_sub_header *kh, char *filename)
 	if (!read_disk_dump_header(&dh, filename))
 		return FALSE;
 
-	offset = DISKDUMP_HDADER_BLOCKS * dh.block_size;
+	offset = DISKDUMP_HEADER_BLOCKS * dh.block_size;
 
 	if ((fd = open(filename, O_RDONLY)) < 0) {
 		ERRMSG("Can't open a file(%s). %s\n",
@@ -7274,7 +7274,7 @@ reassemble_kdump_header(void)
 	 * Write dump bitmap to both a dumpfile and a bitmap file.
 	 */
 	offset_bitmap
-	    = (DISKDUMP_HDADER_BLOCKS + dh.sub_hdr_size) * dh.block_size;
+	    = (DISKDUMP_HEADER_BLOCKS + dh.sub_hdr_size) * dh.block_size;
 	info->len_bitmap = dh.bitmap_blocks * dh.block_size;
 	if ((buf_bitmap = malloc(info->len_bitmap)) == NULL) {
 		ERRMSG("Can't allcate memory for bitmap.\n");
@@ -7365,7 +7365,7 @@ reassemble_kdump_pages(void)
 	num_dumped = 0;
 
 	offset_first_ph
-	    = (DISKDUMP_HDADER_BLOCKS + dh.sub_hdr_size + dh.bitmap_blocks)
+	    = (DISKDUMP_HEADER_BLOCKS + dh.sub_hdr_size + dh.bitmap_blocks)
 		* dh.block_size;
 	cd_pd.offset    = offset_first_ph;
 	offset_data_new = offset_first_ph + sizeof(page_desc_t) * num_dumpable;

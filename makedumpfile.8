@@ -73,7 +73,22 @@ a user can transport the dump data to a remote host. Note that analysis tools
 cannot read the flattened format directly, so on a remote host the received
 data in the flattened format needs to be rearranged to a readable
 \fIDUMPFILE\fR format by makedumpfile (or makedumpfile\-R.pl).
-
+.PP
+makedumpfile can read a \fIDUMPFILE\fR in the kdump-compressed format instead
+of \fIVMCORE\fR and re-filter it. This feature is useful in situation that
+users need to reduce the file size of \fIDUMPFILE\fR for sending it somewhere
+by ftp/scp/etc. (If all of the page types, which are specified by a new dump_level,
+are excluded from an original \fIDUMPFILE\fR already, a new \fIDUMPFILE\fR is the
+same as an original \fIDUMPFILE\fR.)
+.br
+For example, makedumpfile can create a \fIDUMPFILE\fR of dump_level 31 from the
+one of dump_level 3 like the following:
+.br
+.B Example:
+.br
+# makedumpfile \-c \-d 3 /proc/vmcore dumpfile.1
+.br
+# makedumpfile \-c \-d 31 dumpfile.1 dumpfile.2
 
 .PP
 .SH OPTIONS

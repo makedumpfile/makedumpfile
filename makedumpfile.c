@@ -3772,6 +3772,8 @@ initialize_bitmap_memory(void)
 int
 initial(void)
 {
+	int debug_info = FALSE;
+
 	if (!(vt.mem_flags & MEMORY_XEN) && info->flag_exclude_xen_dom) {
 		MSG("'-X' option is disable,");
 		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
@@ -3803,6 +3805,7 @@ initial(void)
 		if (!read_vmcoreinfo())
 			return FALSE;
 		close_vmcoreinfo();
+		debug_info = TRUE;
 	/*
 	 * Get the debug information for analysis from the kernel file
 	 */
@@ -3818,6 +3821,8 @@ initial(void)
 
 		if (!get_srcfile_info())
 			return FALSE;
+
+		debug_info = TRUE;
 	} else {
 		/*
 		 * Check whether /proc/vmcore contains vmcoreinfo,
@@ -3847,6 +3852,7 @@ initial(void)
 		if (!read_vmcoreinfo_from_vmcore(info->offset_vmcoreinfo,
 		    info->size_vmcoreinfo, FALSE))
 			return FALSE;
+		debug_info = TRUE;
 	}
 
 	if (!get_value_for_old_linux())
@@ -3863,31 +3869,25 @@ out:
 	if (!get_max_mapnr())
 		return FALSE;
 
-	if ((info->max_dump_level <= DL_EXCLUDE_ZERO) && !info->flag_dmesg) {
-		/*
-		 * The debugging information is unnecessary, because the memory
-		 * management system will not be analazed.
-		 */
+	if (debug_info) {
+		if (!get_machdep_info())
+			return FALSE;
+
+		if (!check_release())
+			return FALSE;
+
+		if (!get_versiondep_info())
+			return FALSE;
+
+		if (!get_numnodes())
+			return FALSE;
+
+		if (!get_mem_map())
+			return FALSE;
+	} else {
 		if (!get_mem_map_without_mm())
 			return FALSE;
-		else
-			return TRUE;
 	}
-
-	if (!get_machdep_info())
-		return FALSE;
-
-	if (!check_release())
-		return FALSE;
-
-	if (!get_versiondep_info())
-		return FALSE;
-
-	if (!get_numnodes())
-		return FALSE;
-
-	if (!get_mem_map())
-		return FALSE;
 
 	return TRUE;
 }

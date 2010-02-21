@@ -5454,7 +5454,7 @@ write_kdump_header(void)
 	/*
 	 * Write common header
 	 */
-	strcpy(dh->signature, KDUMP_SIGNATURE);
+	strncpy(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE));
 	dh->header_version = 3;
   	dh->block_size     = info->page_size;
 	dh->sub_hdr_size   = sizeof(kh) + info->size_vmcoreinfo;

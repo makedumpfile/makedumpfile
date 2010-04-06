@@ -3547,9 +3547,6 @@ nr_to_section(unsigned long nr, unsigned long *mem_sec)
 {
 	unsigned long addr;
 
-	if (!is_kvaddr(mem_sec[SECTION_NR_TO_ROOT(nr)]))
-		return NOT_KV_ADDR;
-
 	if (is_sparsemem_extreme())
 		addr = mem_sec[SECTION_NR_TO_ROOT(nr)] +
 		    (nr & SECTION_ROOT_MASK()) * SIZE(mem_section);

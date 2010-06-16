@@ -933,14 +933,21 @@ int
 open_dump_bitmap(void)
 {
 	int i, fd;
+	char *tmpname;
 
-	if ((info->name_bitmap
-	    = (char *)malloc(sizeof(FILENAME_BITMAP))) == NULL) {
+	tmpname = getenv("TMPDIR");
+	if (!tmpname)
+		tmpname = "/tmp";
+
+	if ((info->name_bitmap = (char *)malloc(sizeof(FILENAME_BITMAP) +
+						strlen(tmpname) + 1)) == NULL) {
 		ERRMSG("Can't allocate memory for the filename. %s\n",
 		    strerror(errno));
 		return FALSE;
 	}
-	strcpy(info->name_bitmap, FILENAME_BITMAP);
+	strcpy(info->name_bitmap, tmpname);
+	strcat(info->name_bitmap, "/");
+	strcat(info->name_bitmap, FILENAME_BITMAP);
 	if ((fd = mkstemp(info->name_bitmap)) < 0) {
 		ERRMSG("Can't open the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));

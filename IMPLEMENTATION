@@ -56,7 +56,7 @@
     };
 
   - sub header
-    The sub header of the kdump compressed format is orignal. This header
+    The sub header of the kdump compressed format is original. This header
     has the member phys_base and dump_level. The member phys_base is for
     an x86_64 relocatable kernel, and the member dump_level has '-d' option's
     value of makedumpfile command.

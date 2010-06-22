@@ -23,8 +23,8 @@ CFLAGS_ARCH += -m64
 endif
 
 SRC	= makedumpfile.c makedumpfile.h diskdump_mod.h
-SRC_ARCH = x86.c x86_64.c ia64.c ppc64.c
-OBJ_ARCH = x86.o x86_64.o ia64.o ppc64.o
+SRC_ARCH = arm.c x86.c x86_64.c ia64.c ppc64.c
+OBJ_ARCH = arm.o x86.o x86_64.o ia64.o ppc64.o
 
 all: makedumpfile
 

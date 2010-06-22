@@ -506,6 +506,24 @@ do { \
 #define VMEMMAP_START		(info->vmemmap_start)
 #define VMEMMAP_END		(info->vmemmap_end)
 
+#ifdef __arm__
+#define __PAGE_OFFSET		(0xc0000000)
+#define KVBASE_MASK		(0xffff)
+#define KVBASE			(SYMBOL(_stext) & ~KVBASE_MASK)
+#define _SECTION_SIZE_BITS	(28)
+#define _MAX_PHYSMEM_BITS	(32)
+#define ARCH_PFN_OFFSET		(info->phys_base >> PAGESHIFT())
+
+#define PTRS_PER_PTE		(512)
+#define PGDIR_SHIFT		(21)
+#define PMD_SHIFT		(21)
+#define PMD_SIZE		(1UL << PMD_SHIFT)
+#define PMD_MASK		(~(PMD_SIZE - 1))
+
+#define _PAGE_PRESENT		(1 << 0)
+
+#endif /* arm */
+
 #ifdef __x86__
 #define __PAGE_OFFSET		(0xc0000000)
 #define __VMALLOC_RESERVE       (128 << 20)
@@ -653,6 +671,16 @@ do { \
 /*
  * The function of dependence on machine
  */
+#ifdef __arm__
+int get_phys_base_arm(void);
+int get_machdep_info_arm(void);
+unsigned long long vaddr_to_paddr_arm(unsigned long vaddr);
+#define get_phys_base()		get_phys_base_arm()
+#define get_machdep_info()	get_machdep_info_arm()
+#define get_versiondep_info()	TRUE
+#define vaddr_to_paddr(X)	vaddr_to_paddr_arm(X)
+#endif /* arm */
+
 #ifdef __x86__
 int get_machdep_info_x86(void);
 int get_versiondep_info_x86(void);
@@ -1147,6 +1175,11 @@ struct domain_list {
 
 #define PAGES_PER_MAPWORD 	(sizeof(unsigned long) * 8)
 #define MFNS_PER_FRAME		(info->page_size / sizeof(unsigned long))
+
+#ifdef __arm__
+#define kvtop_xen(X)	FALSE
+#define get_xen_info_arch(X) FALSE
+#endif	/* arm */
 
 #ifdef __x86__
 #define HYPERVISOR_VIRT_START_PAE	(0xF5800000UL)

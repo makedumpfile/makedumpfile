@@ -4810,7 +4810,7 @@ exclude_zero_pages(void)
 
 	initialize_2nd_bitmap(&bitmap2);
 
-	for (pfn = paddr = 0; pfn < info->max_mapnr;
+	for (pfn = 0, paddr = pfn_to_paddr(pfn); pfn < info->max_mapnr;
 	    pfn++, paddr += info->page_size) {
 
 		print_progress(PROGRESS_ZERO_PAGES, pfn, info->max_mapnr);

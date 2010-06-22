@@ -112,8 +112,6 @@ isAnon(unsigned long mapping)
 #define PAGEOFFSET(X)		(((unsigned long)(X)) & (PAGESIZE() - 1))
 #define PAGEBASE(X)		(((unsigned long)(X)) & ~(PAGESIZE() - 1))
 #define _2MB_PAGE_MASK		(~((2*1048576)-1))
-#define paddr_to_pfn(X)		((unsigned long long)(X) >> PAGESHIFT())
-#define pfn_to_paddr(X)		((unsigned long long)(X) << PAGESHIFT())
 
 /*
  * for SPARSEMEM
@@ -695,6 +693,14 @@ unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ia64(X)
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
+
+#ifndef ARCH_PFN_OFFSET
+#define ARCH_PFN_OFFSET		0
+#endif
+#define paddr_to_pfn(X) \
+	(((unsigned long long)(X) >> PAGESHIFT()) - ARCH_PFN_OFFSET)
+#define pfn_to_paddr(X) \
+	(((unsigned long long)(X) + ARCH_PFN_OFFSET) << PAGESHIFT())
 
 struct pt_load_segment {
 	off_t			file_offset;

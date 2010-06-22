@@ -4383,7 +4383,8 @@ unsigned long long
 page_to_pfn(unsigned long page)
 {
 	unsigned int num;
-	unsigned long long pfn = 0, index = 0;
+	unsigned long long pfn = ULONGLONG_MAX;
+	unsigned long long index = 0;
 	struct mem_map_data *mmd;
 
 	mmd = info->mem_map_data;
@@ -4398,7 +4399,7 @@ page_to_pfn(unsigned long page)
 		pfn = mmd->pfn_start + index;
 		break;
 	}
-	if (!pfn) {
+	if (pfn == ULONGLONG_MAX) {
 		ERRMSG("Can't convert the address of page descriptor (%lx) to pfn.\n", page);
 		return ULONGLONG_MAX;
 	}

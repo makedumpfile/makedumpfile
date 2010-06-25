@@ -184,9 +184,9 @@ vtop_arm(unsigned long vaddr)
 unsigned long long
 vaddr_to_paddr_arm(unsigned long vaddr)
 {
-	unsigned long long paddr;
+	unsigned long long paddr = vaddr_to_paddr_general(vaddr);
 
-	if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
+	if (paddr != NOT_PADDR)
 		return paddr;
 
 	if (is_vmalloc_addr_arm(vaddr))

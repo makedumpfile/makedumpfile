@@ -73,6 +73,8 @@ struct kdump_sub_header {
 	unsigned long	end_pfn;	/* header_version 2 and later */
 	off_t		offset_vmcoreinfo;/* header_version 3 and later */
 	unsigned long	size_vmcoreinfo;  /* header_version 3 and later */
+	off_t		offset_note;      /* header_version 4 and later */
+	unsigned long	size_note;        /* header_version 4 and later */
 };
 
 /* page flags */

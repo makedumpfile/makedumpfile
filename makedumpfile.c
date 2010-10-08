@@ -911,6 +911,11 @@ get_kdump_compressed_header_info(char *filename)
 		info->offset_vmcoreinfo = kh.offset_vmcoreinfo;
 		info->size_vmcoreinfo   = kh.size_vmcoreinfo;
 	}
+	if (dh.header_version >= 4) {
+		/* A dumpfile contains ELF note section. */
+		info->offset_note = kh.offset_note;
+		info->size_note   = kh.size_note;
+	}
 	return TRUE;
 error:
 	free(info->dh_memory);
@@ -1271,8 +1276,6 @@ int
 get_elf_info(void)
 {
 	int i, j, phnum, num_load, elf_format;
-	off_t offset_note;
-	unsigned long size_note;
 	Elf64_Phdr phdr;
 
 	/*
@@ -1301,15 +1304,15 @@ get_elf_info(void)
 		    strerror(errno));
 		return FALSE;
 	}
-	offset_note = 0;
-	size_note   = 0;
+	info->offset_note = 0;
+	info->size_note   = 0;
 	for (i = 0, j = 0; i < phnum; i++) {
 		if (!get_elf_phdr_memory(i, &phdr))
 			return FALSE;
 
 		if (phdr.p_type == PT_NOTE) {
-			offset_note = phdr.p_offset;
-			size_note   = phdr.p_filesz;
+			info->offset_note = phdr.p_offset;
+			info->size_note   = phdr.p_filesz;
 		}
 		if (phdr.p_type != PT_LOAD)
 			continue;
@@ -1327,11 +1330,11 @@ get_elf_info(void)
 			return FALSE;
 		j++;
 	}
-	if (offset_note == 0 || size_note == 0) {
+	if (info->offset_note == 0 || info->size_note == 0) {
 		ERRMSG("Can't find PT_NOTE Phdr.\n");
 		return FALSE;
 	}
-	if (!get_pt_note_info(offset_note, size_note)) {
+	if (!get_pt_note_info(info->offset_note, info->size_note)) {
 		ERRMSG("Can't get PT_NOTE information.\n");
 		return FALSE;
 	}
@@ -5523,9 +5526,9 @@ write_kdump_header(void)
 	 * Write common header
 	 */
 	strncpy(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE));
-	dh->header_version = 3;
+	dh->header_version = 4;
   	dh->block_size     = info->page_size;
-	dh->sub_hdr_size   = sizeof(kh) + info->size_vmcoreinfo;
+	dh->sub_hdr_size   = sizeof(kh) + info->size_note;
 	dh->sub_hdr_size   = divideup(dh->sub_hdr_size, dh->block_size);
 	dh->max_mapnr      = info->max_mapnr;
 	dh->nr_cpus        = 1;
@@ -5549,35 +5552,44 @@ write_kdump_header(void)
 		kh.start_pfn = info->split_start_pfn;
 		kh.end_pfn   = info->split_end_pfn;
 	}
-	if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
+	if (info->offset_note && info->size_note) {
 		/*
-		 * Write vmcoreinfo data
+		 * Write ELF note section
 		 */
-		kh.offset_vmcoreinfo
+		kh.offset_note
 			= DISKDUMP_HEADER_BLOCKS * dh->block_size + sizeof(kh);
-		kh.size_vmcoreinfo = info->size_vmcoreinfo;
+		kh.size_note = info->size_note;
 
-		buf = malloc(info->size_vmcoreinfo);
+		buf = malloc(info->size_note);
 		if (buf == NULL) {
-			ERRMSG("Can't allocate memory for vmcoreinfo. %s\n",
+			ERRMSG("Can't allocate memory for ELF note section. %s\n",
 			    strerror(errno));
 			return FALSE;
 		}
-		if (lseek(info->fd_memory, info->offset_vmcoreinfo, SEEK_SET)
-		    < 0) {
+		if (lseek(info->fd_memory, info->offset_note, SEEK_SET) < 0) {
 			ERRMSG("Can't seek the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
 			goto out;
 		}
-		if (read(info->fd_memory, buf, info->size_vmcoreinfo)
-		    != info->size_vmcoreinfo) {
+		if (read(info->fd_memory, buf, info->size_note)
+		    != info->size_note) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
 			goto out;
 		}
-		if (!write_buffer(info->fd_dumpfile, kh.offset_vmcoreinfo, buf,
-		    kh.size_vmcoreinfo, info->name_dumpfile))
+		if (!write_buffer(info->fd_dumpfile, kh.offset_note, buf,
+		    kh.size_note, info->name_dumpfile))
 			goto out;
+
+		if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
+			/*
+			 * Set vmcoreinfo data
+			 */
+			kh.offset_vmcoreinfo
+			    = info->offset_vmcoreinfo - info->offset_note
+			      + kh.offset_note;
+			kh.size_vmcoreinfo = info->size_vmcoreinfo;
+		}
 	}
 	if (!write_buffer(info->fd_dumpfile, dh->block_size, &kh,
 	    size, info->name_dumpfile))

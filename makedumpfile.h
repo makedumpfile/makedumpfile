@@ -910,6 +910,12 @@ struct DumpInfo {
 	unsigned long		size_vmcoreinfo_xen;
 
 	/*
+	 * ELF NOTE section in dump memory image info:
+	 */
+	off_t			offset_note;
+	unsigned long		size_note;
+
+	/*
 	 * for Xen extraction
 	 */
 	off_t			offset_xen_crash_info;

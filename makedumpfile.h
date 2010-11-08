@@ -507,7 +507,6 @@ do { \
 #define VMEMMAP_END		(info->vmemmap_end)
 
 #ifdef __arm__
-#define __PAGE_OFFSET		(0xc0000000)
 #define KVBASE_MASK		(0xffff)
 #define KVBASE			(SYMBOL(_stext) & ~KVBASE_MASK)
 #define _SECTION_SIZE_BITS	(28)

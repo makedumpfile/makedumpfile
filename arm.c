@@ -81,7 +81,7 @@ get_machdep_info_arm(void)
 {
 	unsigned long vmlist, vmalloc_start;
 
-	info->page_offset = __PAGE_OFFSET;
+	info->page_offset = SYMBOL(_stext) & 0xffff0000UL;
 	info->max_physmem_bits = _MAX_PHYSMEM_BITS;
 	info->kernel_start = SYMBOL(_stext);
 	info->section_size_bits = _SECTION_SIZE_BITS;

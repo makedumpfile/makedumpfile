@@ -79,45 +79,15 @@ get_phys_base_arm(void)
 int
 get_machdep_info_arm(void)
 {
-	unsigned long vmlist, vmalloc_start;
-
 	info->page_offset = SYMBOL(_stext) & 0xffff0000UL;
 	info->max_physmem_bits = _MAX_PHYSMEM_BITS;
 	info->kernel_start = SYMBOL(_stext);
 	info->section_size_bits = _SECTION_SIZE_BITS;
 
-	/*
-	 * For the compatibility, makedumpfile should run without the symbol
-	 * vmlist and the offset of vm_struct.addr if they are not necessary.
-	 */
-	if ((SYMBOL(vmlist) == NOT_FOUND_SYMBOL) ||
-		OFFSET(vm_struct.addr) == NOT_FOUND_STRUCTURE) {
-		return TRUE;
-	}
-
-	if (!readmem(VADDR, SYMBOL(vmlist), &vmlist, sizeof(vmlist))) {
-		ERRMSG("Can't get vmlist.\n");
-		return FALSE;
-	}
-	if (!readmem(VADDR, vmlist + OFFSET(vm_struct.addr), &vmalloc_start,
-		     sizeof(vmalloc_start))) {
-		ERRMSG("Can't get vmalloc_start.\n");
-		return FALSE;
-	}
-
-	info->vmalloc_start = vmalloc_start;
-
 	DEBUG_MSG("page_offset  : %lx\n", info->page_offset);
 	DEBUG_MSG("kernel_start : %lx\n", info->kernel_start);
-	DEBUG_MSG("vmalloc_start: %lx\n", vmalloc_start);
 
 	return TRUE;
-}
-
-static int
-is_vmalloc_addr_arm(unsigned long vaddr)
-{
-	return (info->vmalloc_start && vaddr >= info->vmalloc_start);
 }
 
 /*
@@ -184,17 +154,15 @@ vtop_arm(unsigned long vaddr)
 unsigned long long
 vaddr_to_paddr_arm(unsigned long vaddr)
 {
-	unsigned long long paddr = vaddr_to_paddr_general(vaddr);
+	/*
+	 * Only use translation tables when user has explicitly requested us to
+	 * perform translation for a given address. Otherwise we assume that the
+	 * translation is done within the kernel direct mapped region.
+	 */
+	if (info->vaddr_for_vtop == vaddr)
+		return vtop_arm(vaddr);
 
-	if (paddr != NOT_PADDR)
-		return paddr;
-
-	if (is_vmalloc_addr_arm(vaddr))
-		paddr = vtop_arm(vaddr);
-	else
-		paddr = __pa(vaddr);
-
-	return paddr;
+	return __pa(vaddr);
 }
 
 #endif /* __arm__ */

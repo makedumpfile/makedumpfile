@@ -5034,10 +5034,6 @@ exclude_unnecessary_pages(void)
 	print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
 	print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
 
-	if (info->dump_level & DL_EXCLUDE_FREE)
-		if (!exclude_free_page())
-			return FALSE;
-
 	return TRUE;
 }
 
@@ -5090,14 +5086,23 @@ create_2nd_bitmap(void)
 	}
 
 	/*
-	 * Exclude unnecessary pages (free pages, cache pages, etc.)
+	 * Exclude cache pages, cache private pages, user data pages.
 	 */
-	if (DL_EXCLUDE_ZERO < info->dump_level) {
+	if (info->dump_level & DL_EXCLUDE_CACHE ||
+	    info->dump_level & DL_EXCLUDE_CACHE_PRI ||
+	    info->dump_level & DL_EXCLUDE_USER_DATA) {
 		if (!exclude_unnecessary_pages()) {
 			ERRMSG("Can't exclude unnecessary pages.\n");
 			return FALSE;
 		}
 	}
+
+	/*
+	 * Exclude free pages.
+	 */
+	if (info->dump_level & DL_EXCLUDE_FREE)
+		if (!exclude_free_page())
+			return FALSE;
 
 	/*
 	 * Exclude Xen user domain.

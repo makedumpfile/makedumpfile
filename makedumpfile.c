@@ -67,6 +67,16 @@ show_version(void)
 	MSG("\n");
 }
 
+void
+print_execution_time(char *step_name, struct timeval *tv_start)
+{
+	struct timeval tv_end;
+
+	gettimeofday(&tv_end, NULL);
+	REPORT_MSG("STEP [%s] : %ld seconds\n",
+		   step_name, tv_end.tv_sec - tv_start->tv_sec);
+}
+
 #define INITIALIZE_LONG_TABLE(table, value) \
 do { \
 	size_member = sizeof(long); \
@@ -4635,7 +4645,7 @@ _exclude_free_page(void)
 {
 	int i, nr_zones, num_nodes, node;
 	unsigned long node_zones, zone, spanned_pages, pgdat;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 
 	if ((node = next_online_node(0)) < 0) {
 		ERRMSG("Can't get next online node.\n");
@@ -4691,10 +4701,7 @@ _exclude_free_page(void)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_FREE_PAGES, vt.numnodes, vt.numnodes);
-
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_FREE_PAGES, tv_end.tv_sec - tv_start.tv_sec);
+	print_execution_time(PROGRESS_FREE_PAGES, &tv_start);
 
 	return TRUE;
 }
@@ -4787,7 +4794,7 @@ create_1st_bitmap(void)
  	char buf[info->page_size];
 	unsigned long long pfn, pfn_start, pfn_end, pfn_bitmap1;
 	struct pt_load_segment *pls;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 	off_t offset_page;
 
 	if (info->flag_refiltering)
@@ -4840,10 +4847,7 @@ create_1st_bitmap(void)
 	 * print 100 %
 	 */
 	print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr);
-
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_HOLES, tv_end.tv_sec - tv_start.tv_sec);
+	print_execution_time(PROGRESS_HOLES, &tv_start);
 
 	if (!sync_1st_bitmap())
 		return FALSE;
@@ -4859,7 +4863,7 @@ exclude_zero_pages(void)
 {
 	unsigned long long pfn, paddr;
 	struct dump_bitmap bitmap2;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 	unsigned char buf[info->page_size];
 
 	initialize_2nd_bitmap(&bitmap2);
@@ -4900,10 +4904,7 @@ exclude_zero_pages(void)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_ZERO_PAGES, info->max_mapnr, info->max_mapnr);
-
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_ZERO_PAGES, tv_end.tv_sec - tv_start.tv_sec);
+	print_execution_time(PROGRESS_ZERO_PAGES, &tv_start);
 
 	return TRUE;
 }
@@ -5001,7 +5002,7 @@ exclude_unnecessary_pages(void)
 {
 	unsigned int mm;
 	struct mem_map_data *mmd;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 
 	gettimeofday(&tv_start, NULL);
 
@@ -5022,10 +5023,7 @@ exclude_unnecessary_pages(void)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
-
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_UNN_PAGES, tv_end.tv_sec - tv_start.tv_sec);
+	print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
 
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		if (!exclude_free_page())
@@ -5692,7 +5690,7 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	off_t off_seg_load, off_memory;
 	Elf64_Phdr load;
 	struct dump_bitmap bitmap2;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 
 	if (!info->flag_elf_dumpfile)
 		return FALSE;
@@ -5852,11 +5850,8 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
+	print_execution_time(PROGRESS_COPY, &tv_start);
 	PROGRESS_MSG("\n");
-
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_COPY, tv_end.tv_sec - tv_start.tv_sec);
 
 	return TRUE;
 }
@@ -5941,7 +5936,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
 	struct dump_bitmap bitmap2;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 	const off_t failed = (off_t)-1;
 
 	int ret = FALSE;
@@ -6073,11 +6068,8 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
+	print_execution_time(PROGRESS_COPY, &tv_start);
 	PROGRESS_MSG("\n");
-
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_COPY, tv_end.tv_sec - tv_start.tv_sec);
 
 	ret = TRUE;
 out:
@@ -6678,7 +6670,7 @@ exclude_xen_user_domain(void)
 	unsigned long long pfn, pfn_end;
 	unsigned long long j, size;
 	struct pt_load_segment *pls;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 
 	gettimeofday(&tv_start, NULL);
 
@@ -6736,10 +6728,7 @@ exclude_xen_user_domain(void)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_XEN_DOMAIN, info->num_load_memory, info->num_load_memory);
-
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_XEN_DOMAIN, tv_end.tv_sec - tv_start.tv_sec);
+	print_execution_time(PROGRESS_XEN_DOMAIN, &tv_start);
 
 	return TRUE;
 }
@@ -7443,7 +7432,7 @@ reassemble_kdump_pages(void)
 	struct disk_dump_header dh;
 	struct page_desc pd, pd_zero;
 	struct cache_data cd_pd, cd_data;
-	struct timeval tv_start, tv_end;
+	struct timeval tv_start;
 	char *data = NULL;
 
 	initialize_2nd_bitmap(&bitmap2);
@@ -7564,9 +7553,7 @@ reassemble_kdump_pages(void)
 		goto out;
 
 	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
-	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   PROGRESS_COPY, tv_end.tv_sec - tv_start.tv_sec);
+	print_execution_time(PROGRESS_COPY, &tv_start);
 
 	ret = TRUE;
 out:

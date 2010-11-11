@@ -826,6 +826,7 @@ struct DumpInfo {
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
+	int		nr_cpus;             /* number of cpu */
 	unsigned long long	max_mapnr;   /* number of page descriptor */
 	unsigned long   page_offset;
 	unsigned long   section_size_bits;

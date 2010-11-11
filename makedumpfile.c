@@ -2926,6 +2926,12 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
 			return FALSE;
 		}
 		n_type = note_type(note);
+
+		if (n_type == NT_PRSTATUS) {
+			info->nr_cpus++;
+			offset += offset_next_note(note);
+			continue;
+		}
 		offset_desc = offset + offset_note_desc(note);
 		size_desc   = note_descsz(note);
 
@@ -5543,7 +5549,7 @@ write_kdump_header(void)
 	dh->sub_hdr_size   = sizeof(kh) + info->size_note;
 	dh->sub_hdr_size   = divideup(dh->sub_hdr_size, dh->block_size);
 	dh->max_mapnr      = info->max_mapnr;
-	dh->nr_cpus        = 1;
+	dh->nr_cpus        = info->nr_cpus;
 	dh->bitmap_blocks  = divideup(info->len_bitmap, dh->block_size);
 	memcpy(&dh->timestamp, &info->timestamp, sizeof(dh->timestamp));
 	memcpy(&dh->utsname, &info->system_utsname, sizeof(dh->utsname));

@@ -4572,8 +4572,15 @@ dump_dmesg()
 {
 	int log_buf_len, length_log, length_oldlog, ret = FALSE;
 	unsigned long log_buf, log_end, index;
+	unsigned long log_end_2_6_24;
+	unsigned      log_end_2_6_25;
 	char *log_buffer = NULL;
 
+	/*
+	 * log_end has been changed to "unsigned" since linux-2.6.25.
+	 *   2.6.24 or former: static unsigned long log_end;
+	 *   2.6.25 or later : static unsigned log_end;
+	 */
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
@@ -4594,9 +4601,20 @@ dump_dmesg()
 		ERRMSG("Can't get log_buf.\n");
 		return FALSE;
 	}
-	if (!readmem(VADDR, SYMBOL(log_end), &log_end, sizeof(log_end))) {
-		ERRMSG("Can't to get log_end.\n");
-		return FALSE;
+	if (info->kernel_version >= KERNEL_VERSION(2, 6, 25)) {
+		if (!readmem(VADDR, SYMBOL(log_end), &log_end_2_6_25,
+		    sizeof(log_end_2_6_25))) {
+			ERRMSG("Can't to get log_end.\n");
+			return FALSE;
+		}
+		log_end = log_end_2_6_25;
+	} else {
+		if (!readmem(VADDR, SYMBOL(log_end), &log_end_2_6_24,
+		    sizeof(log_end_2_6_24))) {
+			ERRMSG("Can't to get log_end.\n");
+			return FALSE;
+		}
+		log_end = log_end_2_6_24;
 	}
 	if (!readmem(VADDR, SYMBOL(log_buf_len), &log_buf_len,
 	    sizeof(log_buf_len))) {

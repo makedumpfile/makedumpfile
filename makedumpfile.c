@@ -5983,6 +5983,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	/*
 	 * Write the data of zero-filled page.
 	 */
+	gettimeofday(&tv_start, NULL);
 	if (info->dump_level & DL_EXCLUDE_ZERO) {
 		pd_zero.size = info->page_size;
 		pd_zero.flags = 0;
@@ -6001,8 +6002,6 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		start_pfn = 0;
 		end_pfn   = info->max_mapnr;
 	}
-
-	gettimeofday(&tv_start, NULL);
 
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 
@@ -7478,6 +7477,7 @@ reassemble_kdump_pages(void)
 	/*
 	 * Write page header of zero-filled page.
 	 */
+	gettimeofday(&tv_start, NULL);
 	if (info->dump_level & DL_EXCLUDE_ZERO) {
 		/*
 		 * makedumpfile outputs the data of zero-filled page at first
@@ -7496,7 +7496,6 @@ reassemble_kdump_pages(void)
 		offset_data_new  += pd_zero.size;
 	}
 
-	gettimeofday(&tv_start, NULL);
 	for (i = 0; i < info->num_dumpfile; i++) {
 		if ((fd = open(SPLITTING_DUMPFILE(i), O_RDONLY)) < 0) {
 			ERRMSG("Can't open a file(%s). %s\n",

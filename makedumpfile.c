@@ -71,10 +71,19 @@ void
 print_execution_time(char *step_name, struct timeval *tv_start)
 {
 	struct timeval tv_end;
+	time_t diff_sec;
+	suseconds_t diff_usec;
 
 	gettimeofday(&tv_end, NULL);
-	REPORT_MSG("STEP [%s] : %ld seconds\n",
-		   step_name, tv_end.tv_sec - tv_start->tv_sec);
+
+	diff_sec  = tv_end.tv_sec - tv_start->tv_sec;
+	diff_usec = tv_end.tv_usec - tv_start->tv_usec;
+	if (diff_usec < 0) {
+		diff_sec--;
+		diff_usec += 1000000;
+	}
+	REPORT_MSG("STEP [%s] : %ld.%06ld seconds\n",
+		   step_name, diff_sec, diff_usec);
 }
 
 #define INITIALIZE_LONG_TABLE(table, value) \

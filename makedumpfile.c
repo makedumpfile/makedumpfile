@@ -5591,6 +5591,9 @@ write_kdump_header(void)
 		if (info->offset_vmcoreinfo && info->size_vmcoreinfo) {
 			/*
 			 * Set vmcoreinfo data
+			 *
+			 * NOTE: ELF note section contains vmcoreinfo data, and
+			 *       kh.offset_vmcoreinfo points the vmcoreinfo data.
 			 */
 			kh.offset_vmcoreinfo
 			    = info->offset_vmcoreinfo - info->offset_note

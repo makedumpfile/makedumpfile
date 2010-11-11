@@ -497,8 +497,8 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 	}
 
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
+		ERRMSG("Can't seek the dump memory(%s). (offset: %lx) %s\n",
+		    info->name_memory, offset, strerror(errno));
 		goto error;
 	}
 

@@ -612,6 +612,45 @@ do { \
 #define _MAX_PHYSMEM_BITS	(44)
 #endif
 
+#ifdef __s390x__
+#define __PAGE_OFFSET		(info->page_size - 1)
+#define KERNELBASE		(0)
+#define KVBASE			(SYMBOL(_stext))
+#define _SECTION_SIZE_BITS	(28)
+#define _MAX_PHYSMEM_BITS	(42)
+
+/* Bits in the segment/region table address-space-control-element */
+#define _ASCE_TYPE_MASK		0x0c
+#define _ASCE_TABLE_LENGTH	0x03	/* region table length  */
+
+#define TABLE_LEVEL(x)		(((x) & _ASCE_TYPE_MASK) >> 2)
+#define TABLE_LENGTH(x)		((x) & _ASCE_TABLE_LENGTH)
+
+/* Bits in the region table entry */
+#define _REGION_ENTRY_ORIGIN	~0xfffUL	/* region table origin*/
+#define _REGION_ENTRY_TYPE_MASK	0x0c	/* region table type mask */
+#define _REGION_ENTRY_INVALID	0x20	/* invalid region table entry */
+#define _REGION_ENTRY_LENGTH	0x03	/* region table length */
+#define _REGION_OFFSET_MASK	0x7ffUL	/* region/segment table offset mask */
+
+#define RSG_TABLE_LEVEL(x)	(((x) & _REGION_ENTRY_TYPE_MASK) >> 2)
+#define RSG_TABLE_LENGTH(x)	((x) & _REGION_ENTRY_LENGTH)
+
+/* Bits in the segment table entry */
+#define _SEGMENT_ENTRY_ORIGIN	~0x7ffUL
+#define _SEGMENT_ENTRY_LARGE	0x400
+#define _SEGMENT_PAGE_SHIFT	31
+#define _SEGMENT_INDEX_SHIFT	20
+
+/* Hardware bits in the page table entry */
+#define _PAGE_CO		0x100	/* HW Change-bit override */
+#define _PAGE_ZERO		0x800	/* Bit pos 52 must conatin zero */
+#define _PAGE_INVALID		0x400	/* HW invalid bit */
+#define _PAGE_INDEX_SHIFT	12
+#define _PAGE_OFFSET_MASK	0xffUL	/* page table offset mask */
+
+#endif /* __s390x__ */
+
 #ifdef __ia64__ /* ia64 */
 #define REGION_SHIFT		(61)
 
@@ -709,6 +748,15 @@ unsigned long long vaddr_to_paddr_ppc64(unsigned long vaddr);
 #define get_versiondep_info()	TRUE
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc64(X)
 #endif          /* powerpc */
+
+#ifdef __s390x__ /* s390x */
+int get_machdep_info_s390x(void);
+unsigned long long vaddr_to_paddr_s390x(unsigned long vaddr);
+#define get_phys_base()		TRUE
+#define get_machdep_info()	get_machdep_info_s390x()
+#define get_versiondep_info()	TRUE
+#define vaddr_to_paddr(X)	vaddr_to_paddr_s390x(X)
+#endif          /* s390x */
 
 #ifdef __ia64__ /* ia64 */
 int get_phys_base_ia64(void);
@@ -1274,3 +1322,7 @@ int get_xen_info_ia64(void);
 #define get_xen_info_arch(X) FALSE
 #endif	/* powerpc */
 
+#ifdef __s390x__ /* s390x */
+#define kvtop_xen(X)	FALSE
+#define get_xen_info_arch(X) FALSE
+#endif	/* s390x */

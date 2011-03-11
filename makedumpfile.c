@@ -924,6 +924,7 @@ get_kdump_compressed_header_info(char *filename)
 		goto error;
 	}
 	memcpy(info->kh_memory, &kh, sizeof(kh));
+	info->nr_cpus = dh.nr_cpus;
 
 	if (dh.header_version >= 3) {
 		/* A dumpfile contains vmcoreinfo data. */

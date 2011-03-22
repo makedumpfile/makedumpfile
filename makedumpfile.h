@@ -615,7 +615,7 @@ do { \
 #ifdef __s390x__
 #define __PAGE_OFFSET		(info->page_size - 1)
 #define KERNELBASE		(0)
-#define KVBASE			(SYMBOL(_stext))
+#define KVBASE			KERNELBASE
 #define _SECTION_SIZE_BITS	(28)
 #define _MAX_PHYSMEM_BITS	(42)
 

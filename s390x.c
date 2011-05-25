@@ -269,9 +269,7 @@ vaddr_to_paddr_s390x(unsigned long vaddr)
 		paddr = vtop_s390x(vaddr);
 	}
 	else {
-		ERRMSG("Can't convert a virtual address(%lx) to " \
-		    "physical address.\n", vaddr);
-		return NOT_PADDR;
+		paddr = vaddr - KVBASE;
 	}
 
 	return paddr;

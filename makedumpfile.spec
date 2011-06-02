@@ -1,13 +1,13 @@
 Name: makedumpfile
 Summary: makedumpfile package
-Version: 1.3.7
+Version: 1.3.8
 Release: 1
 Group: Applications/Text
 License: GPL
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
 Distribution: Linux 2.6 or greater
-Packager: Ken'ichi Ohmichi <oomichi@mxs.nes.nec.co.jp>
+Packager: Atsushi Kumagai <kumagai-atsushi@mxc.nes.nec.co.jp>
 ExclusiveOS: Linux
 ExclusiveArch: i386 ia64 ppc ppc64 ppc64pseries ppc64iseries x86_64
 Buildroot: %{_tmppath}/%{name}-root

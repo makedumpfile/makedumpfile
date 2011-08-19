@@ -6,6 +6,8 @@ makedumpfile \- make a small dumpfile of kdump
 .br
 \fBmakedumpfile\fR \-F [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR
 .br
+\fBmakedumpfile\fR   [\fIOPTION\fR] \-x \fIVMLINUX\fR \-\-config \fIFILTERCONFIGFILE\fR \fIVMCORE\fR \fIDUMPFILE\fR
+.br
 \fBmakedumpfile\fR \-R \fIDUMPFILE\fR
 .br
 \fBmakedumpfile\fR \-\-split [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR \fIDUMPFILE1\fR \fIDUMPFILE2\fR [\fIDUMPFILE3\fR ..]
@@ -54,6 +56,15 @@ the crash utility, and it can be smaller than the ELF format because of the
 compression support. The ELF format is readable with GDB and the crash utility.
 If a user wants to use GDB, \fIDUMPFILE\fR format has to be explicitly
 specified to be the ELF format.
+.PP
+Apart from the exclusion of unnecessary pages mentioned above, makedumpfile
+allows user to filter out targeted kernel data. The filter config file can
+be used to specify kernel/module symbols and its members that need to be
+filtered out through the erase command syntax. makedumpfile reads the filter
+config and builds the list of memory addresses and its sizes after processing
+filter commands. The memory locations that require to be filtered out are
+then poisoned with character 'X' (58 in Hex). Refer to
+\fBmakedumpfile.conf(8)\fR for file format.
 .PP
 To analyze the first kernel's memory usage, makedumpfile can refer to
 \fIVMCOREINFO\fR instead of \fIVMLINUX\fR. \fIVMCOREINFO\fR contains the first
@@ -230,6 +241,13 @@ specified.
 .B Example:
 .br
 # makedumpfile \-g vmcoreinfo \-x vmlinux
+
+.TP
+\fB\-\-config\fR \fIFILTERCONFIGFILE\fR
+Used in conjunction with \-x \fIVMLINUX\fR option, to specify the filter
+config file \fIFILTERCONFIGFILE\fR that contains erase commands to filter out
+desired kernel data from vmcore while creating \fIDUMPFILE\fR. For filter
+command syntax please refer to \fBmakedumpfile.conf(8)\fR.
 
 .TP
 \fB\-F\fR
@@ -482,5 +500,5 @@ Written by Masaki Tachibana, and Ken'ichi Ohmichi.
 
 .SH SEE ALSO
 .PP
-crash(8), gdb(1), kexec(8)
+crash(8), gdb(1), kexec(8), makedumpfile.conf(8)
 

@@ -636,6 +636,11 @@ print_usage(void)
 	MSG("  Creating DUMPFILE:\n");
 	MSG("  # makedumpfile    [-c|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE DUMPFILE\n");
 	MSG("\n");
+	MSG("  Creating DUMPFILE with filtered kernel data specified through filter config\n");
+	MSG("  file:\n");
+	MSG("  # makedumpfile    [-c|-E] [-d DL] -x VMLINUX --config FILTERCONFIGFILE VMCORE\n");
+	MSG("    DUMPFILE\n");
+	MSG("\n");
 	MSG("  Outputting the dump data in the flattened format to the standard output:\n");
 	MSG("  # makedumpfile -F [-c|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
 	MSG("\n");
@@ -713,6 +718,11 @@ print_usage(void)
 	MSG("      kernel. With -i option, a user can specify VMCOREINFO generated on the\n");
 	MSG("      other system that is running the same first kernel. [-x VMLINUX] must\n");
 	MSG("      be specified.\n");
+	MSG("\n");
+	MSG("  [--config FILTERCONFIGFILE]:\n");
+	MSG("      Used in conjunction with -x VMLINUX option, to specify the filter config\n");
+	MSG("      file that contains filter commands to filter out desired kernel data\n");
+	MSG("      from vmcore while creating DUMPFILE.\n");
 	MSG("\n");
 	MSG("  [-F]:\n");
 	MSG("      Output the dump data in the flattened format to the standard output\n");
@@ -7729,6 +7739,9 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	if (info->flag_flatten && info->flag_split)
 		return FALSE;
 
+	if (info->name_filterconfig && !info->name_vmlinux)
+		return FALSE;
+
 	if ((argc == optind + 2) && !info->flag_flatten
 				 && !info->flag_split) {
 		/*
@@ -7821,6 +7834,7 @@ static struct option longopts[] = {
 	{"message-level", required_argument, NULL, 'm'},
 	{"vtop", required_argument, NULL, 'V'},
 	{"dump-dmesg", no_argument, NULL, 'M'}, 
+	{"config", required_argument, NULL, 'C'},
 	{"help", no_argument, NULL, 'h'},
 	{0, 0, 0, 0}
 };
@@ -7850,6 +7864,9 @@ main(int argc, char *argv[])
 		switch (opt) {
 		case 'b':
 			info->block_order = atoi(optarg);
+			break;
+		case 'C':
+			info->name_filterconfig = optarg;
 			break;
 		case 'c':
 			info->flag_compress = 1;

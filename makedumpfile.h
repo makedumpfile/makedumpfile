@@ -888,6 +888,13 @@ struct DumpInfo {
 	unsigned long	vmemmap_end;
 
 	/*
+	 * Filter config file containing filter commands to filter out kernel
+	 * data from vmcore.
+	 */
+	char		*name_filterconfig;
+	FILE		*file_filterconfig;
+
+	/*
 	 * diskdimp info:
 	 */
 	int		block_order;

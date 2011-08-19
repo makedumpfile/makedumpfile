@@ -3352,6 +3352,9 @@ get_pt_note_info(off_t off_note, unsigned long sz_note)
 				return FALSE;
 			}
 			info->p2m_mfn = p2m_mfn;
+		} else if (n_type == NT_ERASE_INFO) {
+			info->offset_eraseinfo = offset_desc;
+			info->size_eraseinfo = size_desc;
 		}
 		offset += offset_next_note(note);
 	}
@@ -4647,6 +4650,15 @@ write_cache_bufsz(struct cache_data *cd)
 }
 
 int
+write_cache_zero(struct cache_data *cd, size_t size)
+{
+	memset(cd->buf + cd->buf_size, 0, size);
+	cd->buf_size += size;
+
+	return write_cache_bufsz(cd);
+}
+
+int
 read_buf_from_stdin(void *buf, int buf_size)
 {
 	int read_size = 0, tmp_read_size = 0;
@@ -5799,10 +5811,12 @@ write_elf_header(struct cache_data *cd_header)
 {
 	int i, num_loads_dumpfile, phnum;
 	off_t offset_note_memory, offset_note_dumpfile;
-	size_t size_note;
+	size_t size_note, size_eraseinfo = 0;
 	Elf64_Ehdr ehdr64;
 	Elf32_Ehdr ehdr32;
 	Elf64_Phdr note;
+	char size_str[MAX_SIZE_STR_LEN];
+	struct filter_info *fl_info = filter_info;
 
 	char *buf = NULL;
 	const off_t failed = (off_t)-1;
@@ -5855,6 +5869,36 @@ write_elf_header(struct cache_data *cd_header)
 	}
 
 	/*
+	 * Pre-calculate the required size to store eraseinfo in ELF note
+	 * section so that we can add enough space in ELF notes section and
+	 * adjust the PT_LOAD offset accordingly.
+	 */
+	while (fl_info) {
+		struct erase_info *ei;
+
+		if (!fl_info->erase_info_idx)
+			continue;
+		ei = &erase_info[fl_info->erase_info_idx];
+		if (fl_info->nullify)
+			sprintf(size_str, "nullify\n");
+		else
+			sprintf(size_str, "%ld\n", fl_info->size);
+
+		size_eraseinfo += strlen("erase ") +
+				strlen(ei->symbol_expr) + 1 +
+				strlen(size_str);
+		fl_info = fl_info->next;
+	}
+
+	/*
+	 * Store the size_eraseinfo for later use in write_elf_eraseinfo()
+	 * function. This will overwrite the size fetched during
+	 * get elf_info() function but we are ok with that.
+	 */
+	info->size_eraseinfo = size_eraseinfo;
+	DEBUG_MSG("erase info size: %lu\n", info->size_eraseinfo);
+
+	/*
 	 * Write a PT_NOTE header.
 	 */
 	if (!(phnum = get_phnum_memory()))
@@ -5884,6 +5928,19 @@ write_elf_header(struct cache_data *cd_header)
 	note.p_offset      = offset_note_dumpfile;
 	size_note          = note.p_filesz;
 
+	/*
+	 * Modify the note size in PT_NOTE header to accomodate eraseinfo data.
+	 * Eraseinfo will be written later.
+	 */
+	if (info->size_eraseinfo) {
+		if (info->flag_elf64_memory)
+			note.p_filesz += sizeof(Elf64_Nhdr);
+		else
+			note.p_filesz += sizeof(Elf32_Nhdr);
+		note.p_filesz += roundup(ERASEINFO_NOTE_NAME_BYTES, 4) +
+					roundup(size_eraseinfo, 4);
+	}
+
 	if (!write_elf_phdr(cd_header, &note))
 		goto out;
 
@@ -5910,10 +5967,14 @@ write_elf_header(struct cache_data *cd_header)
 	    size_note, info->name_dumpfile))
 		goto out;
 
+	/* Set the size_note with new size. */
+	size_note          = note.p_filesz;
+
 	/*
 	 * Set an offset of PT_LOAD segment.
 	 */
 	info->offset_load_dumpfile = offset_note_dumpfile + size_note;
+	info->offset_note_dumpfile = offset_note_dumpfile;
 
 	ret = TRUE;
 out:
@@ -6725,6 +6786,67 @@ out:
 		free(obuf);
 
 	return ret;
+}
+
+int
+write_elf_eraseinfo(struct cache_data *cd_header)
+{
+	char note[MAX_SIZE_NHDR];
+	char buf[ERASEINFO_NOTE_NAME_BYTES + 4];
+	unsigned long note_header_size, size_eraseinfo;
+
+	if (!info->size_eraseinfo)
+		return TRUE;
+
+	DEBUG_MSG("Writing erase info...\n");
+
+	/* calculate the eraseinfo ELF note offset */
+	cd_header->offset = info->offset_note_dumpfile +
+				roundup(info->size_note, 4);
+
+	/* Write eraseinfo ELF note header. */
+	memset(note, 0, sizeof(note));
+	if (info->flag_elf64_memory) {
+		Elf64_Nhdr *nh = (Elf64_Nhdr *)note;
+
+		note_header_size = sizeof(Elf64_Nhdr);
+		nh->n_namesz = ERASEINFO_NOTE_NAME_BYTES;
+		nh->n_descsz = info->size_eraseinfo;
+		nh->n_type = NT_ERASE_INFO;
+	} else {
+		Elf32_Nhdr *nh = (Elf32_Nhdr *)note;
+
+		note_header_size = sizeof(Elf32_Nhdr);
+		nh->n_namesz = ERASEINFO_NOTE_NAME_BYTES;
+		nh->n_descsz = info->size_eraseinfo;
+		nh->n_type = NT_ERASE_INFO;
+	}
+	if (!write_cache(cd_header, note, note_header_size))
+		return FALSE;
+
+	/* Write eraseinfo Note name */
+	memset(buf, 0, sizeof(buf));
+	memcpy(buf, ERASEINFO_NOTE_NAME, ERASEINFO_NOTE_NAME_BYTES);
+	if (!write_cache(cd_header, buf,
+				roundup(ERASEINFO_NOTE_NAME_BYTES, 4)))
+		return FALSE;
+
+	info->offset_eraseinfo = cd_header->offset;
+	if (!write_eraseinfo(cd_header, &size_eraseinfo))
+		return FALSE;
+
+	/*
+	 * The actual eraseinfo written may be less than pre-calculated size.
+	 * Hence fill up the rest of size with zero's.
+	 */
+	if (size_eraseinfo < info->size_eraseinfo)
+		write_cache_zero(cd_header,
+				info->size_eraseinfo - size_eraseinfo);
+
+	DEBUG_MSG("offset_eraseinfo: %lx, size_eraseinfo: %ld\n",
+			info->offset_eraseinfo, info->size_eraseinfo);
+
+	return TRUE;
 }
 
 int
@@ -7580,6 +7702,8 @@ writeout_dumpfile(void)
 		if (!write_elf_header(&cd_header))
 			goto out;
 		if (!write_elf_pages(&cd_header, &cd_page))
+			goto out;
+		if (!write_elf_eraseinfo(&cd_header))
 			goto out;
 	} else {
 		if (!write_kdump_header())

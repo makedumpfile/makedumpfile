@@ -5898,19 +5898,19 @@ extract_filter_info(unsigned long long start_paddr,
 		prev = fi;
 		fi = fi->next;
 	}
-	if (fi) {
-		*fl_info = *fi;
-		fl_info->next = NULL;
-		/* Delete this node */
-		if (!prev)
-			filter_info = fi->next;
-		else
-			prev->next = fi->next;
-		update_erase_info(fi);
-		free(fi);
-		return TRUE;
-	}
-	return FALSE;
+	if (!fi)
+		return FALSE;
+
+	*fl_info = *fi;
+	fl_info->next = NULL;
+	/* Delete this node */
+	if (!prev)
+		filter_info = fi->next;
+	else
+		prev->next = fi->next;
+	update_erase_info(fi);
+	free(fi);
+	return TRUE;
 }
 
 void

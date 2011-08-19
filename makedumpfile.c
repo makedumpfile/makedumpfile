@@ -27,10 +27,13 @@ struct dwarf_info	dwarf_info;
 struct vm_table		vt = { 0 };
 struct DumpInfo		*info = NULL;
 struct module_sym_table	mod_st = { 0 };
+struct filter_info	*filter_info = NULL;
+struct filter_config	filter_config;
 
 char filename_stdout[] = FILENAME_STDOUT;
 int message_level;
 long pointer_size;
+char config_buf[BUFSIZE_FGETS];
 
 /*
  * Forward declarations
@@ -6047,6 +6050,78 @@ get_num_dumpable(void)
 	return num_dumpable;
 }
 
+void
+split_filter_info(struct filter_info *prev, unsigned long long next_paddr,
+						size_t size)
+{
+	struct filter_info *new;
+
+	if ((new = calloc(1, sizeof(struct filter_info))) == NULL) {
+		ERRMSG("Can't allocate memory to split filter info\n");
+		return;
+	}
+	new->nullify = prev->nullify;
+	new->paddr = next_paddr;
+	new->size = size;
+	new->next = prev->next;
+	prev->next = new;
+}
+
+int
+extract_filter_info(unsigned long long start_paddr,
+			unsigned long long end_paddr,
+			struct filter_info *fl_info)
+{
+	struct filter_info *fi = filter_info;
+	struct filter_info *prev = NULL;
+	size_t size1, size2;
+
+	if (!fl_info)
+		return FALSE;
+
+	while (fi) {
+		if ((fi->paddr >= start_paddr) && (fi->paddr < end_paddr)) {
+			size1 = end_paddr - fi->paddr;
+			if (fi->size <= size1)
+				break;
+			size2 = fi->size - size1;
+			fi->size = size1;
+			split_filter_info(fi, fi->paddr + size1, size2);
+			break;
+		}
+		prev = fi;
+		fi = fi->next;
+	}
+	if (fi) {
+		*fl_info = *fi;
+		fl_info->next = NULL;
+		/* Delete this node */
+		if (!prev)
+			filter_info = fi->next;
+		else
+			prev->next = fi->next;
+		free(fi);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+void
+filter_data_buffer(unsigned char *buf, unsigned long long paddr,
+					size_t size)
+{
+	struct filter_info fl_info;
+	unsigned char *buf_ptr;
+
+	while (extract_filter_info(paddr, paddr + size, &fl_info)) {
+		buf_ptr = buf + (fl_info.paddr - paddr);
+		if (fl_info.nullify)
+			memset(buf_ptr, 0, fl_info.size);
+		else
+			memset(buf_ptr, 'X', fl_info.size);
+	}
+}
+
 int
 write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
 		       off_t off_memory, long long size)
@@ -6078,6 +6153,8 @@ write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
 			    info->name_memory, strerror(errno));
 			return FALSE;
 		}
+		filter_data_buffer((unsigned char *)buf, paddr, bufsz_write);
+		paddr += bufsz_write;
 		if (!write_cache(cd_page, buf, bufsz_write))
 			return FALSE;
 
@@ -6296,6 +6373,7 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 			ERRMSG("Can't get the page data.\n");
 			return FALSE;
 		}
+		filter_data_buffer(buf, paddr, info->page_size);
 		return TRUE;
 	}
 
@@ -6318,6 +6396,7 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 		ERRMSG("Can't get the page data.\n");
 		return FALSE;
 	}
+	filter_data_buffer(buf, paddr, size1);
 	if (size1 != info->page_size) {
 		size2 = info->page_size - size1;
 		if (!offset2) {
@@ -6327,6 +6406,7 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 				ERRMSG("Can't get the page data.\n");
 				return FALSE;
 			}
+			filter_data_buffer(buf + size1, paddr + size1, size2);
 		}
 	}
 	return TRUE;
@@ -7689,6 +7769,785 @@ load_module_symbols(void)
 	return TRUE;
 }
 
+void
+free_config_entry(struct config_entry *ce)
+{
+	struct config_entry *p;
+
+	while(ce) {
+		p = ce;
+		ce = p->next;
+		if (p->name)
+			free(p->name);
+		if (p->type_name)
+			free(p->type_name);
+		free(p);
+	}
+}
+
+void
+free_config(struct config *config)
+{
+	if (config) {
+		if (config->module_name)
+			free(config->module_name);
+		if (config->filter_symbol)
+			free_config_entry(config->filter_symbol);
+		if (config->size_symbol)
+			free_config_entry(config->size_symbol);
+		free(config);
+	}
+}
+
+void
+print_config_entry(struct config_entry *ce)
+{
+	while (ce) {
+		DEBUG_MSG("Name: %s\n", ce->name);
+		DEBUG_MSG("Type Name: %s, ", ce->type_name);
+		DEBUG_MSG("flag: %x, ", ce->flag);
+		DEBUG_MSG("Type flag: %lx, ", ce->type_flag);
+		DEBUG_MSG("sym_addr: %llx, ", ce->sym_addr);
+		DEBUG_MSG("addr: %llx, ", ce->addr);
+		DEBUG_MSG("offset: %lx, ", ce->offset);
+		DEBUG_MSG("size: %zd\n", ce->size);
+
+		ce = ce->next;
+	}
+}
+
+/*
+ * Read the non-terminal's which are in the form of <Symbol>[.member[...]]
+ */
+struct config_entry *
+create_config_entry(const char *token, unsigned short flag, int line)
+{
+	struct config_entry *ce = NULL, *ptr, *prev_ce;
+	char *str, *cur, *next;
+	long len;
+	int depth = 0;
+
+	if (!token)
+		return NULL;
+
+	cur = str = strdup(token);
+	prev_ce = ptr = NULL;
+	while (cur != NULL) {
+		if ((next = strchr(cur, '.')) != NULL) {
+			*next++ = '\0';
+		}
+		if (!strlen(cur)) {
+			cur = next;
+			continue;
+		}
+
+		if ((ptr = calloc(1, sizeof(struct config_entry))) == NULL) {
+			ERRMSG("Can't allocate memory for config_entry\n");
+			goto err_out;
+		}
+		ptr->line = line;
+		ptr->flag |= flag;
+		if (depth == 0) {
+			/* First node is always a symbol name */
+			ptr->flag |= SYMBOL_ENTRY;
+		}
+		if (flag & FILTER_ENTRY) {
+			ptr->name = strdup(cur);
+		}
+		if (flag & SIZE_ENTRY) {
+			char ch = '\0';
+			int n = 0;
+			/* See if absolute length is provided */
+			if ((depth == 0) &&
+				((n = sscanf(cur, "%zd%c", &len, &ch)) > 0)) {
+				if (len < 0) {
+					ERRMSG("Config error at %d: size "
+						"value must be positive.\n",
+						line);
+					goto err_out;
+				}
+				ptr->size = len;
+				ptr->flag |= ENTRY_RESOLVED;
+				if (n == 2) {
+					/* Handle suffix.
+					 * K = Kilobytes
+					 * M = Megabytes
+					 */
+					switch (ch) {
+					case 'M':
+					case 'm':
+						ptr->size *= 1024;
+					case 'K':
+					case 'k':
+						ptr->size *= 1024;
+						break;
+					}
+				}
+			}
+			else
+				ptr->name = strdup(cur);
+		}
+		if (prev_ce) {
+			prev_ce->next = ptr;
+			prev_ce = ptr;
+		}
+		else
+			ce = prev_ce = ptr;
+		cur = next;
+		depth++;
+		ptr = NULL;
+	}
+	free(str);
+	return ce;
+
+err_out:
+	if (ce)
+		free_config_entry(ce);
+	if (ptr)
+		free_config_entry(ptr);
+	return NULL;
+}
+
+int
+is_module_loaded(char *mod_name)
+{
+	if (!strcmp(mod_name, "vmlinux") || get_loaded_module(mod_name))
+		return TRUE;
+	return FALSE;
+}
+
+/*
+ * read filter config file and return each string token. If the parameter
+ * expected_token is non-NULL, then return the current token if it matches
+ * with expected_token otherwise save the current token and return NULL.
+ * At start of every module section filter_config.new_section is set to 1 and
+ * subsequent function invocations return NULL untill filter_config.new_section
+ * is reset to 0 by passing @flag = CONFIG_NEW_CMD (0x02).
+ *
+ * Parameters:
+ * @expected_token	INPUT
+ *	Token string to match with currnet token.
+ *	=NULL - return the current available token.
+ *
+ * @flag		INPUT
+ *	=0x01 - Skip to next module section.
+ *	=0x02 - Treat the next token as next filter command and reset.
+ *
+ * @line		OUTPUT
+ *	Line number of current token in filter config file.
+ *
+ * @cur_mod		OUTPUT
+ *	Points to current module section name on non-NULL return value.
+ *
+ * @eof			OUTPUT
+ *	set to -1 when end of file is reached.
+ *	set to -2 when end of section is reached.
+ */
+static char *
+get_config_token(char *expected_token, unsigned char flag, int *line,
+			char **cur_mod, int *eof)
+{
+	char *p;
+	struct filter_config *fc = &filter_config;
+	int skip = flag & CONFIG_SKIP_SECTION;
+
+	if (!fc->file_filterconfig)
+		return NULL;
+
+	if (eof)
+		*eof = 0;
+
+	/*
+	 * set token and saved_token to NULL if skip module section is set
+	 * to 1.
+	 */
+	if (skip) {
+		fc->token = NULL;
+		fc->saved_token = NULL;
+	}
+
+	if (fc->saved_token) {
+		fc->token = fc->saved_token;
+		fc->saved_token = NULL;
+	}
+	else if (fc->token)
+		fc->token = strtok(NULL, " ");
+
+	/* Read next line if we are done all tokens from previous line */
+	while (!fc->token && fgets(config_buf, sizeof(config_buf),
+					fc->file_filterconfig)) {
+		if ((p = strchr(config_buf, '\n'))) {
+			*p = '\0';
+			fc->line_count++;
+		}
+		if ((p = strchr(config_buf, '#'))) {
+			*p = '\0';
+		}
+		/* replace all tabs with spaces */
+		for (p = config_buf; *p != '\0'; p++)
+			if (*p == '\t')
+				*p = ' ';
+		if (config_buf[0] == '[') {
+			/* module section entry */
+			p = strchr(config_buf, ']');
+			if (!p) {
+				ERRMSG("Config error at %d: Invalid module "
+					"section entry.\n", fc->line_count);
+				/* skip to next valid module section */
+				skip = 1;
+			}
+			else {
+				/*
+				 * Found the valid module section. Reset the
+				 * skip flag.
+				 */
+				*p = '\0';
+				if (fc->cur_module)
+					free(fc->cur_module);
+				fc->cur_module = strdup(&config_buf[1]);
+				skip = 0;
+				fc->new_section = 1;
+			}
+			continue;
+		}
+		/*
+		 * If symbol info for current module is not loaded then
+		 * skip to next module section.
+		 */
+		if (skip ||
+			(fc->cur_module && !is_module_loaded(fc->cur_module)))
+			continue;
+
+		fc->token = strtok(config_buf, " ");
+	}
+	if (!fc->token) {
+		if (eof)
+			*eof = -1;
+		return NULL;
+	}
+	if (fc->new_section && !(flag & CONFIG_NEW_CMD)) {
+		fc->saved_token = fc->token;
+		if (eof)
+			*eof = -2;
+		return NULL;
+	}
+	else
+		fc->new_section = 0;
+
+	if (cur_mod)
+		*cur_mod = fc->cur_module;
+
+	if (line)
+		*line = fc->line_count;
+
+	if (expected_token && strcmp(fc->token, expected_token)) {
+		fc->saved_token = fc->token;
+		return NULL;
+	}
+	return fc->token;
+}
+
+static int
+read_size_entry(struct config *config, int line)
+{
+	char *token = get_config_token(NULL, 0, &line, NULL, NULL);
+
+	if (!token || IS_KEYWORD(token)) {
+		ERRMSG("Config error at %d: expected size symbol after"
+		" 'size' keyword.\n", line);
+		return FALSE;
+	}
+	config->size_symbol = create_config_entry(token, SIZE_ENTRY, line);
+	if (!config->size_symbol) {
+		ERRMSG("Error at line %d: Failed to read size symbol\n",
+									line);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/*
+ * Read erase command entry. The erase command syntax is:
+ *
+ *	erase <Symbol>[.member[...]] [size <SizeValue>[K|M]]
+ *	erase <Symbol>[.member[...]] [size <SizeSymbol>]
+ *	erase <Symbol>[.member[...]] [nullify]
+ */
+static int
+read_filter_entry(struct config *config, int line)
+{
+	char *token = get_config_token(NULL, 0, &line, NULL, NULL);
+
+	if (!token || IS_KEYWORD(token)) {
+		ERRMSG("Config error at %d: expected kernel symbol after"
+		" 'erase' command.\n", line);
+		return FALSE;
+	}
+	config->filter_symbol =
+			create_config_entry(token, FILTER_ENTRY, line);
+	if (!config->filter_symbol) {
+		ERRMSG("Error at line %d: Failed to read filter symbol\n",
+									line);
+		return FALSE;
+	}
+	if (get_config_token("nullify", 0, &line, NULL, NULL)) {
+		config->filter_symbol->nullify = 1;
+	}
+	else if (get_config_token("size", 0, &line, NULL, NULL)) {
+		if (!read_size_entry(config, line))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+/*
+ * Configuration file 'makedumpfile.conf' contains filter commands.
+ * Every individual filter command is considered as a config entry. A config
+ * entry can be provided on a single line or multiple lines.
+ */
+struct config *
+get_config(int skip)
+{
+	struct config *config;
+	char *token = NULL;
+	static int line_count = 0;
+	char *cur_module = NULL;
+	int eof = 0;
+	unsigned char flag = CONFIG_NEW_CMD | skip;
+
+	if ((config = calloc(1, sizeof(struct config))) == NULL)
+		return NULL;
+
+	if (get_config_token("erase", flag, &line_count, &cur_module, &eof)) {
+		if (cur_module)
+			config->module_name = strdup(cur_module);
+
+		if (!read_filter_entry(config, line_count))
+			goto err_out;
+	}
+	else {
+		if (!eof) {
+			token = get_config_token(NULL, 0, &line_count,
+								NULL, NULL);
+			ERRMSG("Config error at %d: Invalid token '%s'.\n",
+							line_count, token);
+		}
+		goto err_out;
+	}
+	return config;
+err_out:
+	if (config)
+		free_config(config);
+	return NULL;
+}
+
+static unsigned long long
+read_pointer_value(unsigned long long addr)
+{
+	uint32_t val_32;
+	uint64_t val_64;
+
+	switch (pointer_size) {
+	case 4:
+		if (!readmem(VADDR, addr, &val_32, sizeof(val_32))) {
+			ERRMSG("Can't read pointer value\n");
+			return 0;
+		}
+		return (unsigned long long)val_32;
+		break;
+	case 8:
+		if (!readmem(VADDR, addr, &val_64, sizeof(val_64))) {
+			ERRMSG("Can't read pointer value\n");
+			return 0;
+		}
+		return (unsigned long long)val_64;
+		break;
+	}
+	return 0;
+}
+
+int
+resolve_config_entry(struct config_entry *ce, unsigned long long base_addr,
+						char *base_struct_name)
+{
+	char buf[BUFSIZE + 1];
+
+	if (ce->flag & SYMBOL_ENTRY) {
+		/* find the symbol info */
+		if (!ce->name)
+			return FALSE;
+
+		ce->sym_addr = get_symbol_addr(ce->name);
+		if (!ce->sym_addr) {
+			ERRMSG("Config error at %d: Can't find symbol '%s'.\n",
+							ce->line, ce->name);
+			return FALSE;
+		}
+		ce->type_name = get_symbol_type_name(ce->name,
+					DWARF_INFO_GET_SYMBOL_TYPE,
+					&ce->size, &ce->type_flag);
+		if (ce->type_flag & TYPE_ARRAY) {
+			ce->array_length = get_array_length(ce->name, NULL,
+					DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH);
+			if (ce->array_length < 0)
+				ce->array_length = 0;
+		}
+	}
+	else {
+		/* find the member offset */
+		ce->offset = get_member_offset(base_struct_name,
+				ce->name, DWARF_INFO_GET_MEMBER_OFFSET);
+		ce->sym_addr = base_addr + ce->offset;
+		ce->type_name = get_member_type_name(base_struct_name,
+				ce->name, DWARF_INFO_GET_MEMBER_TYPE,
+				&ce->size, &ce->type_flag);
+		if (ce->type_flag & TYPE_ARRAY) {
+			ce->array_length = get_array_length(base_struct_name,
+					ce->name,
+					DWARF_INFO_GET_MEMBER_ARRAY_LENGTH);
+			if (ce->array_length < 0)
+				ce->array_length = 0;
+		}
+	}
+	if (ce->type_name == NULL) {
+		if (!(ce->flag & SYMBOL_ENTRY))
+			ERRMSG("Config error at %d: struct '%s' has no member"
+				" with name '%s'.\n",
+				ce->line, base_struct_name, ce->name);
+		return FALSE;
+	}
+	ce->addr = ce->sym_addr;
+	if (ce->size < 0)
+		ce->size = 0;
+	if ((ce->type_flag & (TYPE_ARRAY | TYPE_PTR)) == TYPE_PTR) {
+		/* If it's a pointer variable (not array) then read the
+		 * pointer value. */
+		ce->addr = read_pointer_value(ce->sym_addr);
+
+		/*
+		 * if it is a void pointer then reset the size to 0
+		 * User need to provide a size to filter data referenced
+		 * by 'void *' pointer.
+		 */
+		if (!strcmp(ce->type_name, "void"))
+			ce->size = 0;
+
+	}
+	if ((ce->type_flag & TYPE_BASE) && (ce->type_flag & TYPE_PTR)) {
+		/*
+		 * Determine the string length for 'char' pointer.
+		 * BUFSIZE(1024) is the upper limit for string length.
+		 */
+		if (!strcmp(ce->type_name, "char")) {
+			if (readmem(VADDR, ce->addr, buf, BUFSIZE)) {
+				buf[BUFSIZE] = '\0';
+				ce->size = strlen(buf);
+			}
+		}
+	}
+	if (!ce->next && (ce->flag & SIZE_ENTRY)) {
+		void *val;
+
+		/* leaf node of size entry */
+		/* If it is size argument then update the size with data
+		 * value of this symbol/member.
+		 * Check if current symbol/member is of base data type.
+		 */
+
+		if (((ce->type_flag & (TYPE_ARRAY | TYPE_BASE)) != TYPE_BASE)
+				|| (ce->size > sizeof(long))) {
+			ERRMSG("Config error at %d: size symbol/member '%s' "
+				"is not of base type.\n", ce->line, ce->name);
+			return FALSE;
+		}
+		if ((val = calloc(1, ce->size)) == NULL) {
+			ERRMSG("Can't get memory for size parameter\n");
+			return FALSE;
+		}
+
+		if (!readmem(VADDR, ce->addr, val, ce->size)) {
+			ERRMSG("Can't read symbol/member data value\n");
+			return FALSE;
+		}
+		switch (ce->size) {
+		case 1:
+			ce->size = (long)(*((uint8_t *)val));
+			break;
+		case 2:
+			ce->size = (long)(*((uint16_t *)val));
+			break;
+		case 4:
+			ce->size = (long)(*((uint32_t *)val));
+			break;
+		case 8:
+			ce->size = (long)(*((uint64_t *)val));
+			break;
+		}
+		free(val);
+	}
+	ce->flag |= ENTRY_RESOLVED;
+	return TRUE;
+}
+
+unsigned long long
+get_config_symbol_addr(struct config_entry *ce,
+			unsigned long long base_addr,
+			char *base_struct_name)
+{
+	if (!(ce->flag & ENTRY_RESOLVED)) {
+		if (!resolve_config_entry(ce, base_addr, base_struct_name))
+			return 0;
+	}
+
+	if (ce->next && ce->addr) {
+		/* Populate nullify flag down the list */
+		ce->next->nullify = ce->nullify;
+		return get_config_symbol_addr(ce->next, ce->addr,
+							ce->type_name);
+	}
+	else if (ce->nullify) {
+		/* nullify is applicable to pointer type */
+		if (ce->type_flag & TYPE_PTR)
+			return ce->sym_addr;
+		else
+			return 0;
+	}
+	else
+		return ce->addr;
+}
+
+long
+get_config_symbol_size(struct config_entry *ce,
+			unsigned long long base_addr,
+			char *base_struct_name)
+{
+	if (!(ce->flag & ENTRY_RESOLVED)) {
+		if (!resolve_config_entry(ce, base_addr, base_struct_name))
+			return 0;
+	}
+
+	if (ce->next && ce->addr)
+		return get_config_symbol_size(ce->next, ce->addr,
+							ce->type_name);
+	else {
+		if (ce->type_flag & TYPE_ARRAY) {
+			if (ce->type_flag & TYPE_PTR)
+				return ce->array_length * pointer_size;
+			else
+				return ce->array_length * ce->size;
+		}
+		return ce->size;
+	}
+}
+
+/*
+ * Insert the filter info node using insertion sort.
+ * If filter node for a given paddr is aready present then update the size
+ * and delete the fl_info node passed.
+ */
+void
+insert_filter_info(struct filter_info *fl_info)
+{
+	struct filter_info *prev = NULL;
+	struct filter_info *ptr = filter_info;
+
+	if (!ptr) {
+		filter_info = fl_info;
+		return;
+	}
+
+	while (ptr) {
+		if (fl_info->paddr <= ptr->paddr)
+			break;
+		prev = ptr;
+		ptr = ptr->next;
+	}
+	if (ptr && (fl_info->paddr == ptr->paddr)) {
+		if (fl_info->size > ptr->size)
+			ptr->size = fl_info->size;
+		free(fl_info);
+		return;
+	}
+
+	if (prev) {
+		fl_info->next = ptr;
+		prev->next = fl_info;
+	}
+	else {
+		fl_info->next = filter_info;
+		filter_info = fl_info;
+	}
+	return;
+}
+
+int
+update_filter_info(struct config_entry *filter_symbol,
+			struct config_entry *size_symbol)
+{
+	unsigned long long addr;
+	long size;
+	struct filter_info *fl_info;
+
+	addr = get_config_symbol_addr(filter_symbol, 0, NULL);
+	if (message_level & ML_PRINT_DEBUG_MSG)
+		print_config_entry(filter_symbol);
+	if (!addr)
+		return FALSE;
+
+	if (filter_symbol->nullify)
+		size = pointer_size;
+	else if (size_symbol) {
+		size = get_config_symbol_size(size_symbol, 0, NULL);
+		if (message_level & ML_PRINT_DEBUG_MSG)
+			print_config_entry(size_symbol);
+	}
+	else
+		size = get_config_symbol_size(filter_symbol, 0, NULL);
+
+	if (size <= 0)
+		return FALSE;
+
+	if ((fl_info = calloc(1, sizeof(struct filter_info))) == NULL) {
+		ERRMSG("Can't allocate filter info\n");
+		return FALSE;
+	}
+	fl_info->address = addr;
+	fl_info->paddr = vaddr_to_paddr(addr);
+	fl_info->size = size;
+	fl_info->nullify = filter_symbol->nullify;
+
+	insert_filter_info(fl_info);
+	return TRUE;
+}
+
+/*
+ * Process the config entry that has been read by get_config.
+ * return TRUE on success
+ */
+int
+process_config(struct config *config)
+{
+	update_filter_info(config->filter_symbol, config->size_symbol);
+
+	return TRUE;
+}
+
+void
+print_filter_info()
+{
+	struct filter_info *fl_info = filter_info;
+
+	DEBUG_MSG("\n");
+	while (fl_info) {
+		DEBUG_MSG("filter address: paddr (%llx), sym_addr (%llx),"
+			" Size (%ld)\n",
+			fl_info->paddr, fl_info->address, fl_info->size);
+		fl_info = fl_info->next;
+	}
+}
+
+void
+init_filter_config()
+{
+	filter_config.name_filterconfig = info->name_filterconfig;
+	filter_config.file_filterconfig = info->file_filterconfig;
+	filter_config.saved_token = NULL;
+	filter_config.token = NULL;
+	filter_config.cur_module = NULL;
+	filter_config.new_section = 0;
+	filter_config.line_count = 0;
+}
+
+/*
+ * Read and process each config entry (filter commands) from filter config
+ * file. If no module debuginfo found for specified module section then skip
+ * to next module section.
+ */
+int
+process_config_file(const char *name_config)
+{
+	struct config *config;
+	int skip_section = 0;
+
+	if (!name_config)
+		return FALSE;
+
+	if ((info->file_filterconfig = fopen(name_config, "r")) == NULL) {
+		ERRMSG("Can't open config file(%s). %s\n",
+		    name_config, strerror(errno));
+		return FALSE;
+	}
+
+	init_filter_config();
+
+	while((config = get_config(skip_section)) != NULL) {
+		skip_section = 0;
+		if (config->module_name &&
+				strcmp(config->module_name, "vmlinux")) {
+			/*
+			 * if Module debuginfo is not available, then skip to
+			 * next module section.
+			 */
+			if (!set_dwarf_debuginfo(config->module_name,
+								NULL, -1)) {
+				ERRMSG("Skipping to next Module section\n");
+				skip_section = 1;
+				free_config(config);
+				continue;
+			}
+		}
+		else {
+			set_dwarf_debuginfo("vmlinux", info->name_vmlinux,
+							info->fd_vmlinux);
+		}
+		process_config(config);
+		free_config(config);
+	}
+
+	fclose(info->file_filterconfig);
+	print_filter_info();
+	return TRUE;
+}
+
+int
+gather_filter_info()
+{
+	int ret;
+
+	/*
+	 * Before processing filter config file, load the symbol data of
+	 * loaded modules from vmcore.
+	 */
+	set_dwarf_debuginfo("vmlinux", info->name_vmlinux, info->fd_vmlinux);
+	if (!load_module_symbols())
+		return FALSE;
+
+	ret = process_config_file(info->name_filterconfig);
+
+	/*
+	 * Remove modules symbol information, we dont need now.
+	 * Reset the dwarf debuginfo to vmlinux to close open file
+	 * descripter of module debuginfo file, if any.
+	 */
+	clean_module_symbols();
+	set_dwarf_debuginfo("vmlinux", info->name_vmlinux, info->fd_vmlinux);
+	return ret;
+}
+
+void
+clear_filter_info(void)
+{
+	struct filter_info *prev, *fi = filter_info;
+
+	/* Delete filter_info nodes that are left out. */
+	while (fi) {
+		prev = fi;
+		fi = fi->next;
+		free(prev);
+	}
+	filter_info = NULL;
+}
+
 int
 create_dumpfile(void)
 {
@@ -7724,6 +8583,9 @@ retry:
 		}
 	}
 
+	if (info->name_filterconfig && !gather_filter_info())
+		return FALSE;
+
 	if (!create_dump_bitmap())
 		return FALSE;
 
@@ -7750,6 +8612,7 @@ retry:
 	}
 	print_report();
 
+	clear_filter_info();
 	if (!close_files_for_creating_dumpfile())
 		return FALSE;
 

@@ -226,6 +226,7 @@ do { \
 #define BITPERBYTE		(8)
 #define PGMM_CACHED		(512)
 #define PFN_EXCLUDED		(256)
+#define BUFSIZE			(1024)
 #define BUFSIZE_FGETS		(1500)
 #define BUFSIZE_BITMAP		(4096)
 #define PFN_BUFBITMAP		(BITPERBYTE*BUFSIZE_BITMAP)
@@ -1276,6 +1277,65 @@ struct dwarf_info {
 #define TYPE_STRUCT	0x08
 
 extern struct dwarf_info	dwarf_info;
+
+/*
+ * Filtering information
+ */
+struct filter_info {
+	unsigned long long      address;
+	unsigned long long      paddr;
+	long			size;
+	struct filter_info      *next;
+	unsigned short          nullify;
+};
+
+struct config_entry {
+	char			*name;
+	char			*type_name;
+	unsigned short		flag;
+	unsigned short		nullify;
+	unsigned long long	sym_addr;	/* Symbol address */
+	unsigned long long	addr;		/* Symbol address or
+						   value pointed by sym_addr */
+	unsigned long		offset;
+	unsigned long		type_flag;
+	long			array_length;
+	long			size;
+	int			line;	/* Line number in config file. */
+	struct config_entry	*next;
+};
+
+/* flags for config_entry.flag */
+#define FILTER_ENTRY	0x0001
+#define SIZE_ENTRY	0x0002
+#define SYMBOL_ENTRY	0x0010
+#define ENTRY_RESOLVED	0x8000
+
+/*
+ * Filter config information
+ */
+struct filter_config {
+	char		*name_filterconfig;
+	FILE		*file_filterconfig;
+	char		*cur_module;
+	char		*saved_token;
+	char		*token;
+	int		new_section;
+	int		line_count;
+};
+
+#define CONFIG_SKIP_SECTION	0x01
+#define CONFIG_NEW_CMD		0x02
+
+struct config {
+	char			*module_name;
+	struct config_entry	*filter_symbol;
+	struct config_entry	*size_symbol;
+};
+
+#define IS_KEYWORD(tkn)	\
+	(!strcmp(tkn, "erase") || !strcmp(tkn, "size") || \
+	!strcmp(tkn, "nullify"))
 
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 off_t paddr_to_offset(unsigned long long paddr);

@@ -9,6 +9,7 @@ CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
 	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
 CFLAGS_ARCH	= -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
 		    -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+# LDFLAGS = -L/usr/local/lib -I/usr/local/include
 
 ARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
 			       -e s/arm.*/arm/ -e s/sa110/arm/ \
@@ -32,7 +33,7 @@ $(OBJ_ARCH): $(SRC_ARCH)
 	$(CC) $(CFLAGS_ARCH) -c -o ./$@ ./$(@:.o=.c) 
 
 makedumpfile: $(SRC) $(OBJ_ARCH)
-	$(CC) $(CFLAGS) $(OBJ_ARCH) -o $@ $< -static -ldw -lelf -lz
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ_ARCH) -o $@ $< -static -ldw -lbz2 -lebl -ldl -lelf -lz
 	echo .TH MAKEDUMPFILE 8 \"$(DATE)\" \"makedumpfile v$(VERSION)\" \"Linux System Administrator\'s Manual\" > temp.8
 	grep -v "^.TH MAKEDUMPFILE 8" makedumpfile.8 >> temp.8
 	mv temp.8 makedumpfile.8

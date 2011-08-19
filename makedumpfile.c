@@ -7641,11 +7641,9 @@ load_module_symbols(void)
 	unsigned int i = 0, nsym;
 
 	head = SYMBOL(modules);
-	if (!get_num_modules(head, &mod_st.num_modules)) {
+	if (!get_num_modules(head, &mod_st.num_modules) ||
+	    !mod_st.num_modules) {
 		ERRMSG("Can't get module count\n");
-		return FALSE;
-	}
-	if (!mod_st.num_modules) {
 		return FALSE;
 	}
 	mod_st.modules = calloc(mod_st.num_modules,

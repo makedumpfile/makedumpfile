@@ -1218,7 +1218,6 @@ enum {
 	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE,
 	DWARF_INFO_GET_SYMBOL_TYPE,
 	DWARF_INFO_GET_MEMBER_TYPE,
-	DWARF_INFO_GET_PTR_SIZE,
 };
 
 struct dwarf_info {
@@ -1284,7 +1283,7 @@ struct config_entry {
 	unsigned short		flag;
 	unsigned short		nullify;
 	unsigned long long	sym_addr;	/* Symbol address */
-	unsigned long long	addr;		/* Symbol address or
+	unsigned long		addr;		/* Symbol address or
 						   value pointed by sym_addr */
 	unsigned long long	cmp_addr;	/* for LIST_ENTRY */
 	unsigned long		offset;

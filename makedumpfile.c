@@ -34,7 +34,6 @@ struct erase_info	*erase_info = NULL;
 unsigned long		num_erase_info = 1; /* Node 0 is unused. */
 
 char filename_stdout[] = FILENAME_STDOUT;
-long pointer_size;
 char config_buf[BUFSIZE_FGETS];
 
 /*
@@ -2048,10 +2047,6 @@ get_debug_info(void)
 	 */
 	while (dwarf_nextcu(dwarfd, off, &next_off, &header_size,
 	    &abbrev_offset, &address_size, &offset_size) == 0) {
-		if (dwarf_info.cmd == DWARF_INFO_GET_PTR_SIZE) {
-			dwarf_info.struct_size = address_size;
-			break;
-		}
 		off += header_size;
 		if (dwarf_offdie(dwarfd, off, &cu_die) == NULL) {
 			ERRMSG("Can't get CU die.\n");
@@ -2095,14 +2090,7 @@ get_structure_size(char *structname, int flag_typedef)
 long
 get_pointer_size()
 {
-	dwarf_info.cmd = DWARF_INFO_GET_PTR_SIZE;
-	/* reuse struct_size member to report pointer size */
-	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
-
-	if (!get_debug_info())
-		return FAILED_DWARFINFO;
-
-	return dwarf_info.struct_size;
+	return sizeof(void *);
 }
 
 /*
@@ -2274,8 +2262,6 @@ get_symbol_info(void)
 		SYMBOL_ARRAY_LENGTH_INIT(mem_section, "mem_section");
 	if (SYMBOL(node_memblk) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_LENGTH_INIT(node_memblk, "node_memblk");
-
-	pointer_size = get_pointer_size();
 
 	return TRUE;
 }
@@ -7746,7 +7732,7 @@ __load_module_symbol(struct module_info *modules, unsigned long addr_module)
 		 * situation we depend on pointer_size that is
 		 * extracted from vmlinux dwarf information.
 		 */
-		if ((pointer_size * 8) == 64) {
+		if ((get_pointer_size() * 8) == 64) {
 			sym64 = (Elf64_Sym *) (symtab_mem
 					+ (nsym * sizeof(Elf64_Sym)));
 			modules->sym_info[nsym].value =
@@ -7864,7 +7850,7 @@ print_config_entry(struct config_entry *ce)
 		DEBUG_MSG("flag: %x, ", ce->flag);
 		DEBUG_MSG("Type flag: %lx, ", ce->type_flag);
 		DEBUG_MSG("sym_addr: %llx, ", ce->sym_addr);
-		DEBUG_MSG("addr: %llx, ", ce->addr);
+		DEBUG_MSG("addr: %lx, ", ce->addr);
 		DEBUG_MSG("offset: %lx, ", ce->offset);
 		DEBUG_MSG("size: %zd\n", ce->size);
 
@@ -8399,29 +8385,16 @@ err_out:
 	return NULL;
 }
 
-static unsigned long long
+static unsigned long
 read_pointer_value(unsigned long long addr)
 {
-	uint32_t val_32;
-	uint64_t val_64;
+	unsigned long val;
 
-	switch (pointer_size) {
-	case 4:
-		if (!readmem(VADDR, addr, &val_32, sizeof(val_32))) {
-			ERRMSG("Can't read pointer value\n");
-			return 0;
-		}
-		return (unsigned long long)val_32;
-		break;
-	case 8:
-		if (!readmem(VADDR, addr, &val_64, sizeof(val_64))) {
-			ERRMSG("Can't read pointer value\n");
-			return 0;
-		}
-		return (unsigned long long)val_64;
-		break;
+	if (!readmem(VADDR, addr, &val, sizeof(val))) {
+		ERRMSG("Can't read pointer value\n");
+		return 0;
 	}
-	return 0;
+	return val;
 }
 
 int
@@ -8621,7 +8594,7 @@ get_config_symbol_addr(struct config_entry *ce,
 			unsigned long long base_addr,
 			char *base_struct_name)
 {
-	unsigned long long addr = 0;
+	unsigned long addr = 0;
 
 	if (!(ce->flag & ENTRY_RESOLVED)) {
 		if (!resolve_config_entry(ce, base_addr, base_struct_name))
@@ -8646,7 +8619,7 @@ get_config_symbol_addr(struct config_entry *ce,
 				 */
 				while (ce->index < ce->array_length) {
 					addr = read_pointer_value(ce->addr +
-						(ce->index * pointer_size));
+						(ce->index * get_pointer_size()));
 					ce->index++;
 					if (addr)
 						break;
@@ -8728,7 +8701,7 @@ get_config_symbol_size(struct config_entry *ce,
 	else {
 		if (ce->type_flag & TYPE_ARRAY) {
 			if (ce->type_flag & TYPE_PTR)
-				return ce->array_length * pointer_size;
+				return ce->array_length * get_pointer_size();
 			else
 				return ce->array_length * ce->size;
 		}
@@ -8909,7 +8882,7 @@ update_filter_info(struct config_entry *filter_symbol,
 		return FALSE;
 
 	if (filter_symbol->nullify)
-		size = pointer_size;
+		size = get_pointer_size();
 	else if (size_symbol) {
 		size = get_config_symbol_size(size_symbol, 0, NULL);
 		if (message_level & ML_PRINT_DEBUG_MSG)

@@ -1242,7 +1242,10 @@ enum {
 	DWARF_INFO_GET_TYPEDEF_SIZE,
 	DWARF_INFO_GET_TYPEDEF_SRCNAME,
 	DWARF_INFO_GET_ENUM_NUMBER,
-	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE
+	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE,
+	DWARF_INFO_GET_SYMBOL_TYPE,
+	DWARF_INFO_GET_MEMBER_TYPE,
+	DWARF_INFO_GET_PTR_SIZE,
 };
 
 struct dwarf_info {
@@ -1257,12 +1260,20 @@ struct dwarf_info {
 	Elf	*elfd;			/* OUT */
 	Dwarf	*dwarfd;		/* OUT */
 	Dwfl	*dwfl;			/* OUT */
+	char	*type_name;		/* OUT */
 	long	struct_size;		/* OUT */
 	long	member_offset;		/* OUT */
 	long	array_length;		/* OUT */
 	long	enum_number;		/* OUT */
+	unsigned char	type_flag;	/* OUT */
 	char	src_name[LEN_SRCFILE];	/* OUT */
 };
+
+/* flags for dwarf_info.type_flag */
+#define TYPE_BASE	0x01
+#define TYPE_ARRAY	0x02
+#define TYPE_PTR	0x04
+#define TYPE_STRUCT	0x08
 
 extern struct dwarf_info	dwarf_info;
 

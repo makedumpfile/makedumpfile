@@ -30,6 +30,7 @@ struct module_sym_table	mod_st = { 0 };
 
 char filename_stdout[] = FILENAME_STDOUT;
 int message_level;
+long pointer_size;
 
 /*
  * Forward declarations
@@ -1822,6 +1823,41 @@ check_array_type(Dwarf *dwarfd, Dwarf_Die *die)
 	return TRUE;
 }
 
+static int
+get_dwarf_base_type(Dwarf *dwarfd, Dwarf_Die *die)
+{
+	int tag;
+	const char *name;
+
+	while (get_die_type(dwarfd, die, die)) {
+		tag = dwarf_tag(die);
+		switch (tag) {
+		case DW_TAG_array_type:
+			dwarf_info.type_flag |= TYPE_ARRAY;
+			break;
+		case DW_TAG_pointer_type:
+			dwarf_info.type_flag |= TYPE_PTR;
+			break;
+		case DW_TAG_structure_type:
+			dwarf_info.type_flag |= TYPE_STRUCT;
+			break;
+		case DW_TAG_base_type:
+			dwarf_info.type_flag |= TYPE_BASE;
+			break;
+		}
+	}
+
+	name = dwarf_diename(die);
+	if (name)
+		dwarf_info.type_name = strdup(name);
+	else if (dwarf_info.type_flag == TYPE_PTR)
+		dwarf_info.type_name = strdup("void");
+
+	dwarf_info.struct_size = dwarf_bytesize(die);
+
+	return TRUE;
+}
+
 /*
  * Function for searching struct page.union.struct.mapping.
  */
@@ -1902,6 +1938,15 @@ search_member(Dwarf *dwarfd, Dwarf_Die *die)
 			continue;
 
 		switch (dwarf_info.cmd) {
+		case DWARF_INFO_GET_MEMBER_TYPE:
+			if ((!name) || strcmp(name, dwarf_info.member_name))
+				continue;
+			/*
+			 * Get the member offset.
+			 */
+			if (!get_dwarf_base_type(dwarfd, walker))
+				continue;
+			return;
 		case DWARF_INFO_GET_MEMBER_OFFSET:
 			if ((!name) || strcmp(name, dwarf_info.member_name))
 				continue;
@@ -1964,6 +2009,7 @@ is_search_structure(int cmd)
 {
 	if ((cmd == DWARF_INFO_GET_STRUCT_SIZE)
 	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET)
+	    || (cmd == DWARF_INFO_GET_MEMBER_TYPE)
 	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION)
 	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION)
 	    || (cmd == DWARF_INFO_GET_MEMBER_ARRAY_LENGTH))
@@ -1985,6 +2031,7 @@ int
 is_search_symbol(int cmd)
 {
 	if ((cmd == DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)
+	    || (cmd == DWARF_INFO_GET_SYMBOL_TYPE)
 	    || (cmd == DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE))
 		return TRUE;
 	else
@@ -2041,6 +2088,7 @@ search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	switch (dwarf_info.cmd) {
 	case DWARF_INFO_GET_STRUCT_SIZE:
 		break;
+	case DWARF_INFO_GET_MEMBER_TYPE:
 	case DWARF_INFO_GET_MEMBER_OFFSET:
 	case DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION:
 	case DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION:
@@ -2173,6 +2221,9 @@ search_symbol(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	case DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE:
 		check_array_type(dwarfd, die);
 		break;
+	case DWARF_INFO_GET_SYMBOL_TYPE:
+		get_dwarf_base_type(dwarfd, die);
+		break;
 	}
 }
 
@@ -2249,6 +2300,10 @@ get_debug_info(void)
 	 */
 	while (dwarf_nextcu(dwarfd, off, &next_off, &header_size,
 	    &abbrev_offset, &address_size, &offset_size) == 0) {
+		if (dwarf_info.cmd == DWARF_INFO_GET_PTR_SIZE) {
+			dwarf_info.struct_size = address_size;
+			break;
+		}
 		off += header_size;
 		if (dwarf_offdie(dwarfd, off, &cu_die) == NULL) {
 			ERRMSG("Can't get CU die.\n");
@@ -2287,6 +2342,47 @@ get_structure_size(char *structname, int flag_typedef)
 }
 
 /*
+ * Get the size of pointer.
+ */
+long
+get_pointer_size()
+{
+	dwarf_info.cmd = DWARF_INFO_GET_PTR_SIZE;
+	/* reuse struct_size member to report pointer size */
+	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
+
+	if (!get_debug_info())
+		return FAILED_DWARFINFO;
+
+	return dwarf_info.struct_size;
+}
+
+/*
+ * Get the type of given symbol.
+ */
+char *
+get_symbol_type_name(char *symname, int cmd, long *size,
+					unsigned long *flag)
+{
+	dwarf_info.cmd = cmd;
+	dwarf_info.symbol_name = symname;
+	dwarf_info.type_name = NULL;
+	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
+	dwarf_info.type_flag = 0;
+
+	if (!get_debug_info())
+		return NULL;
+
+	if (size)
+		*size = dwarf_info.struct_size;
+
+	if (flag)
+		*flag = dwarf_info.type_flag;
+
+	return dwarf_info.type_name;
+}
+
+/*
  * Get the offset of member.
  */
 long
@@ -2302,6 +2398,35 @@ get_member_offset(char *structname, char *membername, int cmd)
 		return FAILED_DWARFINFO;
 
 	return dwarf_info.member_offset;
+}
+
+/*
+ * Get the type name and size of member.
+ */
+char *
+get_member_type_name(char *structname, char *membername, int cmd, long *size,
+						unsigned long *flag)
+{
+	dwarf_info.cmd = cmd;
+	dwarf_info.struct_name = structname;
+	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
+	dwarf_info.member_name = membername;
+	dwarf_info.type_name = NULL;
+	dwarf_info.type_flag = 0;
+
+	if (!get_debug_info())
+		return NULL;
+
+	if (dwarf_info.struct_size == NOT_FOUND_STRUCTURE)
+		return NULL;
+
+	if (size)
+		*size = dwarf_info.struct_size;
+
+	if (flag)
+		*flag = dwarf_info.type_flag;
+
+	return dwarf_info.type_name;
 }
 
 /*
@@ -2401,6 +2526,8 @@ get_symbol_info(void)
 		SYMBOL_ARRAY_LENGTH_INIT(mem_section, "mem_section");
 	if (SYMBOL(node_memblk) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_LENGTH_INIT(node_memblk, "node_memblk");
+
+	pointer_size = get_pointer_size();
 
 	return TRUE;
 }
@@ -7519,13 +7646,16 @@ load_module_symbols(void)
 		for (nsym = 1; nsym < num_symtab; nsym++) {
 			Elf32_Sym *sym32;
 			Elf64_Sym *sym64;
-			/*
-			 * We can not depend on info->flag_elf64_memory if
-			 * the input vmcore file is kdump-compressed format.
-			 * We will fix this in the next patch and remove the
-			 * dependancy on info->flag_elf64_memory.
+			/* If case of ELF vmcore then the word size can be
+			 * determined using info->flag_elf64_memory flag.
+			 * But in case of kdump-compressed dump, kdump header
+			 * does not carry word size info. May be in future
+			 * this info will be available in kdump header.
+			 * Until then, in order to make this logic work on both
+			 * situation we depend on pointer_size that is
+			 * extracted from vmlinux dwarf information.
 			 */
-			if (info->flag_elf64_memory) {
+			if ((pointer_size * 8) == 64) {
 				sym64 = (Elf64_Sym *) (symtab_mem
 						+ (nsym * sizeof(Elf64_Sym)));
 				sym_info[nsym].value =

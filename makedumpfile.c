@@ -1746,7 +1746,7 @@ get_data_member_location(Dwarf_Die *die, long *offset)
 }
 
 static int
-get_die_type(Dwarf *dwarfd, Dwarf_Die *die, Dwarf_Die *die_type)
+get_die_type(Dwarf_Die *die, Dwarf_Die *die_type)
 {
 	Dwarf_Attribute attr;
 
@@ -1761,14 +1761,14 @@ get_die_type(Dwarf *dwarfd, Dwarf_Die *die, Dwarf_Die *die_type)
 }
 
 static int
-get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
+get_data_array_length(Dwarf_Die *die)
 {
 	int tag;
 	Dwarf_Attribute attr;
 	Dwarf_Die die_type;
 	Dwarf_Word upper_bound;
 
-	if (!get_die_type(dwarfd, die, &die_type)) {
+	if (!get_die_type(die, &die_type)) {
 		ERRMSG("Can't get CU die of DW_AT_type.\n");
 		return FALSE;
 	}
@@ -1808,12 +1808,12 @@ get_data_array_length(Dwarf *dwarfd, Dwarf_Die *die)
 }
 
 static int
-check_array_type(Dwarf *dwarfd, Dwarf_Die *die)
+check_array_type(Dwarf_Die *die)
 {
 	int tag;
 	Dwarf_Die die_type;
 
-	if (!get_die_type(dwarfd, die, &die_type)) {
+	if (!get_die_type(die, &die_type)) {
 		ERRMSG("Can't get CU die of DW_AT_type.\n");
 		return FALSE;
 	}
@@ -1825,12 +1825,12 @@ check_array_type(Dwarf *dwarfd, Dwarf_Die *die)
 }
 
 static int
-get_dwarf_base_type(Dwarf *dwarfd, Dwarf_Die *die)
+get_dwarf_base_type(Dwarf_Die *die)
 {
 	int tag;
 	const char *name;
 
-	while (get_die_type(dwarfd, die, die)) {
+	while (get_die_type(die, die)) {
 		tag = dwarf_tag(die);
 		switch (tag) {
 		case DW_TAG_array_type:
@@ -1863,7 +1863,7 @@ get_dwarf_base_type(Dwarf *dwarfd, Dwarf_Die *die)
  * Function for searching struct page.union.struct.mapping.
  */
 int
-__search_mapping(Dwarf *dwarfd, Dwarf_Die *die, long *offset)
+__search_mapping(Dwarf_Die *die, long *offset)
 {
 	int tag;
 	const char *name;
@@ -1894,7 +1894,7 @@ __search_mapping(Dwarf *dwarfd, Dwarf_Die *die, long *offset)
  * Function for searching struct page.union.struct.
  */
 int
-search_mapping(Dwarf *dwarfd, Dwarf_Die *die, long *offset)
+search_mapping(Dwarf_Die *die, long *offset)
 {
 	Dwarf_Die child, *walker;
 	Dwarf_Die die_struct;
@@ -1907,11 +1907,11 @@ search_mapping(Dwarf *dwarfd, Dwarf_Die *die, long *offset)
 	do {
 		if (dwarf_tag(walker) != DW_TAG_member)
 			continue;
-		if (!get_die_type(dwarfd, walker, &die_struct))
+		if (!get_die_type(walker, &die_struct))
 			continue;
 		if (dwarf_tag(&die_struct) != DW_TAG_structure_type)
 			continue;
-		if (__search_mapping(dwarfd, &die_struct, offset))
+		if (__search_mapping(&die_struct, offset))
 			return TRUE;
 	} while (!dwarf_siblingof(walker, walker));
 
@@ -1919,7 +1919,7 @@ search_mapping(Dwarf *dwarfd, Dwarf_Die *die, long *offset)
 }
 
 static void
-search_member(Dwarf *dwarfd, Dwarf_Die *die)
+search_member(Dwarf_Die *die)
 {
 	int tag;
 	long offset, offset_union;
@@ -1945,7 +1945,7 @@ search_member(Dwarf *dwarfd, Dwarf_Die *die)
 			/*
 			 * Get the member offset.
 			 */
-			if (!get_dwarf_base_type(dwarfd, walker))
+			if (!get_dwarf_base_type(walker))
 				continue;
 			return;
 		case DWARF_INFO_GET_MEMBER_OFFSET:
@@ -1959,14 +1959,14 @@ search_member(Dwarf *dwarfd, Dwarf_Die *die)
 			dwarf_info.member_offset = offset;
 			return;
 		case DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION:
-			if (!get_die_type(dwarfd, walker, &die_union))
+			if (!get_die_type(walker, &die_union))
 				continue;
 			if (dwarf_tag(&die_union) != DW_TAG_union_type)
 				continue;
 			/*
 			 * Search page.mapping in union.
 			 */
-			if (!search_mapping(dwarfd, &die_union, &offset_union))
+			if (!search_mapping(&die_union, &offset_union))
 				continue;
 			/*
 			 * Get the member offset.
@@ -1976,7 +1976,7 @@ search_member(Dwarf *dwarfd, Dwarf_Die *die)
 			dwarf_info.member_offset = offset + offset_union;
  			return;
 		case DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION:
-			if (!get_die_type(dwarfd, walker, &die_union))
+			if (!get_die_type(walker, &die_union))
 				continue;
 			if (dwarf_tag(&die_union) != DW_TAG_union_type)
 				continue;
@@ -1993,7 +1993,7 @@ search_member(Dwarf *dwarfd, Dwarf_Die *die)
 			/*
 			 * Get the member length.
 			 */
-			if (!get_data_array_length(dwarfd, walker))
+			if (!get_data_array_length(walker))
 				continue;
 			return;
 		}
@@ -2050,7 +2050,7 @@ is_search_typedef(int cmd)
 }
 
 static void
-search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+search_structure(Dwarf_Die *die, int *found)
 {
 	int tag;
 	const char *name;
@@ -2094,13 +2094,13 @@ search_structure(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	case DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION:
 	case DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION:
 	case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
-		search_member(dwarfd, die);
+		search_member(die);
 		break;
 	}
 }
 
 static void
-search_number(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+search_number(Dwarf_Die *die, int *found)
 {
 	int tag;
 	Dwarf_Word const_value;
@@ -2141,7 +2141,7 @@ search_number(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 }
 
 static void
-search_typedef(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+search_typedef(Dwarf_Die *die, int *found)
 {
 	int tag = 0;
 	char *src_name = NULL;
@@ -2161,7 +2161,7 @@ search_typedef(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 			continue;
 
 		if (dwarf_info.cmd == DWARF_INFO_GET_TYPEDEF_SIZE) {
-			if (!get_die_type(dwarfd, die, &die_type)) {
+			if (!get_die_type(die, &die_type)) {
 				ERRMSG("Can't get CU die of DW_AT_type.\n");
 				break;
 			}
@@ -2184,7 +2184,7 @@ search_typedef(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 }
 
 static void
-search_symbol(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+search_symbol(Dwarf_Die *die, int *found)
 {
 	int tag;
 	const char *name;
@@ -2217,19 +2217,19 @@ search_symbol(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	*found = TRUE;
 	switch (dwarf_info.cmd) {
 	case DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH:
-		get_data_array_length(dwarfd, die);
+		get_data_array_length(die);
 		break;
 	case DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE:
-		check_array_type(dwarfd, die);
+		check_array_type(die);
 		break;
 	case DWARF_INFO_GET_SYMBOL_TYPE:
-		get_dwarf_base_type(dwarfd, die);
+		get_dwarf_base_type(die);
 		break;
 	}
 }
 
 static void
-search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
+search_die_tree(Dwarf_Die *die, int *found)
 {
 	Dwarf_Die child;
 
@@ -2237,22 +2237,22 @@ search_die_tree(Dwarf *dwarfd, Dwarf_Die *die, int *found)
 	 * start by looking at the children
 	 */
 	if (dwarf_child(die, &child) == 0)
-		search_die_tree(dwarfd, &child, found);
+		search_die_tree(&child, found);
 
 	if (*found)
 		return;
 
 	if (is_search_structure(dwarf_info.cmd))
-		search_structure(dwarfd, die, found);
+		search_structure(die, found);
 
 	else if (is_search_number(dwarf_info.cmd))
-		search_number(dwarfd, die, found);
+		search_number(die, found);
 
 	else if (is_search_symbol(dwarf_info.cmd))
-		search_symbol(dwarfd, die, found);
+		search_symbol(die, found);
 
 	else if (is_search_typedef(dwarf_info.cmd))
-		search_typedef(dwarfd, die, found);
+		search_typedef(die, found);
 }
 
 int
@@ -2310,7 +2310,7 @@ get_debug_info(void)
 			ERRMSG("Can't get CU die.\n");
 			goto out;
 		}
-		search_die_tree(dwarfd, &cu_die, &found);
+		search_die_tree(&cu_die, &found);
 		if (found)
 			break;
 		off = next_off;

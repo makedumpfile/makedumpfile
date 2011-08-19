@@ -1232,9 +1232,6 @@ init_dwarf_info(void)
 				" debuginfo.\n");
 			goto err_out;
 		}
-	}
-
-	if (dwfl_fd > 0) {
 		if (dwfl_report_offline(dwfl, dwarf_info.module_name,
 				dwarf_info.name_debuginfo, dwfl_fd) == NULL) {
 			ERRMSG("Failed reading %s: %s\n",

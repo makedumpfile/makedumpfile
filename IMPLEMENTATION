@@ -25,6 +25,10 @@
     |         page data (pfn 1)                |
     |                        :                 |
     |         page data (pfn Z)                |
+    +------------------------------------------+ offset_eraseinfo
+    | erase mystruct2.mystruct1.var 4          |
+    | erase mystruct2.mystruct1.ptr nullify    |
+    | erase mystruct2.mystruct.array 100       |
     +------------------------------------------+
 
 
@@ -71,6 +75,8 @@
 	unsigned long	size_vmcoreinfo;  /* header_version 3 and later */
 	off_t		offset_note;      /* header_version 4 and later */
 	unsigned long	size_note;        /* header_version 4 and later */
+	off_t		offset_eraseinfo; /* header_version 5 and later */
+	unsigned long	size_eraseinfo;   /* header_version 5 and later */
     };
 
   - 1st-bitmap

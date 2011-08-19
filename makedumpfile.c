@@ -29,6 +29,8 @@ struct DumpInfo		*info = NULL;
 struct module_sym_table	mod_st = { 0 };
 struct filter_info	*filter_info = NULL;
 struct filter_config	filter_config;
+struct erase_info	*erase_info = NULL;
+unsigned long		num_erase_info = 1; /* Node 0 is unused. */
 
 char filename_stdout[] = FILENAME_STDOUT;
 int message_level;
@@ -950,6 +952,11 @@ get_kdump_compressed_header_info(char *filename)
 		/* A dumpfile contains ELF note section. */
 		info->offset_note = kh.offset_note;
 		info->size_note   = kh.size_note;
+	}
+	if (dh.header_version >= 5) {
+		/* A dumpfile contains erased information. */
+		info->offset_eraseinfo = kh.offset_eraseinfo;
+		info->size_eraseinfo   = kh.size_eraseinfo;
 	}
 	return TRUE;
 error:
@@ -5932,7 +5939,7 @@ write_kdump_header(void)
 	 * Write common header
 	 */
 	strncpy(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE));
-	dh->header_version = 4;
+	dh->header_version = 5;
   	dh->block_size     = info->page_size;
 	dh->sub_hdr_size   = sizeof(kh) + info->size_note;
 	dh->sub_hdr_size   = divideup(dh->sub_hdr_size, dh->block_size);
@@ -6000,10 +6007,17 @@ write_kdump_header(void)
 			kh.size_vmcoreinfo = info->size_vmcoreinfo;
 		}
 	}
-	if (!write_buffer(info->fd_dumpfile, dh->block_size, &kh,
-	    size, info->name_dumpfile))
-		goto out;
+	/*
+	 * While writing dump data to STDOUT, delay the writing of sub header
+	 * untill we gather erase info offset and size.
+	 */
+	if (!info->flag_flatten) {
+		if (!write_buffer(info->fd_dumpfile, dh->block_size, &kh,
+		    size, info->name_dumpfile))
+			goto out;
+	}
 
+	info->sub_header = kh;
 	info->offset_bitmap1
 	    = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size) * dh->block_size;
 
@@ -6061,10 +6075,37 @@ split_filter_info(struct filter_info *prev, unsigned long long next_paddr,
 		return;
 	}
 	new->nullify = prev->nullify;
+	new->erase_info_idx = prev->erase_info_idx;
+	new->size_idx = prev->size_idx;
 	new->paddr = next_paddr;
 	new->size = size;
 	new->next = prev->next;
 	prev->next = new;
+}
+
+void
+update_erase_info(struct filter_info *fi)
+{
+	struct erase_info *ei;
+
+	if (!fi->erase_info_idx)
+		return;
+
+	ei = &erase_info[fi->erase_info_idx];
+
+	if (!ei->sizes) {
+		/* First time, allocate sizes array */
+		ei->sizes = calloc(ei->num_sizes, sizeof(long));
+		if (!ei->sizes) {
+			ERRMSG("Can't allocate memory for erase info sizes\n");
+			return;
+		}
+	}
+	ei->erased = 1;
+	if (!fi->nullify)
+		ei->sizes[fi->size_idx] += fi->size;
+	else
+		ei->sizes[fi->size_idx] = -1;
 }
 
 int
@@ -6100,6 +6141,7 @@ extract_filter_info(unsigned long long start_paddr,
 			filter_info = fi->next;
 		else
 			prev->next = fi->next;
+		update_erase_info(fi);
 		free(fi);
 		return TRUE;
 	}
@@ -6565,6 +6607,159 @@ out:
 		free(buf_out);
 
 	return ret;
+}
+
+/*
+ * Copy eraseinfo from input dumpfile/vmcore to output dumpfile.
+ */
+static int
+copy_eraseinfo(struct cache_data *cd_eraseinfo)
+{
+	char *buf = NULL;
+	int ret = FALSE;
+
+	buf = malloc(info->size_eraseinfo);
+	if (buf == NULL) {
+		ERRMSG("Can't allocate memory for erase info section. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+	if (lseek(info->fd_memory, info->offset_eraseinfo, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if (read(info->fd_memory, buf, info->size_eraseinfo)
+	    != info->size_eraseinfo) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    info->name_memory, strerror(errno));
+		goto out;
+	}
+	if (!write_cache(cd_eraseinfo, buf, info->size_eraseinfo))
+		goto out;
+	ret = TRUE;
+out:
+	if (buf)
+		free(buf);
+	return ret;
+}
+
+static int
+update_sub_header(void)
+{
+	off_t offset;
+
+	/* seek to kdump sub header offset */
+	offset = DISKDUMP_HEADER_BLOCKS * info->page_size;
+
+	info->sub_header.offset_eraseinfo = info->offset_eraseinfo;
+	info->sub_header.size_eraseinfo = info->size_eraseinfo;
+
+	if (!write_buffer(info->fd_dumpfile, offset, &info->sub_header,
+			sizeof(struct kdump_sub_header), info->name_dumpfile))
+		return FALSE;
+
+	return TRUE;
+}
+
+/*
+ * Traverse through eraseinfo nodes and write it to the o/p dumpfile if the
+ * node has erased flag set.
+ */
+int
+write_eraseinfo(struct cache_data *cd_page, unsigned long *size_out)
+{
+	int i, j, obuf_size = 0, ei_size = 0;
+	int ret = FALSE;
+	unsigned long size_eraseinfo = 0;
+	char *obuf = NULL;
+	char size_str[MAX_SIZE_STR_LEN];
+
+	for (i = 1; i < num_erase_info; i++) {
+		if (!erase_info[i].erased)
+			continue;
+		for (j = 0; j < erase_info[i].num_sizes; j++) {
+			if (erase_info[i].sizes[j] > 0)
+				sprintf(size_str, "%ld\n",
+						erase_info[i].sizes[j]);
+			else if (erase_info[i].sizes[j] == -1)
+				sprintf(size_str, "nullify\n");
+
+			/* Calculate the required buffer size. */
+			ei_size = strlen("erase ") +
+					strlen(erase_info[i].symbol_expr) + 1 +
+					strlen(size_str) +
+					1;
+			/*
+			 * If obuf is allocated in the previous run and is
+			 * big enough to hold current erase info string then
+			 * reuse it otherwise realloc.
+			 */
+			if (ei_size > obuf_size) {
+				obuf_size = ei_size;
+				obuf = realloc(obuf, obuf_size);
+				if (!obuf) {
+					ERRMSG("Can't allocate memory for"
+						" output buffer\n");
+					return FALSE;
+				}
+			}
+			sprintf(obuf, "erase %s %s", erase_info[i].symbol_expr,
+							size_str);
+			DEBUG_MSG(obuf);
+			if (!write_cache(cd_page, obuf, strlen(obuf)))
+				goto out;
+			size_eraseinfo += strlen(obuf);
+		}
+	}
+	/*
+	 * Write the remainder.
+	 */
+	if (!write_cache_bufsz(cd_page))
+		goto out;
+
+	*size_out = size_eraseinfo;
+	ret = TRUE;
+out:
+	if (obuf)
+		free(obuf);
+
+	return ret;
+}
+
+int
+write_kdump_eraseinfo(struct cache_data *cd_page)
+{
+	off_t offset_eraseinfo;
+	unsigned long size_eraseinfo;
+
+	DEBUG_MSG("Writing erase info...\n");
+	offset_eraseinfo = cd_page->offset;
+
+	/*
+	 * In case of refiltering copy the existing eraseinfo from input
+	 * dumpfile to o/p dumpfile.
+	 */
+	if (info->offset_eraseinfo && info->size_eraseinfo) {
+		if (!copy_eraseinfo(cd_page))
+			return FALSE;
+	}
+
+	/* Initialize eraseinfo offset with new offset value. */
+	info->offset_eraseinfo = offset_eraseinfo;
+
+	if (!write_eraseinfo(cd_page, &size_eraseinfo))
+		return FALSE;
+
+	info->size_eraseinfo += size_eraseinfo;
+	DEBUG_MSG("offset_eraseinfo: %lx, size_eraseinfo: %ld\n",
+			info->offset_eraseinfo, info->size_eraseinfo);
+
+	/* Update the erase info offset and size in kdump sub header */
+	if (!update_sub_header())
+		return FALSE;
+
+	return TRUE;
 }
 
 int
@@ -7391,6 +7586,8 @@ writeout_dumpfile(void)
 			goto out;
 		if (!write_kdump_pages(&cd_header, &cd_page))
 			goto out;
+		if (!write_kdump_eraseinfo(&cd_page))
+			goto out;
 		if (!write_kdump_bitmap())
 			goto out;
 	}
@@ -7781,6 +7978,8 @@ free_config_entry(struct config_entry *ce)
 			free(p->name);
 		if (p->type_name)
 			free(p->type_name);
+		if (p->symbol_expr)
+			free(p->symbol_expr);
 		free(p);
 	}
 }
@@ -8129,6 +8328,13 @@ read_filter_entry(struct config *config, int line)
 									line);
 		return FALSE;
 	}
+
+	/*
+	 * Save the symbol expression string for generation of eraseinfo data
+	 * later while writing dumpfile.
+	 */
+	config->filter_symbol[idx]->symbol_expr = strdup(token);
+
 	if (config->iter_entry) {
 		if (strcmp(config->filter_symbol[idx]->name,
 				config->iter_entry->name)) {
@@ -8726,8 +8932,11 @@ resolve_list_entry(struct config_entry *ce, unsigned long long base_addr,
  * Insert the filter info node using insertion sort.
  * If filter node for a given paddr is aready present then update the size
  * and delete the fl_info node passed.
+ *
+ * Return 1 on successfull insertion.
+ * Return 0 if filter node with same paddr is found.
  */
-void
+int
 insert_filter_info(struct filter_info *fl_info)
 {
 	struct filter_info *prev = NULL;
@@ -8735,7 +8944,7 @@ insert_filter_info(struct filter_info *fl_info)
 
 	if (!ptr) {
 		filter_info = fl_info;
-		return;
+		return 1;
 	}
 
 	while (ptr) {
@@ -8748,7 +8957,7 @@ insert_filter_info(struct filter_info *fl_info)
 		if (fl_info->size > ptr->size)
 			ptr->size = fl_info->size;
 		free(fl_info);
-		return;
+		return 0;
 	}
 
 	if (prev) {
@@ -8759,7 +8968,80 @@ insert_filter_info(struct filter_info *fl_info)
 		fl_info->next = filter_info;
 		filter_info = fl_info;
 	}
-	return;
+	return 1;
+}
+
+/*
+ * Create an erase info node for each erase command. One node per erase
+ * command even if it is part of loop construct.
+ * For erase commands that are not part of loop construct, the num_sizes will
+ * always be 1
+ * For erase commands that are part of loop construct, the num_sizes may be
+ * 1 or >1 depending on number iterations. This function will called multiple
+ * times depending on iterations. At first invokation create a node and
+ * increment num_sizes for subsequent invokations.
+ *
+ * The valid erase info node starts from index value 1. (index 0 is invalid
+ * index).
+ *
+ *            Index 0     1        2        3
+ *             +------+--------+--------+--------+
+ * erase_info->|Unused|        |        |        |......
+ *             +------+--------+--------+--------+
+ *                        |        .        .        .....
+ *                        V
+ *                   +---------+
+ *                   | char*   |----> Original erase command string
+ *                   +---------+
+ *                   |num_sizes|
+ *                   +---------+      +--+--+--+
+ *                   | sizes   |----> |  |  |  |... Sizes array of num_sizes
+ *                   +---------+      +--+--+--+
+ *
+ * On success, return the index value of erase node for given erase command.
+ * On failure, return 0.
+ */
+static int
+add_erase_info_node(struct config_entry *filter_symbol)
+{
+	int idx = filter_symbol->erase_info_idx;
+
+	/*
+	 * Check if node is already created, if yes, increment the num_sizes.
+	 */
+	if (idx) {
+		erase_info[idx].num_sizes++;
+		return idx;
+	}
+
+	/* Allocate a new node. */
+	DEBUG_MSG("Allocating new erase info node for command \"%s\"\n",
+			filter_symbol->symbol_expr);
+	idx = num_erase_info++;
+	erase_info = realloc(erase_info,
+			sizeof(struct erase_info) * num_erase_info);
+	if (!erase_info) {
+		ERRMSG("Can't get memory to create erase information.\n");
+		return 0;
+	}
+
+	memset(&erase_info[idx], 0, sizeof(struct erase_info));
+	erase_info[idx].symbol_expr = filter_symbol->symbol_expr;
+	erase_info[idx].num_sizes = 1;
+
+	filter_symbol->symbol_expr = NULL;
+	filter_symbol->erase_info_idx = idx;
+
+	return idx;
+}
+
+/* Return the index value in sizes array for given erase command index. */
+static inline int
+get_size_index(int ei_idx)
+{
+	if (ei_idx)
+		return erase_info[ei_idx].num_sizes - 1;
+	return 0;
 }
 
 int
@@ -8798,7 +9080,10 @@ update_filter_info(struct config_entry *filter_symbol,
 	fl_info->size = size;
 	fl_info->nullify = filter_symbol->nullify;
 
-	insert_filter_info(fl_info);
+	if (insert_filter_info(fl_info)) {
+		fl_info->erase_info_idx = add_erase_info_node(filter_symbol);
+		fl_info->size_idx = get_size_index(fl_info->erase_info_idx);
+	}
 	return TRUE;
 }
 
@@ -9049,6 +9334,7 @@ void
 clear_filter_info(void)
 {
 	struct filter_info *prev, *fi = filter_info;
+	int i;
 
 	/* Delete filter_info nodes that are left out. */
 	while (fi) {
@@ -9057,6 +9343,13 @@ clear_filter_info(void)
 		free(prev);
 	}
 	filter_info = NULL;
+	if (erase_info) {
+		for (i = 1; i < num_erase_info; i++) {
+			free(erase_info[i].symbol_expr);
+			free(erase_info[i].sizes);
+		}
+		free(erase_info);
+	}
 }
 
 int
@@ -9245,6 +9538,8 @@ store_splitting_info(void)
 		}
 		SPLITTING_START_PFN(i) = kh.start_pfn;
 		SPLITTING_END_PFN(i)   = kh.end_pfn;
+		SPLITTING_OFFSET_EI(i) = kh.offset_eraseinfo;
+		SPLITTING_SIZE_EI(i)   = kh.size_eraseinfo;
 	}
 	return TRUE;
 }
@@ -9452,6 +9747,7 @@ reassemble_kdump_pages(void)
 	struct cache_data cd_pd, cd_data;
 	struct timeval tv_start;
 	char *data = NULL;
+	unsigned long data_buf_size = info->page_size;
 
 	initialize_2nd_bitmap(&bitmap2);
 
@@ -9465,7 +9761,7 @@ reassemble_kdump_pages(void)
 		free_cache_data(&cd_pd);
 		return FALSE;
 	}
-	if ((data = malloc(info->page_size)) == NULL) {
+	if ((data = malloc(data_buf_size)) == NULL) {
 		ERRMSG("Can't allcate memory for page data.\n");
 		free_cache_data(&cd_pd);
 		free_cache_data(&cd_data);
@@ -9568,6 +9864,49 @@ reassemble_kdump_pages(void)
 	if (!write_cache_bufsz(&cd_pd))
 		goto out;
 	if (!write_cache_bufsz(&cd_data))
+		goto out;
+
+	info->offset_eraseinfo = cd_data.offset;
+	/* Copy eraseinfo from split dumpfiles to o/p dumpfile */
+	for (i = 0; i < info->num_dumpfile; i++) {
+		if (!SPLITTING_SIZE_EI(i))
+			continue;
+
+		if (SPLITTING_SIZE_EI(i) > data_buf_size) {
+			data_buf_size = SPLITTING_SIZE_EI(i);
+			if ((data = realloc(data, data_buf_size)) == NULL) {
+				ERRMSG("Can't allcate memory for eraseinfo"
+					" data.\n");
+				goto out;
+			}
+		}
+		if ((fd = open(SPLITTING_DUMPFILE(i), O_RDONLY)) < 0) {
+			ERRMSG("Can't open a file(%s). %s\n",
+			    SPLITTING_DUMPFILE(i), strerror(errno));
+			goto out;
+		}
+		if (lseek(fd, SPLITTING_OFFSET_EI(i), SEEK_SET) < 0) {
+			ERRMSG("Can't seek a file(%s). %s\n",
+			    SPLITTING_DUMPFILE(i), strerror(errno));
+			goto out;
+		}
+		if (read(fd, data, SPLITTING_SIZE_EI(i)) !=
+						SPLITTING_SIZE_EI(i)) {
+			ERRMSG("Can't read a file(%s). %s\n",
+			    SPLITTING_DUMPFILE(i), strerror(errno));
+			goto out;
+		}
+		if (!write_cache(&cd_data, data, SPLITTING_SIZE_EI(i)))
+			goto out;
+		info->size_eraseinfo += SPLITTING_SIZE_EI(i);
+
+		close(fd);
+		fd = 0;
+	}
+	if (!write_cache_bufsz(&cd_data))
+		goto out;
+
+	if (!update_sub_header())
 		goto out;
 
 	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);

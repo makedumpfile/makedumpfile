@@ -434,6 +434,8 @@ do { \
 #define SPLITTING_FD_BITMAP(i)	info->splitting_info[i].fd_bitmap
 #define SPLITTING_START_PFN(i)	info->splitting_info[i].start_pfn
 #define SPLITTING_END_PFN(i)	info->splitting_info[i].end_pfn
+#define SPLITTING_OFFSET_EI(i)	info->splitting_info[i].offset_eraseinfo
+#define SPLITTING_SIZE_EI(i)	info->splitting_info[i].size_eraseinfo
 
 /*
  * kernel version
@@ -498,6 +500,8 @@ do { \
 
 #define XEN_ELFNOTE_CRASH_INFO	(0x1000001)
 #define SIZE_XEN_CRASH_INFO_V2	(sizeof(unsigned long) * 10)
+
+#define MAX_SIZE_STR_LEN (21)
 
 /*
  * The value of dependence on machine
@@ -841,6 +845,8 @@ struct splitting_info {
 	int 			fd_bitmap;
 	unsigned long long	start_pfn;
 	unsigned long long	end_pfn;
+	off_t			offset_eraseinfo;
+	unsigned long		size_eraseinfo;
 } splitting_info_t;
 
 struct DumpInfo {
@@ -905,6 +911,7 @@ struct DumpInfo {
 	struct dump_bitmap 		*bitmap1;
 	struct dump_bitmap 		*bitmap2;
 	struct disk_dump_header		*dump_header;
+	struct kdump_sub_header		sub_header;
 
 	/*
 	 * ELF header info:
@@ -971,6 +978,12 @@ struct DumpInfo {
 	 */
 	off_t			offset_note;
 	unsigned long		size_note;
+
+	/*
+	 * erased information in dump memory image info:
+	 */
+	off_t			offset_eraseinfo;
+	unsigned long		size_eraseinfo;
 
 	/*
 	 * for Xen extraction
@@ -1280,12 +1293,27 @@ struct dwarf_info {
 extern struct dwarf_info	dwarf_info;
 
 /*
+ * Erase information, original symbol expressions.
+ */
+struct erase_info {
+	char		*symbol_expr;
+	int		num_sizes;
+	long		*sizes;
+	int		erased;		/* 1= erased, 0= Not erased */
+};
+
+/*
  * Filtering information
  */
 struct filter_info {
 	unsigned long long      address;
 	unsigned long long      paddr;
 	long			size;
+
+	/* direct access to update erase information node */
+	int			erase_info_idx;	/* 0= invalid index */
+	int			size_idx;
+
 	struct filter_info      *next;
 	unsigned short          nullify;
 };
@@ -1293,6 +1321,7 @@ struct filter_info {
 struct config_entry {
 	char			*name;
 	char			*type_name;
+	char			*symbol_expr;	/* original symbol expression */
 	unsigned short		flag;
 	unsigned short		nullify;
 	unsigned long long	sym_addr;	/* Symbol address */
@@ -1305,6 +1334,7 @@ struct config_entry {
 	long			index;
 	long			size;
 	int			line;	/* Line number in config file. */
+	int			erase_info_idx;	/* 0= invalid index */
 	struct config_entry	*refer_to;
 	struct config_entry	*next;
 };

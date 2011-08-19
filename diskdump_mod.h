@@ -75,6 +75,8 @@ struct kdump_sub_header {
 	unsigned long	size_vmcoreinfo;  /* header_version 3 and later */
 	off_t		offset_note;      /* header_version 4 and later */
 	unsigned long	size_note;        /* header_version 4 and later */
+	off_t		offset_eraseinfo; /* header_version 5 and later */
+	unsigned long	size_eraseinfo;   /* header_version 5 and later */
 };
 
 /* page flags */

@@ -24,16 +24,21 @@ CFLAGS_ARCH += -m64
 endif
 
 SRC	= makedumpfile.c makedumpfile.h diskdump_mod.h
+SRC_PART = print_info.c
+OBJ_PART = print_info.o
 SRC_ARCH = arm.c x86.c x86_64.c ia64.c ppc64.c s390x.c
 OBJ_ARCH = arm.o x86.o x86_64.o ia64.o ppc64.o s390x.o
 
 all: makedumpfile
 
+$(OBJ_PART): $(SRC_PART)
+	$(CC) $(CFLAGS) -c -o ./$@ ./$(@:.o=.c) 
+
 $(OBJ_ARCH): $(SRC_ARCH)
 	$(CC) $(CFLAGS_ARCH) -c -o ./$@ ./$(@:.o=.c) 
 
-makedumpfile: $(SRC) $(OBJ_ARCH)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ_ARCH) -o $@ $< -static -ldw -lbz2 -lebl -ldl -lelf -lz
+makedumpfile: $(SRC) $(OBJ_PART) $(OBJ_ARCH)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ_PART) $(OBJ_ARCH) -o $@ $< -static -ldw -lbz2 -lebl -ldl -lelf -lz
 	echo .TH MAKEDUMPFILE 8 \"$(DATE)\" \"makedumpfile v$(VERSION)\" \"Linux System Administrator\'s Manual\" > temp.8
 	grep -v "^.TH MAKEDUMPFILE 8" makedumpfile.8 >> temp.8
 	mv temp.8 makedumpfile.8
@@ -44,7 +49,7 @@ makedumpfile: $(SRC) $(OBJ_ARCH)
 	gzip -c ./makedumpfile.conf.8 > ./makedumpfile.conf.8.gz
 
 clean:
-	rm -f $(OBJ) $(OBJ_ARCH) makedumpfile makedumpfile.8.gz makedumpfile.conf.8.gz
+	rm -f $(OBJ) $(OBJ_PART) $(OBJ_ARCH) makedumpfile makedumpfile.8.gz makedumpfile.conf.8.gz
 
 install:
 	cp makedumpfile ${DESTDIR}/bin

@@ -20,6 +20,7 @@
 
 #ifdef __powerpc__
 
+#include "print_info.h"
 #include "makedumpfile.h"
 
 int

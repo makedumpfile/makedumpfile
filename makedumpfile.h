@@ -13,6 +13,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#ifndef _MAKEDUMPFILE_H
+#define _MAKEDUMPFILE_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -154,66 +156,6 @@ isAnon(unsigned long mapping)
 				           with Private Pages */
 #define DL_EXCLUDE_USER_DATA	(0x008) /* Exclude UserProcessData Pages */
 #define DL_EXCLUDE_FREE		(0x010)	/* Exclude Free Pages */
-
-/*
- * Message Level
- */
-#define MIN_MSG_LEVEL		(0)
-#define MAX_MSG_LEVEL		(31)
-#define DEFAULT_MSG_LEVEL	(7)	/* Print the progress indicator, the
-					   common message, the error message */
-#define ML_PRINT_PROGRESS	(0x001) /* Print the progress indicator */
-#define ML_PRINT_COMMON_MSG	(0x002)	/* Print the common message */
-#define ML_PRINT_ERROR_MSG	(0x004)	/* Print the error message */
-#define ML_PRINT_DEBUG_MSG	(0x008) /* Print the debugging message */
-#define ML_PRINT_REPORT_MSG	(0x010) /* Print the report message */
-extern int message_level;
-
-#define MSG(x...) \
-do { \
-	if (message_level & ML_PRINT_COMMON_MSG) { \
-		if (info->flag_flatten) \
-			fprintf(stderr, x); \
-		else \
-			fprintf(stdout, x); \
-	} \
-} while (0)
-
-#define ERRMSG(x...) \
-do { \
-	if (message_level & ML_PRINT_ERROR_MSG) { \
-		fprintf(stderr, __FUNCTION__); \
-		fprintf(stderr, ": "); \
-		fprintf(stderr, x); \
-	} \
-} while (0)
-
-#define PROGRESS_MSG(x...) \
-do { \
-	if (message_level & ML_PRINT_PROGRESS) { \
-		fprintf(stderr, x); \
-	} \
-} while (0)
-
-#define DEBUG_MSG(x...) \
-do { \
-	if (message_level & ML_PRINT_DEBUG_MSG) { \
-		if (info->flag_flatten) \
-			fprintf(stderr, x); \
-		else \
-			fprintf(stdout, x); \
-	} \
-} while (0)
-
-#define REPORT_MSG(x...) \
-do { \
-	if (message_level & ML_PRINT_REPORT_MSG) { \
-		if (info->flag_flatten) \
-			fprintf(stderr, x); \
-		else \
-			fprintf(stdout, x); \
-	} \
-} while (0)
 
 
 /*
@@ -1523,3 +1465,5 @@ int get_xen_info_ia64(void);
 #define kvtop_xen(X)	FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* s390x */
+
+#endif /* MAKEDUMPFILE_H */

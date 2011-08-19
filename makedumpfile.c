@@ -1187,7 +1187,60 @@ clean_dwfl_info(void)
 }
 
 /*
- * Intitialize the dwarf info.
+ * Search module debuginfo.
+ * This function searches for module debuginfo in default debuginfo path for
+ * a given module in dwarf_info.module_name.
+ *
+ * On success, dwarf_info.name_debuginfo is set to absolute path of
+ * module debuginfo.
+ */
+static int
+search_module_debuginfo(void)
+{
+	Dwfl *dwfl = NULL;
+	static char *debuginfo_path = DEFAULT_DEBUGINFO_PATH;
+	static const Dwfl_Callbacks callbacks = {
+		.section_address = dwfl_offline_section_address,
+		.find_debuginfo = dwfl_standard_find_debuginfo,
+		.debuginfo_path = &debuginfo_path,
+	};
+
+	/*
+	 * Check if We already have debuginfo file name with us. If yes,
+	 * then we don't need to proceed with search method.
+	 */
+	if (dwarf_info.name_debuginfo)
+		return TRUE;
+
+	if ((dwfl = dwfl_begin(&callbacks)) == NULL) {
+		ERRMSG("Can't create a handle for a new dwfl session.\n");
+		return FALSE;
+	}
+
+	/* Search for module debuginfo file. */
+	if (dwfl_linux_kernel_report_offline(dwfl,
+						info->system_utsname.release,
+						&dwfl_report_module_p)) {
+		ERRMSG("Can't get Module debuginfo for module '%s'\n",
+					dwarf_info.module_name);
+		dwfl_end(dwfl);
+		return FALSE;
+	}
+	dwfl_report_end(dwfl, NULL, NULL);
+	dwfl_getmodules(dwfl, &process_module, NULL, 0);
+
+	dwfl_end(dwfl);
+	clean_dwfl_info();
+
+	/* Return success if module debuginfo is found. */
+	if (dwarf_info.name_debuginfo)
+		return TRUE;
+
+	return FALSE;
+}
+
+/*
+ * Initialize the dwarf info.
  * Linux kernel module debuginfo are of ET_REL (relocatable) type.
  * This function uses dwfl API's to apply relocation before reading the
  * dwarf information from module debuginfo.
@@ -1199,51 +1252,45 @@ init_dwarf_info(void)
 {
 	Dwfl *dwfl = NULL;
 	int dwfl_fd = -1;
-	static char *debuginfo_path = DEFAULT_DEBUGINFO_PATH;
 	static const Dwfl_Callbacks callbacks = {
 		.section_address = dwfl_offline_section_address,
-		.find_debuginfo = dwfl_standard_find_debuginfo,
-		.debuginfo_path = &debuginfo_path,
 	};
 
 	dwarf_info.elfd = NULL;
 	dwarf_info.dwarfd = NULL;
+
+	 /*
+	  * We already know the absolute path of debuginfo file. Fail if we
+	  * still don't have one. Ideally we should never be in this situation.
+	  */
+	if (!dwarf_info.name_debuginfo) {
+		ERRMSG("Can't find absolute path to debuginfo file.\n");
+		return FALSE;
+	}
 
 	if ((dwfl = dwfl_begin(&callbacks)) == NULL) {
 		ERRMSG("Can't create a handle for a new dwfl session.\n");
 		return FALSE;
 	}
 
-	if (dwarf_info.name_debuginfo) {
-		/* We have absolute path for debuginfo file, use it directly
-		 * instead of searching it through
-		 * dwfl_linux_kernel_report_offline() call.
-		 *
-		 * Open the debuginfo file if it is not already open.
-		 */
-		if (dwarf_info.fd_debuginfo < 0)
-			dwarf_info.fd_debuginfo =
-				open(dwarf_info.name_debuginfo, O_RDONLY);
+	/* Open the debuginfo file if it is not already open.  */
+	if (dwarf_info.fd_debuginfo < 0)
+		dwarf_info.fd_debuginfo =
+			open(dwarf_info.name_debuginfo, O_RDONLY);
 
-		dwfl_fd = dup(dwarf_info.fd_debuginfo);
-		if (dwfl_fd < 0) {
-			ERRMSG("Failed to get a duplicate handle for"
-				" debuginfo.\n");
-			goto err_out;
-		}
-		if (dwfl_report_offline(dwfl, dwarf_info.module_name,
-				dwarf_info.name_debuginfo, dwfl_fd) == NULL) {
-			ERRMSG("Failed reading %s: %s\n",
-				dwarf_info.name_debuginfo, dwfl_errmsg (-1));
-			/* dwfl_fd is consumed on success, not on failure */
-			close(dwfl_fd);
-			goto err_out;
-		}
-	} else if (dwfl_linux_kernel_report_offline(dwfl,
-						info->system_utsname.release,
-						&dwfl_report_module_p)) {
-		ERRMSG("Can't get Module debuginfo for module '%s'\n",
-					dwarf_info.module_name);
+	dwfl_fd = dup(dwarf_info.fd_debuginfo);
+	if (dwfl_fd < 0) {
+		ERRMSG("Failed to get a duplicate handle for"
+			" debuginfo.\n");
+		goto err_out;
+	}
+	/* Apply relocations. */
+	if (dwfl_report_offline(dwfl, dwarf_info.module_name,
+			dwarf_info.name_debuginfo, dwfl_fd) == NULL) {
+		ERRMSG("Failed reading %s: %s\n",
+			dwarf_info.name_debuginfo, dwfl_errmsg (-1));
+		/* dwfl_fd is consumed on success, not on failure */
+		close(dwfl_fd);
 		goto err_out;
 	}
 	dwfl_report_end(dwfl, NULL, NULL);
@@ -2523,20 +2570,19 @@ set_dwarf_debuginfo(char *mod_name, char *name_debuginfo, int fd_debuginfo)
 		if (dwarf_info.name_debuginfo)
 			free(dwarf_info.name_debuginfo);
 	}
+	if (dwarf_info.module_name)
+		free(dwarf_info.module_name);
+
 	dwarf_info.fd_debuginfo = fd_debuginfo;
 	dwarf_info.name_debuginfo = name_debuginfo;
-	dwarf_info.module_name = mod_name;
+	dwarf_info.module_name = strdup(mod_name);
 
 	if (!strcmp(dwarf_info.module_name, "vmlinux") ||
 		!strcmp(dwarf_info.module_name, "xen-syms"))
 		return TRUE;
 
 	/* check to see whether module debuginfo is available */
-	if (!init_dwarf_info())
-		return FALSE;
-	else
-		clean_dwfl_info();
-	return TRUE;
+	return search_module_debuginfo();
 }
 
 int

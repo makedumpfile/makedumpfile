@@ -27,6 +27,7 @@
 #include <sys/wait.h>
 #include <zlib.h>
 #include <elfutils/libdw.h>
+#include <elfutils/libdwfl.h>
 #include <libelf.h>
 #include <dwarf.h>
 #include <byteswap.h>
@@ -1177,6 +1178,8 @@ extern struct srcfile_table	srcfile_table;
 /*
  * Debugging information
  */
+#define DEFAULT_DEBUGINFO_PATH	"/usr/lib/debug"
+
 enum {
 	DWARF_INFO_GET_STRUCT_SIZE,
 	DWARF_INFO_GET_MEMBER_OFFSET,
@@ -1194,10 +1197,14 @@ struct dwarf_info {
 	unsigned int	cmd;		/* IN */
 	int	fd_debuginfo;		/* IN */
 	char	*name_debuginfo;	/* IN */
+	char	*module_name;		/* IN */
 	char	*struct_name;		/* IN */
 	char	*symbol_name;		/* IN */
 	char	*member_name;		/* IN */
 	char	*enum_name;		/* IN */
+	Elf	*elfd;			/* OUT */
+	Dwarf	*dwarfd;		/* OUT */
+	Dwfl	*dwfl;			/* OUT */
 	long	struct_size;		/* OUT */
 	long	member_offset;		/* OUT */
 	long	array_length;		/* OUT */

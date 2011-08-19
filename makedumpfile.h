@@ -1275,6 +1275,7 @@ struct dwarf_info {
 #define TYPE_ARRAY	0x02
 #define TYPE_PTR	0x04
 #define TYPE_STRUCT	0x08
+#define TYPE_LIST_HEAD	0x10
 
 extern struct dwarf_info	dwarf_info;
 
@@ -1297,18 +1298,25 @@ struct config_entry {
 	unsigned long long	sym_addr;	/* Symbol address */
 	unsigned long long	addr;		/* Symbol address or
 						   value pointed by sym_addr */
+	unsigned long long	cmp_addr;	/* for LIST_ENTRY */
 	unsigned long		offset;
 	unsigned long		type_flag;
 	long			array_length;
+	long			index;
 	long			size;
 	int			line;	/* Line number in config file. */
+	struct config_entry	*refer_to;
 	struct config_entry	*next;
 };
 
 /* flags for config_entry.flag */
 #define FILTER_ENTRY	0x0001
 #define SIZE_ENTRY	0x0002
+#define ITERATION_ENTRY	0x0004
+#define LIST_ENTRY	0x0008
 #define SYMBOL_ENTRY	0x0010
+#define VAR_ENTRY	0x0020
+#define TRAVERSAL_ENTRY	0x0040
 #define ENTRY_RESOLVED	0x8000
 
 /*
@@ -1329,13 +1337,18 @@ struct filter_config {
 
 struct config {
 	char			*module_name;
-	struct config_entry	*filter_symbol;
-	struct config_entry	*size_symbol;
+	struct config_entry	*iter_entry;
+	struct config_entry	*list_entry;
+	int			num_filter_symbols;
+	struct config_entry	**filter_symbol;
+	struct config_entry	**size_symbol;
 };
 
 #define IS_KEYWORD(tkn)	\
 	(!strcmp(tkn, "erase") || !strcmp(tkn, "size") || \
-	!strcmp(tkn, "nullify"))
+	!strcmp(tkn, "nullify") || !strcmp(tkn, "for") || \
+	!strcmp(tkn, "in") || !strcmp(tkn, "within") || \
+	!strcmp(tkn, "endfor"))
 
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 off_t paddr_to_offset(unsigned long long paddr);

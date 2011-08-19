@@ -1,0 +1,419 @@
+.TH FILTER.CONF 8 "16 November 2010" "makedumpfile v1.3.7" "Linux System Administrator's Manual"
+.SH NAME
+makedumpfile.conf \- The filter configuration file for makedumpfile(8).
+.SH DESCRIPTION
+.PP
+The makedumpfile.conf is a configuration file for makedumpfile tool.
+makedumpfile.conf file contains the erase commands to filter out desired kernel
+data from the vmcore while creating \fIDUMPFILE\fR using makedumpfile tool.
+makedumpfile reads the filter config and builds the list of memory addresses
+and its sizes after processing filter commands. The memory locations that
+require to be filtered out are then poisoned with character ÅfXÅf (58 in Hex).
+.SH FILE FORMAT
+.PP
+The file consists of module sections that contains filter commands. A section
+begins with the name of the section in square brackets and continues until the
+next section begins.
+
+.br
+"["<\fIModuleName\fR>"]"
+.br
+<\fIFilterCommands\fR>
+.br
+
+where
+.br
+"[" is the character \fB[\fR
+.br
+"]" is the character \fB]\fR
+.TP
+<\fIModuleName\fR>
+is either 'vmlinux' or name of a Linux kernel module.
+.TP
+<\fIFilterCommands\fR>
+is a list of one or more filter commands as described in the section
+\fBFILTER COMMANDS\fR of this manual page.
+.PP
+The section name indicates a kernel module name (including \fBvmlinux\fR) where
+the symbols specified in subsequent erase commands belong to. The unnamed
+section defaults to \fB[vmlinux]\fR section. However, a user can also explicitly
+define \fB[vmlinux]\fR section. The sections help makedumpfile tool to select
+appropriate kernel or module debuginfo file before processing the subsequent
+erase commands. Before selecting appropriate debuginfo file, the module name
+is validated against the loaded modules from the vmcore. If no match is found,
+then the section is ignored and makedumpfile skips to the next module section.
+If match is found, then makedumpfile will try to load the corresponding
+module debuginfo file. If module debuginfo is not available then, makedumpfile
+will skip the section with a warning message.
+.SH FILTER COMMANDS
+.SS filter command
+.PP
+A filter command is either an erase command or a loop construct. Each erase
+command and loop construct must start with a new line. Each filter command
+describes data in the dump to be erased. Syntax:
+
+.br
+<\fIEraseCommands\fR>|<\fILoopConstruct\fR>
+.br
+
+where
+.TP
+<\fIEraseCommands\fR>
+Described in the subsection \fBerase command\fR of this manual page.
+.TP
+<\fILoopConstruct\fR>
+Described in the subsection \fBLoop construct\fR of this manual page.
+.SS erase command
+.PP
+Erase specified size of a kernel data referred by specified kernel/module
+symbol or its member component. The erase command syntax is:
+
+.br
+\fBerase\fR <\fISymbol\fR>[.\fImember\fR[...]] [\fBsize\fR
+<\fISizeValue\fR>[K|M]]
+.br
+\fBerase\fR <\fISymbol\fR>[.\fImember\fR[...]] [\fBsize\fR <\fISizeSymbol\fR>]
+.br
+\fBerase\fR <\fISymbol\fR>[.\fImember\fR[...]] [\fBnullify\fR]
+.br
+
+where
+.br
+.TP
+<\fISymbol\fR>
+A kernel or module symbol (variable) name that is part of global symbols
+\fB/proc/kallsyms\fR.
+.TP
+<\fISizeValue\fR>
+A positive integer value as a size of the data in bytes to be erased. The
+suffixes 'K' and 'M' can be used to specify kilobytes and Megabytes
+respectively where, K means 1024 bytes and M means 1024 ^ 2 = 1048576 bytes.
+The suffixes are not case sensitive.
+.TP
+<\fISizeSymbol\fR>
+A simple expression of the form <\fISymbol\fR>[.\fImember\fR[...]] that denotes
+a symbol which contains a positive integer value as a size of the data in bytes
+to be erased.
+.TP
+<\fISymbol\fR>[.\fImember\fR[...]]
+A simple expression that results into either a global kernel symbol name or
+its member components. The expression always uses '.' operator to specify
+the \fImember\fR component of kernel symbol or its member irrespective of
+whether it is of pointer type or not.
+.TP
+\fImember\fR[...]
+Member or component of member in <\fISymbol\fR>.
+.PP
+The \fBerase\fR command takes two arguments 1. kernel symbol name or its
+member components and 2. size of the data referred by argument (1) OR
+\fBnullify\fR keyword. The second argument \fBsize\fR OR \fBnullify\fR is
+optional. The unit for size value is in \fBbytes\fR. If \fBsize\fR option is
+not specified then the size of the first argument is determined according to
+its data type using dwarf info from debuginfo file. In case of '\fBchar *\fR'
+data type, the length of string pointed by '\fBchar *\fR' pointer is determined
+with an upper limit of 1024. The \fBsize\fR can be specified in two forms 1.
+a integer value as explained above (<\fISizeValue\fR>) and 2. a simple
+expression in the form of <\fISymbol\fR>[.\fImember\fR[...]]] that results into
+base type (integer) variable.
+.PP
+If the specified <\fISymbol\fR> is of type '\fBvoid *\fR', then user needs to
+provide either \fBsize\fR or \fBnullify\fR option, otherwise the erase command
+will not have any effect.
+.PP
+The \fBnullify\fR option only works if specified <\fISymbol\fR> is a pointer.
+Instead of erasing data pointed by the specified pointer \fBnullify\fR erases
+the pointer value and set it to '0' (NULL). Please note that by nullifying
+the pointer values may affect the debug ability of created \fIDUMPFILE\fR.
+Use the \fBnullify\fR option only when the size of data to be erased is not
+known.  \fBe.g.\fR data pointed by '\fBvoid *\fR'.
+.PP
+Let us look at the makedumpfile.conf file from the example below which was
+configured to erase desired kernel data from the kernel module with name
+\fBmymodule\fR. At line 1 and 3, the user has not specified size option while
+erasing 'array_var' and 'mystruct1.name' symbols. Instead the user depends on
+makedumpfile to automatically determine the sizes to be erased \fBi.e\fR
+100 bytes for 'array_var' and 11 bytes for 'mystruct1.name'.  At line 2,
+while erasing the 'mystruct1.buffer' member the user has specified the size
+value 25 against the actual size of 50. In this case the user specified
+\fBsize\fR takes the precedence and makedumpfile erases only 25 bytes from
+\'mystruct1.buffer'. At line 4, the size of the data pointed by \fBvoid *\fR
+pointer 'mystruct1.addr' is unknown. Hence the \fBnullify\fR option has been
+specified to reset the pointer value to NULL. At line 5, the
+\'mystruct2.addr_size' is specified as \fBsize\fR argument to determine the
+size of the data pointed by \fBvoid *\fR pointer 'mystruct2.addr'.
+.br
+
+.B Example:
+.PP
+Assuming the following piece of code is from kernel module 'mymodule':
+.br
+
+struct s1 {
+.br
+	char *name;
+.br
+	void *addr1;
+.br
+	void *addr2;
+.br
+	char buffer[50];
+.br
+};
+.br
+struct s2 {
+.br
+	void *addr;
+.br
+	long addr_size;
+.br
+};
+.br
+
+/* Global symbols */
+.br
+char array_var[100];
+.br
+struct s1 mystruct1;
+.br
+struct s2 *mystruct2;
+.br
+
+int foo()
+.br
+{
+.br
+	...
+.br
+	s1.name = "Hello World";
+.br
+	...
+.br
+}
+.br
+
+\fBmakedumpfile.conf:\fR
+.br
+[mymodule]
+.br
+erase array_var
+.br
+erase mystruct1.buffer size 25
+.br
+erase mystruct1.name
+.br
+erase mystruct1.addr1 nullify
+.br
+# Assuming addr2 points to 1024 bytes
+.br
+erase mystruct1.addr2 size 1K
+.br
+erase mystruct2.addr size mystruct2.addr_size
+.br
+.B EOF
+
+.SS Loop construct
+.PP
+A Loop construct allows the user to traverse the linked list or array elements
+and erase the data contents referred by each element.
+
+.br
+\fBfor\fR <\fIid\fR> \fBin\fR {<\fIArrayVar\fR> |
+.br
+		   <\fIStructVar\fR> \fBvia\fR <\fINextMember\fR> |
+.br
+		   <\fIListHeadVar\fR> \fBwithin\fR
+<\fIStructName\fR>\fB:\fR<\fIListHeadMember\fR>}
+.br
+	\fBerase\fR <\fIid\fR>[.\fIMemberExpression\fR]
+[\fBsize\fR <\fISizeExpression\fR>|\fBnullify\fR]
+.br
+	[\fBerase\fR <\fIid\fR>...]
+.br
+	[...]
+.br
+\fBendfor\fR
+.PP
+where
+.PP
+.TP
+<\fIid\fR>
+Arbitrary name used to temporarily point to elements of the list. This is
+also called iteration variable.
+.TP
+<\fIArrayVar\fR>
+A simple expression in the form of <\fISymbol\fR>[.\fImember\fR[...]] that
+results into an array variable.
+.TP
+<\fIStructVar\fR>
+A simple expression in the form of <\fISymbol\fR>[.\fImember\fR[...]] that
+results into a variable that points to a structure.
+.TP
+<\fINextMember\fR>
+Member within <\fIStructVar\fR> that points to an object of same type that of
+<\fIStructVar\fR>.
+.TP
+<\fIListHeadVar\fR>
+A simple expression in the form of <\fISymbol\fR>[.\fImember\fR[...]] that
+results into a variable of type struct list_head.
+.TP
+<\fIStructName\fR>
+Name of the structure type that can be traversed using HEAD variable
+<\fIListHeadVar\fR> and contains a member named <\fIListHeadMember\fR>.
+.TP
+<\fIListHeadMember\fR>
+Name of a member in <\fIStructName\fR>, of type struct list_head.
+.TP
+<\fIMemberExpression\fR>
+A simple expression in the form of [.\fImember\fR[...]] to specify a member
+or component of an element in <\fIArrayVar\fR>, <\fIStructVar\fR>
+or <\fIStructName\fR>.
+.TP
+<\fISizeExpression\fR>
+Size value in the form of <\fISizeValue\fR>, <\fIid\fR>[.\fIMemberExpression\fR]
+or <\fISymbol\fR>[.\fImember\fR[...]].
+.PP
+The \fBfor\fR loop construct allows to iterate on list of elements in an array
+or linked lists. Each element in the list is assigned to iteration variable
+<\fIid\fR>. The type of the iteration variable is determined by that of the
+list elements. The entry specified after '\fBin\fR' terminal is called LIST
+entry. The LIST entry can be an array variable, structure variable/pointer or a
+struct list_head type variable. The set of \fBerase\fR commands specified
+between \fBfor\fR and \fBendfor\fR, will be executed for each element in the
+LIST entry.
+.PP
+If the LIST entry specified is an array variable, then the loop will be
+executed for each array element. The size of the array will be determined by
+using dwarf information.
+.PP
+If the LIST entry specified is a structure variable/pointer, then a traversal
+member (<\fINextMember\fR>) must be specified using '\fBvia\fR' terminal. The
+\fBfor\fR loop will continue until the value of traversal member is NULL or
+matches with address of the first node <\fIStructVar\fR> if it is a circular
+linked list.
+.PP
+If the LIST entry is specified using a struct list_head type variable, then
+\fBwithin\fR terminal must be used to specify the structure name
+<\fIStructName\fR> that is surrounding to it along with the struct list_head
+type member after '\fB:\fR' which is part of the linked list. In the erase
+statement <\fIid\fR> then denotes the structure that the list_head is
+contained in (ELEMENT_OF).
+.PP
+The below example illustrates how to use loop construct for traversing
+Array, linked list via next member and list_head.
+
+.B Example:
+.PP
+Assuming following piece of code is from kernel module 'mymodule':
+.br
+
+struct s1 {
+.br
+	struct *next;
+.br
+	struct list_head list;
+.br
+	char private[100];
+.br
+	void *key;
+.br
+	long key_size;
+.br
+};
+.br
+
+/* Global symbols */
+.br
+struct s1 mystruct1;
+.br
+static LIST_HEAD(s1_list_head);
+.br
+struct s1 myarray[100];
+.br
+
+void foo()
+.br
+{
+.br
+	struct s1 *s1_ptr;
+.br
+	...
+.br
+	...
+.br
+	s1_ptr = malloc(...);
+.br
+	...
+.br
+	...
+.br
+	list_add(&s1_ptr->list, &s1_list_head);
+.br
+	...
+.br
+}
+.br
+
+\fBmakedumpfile.conf:\fR
+.br
+[mymodule]
+.br
+# erase private fields from list starting with mystruct1 connected via
+.br
+# 'next' member:
+.br
+for mys1 in mystruct1 via next
+.br
+	erase mys1.private
+.br
+	erase mys1.key size mys1.key_size
+.br
+endfor
+.br
+
+# erase private fields from list starting with list_head variable
+.br
+# s1_list_head.
+.br
+for mys1 in s1_list_head.next within s1:list
+.br
+	erase mys1.private
+.br
+	erase mys1.key size mys1.key_size
+.br
+endfor
+.br
+
+# erase private fields from all elements of the array myarray:
+.br
+for mys1 in myarray
+.br
+	erase mys1.private
+.br
+	erase mys1.key size mys1.key_size
+.br
+endfor
+.br
+.B EOF
+.PP
+In the above example, the first \fBfor\fR construct traverses the linked list
+through a specified structure variable \fBmystruct1\fR of type \fBstruct s1\fR.
+The linked list can be traversed using '\fBnext\fR' member of \fBmystruct1\fR.
+Hence a \fBvia\fR terminal has been used to specify the traversal member
+name '\fBnext\fR'.
+.PP
+The second \fBfor\fR construct traverses the linked list through a specified
+struct list_head variable \fBs1_list_head.next\fR. The global symbol
+\fBs1_list_head\fR is a start address of the linked list and its \fBnext\fR
+member points to the address of struct list_head type member '\fBlist\fR' from
+\fBstruct s1\fR. Hence a \fBwithin\fR terminal is used to specify the structure
+name '\fBs1\fR' that can be traversed using \fBs1_list_head.next\fR variable
+along with the name of struct list_head type member '\fBlist\fR' which is part
+of the linked list that starts from \fBs1_list_head\fR global symbol.
+.PP
+The third \fBfor\fR construct traverses the array elements specified through
+a array variable \fBmyarray\fR.
+.br
+.SH SEE ALSO
+.PP
+makedumpfile(8)
+

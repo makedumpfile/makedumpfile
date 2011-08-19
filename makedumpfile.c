@@ -7788,13 +7788,20 @@ free_config_entry(struct config_entry *ce)
 void
 free_config(struct config *config)
 {
+	int i;
 	if (config) {
 		if (config->module_name)
 			free(config->module_name);
+		for (i = 0; i < config->num_filter_symbols; i++) {
+			if (config->filter_symbol[i])
+				free_config_entry(config->filter_symbol[i]);
+			if (config->size_symbol[i])
+				free_config_entry(config->size_symbol[i]);
+		}
 		if (config->filter_symbol)
-			free_config_entry(config->filter_symbol);
+			free(config->filter_symbol);
 		if (config->size_symbol)
-			free_config_entry(config->size_symbol);
+			free(config->size_symbol);
 		free(config);
 	}
 }
@@ -7851,7 +7858,16 @@ create_config_entry(const char *token, unsigned short flag, int line)
 			/* First node is always a symbol name */
 			ptr->flag |= SYMBOL_ENTRY;
 		}
-		if (flag & FILTER_ENTRY) {
+		if (flag & ITERATION_ENTRY) {
+			/* Max depth for iteration entry is 1 */
+			if (depth > 0) {
+				ERRMSG("Config error at %d: Invalid iteration "
+					"variable entry.\n", line);
+				goto err_out;
+			}
+			ptr->name = strdup(cur);
+		}
+		if (flag & (FILTER_ENTRY | LIST_ENTRY)) {
 			ptr->name = strdup(cur);
 		}
 		if (flag & SIZE_ENTRY) {
@@ -8050,6 +8066,7 @@ get_config_token(char *expected_token, unsigned char flag, int *line,
 static int
 read_size_entry(struct config *config, int line)
 {
+	int idx = config->num_filter_symbols - 1;
 	char *token = get_config_token(NULL, 0, &line, NULL, NULL);
 
 	if (!token || IS_KEYWORD(token)) {
@@ -8057,11 +8074,18 @@ read_size_entry(struct config *config, int line)
 		" 'size' keyword.\n", line);
 		return FALSE;
 	}
-	config->size_symbol = create_config_entry(token, SIZE_ENTRY, line);
-	if (!config->size_symbol) {
+	config->size_symbol[idx] = create_config_entry(token, SIZE_ENTRY, line);
+	if (!config->size_symbol[idx]) {
 		ERRMSG("Error at line %d: Failed to read size symbol\n",
 									line);
 		return FALSE;
+	}
+	if (config->iter_entry && config->size_symbol[idx]->name &&
+					(!strcmp(config->size_symbol[idx]->name,
+					config->iter_entry->name))) {
+		config->size_symbol[idx]->flag &= ~SYMBOL_ENTRY;
+		config->size_symbol[idx]->flag |= VAR_ENTRY;
+		config->size_symbol[idx]->refer_to = config->iter_entry;
 	}
 	return TRUE;
 }
@@ -8076,6 +8100,7 @@ read_size_entry(struct config *config, int line)
 static int
 read_filter_entry(struct config *config, int line)
 {
+	int size, idx;
 	char *token = get_config_token(NULL, 0, &line, NULL, NULL);
 
 	if (!token || IS_KEYWORD(token)) {
@@ -8083,19 +8108,189 @@ read_filter_entry(struct config *config, int line)
 		" 'erase' command.\n", line);
 		return FALSE;
 	}
-	config->filter_symbol =
+
+	idx = config->num_filter_symbols;
+	config->num_filter_symbols++;
+	size = config->num_filter_symbols * sizeof(struct config_entry *);
+	config->filter_symbol = realloc(config->filter_symbol, size);
+	config->size_symbol = realloc(config->size_symbol, size);
+
+	if (!config->filter_symbol || !config->size_symbol) {
+		ERRMSG("Can't get memory to read config symbols.\n");
+		return FALSE;
+	}
+	config->filter_symbol[idx] = NULL;
+	config->size_symbol[idx] = NULL;
+
+	config->filter_symbol[idx] =
 			create_config_entry(token, FILTER_ENTRY, line);
-	if (!config->filter_symbol) {
+	if (!config->filter_symbol[idx]) {
 		ERRMSG("Error at line %d: Failed to read filter symbol\n",
 									line);
 		return FALSE;
 	}
+	if (config->iter_entry) {
+		if (strcmp(config->filter_symbol[idx]->name,
+				config->iter_entry->name)) {
+			ERRMSG("Config error at %d: unused iteration"
+				" variable '%s'.\n", line,
+				config->iter_entry->name);
+			return FALSE;
+		}
+		config->filter_symbol[idx]->flag &= ~SYMBOL_ENTRY;
+		config->filter_symbol[idx]->flag |= VAR_ENTRY;
+		config->filter_symbol[idx]->refer_to = config->iter_entry;
+	}
 	if (get_config_token("nullify", 0, &line, NULL, NULL)) {
-		config->filter_symbol->nullify = 1;
+		config->filter_symbol[idx]->nullify = 1;
 	}
 	else if (get_config_token("size", 0, &line, NULL, NULL)) {
 		if (!read_size_entry(config, line))
 			return FALSE;
+	}
+	return TRUE;
+}
+
+static int
+add_traversal_entry(struct config_entry *ce, char *member, int line)
+{
+	if (!ce)
+		return FALSE;
+
+	while (ce->next)
+		ce = ce->next;
+
+	ce->next = create_config_entry(member, LIST_ENTRY, line);
+	if (ce->next == NULL) {
+		ERRMSG("Error at line %d: Failed to read 'via' member\n",
+									line);
+		return FALSE;
+	}
+
+	ce->next->flag |= TRAVERSAL_ENTRY;
+	ce->next->flag &= ~SYMBOL_ENTRY;
+	return TRUE;
+}
+
+static int
+read_list_entry(struct config *config, int line)
+{
+	char *token = get_config_token(NULL, 0, &line, NULL, NULL);
+
+	if (!token || IS_KEYWORD(token)) {
+		ERRMSG("Config error at %d: expected list symbol after"
+		" 'in' keyword.\n", line);
+		return FALSE;
+	}
+	config->list_entry = create_config_entry(token, LIST_ENTRY, line);
+	if (!config->list_entry) {
+		ERRMSG("Error at line %d: Failed to read list symbol\n",
+									line);
+		return FALSE;
+	}
+	/* Check if user has provided 'via' or 'within' keyword */
+	if (get_config_token("via", 0, &line, NULL, NULL)) {
+		/* next token is traversal member NextMember */
+		token = get_config_token(NULL, 0, &line, NULL, NULL);
+		if (!token) {
+			ERRMSG("Config error at %d: expected member name after"
+			" 'via' keyword.\n", line);
+			return FALSE;
+		}
+		if (!add_traversal_entry(config->list_entry, token, line))
+			return FALSE;
+	}
+	else if (get_config_token("within", 0, &line, NULL, NULL)) {
+		char *s_name, *lh_member;
+		/* next value is StructName:ListHeadMember */
+		s_name = get_config_token(NULL, 0, &line, NULL, NULL);
+		if (!s_name || IS_KEYWORD(s_name)) {
+			ERRMSG("Config error at %d: expected struct name after"
+			" 'within' keyword.\n", line);
+			return FALSE;
+		}
+		lh_member = strchr(s_name, ':');
+		if (lh_member) {
+			*lh_member++ = '\0';
+			if (!strlen(lh_member)) {
+				ERRMSG("Config error at %d: expected list_head"
+					" member after ':'.\n", line);
+				return FALSE;
+			}
+			config->iter_entry->next =
+				create_config_entry(lh_member,
+							ITERATION_ENTRY, line);
+			if (!config->iter_entry->next)
+				return FALSE;
+			config->iter_entry->next->flag &= ~SYMBOL_ENTRY;
+		}
+		if (!strlen(s_name)) {
+			ERRMSG("Config error at %d: Invalid token found "
+				"after 'within' keyword.\n", line);
+			return FALSE;
+		}
+		config->iter_entry->type_name = strdup(s_name);
+	}
+	return TRUE;
+}
+
+/*
+ * Read the iteration entry (LoopConstruct). The syntax is:
+ *
+ *	for <id> in {<ArrayVar> |
+ *		    <StructVar> via <NextMember> |
+ *		    <ListHeadVar> within <StructName>:<ListHeadMember>}
+ *		erase <id>[.MemberExpression] [size <SizeExpression>|nullify]
+ *		[erase <id>...]
+ *		[...]
+ *	endfor
+ */
+static int
+read_iteration_entry(struct config *config, int line)
+{
+	int eof = 0;
+	char *token = get_config_token(NULL, 0, &line, NULL, NULL);
+
+	if (!token || IS_KEYWORD(token)) {
+		ERRMSG("Config error at %d: expected iteration VAR entry after"
+		" 'for' keyword.\n", line);
+		return FALSE;
+	}
+	config->iter_entry =
+		create_config_entry(token, ITERATION_ENTRY, line);
+	if (!config->iter_entry) {
+		ERRMSG("Error at line %d: "
+			"Failed to read iteration VAR entry.\n", line);
+		return FALSE;
+	}
+	if (!get_config_token("in", 0, &line, NULL, NULL)) {
+		char *token;
+		token = get_config_token(NULL, 0, &line, NULL, NULL);
+		if (token)
+			ERRMSG("Config error at %d: Invalid token '%s'.\n",
+								line, token);
+		ERRMSG("Config error at %d: expected token 'in'.\n", line);
+		return FALSE;
+	}
+	if (!read_list_entry(config, line))
+		return FALSE;
+
+	while (!get_config_token("endfor", 0, &line, NULL, &eof) && !eof) {
+		if (get_config_token("erase", 0, &line, NULL, NULL)) {
+			if (!read_filter_entry(config, line))
+				return FALSE;
+		}
+		else {
+			token = get_config_token(NULL, 0, &line, NULL, NULL);
+			ERRMSG("Config error at %d: "
+				"Invalid token '%s'.\n", line, token);
+			return FALSE;
+		}
+	}
+	if (eof) {
+		ERRMSG("Config error at %d: No matching 'endfor' found.\n",
+									line);
+		return FALSE;
 	}
 	return TRUE;
 }
@@ -8123,6 +8318,13 @@ get_config(int skip)
 			config->module_name = strdup(cur_module);
 
 		if (!read_filter_entry(config, line_count))
+			goto err_out;
+	}
+	else if (get_config_token("for", 0, &line_count, &cur_module, &eof)) {
+		if (cur_module)
+			config->module_name = strdup(cur_module);
+
+		if (!read_iteration_entry(config, line_count))
 			goto err_out;
 	}
 	else {
@@ -8193,6 +8395,24 @@ resolve_config_entry(struct config_entry *ce, unsigned long long base_addr,
 				ce->array_length = 0;
 		}
 	}
+	else if (ce->flag & VAR_ENTRY) {
+		/* iteration variable.
+		 * read the value from ce->refer_to
+		 */
+		ce->addr = ce->refer_to->addr;
+		ce->sym_addr = ce->refer_to->sym_addr;
+		ce->size = ce->refer_to->size;
+		ce->type_flag = ce->refer_to->type_flag;
+		if (!ce->type_name)
+			ce->type_name = strdup(ce->refer_to->type_name);
+
+		/* This entry has been changed hence next entry needs to
+		 * be resolved accordingly.
+		 */
+		if (ce->next)
+			ce->next->flag &= ~ENTRY_RESOLVED;
+		return TRUE;
+	}
 	else {
 		/* find the member offset */
 		ce->offset = get_member_offset(base_struct_name,
@@ -8216,9 +8436,58 @@ resolve_config_entry(struct config_entry *ce, unsigned long long base_addr,
 				ce->line, base_struct_name, ce->name);
 		return FALSE;
 	}
+	if (!strcmp(ce->type_name, "list_head")) {
+		ce->type_flag |= TYPE_LIST_HEAD;
+		/* If this list head expression is a LIST entry then
+		 * mark the next entry as TRAVERSAL_ENTRY, if any.
+		 * Error out if next entry is not a last node.
+		 */
+		if ((ce->flag & LIST_ENTRY) && ce->next) {
+			if (ce->next->next) {
+				ERRMSG("Config error at %d: Only one traversal"
+					" entry is allowed for list_head type"
+					" LIST entry", ce->line);
+				return FALSE;
+			}
+			ce->next->flag |= TRAVERSAL_ENTRY;
+		}
+	}
 	ce->addr = ce->sym_addr;
 	if (ce->size < 0)
 		ce->size = 0;
+	if ((ce->flag & LIST_ENTRY) && !ce->next) {
+		/* This is the last node of LIST entry.
+		 * For the list entry symbol, the allowed data types are:
+		 * Array, Structure Pointer (with 'next' member) and list_head.
+		 *
+		 * If this is a struct or list_head data type then
+		 * create a leaf node entry with 'next' member.
+		 */
+		if ((ce->type_flag & TYPE_BASE)
+					&& (strcmp(ce->type_name, "void")))
+			return FALSE;
+
+		if ((ce->type_flag & TYPE_LIST_HEAD)
+			|| ((ce->type_flag & (TYPE_STRUCT | TYPE_ARRAY))
+							== TYPE_STRUCT)) {
+			if (!(ce->flag & TRAVERSAL_ENTRY)) {
+				ce->next = create_config_entry("next",
+							LIST_ENTRY, ce->line);
+				if (ce->next == NULL)
+					return FALSE;
+
+				ce->next->flag |= TRAVERSAL_ENTRY;
+				ce->next->flag &= ~SYMBOL_ENTRY;
+			}
+		}
+		if (ce->flag & TRAVERSAL_ENTRY) {
+			/* type name of traversal entry should match with
+			 * that of parent node.
+			 */
+			if (strcmp(base_struct_name, ce->type_name))
+				return FALSE;
+		}
+	}
 	if ((ce->type_flag & (TYPE_ARRAY | TYPE_PTR)) == TYPE_PTR) {
 		/* If it's a pointer variable (not array) then read the
 		 * pointer value. */
@@ -8227,7 +8496,7 @@ resolve_config_entry(struct config_entry *ce, unsigned long long base_addr,
 		/*
 		 * if it is a void pointer then reset the size to 0
 		 * User need to provide a size to filter data referenced
-		 * by 'void *' pointer.
+		 * by 'void *' pointer or nullify option.
 		 */
 		if (!strcmp(ce->type_name, "void"))
 			ce->size = 0;
@@ -8286,6 +8555,8 @@ resolve_config_entry(struct config_entry *ce, unsigned long long base_addr,
 		free(val);
 	}
 	ce->flag |= ENTRY_RESOLVED;
+	if (ce->next)
+		ce->next->flag &= ~ENTRY_RESOLVED;
 	return TRUE;
 }
 
@@ -8294,9 +8565,78 @@ get_config_symbol_addr(struct config_entry *ce,
 			unsigned long long base_addr,
 			char *base_struct_name)
 {
+	unsigned long long addr = 0;
+
 	if (!(ce->flag & ENTRY_RESOLVED)) {
 		if (!resolve_config_entry(ce, base_addr, base_struct_name))
 			return 0;
+	}
+
+	if ((ce->flag & LIST_ENTRY)) {
+		/* handle List entry differently */
+		if (!ce->next) {
+			/* leaf node. */
+			if (ce->type_flag & TYPE_ARRAY) {
+				if (ce->index == ce->array_length)
+					return 0;
+				if (!(ce->type_flag & TYPE_PTR))
+					return (ce->addr +
+							(ce->index * ce->size));
+				/* Array of pointers.
+				 *
+				 * Array may contain NULL pointers at some
+				 * indexes. Hence return the next non-null
+				 * address value.
+				 */
+				while (ce->index < ce->array_length) {
+					addr = read_pointer_value(ce->addr +
+						(ce->index * pointer_size));
+					ce->index++;
+					if (addr)
+						break;
+				}
+				return addr;
+			}
+			else {
+				if (ce->addr == ce->cmp_addr)
+					return 0;
+
+				/* Set the leaf node as unresolved, so that
+				 * it will be resolved every time when
+				 * get_config_symbol_addr is called untill
+				 * it hits the exit condiftion.
+				 */
+				ce->flag &= ~ENTRY_RESOLVED;
+			}
+		}
+		else if ((ce->next->next == NULL) &&
+					!(ce->next->type_flag & TYPE_ARRAY)) {
+			/* the next node is leaf node. for non-array element
+			 * Set the sym_addr and addr of this node with that of
+			 * leaf node.
+			 */
+			addr = ce->addr;
+			ce->addr = ce->next->addr;
+
+			if (!(ce->type_flag & TYPE_LIST_HEAD)) {
+				if (addr == ce->next->cmp_addr)
+					return 0;
+
+				if (!ce->next->cmp_addr) {
+					/* safeguard against circular
+					 * link-list
+					 */
+					ce->next->cmp_addr = addr;
+				}
+
+				/* Force resolution of traversal node */
+				if (ce->addr && !resolve_config_entry(ce->next,
+						ce->addr, ce->type_name))
+					return 0;
+
+				return addr;
+			}
+		}
 	}
 
 	if (ce->next && ce->addr) {
@@ -8305,7 +8645,7 @@ get_config_symbol_addr(struct config_entry *ce,
 		return get_config_symbol_addr(ce->next, ce->addr,
 							ce->type_name);
 	}
-	else if (ce->nullify) {
+	else if (!ce->next && ce->nullify) {
 		/* nullify is applicable to pointer type */
 		if (ce->type_flag & TYPE_PTR)
 			return ce->sym_addr;
@@ -8338,6 +8678,48 @@ get_config_symbol_size(struct config_entry *ce,
 		}
 		return ce->size;
 	}
+}
+
+static int
+resolve_list_entry(struct config_entry *ce, unsigned long long base_addr,
+			char *base_struct_name, char **out_type_name,
+			unsigned char *out_type_flag)
+{
+	if (!(ce->flag & ENTRY_RESOLVED)) {
+		if (!resolve_config_entry(ce, base_addr, base_struct_name))
+			return FALSE;
+	}
+
+	if (ce->next && (ce->next->flag & TRAVERSAL_ENTRY) &&
+				(ce->type_flag & TYPE_ARRAY)) {
+		/*
+		 * We are here because user has provided
+		 * traversal member for ArrayVar using 'via' keyword.
+		 *
+		 * Print warning and continue.
+		 */
+		ERRMSG("Warning: line %d: 'via' keyword not required "
+			"for ArrayVar.\n", ce->next->line);
+		free_config_entry(ce->next);
+		ce->next = NULL;
+	}
+	if ((ce->type_flag & TYPE_LIST_HEAD) && ce->next &&
+			(ce->next->flag & TRAVERSAL_ENTRY)) {
+		/* set cmp_addr for list empty condition.  */
+		ce->next->cmp_addr = ce->sym_addr;
+	}
+	if (ce->next && ce->addr) {
+		return resolve_list_entry(ce->next, ce->addr,
+				ce->type_name, out_type_name, out_type_flag);
+	}
+	else {
+		ce->index = 0;
+		if (out_type_name)
+			*out_type_name = ce->type_name;
+		if (out_type_flag)
+			*out_type_flag = ce->type_flag;
+	}
+	return TRUE;
 }
 
 /*
@@ -8420,6 +8802,107 @@ update_filter_info(struct config_entry *filter_symbol,
 	return TRUE;
 }
 
+int
+initialize_iteration_entry(struct config_entry *ie,
+				char *type_name, unsigned char type_flag)
+{
+	if (!(ie->flag & ITERATION_ENTRY))
+		return FALSE;
+
+	if (type_flag & TYPE_LIST_HEAD) {
+		if (!ie->type_name) {
+			ERRMSG("Config error at %d: Use 'within' keyword "
+				"to specify StructName:ListHeadMember.\n",
+				ie->line);
+			return FALSE;
+		}
+		/*
+		 * If the LIST entry is of list_head type and user has not
+		 * specified the member name where iteration entry is hooked
+		 * on to list_head, then we default to member name 'list'.
+		 */
+		if (!ie->next) {
+			ie->next = create_config_entry("list", ITERATION_ENTRY,
+								ie->line);
+			ie->next->flag &= ~SYMBOL_ENTRY;
+		}
+	}
+	else {
+		if (ie->type_name) {
+			/* looks like user has used 'within' keyword for
+			 * non-list_head VAR. Print the warning and continue.
+			 */
+			ERRMSG("Warning: line %d: 'within' keyword not "
+				"required for ArrayVar/StructVar.\n", ie->line);
+			free(ie->type_name);
+
+			/* remove the next list_head member from iteration
+			 * entry that would have added as part of 'within'
+			 * keyword processing.
+			 */
+			if (ie->next) {
+				free_config_entry(ie->next);
+				ie->next = NULL;
+			}
+		}
+		ie->type_name = strdup(type_name);
+	}
+
+	if (!ie->size) {
+		ie->size = get_structure_size(ie->type_name,
+						DWARF_INFO_GET_STRUCT_SIZE);
+		if (ie->size == FAILED_DWARFINFO) {
+			ERRMSG("Config error at %d: "
+				"Can't get size for type: %s.\n",
+				ie->line, ie->type_name);
+			return FALSE;
+		}
+		else if (ie->size == NOT_FOUND_STRUCTURE) {
+			ERRMSG("Config error at %d: "
+				"Can't find structure: %s.\n",
+				ie->line, ie->type_name);
+			return FALSE;
+		}
+	}
+	if (type_flag & TYPE_LIST_HEAD) {
+		if (!resolve_config_entry(ie->next, 0, ie->type_name))
+			return FALSE;
+
+		if (strcmp(ie->next->type_name, "list_head")) {
+			ERRMSG("Config error at %d: "
+				"Member '%s' is not of 'list_head' type.\n",
+				ie->next->line, ie->next->name);
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+int
+list_entry_empty(struct config_entry *le, struct config_entry *ie)
+{
+	unsigned long long addr;
+
+	/* Error out if arguments are not correct */
+	if (!(le->flag & LIST_ENTRY) || !(ie->flag & ITERATION_ENTRY)) {
+		ERRMSG("Invalid arguments\n");
+		return TRUE;
+	}
+	addr = get_config_symbol_addr(le, 0, NULL);
+	if (!addr)
+		return TRUE;
+
+	if (ie->next) {
+		/* we are dealing with list_head */
+		ie->next->addr = addr;
+		ie->addr = addr - ie->next->offset;
+		//resolve_iteration_entry(ie, addr);
+	}
+	else
+		ie->addr = addr;
+	return FALSE;
+}
+
 /*
  * Process the config entry that has been read by get_config.
  * return TRUE on success
@@ -8427,7 +8910,35 @@ update_filter_info(struct config_entry *filter_symbol,
 int
 process_config(struct config *config)
 {
-	update_filter_info(config->filter_symbol, config->size_symbol);
+	int i;
+	if (config->list_entry) {
+		unsigned char type_flag;
+		char *type_name = NULL;
+		/*
+		 * We are dealing with 'for' command.
+		 * - First resolve list entry.
+		 * - Initialize iteration entry for iteration.
+		 * - Populate iteration entry untill list entry empty.
+		 */
+		if (!resolve_list_entry(config->list_entry, 0, NULL,
+					&type_name, &type_flag)) {
+			return FALSE;
+		}
+		if (!initialize_iteration_entry(config->iter_entry,
+						type_name, type_flag)) {
+			return FALSE;
+		}
+
+		while (!list_entry_empty(config->list_entry,
+						config->iter_entry)) {
+			for (i = 0; i < config->num_filter_symbols; i++)
+				update_filter_info(config->filter_symbol[i],
+							config->size_symbol[i]);
+		}
+	}
+	else
+		update_filter_info(config->filter_symbol[0],
+						config->size_symbol[0]);
 
 	return TRUE;
 }

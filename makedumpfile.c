@@ -1749,20 +1749,11 @@ static int
 get_die_type(Dwarf *dwarfd, Dwarf_Die *die, Dwarf_Die *die_type)
 {
 	Dwarf_Attribute attr;
-	Dwarf_Off offset_type, offset_cu;
 
-	offset_cu = dwarf_dieoffset(die) - dwarf_cuoffset(die);
-
-	/*
-	 * Get the offset of DW_AT_type.
-	 */
 	if (dwarf_attr(die, DW_AT_type, &attr) == NULL)
 		return FALSE;
 
-	if (dwarf_formref(&attr, &offset_type) < 0)
-		return FALSE;
-
-	if (dwarf_offdie(dwarfd, offset_type + offset_cu, die_type) == NULL) {
+	if (dwarf_formref_die(&attr, die_type) < 0) {
 		ERRMSG("Can't get CU die.\n");
 		return FALSE;
 	}

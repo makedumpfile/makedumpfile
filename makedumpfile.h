@@ -1012,6 +1012,33 @@ struct vm_table {
 };
 extern struct vm_table		vt;
 
+/*
+ * Loaded module symbols info.
+ */
+#define MOD_NAME_LEN	64
+#define IN_RANGE(addr, mbase, sz) \
+	(((unsigned long)(addr) >= (unsigned long)mbase) \
+	&& ((unsigned long)addr < (unsigned long)(mbase + sz)))
+
+struct symbol_info {
+	char			*name;
+	unsigned long long	value;
+};
+
+struct module_info {
+	char			name[MOD_NAME_LEN];
+	unsigned int		num_syms;
+	struct symbol_info	*sym_info;
+};
+
+struct module_sym_table {
+	unsigned int		num_modules;
+	unsigned int		current_mod;
+	struct module_info	*modules;
+};
+
+extern struct module_sym_table	mod_st;
+
 struct symbol_table {
 	unsigned long long	mem_map;
 	unsigned long long	vmem_map;
@@ -1052,6 +1079,12 @@ struct symbol_table {
 	unsigned long long	frametable_pg_dir;
 	unsigned long long	max_page;
 	unsigned long long	alloc_bitmap;
+
+	/*
+	 * for loading module symbol data
+	 */
+
+	unsigned long long	modules;
 };
 
 struct size_table {
@@ -1069,6 +1102,11 @@ struct size_table {
 	 */
 	long	page_info;
 	long	domain;
+
+	/*
+	 * for loading module symbol data
+	 */
+	long	module;
 };
 
 struct offset_table {
@@ -1123,6 +1161,20 @@ struct offset_table {
 		long	next_in_list;
 	} domain;
 
+	/*
+	 * for loading module symbol data
+	 */
+	struct module {
+		long	list;
+		long	name;
+		long	module_core;
+		long	core_size;
+		long	module_init;
+		long	init_size;
+		long	num_symtab;
+		long	symtab;
+		long	strtab;
+	} module;
 };
 
 /*

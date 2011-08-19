@@ -26,6 +26,7 @@ struct srcfile_table	srcfile_table;
 struct dwarf_info	dwarf_info;
 struct vm_table		vt = { 0 };
 struct DumpInfo		*info = NULL;
+struct module_sym_table	mod_st = { 0 };
 
 char filename_stdout[] = FILENAME_STDOUT;
 int message_level;
@@ -1512,6 +1513,54 @@ err_out:
 	return FALSE;
 }
 
+static struct module_info *
+get_loaded_module(char *mod_name)
+{
+	unsigned int i;
+	struct module_info *modules;
+
+	modules = mod_st.modules;
+	if (strcmp(mod_name, modules[mod_st.current_mod].name)) {
+		for (i = 0; i < mod_st.num_modules; i++) {
+			if (!strcmp(mod_name, modules[i].name))
+				break;
+		}
+		if (i == mod_st.num_modules)
+			return NULL;
+		/* set the current_mod for fast lookup next time */
+		mod_st.current_mod = i;
+	}
+
+	return &modules[mod_st.current_mod];
+}
+
+int
+sym_in_module(char *symname, unsigned long long *symbol_addr)
+{
+	int i;
+	struct module_info *module_ptr;
+	struct symbol_info *sym_info;
+
+	if (!mod_st.num_modules
+		|| !strcmp(dwarf_info.module_name, "vmlinux")
+		|| !strcmp(dwarf_info.module_name, "xen-syms"))
+		return FALSE;
+
+	module_ptr = get_loaded_module(dwarf_info.module_name);
+	if (!module_ptr)
+		return FALSE;
+	sym_info = module_ptr->sym_info;
+	if (!sym_info)
+		return FALSE;
+	for (i = 1; i < module_ptr->num_syms; i++) {
+		if (sym_info[i].name && !strcmp(sym_info[i].name, symname)) {
+			*symbol_addr = sym_info[i].value;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 unsigned long long
 get_symbol_addr(char *symname)
 {
@@ -1523,6 +1572,13 @@ get_symbol_addr(char *symname)
 	Elf_Data *data = NULL;
 	Elf_Scn *scn = NULL;
 	char *sym_name = NULL;
+
+	/*
+	 * If we are looking for module symbol then traverse through
+	 * mod_st.modules for symbol lookup
+	 */
+	if (sym_in_module(symname, &symbol))
+		return symbol;
 
 	if (!init_dwarf_info())
 		return 0;
@@ -2335,6 +2391,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(log_buf_len, "log_buf_len");
 	SYMBOL_INIT(log_end, "log_end");
 	SYMBOL_INIT(max_pfn, "max_pfn");
+	SYMBOL_INIT(modules, "modules");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -2436,6 +2493,20 @@ get_structure_info(void)
 	OFFSET_INIT(node_memblk_s.nid, "node_memblk_s", "nid");
 
 	OFFSET_INIT(vm_struct.addr, "vm_struct", "addr");
+
+	/*
+	 * Get offset of the module members.
+	 */
+	SIZE_INIT(module, "module");
+	OFFSET_INIT(module.strtab, "module", "strtab");
+	OFFSET_INIT(module.symtab, "module", "symtab");
+	OFFSET_INIT(module.num_symtab, "module", "num_symtab");
+	OFFSET_INIT(module.list, "module", "list");
+	OFFSET_INIT(module.name, "module", "name");
+	OFFSET_INIT(module.module_core, "module", "module_core");
+	OFFSET_INIT(module.core_size, "module", "core_size");
+	OFFSET_INIT(module.module_init, "module", "module_init");
+	OFFSET_INIT(module.init_size, "module", "init_size");
 
 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
 	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");
@@ -7252,6 +7323,240 @@ writeout_multiple_dumpfiles(void)
 			ret = NOSPACE;
 	}
 	return ret;
+}
+
+static unsigned int
+get_num_modules(unsigned long head, unsigned int *num)
+{
+	unsigned long cur;
+	unsigned int num_modules = 0;
+
+	if (!num)
+		return FALSE;
+
+	if (!readmem(VADDR, head + OFFSET(list_head.next), &cur, sizeof cur)) {
+		ERRMSG("Can't get next list_head.\n");
+		return FALSE;
+	}
+	while (cur != head) {
+		num_modules++;
+		if (!readmem(VADDR, cur + OFFSET(list_head.next),
+					&cur, sizeof cur)) {
+			ERRMSG("Can't get next list_head.\n");
+			return FALSE;
+		}
+	}
+	*num = num_modules;
+	return TRUE;
+}
+
+static void
+free_symbol_info(struct module_info *module)
+{
+	int i;
+
+	if (module->num_syms) {
+		for (i = 1; i < module->num_syms; i++)
+			if (module->sym_info[i].name)
+				free(module->sym_info[i].name);
+		free(module->sym_info);
+	}
+}
+
+static void
+clean_module_symbols(void)
+{
+	int i;
+
+	for (i = 0; i < mod_st.num_modules; i++)
+		free_symbol_info(&mod_st.modules[i]);
+
+	if (mod_st.num_modules) {
+		free(mod_st.modules);
+		mod_st.modules = NULL;
+		mod_st.num_modules = 0;
+	}
+}
+
+static int
+load_module_symbols(void)
+{
+	unsigned long head, cur, cur_module;
+	unsigned long symtab, strtab;
+	unsigned long mod_base, mod_init;
+	unsigned int mod_size, mod_init_size;
+	unsigned char *module_struct_mem, *module_core_mem;
+	unsigned char *module_init_mem = NULL;
+	unsigned char *symtab_mem;
+	char *module_name, *strtab_mem, *nameptr;
+	struct module_info *modules = NULL;
+	struct symbol_info *sym_info;
+	unsigned int num_symtab;
+	unsigned int i = 0, nsym;
+
+	head = SYMBOL(modules);
+	if (!get_num_modules(head, &mod_st.num_modules)) {
+		ERRMSG("Can't get module count\n");
+		return FALSE;
+	}
+	if (!mod_st.num_modules) {
+		return FALSE;
+	}
+	mod_st.modules = calloc(mod_st.num_modules,
+					sizeof(struct module_info));
+	if (!mod_st.modules) {
+		ERRMSG("Can't allocate memory for module info\n");
+		return FALSE;
+	}
+	modules = mod_st.modules;
+
+	/* Allocate buffer to read struct module data from vmcore. */
+	if ((module_struct_mem = calloc(1, SIZE(module))) == NULL) {
+		ERRMSG("Failed to allocate buffer for module\n");
+		return FALSE;
+	}
+
+	if (!readmem(VADDR, head + OFFSET(list_head.next), &cur, sizeof cur)) {
+		ERRMSG("Can't get next list_head.\n");
+		return FALSE;
+	}
+
+	/* Travese the list and read module symbols */
+	while (cur != head) {
+		cur_module = cur - OFFSET(module.list);
+		if (!readmem(VADDR, cur_module, module_struct_mem,
+							SIZE(module))) {
+			ERRMSG("Can't get module info.\n");
+			return FALSE;
+		}
+
+		module_name = (char *)(module_struct_mem + OFFSET(module.name));
+		if (strlen(module_name) < MOD_NAME_LEN)
+			strcpy(modules[i].name, module_name);
+		else
+			strncpy(modules[i].name, module_name, MOD_NAME_LEN-1);
+
+		mod_init = ULONG(module_struct_mem +
+						OFFSET(module.module_init));
+		mod_init_size = UINT(module_struct_mem +
+						OFFSET(module.init_size));
+		mod_base = ULONG(module_struct_mem +
+						OFFSET(module.module_core));
+		mod_size = UINT(module_struct_mem +
+						OFFSET(module.core_size));
+
+		DEBUG_MSG("Module: %s, Base: 0x%lx, Size: %u\n",
+				module_name, mod_base, mod_size);
+		if (mod_init_size > 0) {
+			module_init_mem = calloc(1, mod_init_size);
+			if (module_init_mem == NULL) {
+				ERRMSG("Can't allocate memory for module "
+								"init\n");
+				return FALSE;
+			}
+			if (!readmem(VADDR, mod_init, module_init_mem,
+							mod_init_size)) {
+				ERRMSG("Can't access module init in memory.\n");
+				return FALSE;
+			}
+		}
+
+		if ((module_core_mem = calloc(1, mod_size)) == NULL) {
+			ERRMSG("Can't allocate memory for module\n");
+			return FALSE;
+		}
+		if (!readmem(VADDR, mod_base, module_core_mem, mod_size)) {
+			ERRMSG("Can't access module in memory.\n");
+			return FALSE;
+		}
+
+		num_symtab = UINT(module_struct_mem +
+						OFFSET(module.num_symtab));
+		if (!num_symtab) {
+			ERRMSG("%s: Symbol info not available\n", module_name);
+			return FALSE;
+		}
+		modules[i].num_syms = num_symtab;
+		DEBUG_MSG("num_sym: %d\n", num_symtab);
+
+		symtab = ULONG(module_struct_mem + OFFSET(module.symtab));
+		strtab = ULONG(module_struct_mem + OFFSET(module.strtab));
+
+		/* check if symtab and strtab are inside the module space. */
+		if (!IN_RANGE(symtab, mod_base, mod_size) &&
+			!IN_RANGE(symtab, mod_init, mod_init_size)) {
+			ERRMSG("%s: module symtab is outseide of module "
+				"address space\n", module_name);
+			return FALSE;
+		}
+		if (IN_RANGE(symtab, mod_base, mod_size))
+			symtab_mem = module_core_mem + (symtab - mod_base);
+		else
+			symtab_mem = module_init_mem + (symtab - mod_init);
+
+		if (!IN_RANGE(strtab, mod_base, mod_size) &&
+			!IN_RANGE(strtab, mod_init, mod_init_size)) {
+			ERRMSG("%s: module strtab is outseide of module "
+				"address space\n", module_name);
+			return FALSE;
+		}
+		if (IN_RANGE(strtab, mod_base, mod_size))
+			strtab_mem = (char *)(module_core_mem
+						+ (strtab - mod_base));
+		else
+			strtab_mem = (char *)(module_init_mem
+						+ (strtab - mod_init));
+
+		modules[i].sym_info = calloc(num_symtab,
+						sizeof(struct symbol_info));
+		if (modules[i].sym_info == NULL) {
+			ERRMSG("Can't allocate memory to store sym info\n");
+			return FALSE;
+		}
+		sym_info = modules[i].sym_info;
+
+		/* symbols starts from 1 */
+		for (nsym = 1; nsym < num_symtab; nsym++) {
+			Elf32_Sym *sym32;
+			Elf64_Sym *sym64;
+			/*
+			 * We can not depend on info->flag_elf64_memory if
+			 * the input vmcore file is kdump-compressed format.
+			 * We will fix this in the next patch and remove the
+			 * dependancy on info->flag_elf64_memory.
+			 */
+			if (info->flag_elf64_memory) {
+				sym64 = (Elf64_Sym *) (symtab_mem
+						+ (nsym * sizeof(Elf64_Sym)));
+				sym_info[nsym].value =
+					(unsigned long long) sym64->st_value;
+				nameptr = strtab_mem + sym64->st_name;
+			}
+			else {
+				sym32 = (Elf32_Sym *) (symtab_mem
+						+ (nsym * sizeof(Elf32_Sym)));
+				sym_info[nsym].value =
+					(unsigned long long) sym32->st_value;
+				nameptr = strtab_mem + sym32->st_name;
+			}
+			if (strlen(nameptr))
+				sym_info[nsym].name = strdup(nameptr);
+			DEBUG_MSG("\t[%d] %llx %s\n", nsym,
+						sym_info[nsym].value, nameptr);
+		}
+
+		if (!readmem(VADDR, cur + OFFSET(list_head.next),
+					&cur, sizeof cur)) {
+			ERRMSG("Can't get next list_head.\n");
+			return FALSE;
+		}
+		i++;
+		free(module_core_mem);
+		if (mod_init_size > 0)
+			free(module_init_mem);
+	} while (cur != head);
+	free(module_struct_mem);
+	return TRUE;
 }
 
 int

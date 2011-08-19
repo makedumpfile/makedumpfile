@@ -1435,11 +1435,7 @@ clean_dwfl_info(void)
 
 /*
  * Intitialize the dwarf info.
- * Linux kernel module debuginfo are of ET_REL (relocatable) type. The old
- * implementation of get_debug_info() function that reads the debuginfo was
- * not relocation-aware and hence could not read the dwarf info properly
- * from module debuginfo.
- *
+ * Linux kernel module debuginfo are of ET_REL (relocatable) type.
  * This function uses dwfl API's to apply relocation before reading the
  * dwarf information from module debuginfo.
  * On success, this function sets the dwarf_info.elfd and dwarf_info.dwarfd
@@ -1483,7 +1479,8 @@ init_dwarf_info(void)
 			goto err_out;
 		}
 	}
-	if (dwarf_info.fd_debuginfo > 0) {
+
+	if (dwfl_fd > 0) {
 		if (dwfl_report_offline(dwfl, dwarf_info.module_name,
 				dwarf_info.name_debuginfo, dwfl_fd) == NULL) {
 			ERRMSG("Failed reading %s: %s\n",
@@ -1492,8 +1489,7 @@ init_dwarf_info(void)
 			close(dwfl_fd);
 			goto err_out;
 		}
-	}
-	else if (dwfl_linux_kernel_report_offline(dwfl,
+	} else if (dwfl_linux_kernel_report_offline(dwfl,
 						info->system_utsname.release,
 						&dwfl_report_module_p)) {
 		ERRMSG("Can't get Module debuginfo for module '%s'\n",
@@ -1592,7 +1588,7 @@ get_symbol_addr(char *symname)
 		return symbol;
 
 	if (!init_dwarf_info())
-		return 0;
+		return NOT_FOUND_SYMBOL;
 
 	elfd = dwarf_info.elfd;
 
@@ -1651,7 +1647,7 @@ get_next_symbol_addr(char *symname)
 	char *sym_name = NULL;
 
 	if (!init_dwarf_info())
-		return 0;
+		return NOT_FOUND_SYMBOL;
 
 	elfd = dwarf_info.elfd;
 

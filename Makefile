@@ -26,8 +26,8 @@ endif
 SRC	= makedumpfile.c makedumpfile.h diskdump_mod.h
 SRC_PART = print_info.c
 OBJ_PART = print_info.o
-SRC_ARCH = arm.c x86.c x86_64.c ia64.c ppc64.c s390x.c
-OBJ_ARCH = arm.o x86.o x86_64.o ia64.o ppc64.o s390x.o
+SRC_ARCH = arch/arm.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c
+OBJ_ARCH = arch/arm.o arch/x86.o arch/x86_64.o arch/ia64.o arch/ppc64.o arch/s390x.o
 
 all: makedumpfile
 

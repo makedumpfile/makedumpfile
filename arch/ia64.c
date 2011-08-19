@@ -15,8 +15,8 @@
  */
 #ifdef __ia64__
 
-#include "print_info.h"
-#include "makedumpfile.h"
+#include "../print_info.h"
+#include "../makedumpfile.h"
 
 
 /*

@@ -16,8 +16,8 @@
  */
 #ifdef __arm__
 
-#include "print_info.h"
-#include "makedumpfile.h"
+#include "../print_info.h"
+#include "../makedumpfile.h"
 
 #define PMD_TYPE_MASK	3
 #define PMD_TYPE_SECT	2

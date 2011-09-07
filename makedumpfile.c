@@ -7820,17 +7820,53 @@ get_splitting_info(void)
 	if (!check_splitting_info())
 		return FALSE;
 
+	if (!get_kdump_compressed_header_info(SPLITTING_DUMPFILE(0)))
+		return FALSE;
+
 	return TRUE;
+}
+
+int
+copy_same_data(int src_fd, int dst_fd, off_t offset, unsigned long size)
+{
+	int ret = FALSE;
+	char *buf = NULL;
+
+	if ((buf = malloc(size)) == NULL) {
+		ERRMSG("Can't allcate memory.\n");
+		return FALSE;
+	}
+	if (lseek(src_fd, offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a source file. %s\n", strerror(errno));
+		goto out;
+	}
+	if (read(src_fd, buf, size) != size) {
+		ERRMSG("Can't read a source file. %s\n", strerror(errno));
+		goto out;
+	}
+	if (lseek(dst_fd, offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek a destination file. %s\n", strerror(errno));
+		goto out;
+	}
+	if (write(dst_fd, buf, size) != size) {
+		ERRMSG("Can't write a destination file. %s\n", strerror(errno));
+		goto out;
+	}
+	ret = TRUE;
+out:
+	free(buf);
+	return ret;
 }
 
 int
 reassemble_kdump_header(void)
 {
-	int fd, ret = FALSE;
-	off_t offset_bitmap;
+	int fd = -1, ret = FALSE;
+	off_t offset;
+	unsigned long size;
 	struct disk_dump_header dh;
 	struct kdump_sub_header kh;
-	char *buf_bitmap;
+	char *buf_bitmap = NULL;
 
 	/*
 	 * Write common header.
@@ -7871,24 +7907,38 @@ reassemble_kdump_header(void)
 	}
 	memcpy(&info->sub_header, &kh, sizeof(kh));
 
-	/*
-	 * Write dump bitmap to both a dumpfile and a bitmap file.
-	 */
-	offset_bitmap
-	    = (DISKDUMP_HEADER_BLOCKS + dh.sub_hdr_size) * dh.block_size;
-	info->len_bitmap = dh.bitmap_blocks * dh.block_size;
-	if ((buf_bitmap = malloc(info->len_bitmap)) == NULL) {
-		ERRMSG("Can't allcate memory for bitmap.\n");
-		return FALSE;
-	}
-
 	if ((fd = open(SPLITTING_DUMPFILE(0), O_RDONLY)) < 0) {
 		ERRMSG("Can't open a file(%s). %s\n",
 		    SPLITTING_DUMPFILE(0), strerror(errno));
-		free(buf_bitmap);
 		return FALSE;
 	}
-	if (lseek(fd, offset_bitmap, SEEK_SET) < 0) {
+	if (has_pt_note()) {
+		get_pt_note(&offset, &size);
+		if (!copy_same_data(fd, info->fd_dumpfile, offset, size)) {
+			ERRMSG("Can't copy pt_note data to %s.\n",
+			    info->name_dumpfile);
+			goto out;
+		}
+	}
+	if (has_vmcoreinfo()) {
+		get_vmcoreinfo(&offset, &size);
+		if (!copy_same_data(fd, info->fd_dumpfile, offset, size)) {
+			ERRMSG("Can't copy vmcoreinfo data to %s.\n",
+			    info->name_dumpfile);
+			goto out;
+		}
+	}
+
+	/*
+	 * Write dump bitmap to both a dumpfile and a bitmap file.
+	 */
+	offset = (DISKDUMP_HEADER_BLOCKS + dh.sub_hdr_size) * dh.block_size;
+	info->len_bitmap = dh.bitmap_blocks * dh.block_size;
+	if ((buf_bitmap = malloc(info->len_bitmap)) == NULL) {
+		ERRMSG("Can't allcate memory for bitmap.\n");
+		goto out;
+	}
+	if (lseek(fd, offset, SEEK_SET) < 0) {
 		ERRMSG("Can't seek a file(%s). %s\n",
 		    SPLITTING_DUMPFILE(0), strerror(errno));
 		goto out;
@@ -7899,7 +7949,7 @@ reassemble_kdump_header(void)
 		goto out;
 	}
 
-	if (lseek(info->fd_dumpfile, offset_bitmap, SEEK_SET) < 0) {
+	if (lseek(info->fd_dumpfile, offset, SEEK_SET) < 0) {
 		ERRMSG("Can't seek a file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
 		goto out;
@@ -7925,7 +7975,9 @@ reassemble_kdump_header(void)
 
 	ret = TRUE;
 out:
-	close(fd);
+	if (fd > 0)
+		close(fd);
+	free(buf_bitmap);
 
 	return ret;
 }

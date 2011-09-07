@@ -351,7 +351,7 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-		    info->name_memory, offset, strerror(errno));
+		    info->name_memory, (unsigned long long)offset, strerror(errno));
 		goto error;
 	}
 
@@ -4886,8 +4886,8 @@ write_elf_eraseinfo(struct cache_data *cd_header)
 		write_cache_zero(cd_header,
 				info->size_elf_eraseinfo - size_written);
 
-	DEBUG_MSG("offset_eraseinfo: %lx, size_eraseinfo: %ld\n",
-			offset_eraseinfo, info->size_elf_eraseinfo);
+	DEBUG_MSG("offset_eraseinfo: %llx, size_eraseinfo: %ld\n",
+		(unsigned long long)offset_eraseinfo, info->size_elf_eraseinfo);
 
 	return TRUE;
 }
@@ -4916,8 +4916,8 @@ write_kdump_eraseinfo(struct cache_data *cd_page)
 		return FALSE;
 
 	size_eraseinfo += size_written;
-	DEBUG_MSG("offset_eraseinfo: %lx, size_eraseinfo: %ld\n",
-			offset_eraseinfo, size_eraseinfo);
+	DEBUG_MSG("offset_eraseinfo: %llx, size_eraseinfo: %ld\n",
+		(unsigned long long)offset_eraseinfo, size_eraseinfo);
 
 	/* Update the erase info offset and size in kdump sub header */
 	if (!update_eraseinfo_of_sub_header(offset_eraseinfo, size_eraseinfo))
@@ -6194,8 +6194,8 @@ print_config_entry(struct config_entry *ce)
 		DEBUG_MSG("Type flag: %lx, ", ce->type_flag);
 		DEBUG_MSG("sym_addr: %llx, ", ce->sym_addr);
 		DEBUG_MSG("addr: %lx, ", ce->addr);
-		DEBUG_MSG("offset: %lx, ", ce->offset);
-		DEBUG_MSG("size: %zd\n", ce->size);
+		DEBUG_MSG("offset: %llx, ", (unsigned long long)ce->offset);
+		DEBUG_MSG("size: %ld\n", ce->size);
 
 		ce = ce->next;
 	}
@@ -6253,7 +6253,7 @@ create_config_entry(const char *token, unsigned short flag, int line)
 			int n = 0;
 			/* See if absolute length is provided */
 			if ((depth == 0) &&
-				((n = sscanf(cur, "%zd%c", &len, &ch)) > 0)) {
+				((n = sscanf(cur, "%ld%c", &len, &ch)) > 0)) {
 				if (len < 0) {
 					ERRMSG("Config error at %d: size "
 						"value must be positive.\n",

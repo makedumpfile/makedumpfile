@@ -1988,7 +1988,7 @@ get_size_eraseinfo(void)
 		if (fl_info->nullify)
 			sprintf(size_str, "nullify\n");
 		else
-			sprintf(size_str, "%ld\n", fl_info->size);
+			sprintf(size_str, "size %ld\n", fl_info->size);
 
 		size_eraseinfo += strlen("erase ") +
 				strlen(ei->symbol_expr) + 1 +

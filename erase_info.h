@@ -19,7 +19,7 @@
 #ifndef _ERASE_INFO_H
 #define _ERASE_INFO_H
 
-#define MAX_SIZE_STR_LEN (21)
+#define MAX_SIZE_STR_LEN (26)
 
 /*
  * Erase information, original symbol expressions.

@@ -4628,7 +4628,7 @@ write_eraseinfo(struct cache_data *cd_page, unsigned long *size_out)
 			continue;
 		for (j = 0; j < erase_info[i].num_sizes; j++) {
 			if (erase_info[i].sizes[j] > 0)
-				sprintf(size_str, "%ld\n",
+				sprintf(size_str, "size %ld\n",
 						erase_info[i].sizes[j]);
 			else if (erase_info[i].sizes[j] == -1)
 				sprintf(size_str, "nullify\n");

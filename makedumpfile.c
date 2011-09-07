@@ -590,14 +590,23 @@ get_kdump_compressed_header_info(char *filename)
 	if (dh.header_version >= 3) {
 		/* A dumpfile contains vmcoreinfo data. */
 		set_vmcoreinfo(kh.offset_vmcoreinfo, kh.size_vmcoreinfo);
+		DEBUG_MSG("  offset_vmcoreinfo: 0x%llx\n",
+				(unsigned long long)kh.offset_vmcoreinfo);
+		DEBUG_MSG("  size_vmcoreinfo  : 0x%ld\n", kh.size_vmcoreinfo);
 	}
 	if (dh.header_version >= 4) {
 		/* A dumpfile contains ELF note section. */
 		set_pt_note(kh.offset_note, kh.size_note);
+		DEBUG_MSG("  offset_note      : 0x%llx\n",
+				(unsigned long long)kh.offset_note);
+		DEBUG_MSG("  size_note        : 0x%ld\n", kh.size_note);
 	}
 	if (dh.header_version >= 5) {
 		/* A dumpfile contains erased information. */
 		set_eraseinfo(kh.offset_eraseinfo, kh.size_eraseinfo);
+		DEBUG_MSG("  offset_eraseinfo : 0x%llx\n",
+				(unsigned long long)kh.offset_eraseinfo);
+		DEBUG_MSG("  size_eraseinfo   : 0x%ld\n", kh.size_eraseinfo);
 	}
 	return TRUE;
 error:

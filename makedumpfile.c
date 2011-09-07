@@ -6882,6 +6882,7 @@ err_out:
 		free_config_entry(ce);
 	if (ptr)
 		free_config_entry(ptr);
+	free(str);
 	return NULL;
 }
 
@@ -7276,7 +7277,10 @@ get_config(int skip)
 	static int line_count = 0;
 	char *cur_module = NULL;
 	int eof = 0;
-	unsigned char flag = CONFIG_NEW_CMD | skip;
+	unsigned char flag = CONFIG_NEW_CMD;
+
+	if (skip)
+		flag |= CONFIG_SKIP_SECTION;
 
 	if ((config = calloc(1, sizeof(struct config))) == NULL)
 		return NULL;

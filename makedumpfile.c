@@ -2755,6 +2755,9 @@ write_cache_bufsz(struct cache_data *cd)
 int
 write_cache_zero(struct cache_data *cd, size_t size)
 {
+	if (!write_cache_bufsz(cd))
+		return FALSE;
+
 	memset(cd->buf + cd->buf_size, 0, size);
 	cd->buf_size += size;
 

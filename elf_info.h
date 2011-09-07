@@ -19,21 +19,11 @@
 #include <elf.h>
 #include <sys/types.h>
 
+#define ERASEINFO_NOTE_NAME		"ERASEINFO"
+#define ERASEINFO_NOTE_NAME_BYTES	(sizeof(ERASEINFO_NOTE_NAME))
+
 #define MAX_SIZE_NHDR	MAX(sizeof(Elf64_Nhdr), sizeof(Elf32_Nhdr))
 
-/*
- * ELF note section for erase information
- *
- * According to elf.h the unused values are 0x15(21) through 0xff. The value
- * range 0x1XX, 0x2XX and 0x3XX is been used for PPC, i386 and s390
- * respectively.
- *
- * Using 0xff to be on safer side so that any new Elf Note addition in elf.h
- * after 0x15 value would not clash.
- */
-#ifndef NT_ERASE_INFO
-#define NT_ERASE_INFO (0xff)	/* Contains erased information. */
-#endif
 
 off_t paddr_to_offset(unsigned long long paddr);
 off_t paddr_to_offset2(unsigned long long paddr, off_t hint);

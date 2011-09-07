@@ -362,7 +362,15 @@ get_pt_note_info(void)
 				return FALSE;
 			}
 			xen_p2m_mfn = p2m_mfn;
-		} else if (n_type == NT_ERASE_INFO) {
+
+		/*
+		 * Check whether a source dumpfile contains eraseinfo.
+		 *   /proc/vmcore does not contain eraseinfo, because eraseinfo
+		 *   is added only by makedumpfile and makedumpfile does not
+		 *   create /proc/vmcore.
+		 */
+		} else if (!strncmp(ERASEINFO_NOTE_NAME, buf,
+		    ERASEINFO_NOTE_NAME_BYTES)) {
 			set_eraseinfo(offset_desc, size_desc);
 		}
 		offset += offset_next_note(note);

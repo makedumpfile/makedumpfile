@@ -4858,14 +4858,14 @@ write_elf_eraseinfo(struct cache_data *cd_header)
 		note_header_size = sizeof(Elf64_Nhdr);
 		nh->n_namesz = ERASEINFO_NOTE_NAME_BYTES;
 		nh->n_descsz = info->size_elf_eraseinfo;
-		nh->n_type = NT_ERASE_INFO;
+		nh->n_type = 0;
 	} else {
 		Elf32_Nhdr *nh = (Elf32_Nhdr *)note;
 
 		note_header_size = sizeof(Elf32_Nhdr);
 		nh->n_namesz = ERASEINFO_NOTE_NAME_BYTES;
 		nh->n_descsz = info->size_elf_eraseinfo;
-		nh->n_type = NT_ERASE_INFO;
+		nh->n_type = 0;
 	}
 	if (!write_cache(cd_header, note, note_header_size))
 		return FALSE;

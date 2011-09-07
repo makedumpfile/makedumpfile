@@ -413,9 +413,6 @@ do { \
 
 #define MAX_SIZE_STR_LEN (21)
 
-#define ERASEINFO_NOTE_NAME		"ERASEINFO"
-#define ERASEINFO_NOTE_NAME_BYTES	(sizeof(ERASEINFO_NOTE_NAME))
-
 /*
  * The value of dependence on machine
  */

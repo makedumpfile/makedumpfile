@@ -13,6 +13,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+#ifndef _DISKDUMP_MOD_H
+#define _DISKDUMP_MOD_H
 
 #include <elf.h>
 
@@ -89,4 +91,6 @@ typedef struct page_desc {
 #define DISKDUMP_CACHED_PAGES	(16)
 #define PAGE_VALID		(0x1)	/* flags */
 #define DISKDUMP_VALID_PAGE(flags)	((flags) & PAGE_VALID)
+
+#endif  /* DISKDUMP_MOD_H */
 

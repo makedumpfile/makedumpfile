@@ -411,8 +411,6 @@ do { \
 
 #define SIZE_XEN_CRASH_INFO_V2	(sizeof(unsigned long) * 10)
 
-#define MAX_SIZE_STR_LEN (21)
-
 /*
  * The value of dependence on machine
  */
@@ -929,13 +927,6 @@ struct module_info {
 	struct symbol_info	*sym_info;
 };
 
-struct module_sym_table {
-	unsigned int		num_modules;
-	unsigned int		current_mod;
-	struct module_info	*modules;
-};
-
-extern struct module_sym_table	mod_st;
 
 struct symbol_table {
 	unsigned long long	mem_map;
@@ -1124,94 +1115,6 @@ extern struct array_table	array_table;
 extern struct number_table	number_table;
 extern struct srcfile_table	srcfile_table;
 
-
-/*
- * Erase information, original symbol expressions.
- */
-struct erase_info {
-	char		*symbol_expr;
-	int		num_sizes;
-	long		*sizes;
-	int		erased;		/* 1= erased, 0= Not erased */
-};
-
-/*
- * Filtering information
- */
-struct filter_info {
-	unsigned long long      address;
-	unsigned long long      paddr;
-	long			size;
-
-	/* direct access to update erase information node */
-	int			erase_info_idx;	/* 0= invalid index */
-	int			size_idx;
-
-	struct filter_info      *next;
-	unsigned short          nullify;
-};
-
-struct config_entry {
-	char			*name;
-	char			*type_name;
-	char			*symbol_expr;	/* original symbol expression */
-	unsigned short		flag;
-	unsigned short		nullify;
-	unsigned long long	sym_addr;	/* Symbol address */
-	unsigned long		addr;		/* Symbol address or
-						   value pointed by sym_addr */
-	unsigned long long	cmp_addr;	/* for LIST_ENTRY */
-	unsigned long		offset;
-	unsigned long		type_flag;
-	long			array_length;
-	long			index;
-	long			size;
-	int			line;	/* Line number in config file. */
-	int			erase_info_idx;	/* 0= invalid index */
-	struct config_entry	*refer_to;
-	struct config_entry	*next;
-};
-
-/* flags for config_entry.flag */
-#define FILTER_ENTRY	0x0001
-#define SIZE_ENTRY	0x0002
-#define ITERATION_ENTRY	0x0004
-#define LIST_ENTRY	0x0008
-#define SYMBOL_ENTRY	0x0010
-#define VAR_ENTRY	0x0020
-#define TRAVERSAL_ENTRY	0x0040
-#define ENTRY_RESOLVED	0x8000
-
-/*
- * Filter config information
- */
-struct filter_config {
-	char		*name_filterconfig;
-	FILE		*file_filterconfig;
-	char		*cur_module;
-	char		*saved_token;
-	char		*token;
-	int		new_section;
-	int		line_count;
-};
-
-#define CONFIG_SKIP_SECTION	0x01
-#define CONFIG_NEW_CMD		0x02
-
-struct config {
-	char			*module_name;
-	struct config_entry	*iter_entry;
-	struct config_entry	*list_entry;
-	int			num_filter_symbols;
-	struct config_entry	**filter_symbol;
-	struct config_entry	**size_symbol;
-};
-
-#define IS_KEYWORD(tkn)	\
-	(!strcmp(tkn, "erase") || !strcmp(tkn, "size") || \
-	!strcmp(tkn, "nullify") || !strcmp(tkn, "for") || \
-	!strcmp(tkn, "in") || !strcmp(tkn, "within") || \
-	!strcmp(tkn, "endfor"))
 
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 int get_str_osrelease_from_vmlinux(void);

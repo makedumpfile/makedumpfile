@@ -7853,6 +7853,7 @@ reassemble_kdump_header(void)
 		    info->name_dumpfile, strerror(errno));
 		return FALSE;
 	}
+	memcpy(&info->sub_header, &kh, sizeof(kh));
 
 	/*
 	 * Write dump bitmap to both a dumpfile and a bitmap file.

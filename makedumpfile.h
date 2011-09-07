@@ -28,13 +28,11 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <zlib.h>
-#include <elfutils/libdw.h>
-#include <elfutils/libdwfl.h>
 #include <libelf.h>
-#include <dwarf.h>
 #include <byteswap.h>
 #include <getopt.h>
 #include "common.h"
+#include "dwarf_info.h"
 #include "diskdump_mod.h"
 
 /*
@@ -187,7 +185,6 @@ isAnon(unsigned long mapping)
 /*
  * for symbol
  */
-#define NOT_FOUND_SYMBOL	(0)
 #define INVALID_SYMBOL_DATA	(ULONG_MAX)
 #define SYMBOL(X)		(symbol_table.X)
 #define SYMBOL_INIT(symbol, str_symbol) \
@@ -217,12 +214,6 @@ do { \
 /*
  * for structure
  */
-#define NOT_FOUND_LONG_VALUE	(-1)
-#define NOT_FOUND_STRUCTURE	(NOT_FOUND_LONG_VALUE)
-#define FAILED_DWARFINFO	(-2)
-#define INVALID_STRUCTURE_DATA	(-3)
-#define FOUND_ARRAY_TYPE	(LONG_MAX - 1)
-
 #define SIZE(X)			(size_table.X)
 #define OFFSET(X)		(offset_table.X)
 #define ARRAY_LENGTH(X)		(array_table.X)
@@ -313,7 +304,6 @@ do { \
 /*
  * for number
  */
-#define NOT_FOUND_NUMBER	(NOT_FOUND_LONG_VALUE)
 #define NUMBER(X)		(number_table.X)
 
 #define ENUM_NUMBER_INIT(number, str_number)	\
@@ -1171,7 +1161,6 @@ struct number_table {
 	long	PG_swapcache;
 };
 
-#define LEN_SRCFILE				(100)
 struct srcfile_table {
 	/*
 	 * typedef
@@ -1186,55 +1175,6 @@ extern struct array_table	array_table;
 extern struct number_table	number_table;
 extern struct srcfile_table	srcfile_table;
 
-/*
- * Debugging information
- */
-#define DEFAULT_DEBUGINFO_PATH	"/usr/lib/debug"
-
-enum {
-	DWARF_INFO_GET_STRUCT_SIZE,
-	DWARF_INFO_GET_MEMBER_OFFSET,
-	DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION,
-	DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION,
-	DWARF_INFO_GET_MEMBER_ARRAY_LENGTH,
-	DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH,
-	DWARF_INFO_GET_TYPEDEF_SIZE,
-	DWARF_INFO_GET_TYPEDEF_SRCNAME,
-	DWARF_INFO_GET_ENUM_NUMBER,
-	DWARF_INFO_CHECK_SYMBOL_ARRAY_TYPE,
-	DWARF_INFO_GET_SYMBOL_TYPE,
-	DWARF_INFO_GET_MEMBER_TYPE,
-};
-
-struct dwarf_info {
-	unsigned int	cmd;		/* IN */
-	int	fd_debuginfo;		/* IN */
-	char	*name_debuginfo;	/* IN */
-	char	*module_name;		/* IN */
-	char	*struct_name;		/* IN */
-	char	*symbol_name;		/* IN */
-	char	*member_name;		/* IN */
-	char	*enum_name;		/* IN */
-	Elf	*elfd;			/* OUT */
-	Dwarf	*dwarfd;		/* OUT */
-	Dwfl	*dwfl;			/* OUT */
-	char	*type_name;		/* OUT */
-	long	struct_size;		/* OUT */
-	long	member_offset;		/* OUT */
-	long	array_length;		/* OUT */
-	long	enum_number;		/* OUT */
-	unsigned char	type_flag;	/* OUT */
-	char	src_name[LEN_SRCFILE];	/* OUT */
-};
-
-/* flags for dwarf_info.type_flag */
-#define TYPE_BASE	0x01
-#define TYPE_ARRAY	0x02
-#define TYPE_PTR	0x04
-#define TYPE_STRUCT	0x08
-#define TYPE_LIST_HEAD	0x10
-
-extern struct dwarf_info	dwarf_info;
 
 /*
  * Erase information, original symbol expressions.

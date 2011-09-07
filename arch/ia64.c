@@ -16,6 +16,7 @@
 #ifdef __ia64__
 
 #include "../print_info.h"
+#include "../elf_info.h"
 #include "../makedumpfile.h"
 
 
@@ -34,18 +35,18 @@ int
 get_phys_base_ia64(void)
 {
 	int i;
-	struct pt_load_segment *pls;
+	unsigned long long phys_start;
+	unsigned long long virt_start;
 
 	/*
 	 *  Default to 64MB.
 	 */
 	info->phys_base = DEFAULT_PHYS_START;
 
-	for (i = 0; i < info->num_load_memory; i++) {
-		pls = &info->pt_load_segments[i];
-		if (VADDR_REGION(pls->virt_start) == KERNEL_VMALLOC_REGION) {
+	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
+		if (VADDR_REGION(virt_start) == KERNEL_VMALLOC_REGION) {
 
-			info->phys_base = pls->phys_start;
+			info->phys_base = phys_start;
 			break;
 		}
 	}

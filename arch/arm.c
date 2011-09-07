@@ -17,6 +17,7 @@
 #ifdef __arm__
 
 #include "../print_info.h"
+#include "../elf_info.h"
 #include "../makedumpfile.h"
 
 #define PMD_TYPE_MASK	3
@@ -53,17 +54,16 @@ int
 get_phys_base_arm(void)
 {
 	unsigned long phys_base = ULONG_MAX;
+	unsigned long long phys_start;
 	int i;
 
 	/*
 	 * We resolve phys_base from PT_LOAD segments. LMA contains physical
 	 * address of the segment, and we use the first one.
 	 */
-	for (i = 0; i < info->num_load_memory; i++) {
-		const struct pt_load_segment *pls = &info->pt_load_segments[i];
-
-		if (pls->phys_start < phys_base)
-			phys_base = pls->phys_start;
+	for (i = 0; get_pt_load(i, &phys_start, NULL, NULL, NULL); i++) {
+		if (phys_start < phys_base)
+			phys_base = phys_start;
 	}
 
 	if (phys_base == ULONG_MAX) {

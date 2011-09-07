@@ -21,6 +21,7 @@
 #ifdef __s390x__
 
 #include "../print_info.h"
+#include "../elf_info.h"
 #include "../makedumpfile.h"
 
 #define TABLE_SIZE		4096

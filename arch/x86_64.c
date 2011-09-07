@@ -16,6 +16,7 @@
 #ifdef __x86_64__
 
 #include "../print_info.h"
+#include "../elf_info.h"
 #include "../makedumpfile.h"
 
 int
@@ -33,20 +34,20 @@ int
 get_phys_base_x86_64(void)
 {
 	int i;
-	struct pt_load_segment *pls;
+	unsigned long long phys_start;
+	unsigned long long virt_start;
 
 	/*
 	 * Get the relocatable offset
 	 */
 	info->phys_base = 0; /* default/traditional */
 
-	for (i = 0; i < info->num_load_memory; i++) {
-		pls = &info->pt_load_segments[i];
-		if ((pls->virt_start >= __START_KERNEL_map) &&
-		    !(is_vmalloc_addr(pls->virt_start))) {
+	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
+		if ((virt_start >= __START_KERNEL_map) &&
+		    !(is_vmalloc_addr(virt_start))) {
 
-			info->phys_base = pls->phys_start -
-			    (pls->virt_start & ~(__START_KERNEL_map));
+			info->phys_base = phys_start -
+			    (virt_start & ~(__START_KERNEL_map));
 
 			break;
 		}
@@ -64,14 +65,14 @@ get_machdep_info_x86_64(void)
 
 	info->section_size_bits = _SECTION_SIZE_BITS;
 
-	if (!(vt.mem_flags & MEMORY_XEN))
+	if (!is_xen_memory())
 		return TRUE;
 
 	/*
 	 * Get the information for translating domain-0's physical
 	 * address into machine address.
 	 */
-	if (!readmem(MADDR_XEN, pfn_to_paddr(info->p2m_mfn),
+	if (!readmem(MADDR_XEN, pfn_to_paddr(get_xen_p2m_mfn()),
 					 &frame_mfn, PAGESIZE())) {
 		ERRMSG("Can't get p2m_mfn.\n");
 		return FALSE;
@@ -269,7 +270,7 @@ vaddr_to_paddr_x86_64(unsigned long vaddr)
 		paddr = vaddr - __START_KERNEL_map + phys_base;
 
 	} else {
-		if (vt.mem_flags & MEMORY_XEN)
+		if (is_xen_memory())
 			paddr = vaddr - PAGE_OFFSET_XEN_DOM0;
 		else
 			paddr = vaddr - PAGE_OFFSET;

@@ -77,7 +77,6 @@ enum {
 #define MEMORY_PAGETABLE_4L	(1 << 0)
 #define MEMORY_PAGETABLE_3L	(1 << 1)
 #define MEMORY_X86_PAE		(1 << 2)
-#define MEMORY_XEN		(1 << 3)
 
 /*
  * Type of address
@@ -383,11 +382,7 @@ do { \
  * vmcoreinfo in /proc/vmcore
  */
 #define VMCOREINFO_BYTES		(4096)
-#define VMCOREINFO_NOTE_NAME		"VMCOREINFO"
-#define VMCOREINFO_NOTE_NAME_BYTES	(sizeof(VMCOREINFO_NOTE_NAME))
 #define FILENAME_VMCOREINFO		"/tmp/vmcoreinfoXXXXXX"
-#define VMCOREINFO_XEN_NOTE_NAME	"VMCOREINFO_XEN"
-#define VMCOREINFO_XEN_NOTE_NAME_BYTES	(sizeof(VMCOREINFO_XEN_NOTE_NAME))
 
 /*
  * field name of vmcoreinfo file
@@ -412,28 +407,12 @@ do { \
 #define DEFAULT_ORDER	(4)
 #define TIMEOUT_STDIN	(600)
 #define SIZE_BUF_STDIN	(4096)
-#define ELF32		(1)
-#define ELF64		(2)
 #define STRLEN_OSRELEASE (65)	/* same length as diskdump.h */
 
-#define XEN_ELFNOTE_CRASH_INFO	(0x1000001)
 #define SIZE_XEN_CRASH_INFO_V2	(sizeof(unsigned long) * 10)
 
 #define MAX_SIZE_STR_LEN (21)
 
-/*
- * ELF note section for erase information
- *
- * According to elf.h the unused values are 0x15(21) through 0xff. The value
- * range 0x1XX, 0x2XX and 0x3XX is been used for PPC, i386 and s390
- * respectively.
- *
- * Using 0xff to be on safer side so that any new Elf Note addition in elf.h
- * after 0x15 value would not clash.
- */
-#ifndef NT_ERASE_INFO
-#define NT_ERASE_INFO (0xff)	/* Contains erased information. */
-#endif
 #define ERASEINFO_NOTE_NAME		"ERASEINFO"
 #define ERASEINFO_NOTE_NAME_BYTES	(sizeof(ERASEINFO_NOTE_NAME))
 
@@ -717,14 +696,6 @@ unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define pfn_to_paddr(X) \
 	(((unsigned long long)(X) + ARCH_PFN_OFFSET) << PAGESHIFT())
 
-struct pt_load_segment {
-	off_t			file_offset;
-	unsigned long long	phys_start;
-	unsigned long long	phys_end;
-	unsigned long long	virt_start;
-	unsigned long long	virt_end;
-};
-
 struct mem_map_data {
 	unsigned long long	pfn_start;
 	unsigned long long	pfn_end;
@@ -796,7 +767,6 @@ struct DumpInfo {
 	int		num_dump_level;      /* number of dump level */
 	int		array_dump_level[NUM_ARRAY_DUMP_LEVEL];
 	int		flag_compress;       /* flag of compression */
-	int		flag_elf64_memory;   /* flag of ELF64 memory */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_generate_vmcoreinfo;/* flag of generating vmcoreinfo file */
 	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */
@@ -816,7 +786,6 @@ struct DumpInfo {
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
-	int		nr_cpus;             /* number of cpu */
 	unsigned long long	max_mapnr;   /* number of page descriptor */
 	unsigned long   page_offset;
 	unsigned long   section_size_bits;
@@ -850,11 +819,8 @@ struct DumpInfo {
 	/*
 	 * ELF header info:
 	 */
-	unsigned int		num_load_memory;
 	unsigned int		num_load_dumpfile;
-	size_t			offset_load_memory;
 	size_t			offset_load_dumpfile;
-	struct pt_load_segment	*pt_load_segments;
 
 	/*
 	 * mem_map info:
@@ -900,31 +866,18 @@ struct DumpInfo {
 	char			release[STRLEN_OSRELEASE];
 
 	/*
-	 * vmcoreinfo in dump memory image info:
-	 */
-	off_t			offset_vmcoreinfo;
-	unsigned long		size_vmcoreinfo;
-	off_t			offset_vmcoreinfo_xen;
-	unsigned long		size_vmcoreinfo_xen;
-
-	/*
 	 * ELF NOTE section in dump memory image info:
 	 */
-	off_t			offset_note;
 	off_t			offset_note_dumpfile;
-	unsigned long		size_note;
 
 	/*
 	 * erased information in dump memory image info:
 	 */
-	off_t			offset_eraseinfo;
-	unsigned long		size_eraseinfo;
+	unsigned long           size_elf_eraseinfo;
 
 	/*
 	 * for Xen extraction
 	 */
-	off_t			offset_xen_crash_info;
-	unsigned long		size_xen_crash_info;
 	unsigned long long	dom0_mapnr;  /* The number of page in domain-0.
 					      * Different from max_mapnr.
 					      * max_mapnr is the number of page
@@ -937,7 +890,6 @@ struct DumpInfo {
 	unsigned long alloc_bitmap;
 	unsigned long dom0;
 	unsigned long p2m_frames;
-	unsigned long p2m_mfn;
 	unsigned long *p2m_mfn_frame_list;
 	int	num_domain;
 	struct domain_list *domain_list;
@@ -1265,13 +1217,7 @@ struct config {
 	!strcmp(tkn, "endfor"))
 
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
-off_t paddr_to_offset(unsigned long long paddr);
-unsigned long long vaddr_to_paddr_general(unsigned long long vaddr);
-int check_elf_format(int fd, char *filename, int *phnum, int *num_load);
-int get_elf64_phdr(int fd, char *filename, int num, Elf64_Phdr *phdr);
-int get_elf32_phdr(int fd, char *filename, int num, Elf32_Phdr *phdr);
 int get_str_osrelease_from_vmlinux(void);
-int get_pt_note_info(off_t off_note, unsigned long sz_note);
 int read_vmcoreinfo_xen(void);
 int exclude_xen_user_domain(void);
 unsigned long long get_num_dumpable(void);

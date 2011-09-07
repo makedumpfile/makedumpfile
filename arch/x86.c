@@ -16,6 +16,7 @@
 #ifdef __x86__
 
 #include "../print_info.h"
+#include "../elf_info.h"
 #include "../makedumpfile.h"
 
 int

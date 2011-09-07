@@ -18,7 +18,6 @@
 
 #include <stdio.h>
 #include <sys/time.h>
-#include "makedumpfile.h"
 
 extern int message_level;
 extern int flag_strerr_message;

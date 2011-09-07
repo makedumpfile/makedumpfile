@@ -34,6 +34,7 @@
 #include <dwarf.h>
 #include <byteswap.h>
 #include <getopt.h>
+#include "common.h"
 #include "diskdump_mod.h"
 
 /*
@@ -134,13 +135,6 @@ isAnon(unsigned long mapping)
 #define SECTION_NR_TO_PFN(sec)	((sec) << PFN_SECTION_SHIFT())
 #define SECTIONS_SHIFT()	(MAX_PHYSMEM_BITS() - SECTION_SIZE_BITS())
 #define NR_MEM_SECTIONS()	(1UL << SECTIONS_SHIFT())
-
-/*
- * Incorrect address
- */
-#define NOT_MEMMAP_ADDR	(0x0)
-#define NOT_KV_ADDR	(0x0)
-#define NOT_PADDR	(ULONGLONG_MAX)
 
 /*
  * Dump Level
@@ -424,15 +418,7 @@ do { \
 /*
  * common value
  */
-#define TRUE		(1)
-#define FALSE		(0)
-#define ERROR		(-1)
 #define NOSPACE		(-1)    /* code of write-error due to nospace */
-#define MAX(a,b)	((a) > (b) ? (a) : (b))
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#define LONG_MAX	((long)(~0UL>>1))
-#define ULONG_MAX	(~0UL)
-#define ULONGLONG_MAX	(~0ULL)
 #define DEFAULT_ORDER	(4)
 #define TIMEOUT_STDIN	(600)
 #define SIZE_BUF_STDIN	(4096)

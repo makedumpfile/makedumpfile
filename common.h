@@ -1,0 +1,42 @@
+/*
+ * common.h
+ *
+ * Copyright (C) 2011  NEC Corporation
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+#ifndef _COMMON_H
+#define _COMMON_H
+
+#define TRUE		(1)
+#define FALSE		(0)
+#define ERROR		(-1)
+
+#define LONG_MAX	((long)(~0UL>>1))
+#define ULONG_MAX	(~0UL)
+#define ULONGLONG_MAX	(~0ULL)
+
+#define MAX(a,b)	((a) > (b) ? (a) : (b))
+#define MIN(a,b)	((a) < (b) ? (a) : (b))
+
+#define divideup(x, y)	(((x) + ((y) - 1)) / (y))
+#define round(x, y)	(((x) / (y)) * (y))
+#define roundup(x, y)	((((x) + ((y) - 1)) / (y)) * (y))
+
+/*
+ * Incorrect address
+ */
+#define NOT_MEMMAP_ADDR	(0x0)
+#define NOT_KV_ADDR	(0x0)
+#define NOT_PADDR	(ULONGLONG_MAX)
+
+#endif  /* COMMON_H */
+

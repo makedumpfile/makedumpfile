@@ -4415,7 +4415,15 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			 */
 			load.p_memsz  = memsz;
 			load.p_filesz = filesz;
-			load.p_offset = off_seg_load;
+			if (load.p_filesz)
+				load.p_offset = off_seg_load;
+			else
+				/*
+				 * If PT_LOAD segment does not have real data
+				 * due to the all excluded pages, the file
+				 * offset is not effective and it should be 0.
+				 */
+				load.p_offset = 0;
 
 			/*
 			 * Write a PT_LOAD header.
@@ -4426,9 +4434,10 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			/*
 			 * Write a PT_LOAD segment.
 			 */
-			if (!write_elf_load_segment(cd_page, paddr, off_memory,
-			    load.p_filesz))
-				return FALSE;
+			if (load.p_filesz)
+				if (!write_elf_load_segment(cd_page, paddr,
+				    off_memory, load.p_filesz))
+					return FALSE;
 
 			load.p_paddr += load.p_memsz;
 #ifdef __x86__
@@ -4465,8 +4474,10 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		/*
 		 * Write a PT_LOAD segment.
 		 */
-		if (!write_elf_load_segment(cd_page, paddr, off_memory, load.p_filesz))
-			return FALSE;
+		if (load.p_filesz)
+			if (!write_elf_load_segment(cd_page, paddr,
+						    off_memory, load.p_filesz))
+				return FALSE;
 
 		off_seg_load += load.p_filesz;
 	}

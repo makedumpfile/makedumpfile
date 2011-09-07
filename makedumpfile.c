@@ -4919,9 +4919,11 @@ write_kdump_eraseinfo(struct cache_data *cd_page)
 	DEBUG_MSG("offset_eraseinfo: %llx, size_eraseinfo: %ld\n",
 		(unsigned long long)offset_eraseinfo, size_eraseinfo);
 
-	/* Update the erase info offset and size in kdump sub header */
-	if (!update_eraseinfo_of_sub_header(offset_eraseinfo, size_eraseinfo))
-		return FALSE;
+	if (size_eraseinfo)
+		/* Update the erase info offset and size in kdump sub header */
+		if (!update_eraseinfo_of_sub_header(offset_eraseinfo,
+						    size_eraseinfo))
+			return FALSE;
 
 	return TRUE;
 }
@@ -8086,12 +8088,14 @@ reassemble_kdump_pages(void)
 		close(fd);
 		fd = 0;
 	}
-	if (!write_cache_bufsz(&cd_data))
-		goto out;
+	if (size_eraseinfo) {
+		if (!write_cache_bufsz(&cd_data))
+			goto out;
 
-	if (!update_eraseinfo_of_sub_header(offset_eraseinfo, size_eraseinfo))
-		goto out;
-
+		if (!update_eraseinfo_of_sub_header(offset_eraseinfo,
+						    size_eraseinfo))
+			goto out;
+	}
 	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
 	print_execution_time(PROGRESS_COPY, &tv_start);
 

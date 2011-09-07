@@ -4138,15 +4138,9 @@ write_kdump_header(void)
 			kh.size_vmcoreinfo = size_vmcoreinfo;
 		}
 	}
-	/*
-	 * While writing dump data to STDOUT, delay the writing of sub header
-	 * untill we gather erase info offset and size.
-	 */
-	if (!info->flag_flatten) {
-		if (!write_buffer(info->fd_dumpfile, dh->block_size, &kh,
-		    size, info->name_dumpfile))
-			goto out;
-	}
+	if (!write_buffer(info->fd_dumpfile, dh->block_size, &kh,
+	    size, info->name_dumpfile))
+		goto out;
 
 	info->sub_header = kh;
 	info->offset_bitmap1

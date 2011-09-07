@@ -20,6 +20,7 @@
 
 int message_level;
 int flag_strerr_message;
+int flag_ignore_r_char; /* 0: '\r' is effective. 1: not effective. */
 
 void
 show_version(void)
@@ -246,8 +247,14 @@ print_progress(const char *msg, unsigned long current, unsigned long end)
 	} else
 		progress = 100;
 
-	PROGRESS_MSG("\r");
-	PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3d %%] ", msg, progress);
+	if (flag_ignore_r_char) {
+		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3d %%]\n",
+			     msg, progress);
+	} else {
+		PROGRESS_MSG("\r");
+		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3d %%] ",
+			     msg, progress);
+	}
 }
 
 void

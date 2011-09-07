@@ -63,6 +63,11 @@ int
 get_machdep_info_s390x(void)
 {
 	unsigned long vmlist, vmalloc_start;
+	char *term_str = getenv("TERM");
+
+	if (term_str && strcmp(term_str, "dumb") == 0)
+		/* '\r' control character is ignored on "dumb" terminal. */
+		flag_ignore_r_char = 1;
 
 	info->section_size_bits = _SECTION_SIZE_BITS;
 	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;

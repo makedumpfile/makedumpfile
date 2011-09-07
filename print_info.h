@@ -21,6 +21,7 @@
 
 extern int message_level;
 extern int flag_strerr_message;
+extern int flag_ignore_r_char;
 
 void show_version(void);
 void print_usage(void);

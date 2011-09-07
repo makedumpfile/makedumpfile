@@ -328,6 +328,14 @@ get_data_array_length(Dwarf_Die *die)
 		return FALSE;
 	}
 	tag = dwarf_tag(&die_type);
+	if (tag == DW_TAG_const_type) {
+		/* This array is of const type. Get the die type again */
+		if (!get_die_type(&die_type, &die_type)) {
+			ERRMSG("Can't get CU die of DW_AT_type.\n");
+			return FALSE;
+		}
+		tag = dwarf_tag(&die_type);
+	}
 	if (tag != DW_TAG_array_type) {
 		/*
 		 * This kernel doesn't have the member of array.

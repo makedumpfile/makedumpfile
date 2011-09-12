@@ -43,18 +43,18 @@ makedumpfile: $(SRC) $(OBJ_PART) $(OBJ_ARCH)
 	grep -v "^.TH MAKEDUMPFILE 8" makedumpfile.8 >> temp.8
 	mv temp.8 makedumpfile.8
 	gzip -c ./makedumpfile.8 > ./makedumpfile.8.gz
-	echo .TH FILTER.CONF 8 \"$(DATE)\" \"makedumpfile v$(VERSION)\" \"Linux System Administrator\'s Manual\" > temp.8
-	grep -v "^.TH FILTER.CONF 8" makedumpfile.conf.8 >> temp.8
-	mv temp.8 makedumpfile.conf.8
-	gzip -c ./makedumpfile.conf.8 > ./makedumpfile.conf.8.gz
+	echo .TH MAKEDUMPFILE.CONF 5 \"$(DATE)\" \"makedumpfile v$(VERSION)\" \"Linux System Administrator\'s Manual\" > temp.5
+	grep -v "^.TH MAKEDUMPFILE.CONF 5" makedumpfile.conf.5 >> temp.5
+	mv temp.5 makedumpfile.conf.5
+	gzip -c ./makedumpfile.conf.5 > ./makedumpfile.conf.5.gz
 
 clean:
-	rm -f $(OBJ) $(OBJ_PART) $(OBJ_ARCH) makedumpfile makedumpfile.8.gz makedumpfile.conf.8.gz
+	rm -f $(OBJ) $(OBJ_PART) $(OBJ_ARCH) makedumpfile makedumpfile.8.gz makedumpfile.conf.5.gz
 
 install:
 	cp makedumpfile ${DESTDIR}/bin
 	cp makedumpfile-R.pl ${DESTDIR}/bin
 	cp makedumpfile.8.gz ${DESTDIR}/usr/share/man/man8
-	cp makedumpfile.conf.8.gz ${DESTDIR}/usr/share/man/man8
+	cp makedumpfile.conf.5.gz ${DESTDIR}/usr/share/man/man5
 	cp makedumpfile.conf ${DESTDIR}/etc/makedumpfile.conf.sample
 

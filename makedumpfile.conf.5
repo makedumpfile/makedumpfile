@@ -1,4 +1,4 @@
-.TH FILTER.CONF 8 "16 November 2010" "makedumpfile v1.3.7" "Linux System Administrator's Manual"
+.TH MAKEDUMPFILE.CONF 5 "16 November 2010" "makedumpfile v1.3.7" "Linux System Administrator's Manual"
 .SH NAME
 makedumpfile.conf \- The filter configuration file for makedumpfile(8).
 .SH DESCRIPTION
@@ -8,7 +8,7 @@ makedumpfile.conf file contains the erase commands to filter out desired kernel
 data from the vmcore while creating \fIDUMPFILE\fR using makedumpfile tool.
 makedumpfile reads the filter config and builds the list of memory addresses
 and its sizes after processing filter commands. The memory locations that
-require to be filtered out are then poisoned with character ÅfXÅf (58 in Hex).
+require to be filtered out are then poisoned with character \fIX\fR (58 in Hex).
 .SH FILE FORMAT
 .PP
 The file consists of module sections that contains filter commands. A section

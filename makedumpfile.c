@@ -2879,7 +2879,7 @@ page_to_pfn(unsigned long page)
 		if (page < mmd->mem_map)
 			continue;
 		index = (page - mmd->mem_map) / SIZE(page);
-		if (index > mmd->pfn_end - mmd->pfn_start)
+		if (index >= mmd->pfn_end - mmd->pfn_start)
 			continue;
 		pfn = mmd->pfn_start + index;
 		break;

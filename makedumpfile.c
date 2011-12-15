@@ -797,6 +797,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(log_end, "log_end");
 	SYMBOL_INIT(max_pfn, "max_pfn");
 	SYMBOL_INIT(modules, "modules");
+	SYMBOL_INIT(high_memory, "high_memory");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -1108,6 +1109,7 @@ generate_vmcoreinfo(void)
 	WRITE_SYMBOL("log_buf_len", log_buf_len);
 	WRITE_SYMBOL("log_end", log_end);
 	WRITE_SYMBOL("max_pfn", max_pfn);
+	WRITE_SYMBOL("high_memory", high_memory);
 
 	/*
 	 * write the structure size of 1st kernel
@@ -1366,6 +1368,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("log_buf_len", log_buf_len);
 	READ_SYMBOL("log_end", log_end);
 	READ_SYMBOL("max_pfn", max_pfn);
+	READ_SYMBOL("high_memory", high_memory);
 
 	READ_STRUCTURE_SIZE("page", page);
 	READ_STRUCTURE_SIZE("mem_section", mem_section);

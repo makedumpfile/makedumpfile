@@ -974,6 +974,11 @@ struct symbol_table {
 	 */
 
 	unsigned long long	modules;
+
+	/*
+	 * vmalloc_start address on s390x arch
+	 */
+	unsigned long long	high_memory;
 };
 
 struct size_table {

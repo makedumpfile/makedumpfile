@@ -68,7 +68,7 @@ filtered out through the erase command syntax. makedumpfile reads the filter
 config and builds the list of memory addresses and its sizes after processing
 filter commands. The memory locations that require to be filtered out are
 then poisoned with character 'X' (58 in Hex). Refer to
-\fBmakedumpfile.conf(8)\fR for file format.
+\fBmakedumpfile.conf(5)\fR for file format.
 .PP
 To analyze the first kernel's memory usage, makedumpfile can refer to
 \fIVMCOREINFO\fR instead of \fIVMLINUX\fR. \fIVMCOREINFO\fR contains the first
@@ -260,7 +260,7 @@ specified.
 Used in conjunction with \-x \fIVMLINUX\fR option, to specify the filter
 config file \fIFILTERCONFIGFILE\fR that contains erase commands to filter out
 desired kernel data from vmcore while creating \fIDUMPFILE\fR. For filter
-command syntax please refer to \fBmakedumpfile.conf(8)\fR.
+command syntax please refer to \fBmakedumpfile.conf(5)\fR.
 
 .TP
 \fB\-F\fR
@@ -526,5 +526,5 @@ Written by Masaki Tachibana, and Ken'ichi Ohmichi.
 
 .SH SEE ALSO
 .PP
-crash(8), gdb(1), kexec(8), makedumpfile.conf(8)
+crash(8), gdb(1), kexec(8), makedumpfile.conf(5)
 

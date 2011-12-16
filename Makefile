@@ -23,7 +23,7 @@ CFLAGS += -m64
 CFLAGS_ARCH += -m64
 endif
 
-SRC	= makedumpfile.c makedumpfile.h diskdump_mod.h
+SRC	= makedumpfile.c makedumpfile.h diskdump_mod.h sadump_mod.h
 SRC_PART = print_info.c dwarf_info.c elf_info.c erase_info.c
 OBJ_PART = print_info.o dwarf_info.o elf_info.o erase_info.o
 SRC_ARCH = arch/arm.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c

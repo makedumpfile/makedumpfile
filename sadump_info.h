@@ -25,8 +25,14 @@
 #if defined(__x86__) || defined(__x86_64__)
 
 int check_and_get_sadump_header_info(char *filename);
+int sadump_initialize_bitmap_memory(void);
+int sadump_get_nr_cpus(int *nr_cpus);
+int sadump_set_timestamp(struct timeval *ts);
+unsigned long long sadump_get_max_mapnr(void);
 int sadump_add_diskset_info(char *name_memory);
+long sadump_page_size(void);
 char *sadump_head_disk_name_memory(void);
+char *sadump_format_type_name(void);
 void free_sadump_info(void);
 
 static inline int sadump_is_supported_arch(void)
@@ -45,13 +51,43 @@ static inline int check_and_get_sadump_header_info(char *filename)
 	return TRUE;
 }
 
+static inline int sadump_initialize_bitmap_memory(void)
+{
+	return FALSE;
+}
+
+static inline int sadump_get_nr_cpus(int *nr_cpus)
+{
+	return 0;
+}
+
+static inline int sadump_set_timestamp(struct timeval *ts)
+{
+	return FALSE;
+}
+
+static inline unsigned long long sadump_get_max_mapnr(void)
+{
+	return 0;
+}
+
 static inline int sadump_add_diskset_info(char *name_memory)
 {
 	return TRUE;
 }
 
+static inline long sadump_page_size(void)
+{
+	return 0;
+}
+
 static inline char *
 sadump_head_disk_name_memory(void)
+{
+	return NULL;
+}
+
+static inline char *sadump_format_type_name(void)
 {
 	return NULL;
 }

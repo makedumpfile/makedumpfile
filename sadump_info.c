@@ -39,6 +39,7 @@ struct sadump_info {
 	unsigned long sub_hdr_offset;
 	uint32_t smram_cpu_state_size;
 	unsigned long data_offset;
+	unsigned long long *block_table;
 };
 
 static char *guid_to_str(efi_guid_t *guid, char *buf, size_t buflen);
@@ -505,6 +506,125 @@ error:
 }
 
 int
+sadump_initialize_bitmap_memory(void)
+{
+	struct sadump_header *sh = si->sh_memory;
+	struct dump_bitmap *bmp;
+	unsigned long dumpable_bitmap_offset, dumpable_bitmap_len;
+	unsigned long long section, max_section, pfn;
+	unsigned long long *block_table;
+
+	dumpable_bitmap_offset =
+		si->sub_hdr_offset +
+		sh->block_size * (sh->sub_hdr_size + sh->bitmap_blocks);
+
+	dumpable_bitmap_len = sh->block_size * sh->dumpable_bitmap_blocks;
+
+	bmp = malloc(sizeof(struct dump_bitmap));
+	if (bmp == NULL) {
+		ERRMSG("Can't allocate memory for the memory-bitmap. %s\n",
+		       strerror(errno));
+		return FALSE;
+	}
+	bmp->fd = info->fd_memory;
+	bmp->file_name = info->name_memory;
+	bmp->no_block = -1;
+	memset(bmp->buf, 0, BUFSIZE_BITMAP);
+	bmp->offset = dumpable_bitmap_offset;
+
+	max_section = divideup(sh->max_mapnr, SADUMP_PF_SECTION_NUM);
+
+	block_table = calloc(sizeof(unsigned long long), max_section);
+	if (block_table == NULL) {
+		ERRMSG("Can't allocate memory for the block_table. %s\n",
+		       strerror(errno));
+		free(bmp);
+		return FALSE;
+	}
+
+	for (section = 0; section < max_section; ++section) {
+		if (section > 0)
+			block_table[section] = block_table[section-1];
+		for (pfn = section * SADUMP_PF_SECTION_NUM;
+		     pfn < (section + 1) * SADUMP_PF_SECTION_NUM;
+		     ++pfn)
+			if (is_dumpable(bmp, pfn))
+				block_table[section]++;
+	}
+
+	info->bitmap_memory = bmp;
+	si->block_table = block_table;
+
+	return TRUE;
+}
+
+int
+sadump_get_nr_cpus(int *nr_cpus)
+{
+	unsigned long offset;
+	struct sadump_smram_cpu_state scs, zero;
+	uint32_t x_cpu;
+	int count;
+
+	memset(&zero, 0, sizeof(zero));
+
+	offset = si->sub_hdr_offset + sizeof(uint32_t) +
+		si->sh_memory->nr_cpus * sizeof(struct sadump_apic_state);
+
+	count = 0;
+	for (x_cpu = 0; x_cpu < si->sh_memory->nr_cpus; ++x_cpu) {
+		if (!read_device(&scs, sizeof(scs), &offset))
+			return FALSE;
+		if (memcmp(&scs, &zero, sizeof(scs)) != 0)
+			count++;
+	}
+
+	*nr_cpus = count;
+
+	DEBUG_MSG("sadump: nr_cpus: %d\n", *nr_cpus);
+
+	return TRUE;
+}
+
+int
+sadump_set_timestamp(struct timeval *ts)
+{
+	static struct tm t;
+	efi_time_t *e = &si->sph_memory->time_stamp;
+	time_t ti;
+
+	memset(&t, 0, sizeof(t));
+
+	t.tm_sec  = e->second;
+	t.tm_min  = e->minute;
+	t.tm_hour = e->hour;
+	t.tm_mday = e->day;
+	t.tm_mon  = e->month - 1;
+	t.tm_year = e->year - 1900;
+
+	if (e->timezone != EFI_UNSPECIFIED_TIMEZONE)
+		t.tm_hour += e->timezone;
+
+	else
+		DEBUG_MSG("sadump: timezone information is missing\n");
+
+	ti = mktime(&t);
+	if (ti == (time_t)-1)
+		return FALSE;
+
+	ts->tv_sec = ti;
+	ts->tv_usec = 0;
+
+	return TRUE;
+}
+
+unsigned long long
+sadump_get_max_mapnr(void)
+{
+	return si->sh_memory->max_mapnr;
+}
+
+int
 sadump_add_diskset_info(char *name_memory)
 {
 	si->num_disks++;
@@ -523,10 +643,32 @@ sadump_add_diskset_info(char *name_memory)
 	return TRUE;
 }
 
+long
+sadump_page_size(void)
+{
+	return si->sh_memory->block_size;
+}
+
 char *
 sadump_head_disk_name_memory(void)
 {
 	return si->diskset_info[0].name_memory;
+}
+
+char *
+sadump_format_type_name(void)
+{
+	switch (info->flag_sadump) {
+	case SADUMP_SINGLE_PARTITION:
+		return "single partition";
+	case SADUMP_DISKSET:
+		return "diskset";
+	case SADUMP_MEDIA_BACKUP:
+		return "media backup";
+	case SADUMP_UNKNOWN:
+		return "unknown";
+	}
+	return NULL;
 }
 
 void
@@ -551,6 +693,8 @@ free_sadump_info(void)
 		}
 		free(si->diskset_info);
 	}
+	if (si->block_table)
+		free(si->block_table);
 }
 
 #endif /* defined(__x86__) && defined(__x86_64__) */

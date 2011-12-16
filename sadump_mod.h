@@ -169,6 +169,8 @@ struct sadump_media_header {
 	char reserve[4044];	// reserve feild
 };
 
+#define SADUMP_PF_SECTION_NUM 4096
+
 #endif /* defined(__x86__) && defined(__x86_64__) */
 
 /*

@@ -119,6 +119,12 @@ get_max_mapnr(void)
 		info->max_mapnr = info->dh_memory->max_mapnr;
 		return TRUE;
 	}
+
+	if (info->flag_sadump) {
+		info->max_mapnr = sadump_get_max_mapnr();
+		return TRUE;
+	}
+
 	max_paddr = get_max_paddr();
 	info->max_mapnr = paddr_to_pfn(max_paddr);
 
@@ -2307,6 +2313,28 @@ initial(void)
 
 		if (!initialize_bitmap_memory())
 			return FALSE;
+
+	} else if (info->flag_sadump) {
+		int nr_cpus;
+
+		if (info->flag_elf_dumpfile) {
+			MSG("'-E' option is disable, ");
+			MSG("because %s is sadump %s format.\n",
+			    info->name_memory, sadump_format_type_name());
+			return FALSE;
+		}
+
+		set_page_size(sadump_page_size());
+
+		if (!sadump_initialize_bitmap_memory())
+			return FALSE;
+
+		if (!sadump_get_nr_cpus(&nr_cpus))
+			return FALSE;
+
+		set_nr_cpus(nr_cpus);
+
+		(void) sadump_set_timestamp(&info->timestamp);
 
 	} else if (!get_phys_base())
 		return FALSE;

@@ -18,6 +18,7 @@
 #include "dwarf_info.h"
 #include "elf_info.h"
 #include "erase_info.h"
+#include "sadump_info.h"
 #include <sys/time.h>
 
 struct symbol_table	symbol_table;
@@ -6503,20 +6504,34 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	if (info->name_filterconfig && !info->name_vmlinux)
 		return FALSE;
 
+	if (info->flag_sadump_diskset && !sadump_is_supported_arch())
+		return FALSE;
+
 	if ((argc == optind + 2) && !info->flag_flatten
-				 && !info->flag_split) {
+				 && !info->flag_split
+				 && !info->flag_sadump_diskset) {
 		/*
 		 * Parameters for creating the dumpfile from vmcore.
 		 */
 		info->name_memory   = argv[optind];
 		info->name_dumpfile = argv[optind+1];
 
-	} else if ((argc > optind + 2) && info->flag_split) {
+	} else if (info->flag_split && (info->flag_sadump_diskset
+					? (argc >= optind + 2)
+					: (argc > optind + 2))) {
+		int num_vmcore;
+
 		/*
 		 * Parameters for creating multiple dumpfiles from vmcore.
 		 */
-		info->num_dumpfile = argc - optind - 1;
-		info->name_memory  = argv[optind];
+		if (info->flag_sadump_diskset) {
+			num_vmcore = 0;
+			info->name_memory = sadump_head_disk_name_memory();
+		} else {
+			num_vmcore = 1;
+			info->name_memory = argv[optind];
+		}
+		info->num_dumpfile = argc - optind - num_vmcore;
 
 		if (info->flag_elf_dumpfile) {
 			MSG("Options for splitting dumpfile cannot be used with Elf format.\n");
@@ -6529,7 +6544,15 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 			return FALSE;
 		}
 		for (i = 0; i < info->num_dumpfile; i++)
-			SPLITTING_DUMPFILE(i) = argv[optind + 1 + i];
+			SPLITTING_DUMPFILE(i) = argv[optind + num_vmcore + i];
+
+	} else if ((argc == optind + 1) && !info->flag_split
+					&& info->flag_sadump_diskset) {
+		info->name_dumpfile = argv[optind];
+		info->name_memory = sadump_head_disk_name_memory();
+
+		DEBUG_MSG("name_dumpfile: %s\n", info->name_dumpfile);
+		DEBUG_MSG("name_memory: %s\n", info->name_memory);
 
 	} else if ((argc == optind + 1) && info->flag_flatten) {
 		/*
@@ -6597,6 +6620,7 @@ static struct option longopts[] = {
 	{"dump-dmesg", no_argument, NULL, 'M'}, 
 	{"config", required_argument, NULL, 'C'},
 	{"help", no_argument, NULL, 'h'},
+	{"diskset", required_argument, NULL, 'k'},
 	{0, 0, 0, 0}
 };
 
@@ -6663,6 +6687,11 @@ main(int argc, char *argv[])
 		case 'i':
 			info->flag_read_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
+			break;
+		case 'k':
+			if (!sadump_add_diskset_info(optarg))
+				goto out;
+			info->flag_sadump_diskset = 1;
 			break;
 		case 'm':
 			message_level = atoi(optarg);

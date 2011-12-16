@@ -45,7 +45,9 @@ be excluded.
 .br
 .B \- Pages filled with zero
 .br
-.B \- Cache pages
+.B \- Cache pages without private pages
+.br
+.B \- All cache pages with private pages
 .br
 .B \- User process data pages
 .br
@@ -151,42 +153,43 @@ by dump_level 11, makedumpfile retries it by dump_level 31.
 .br
 # makedumpfile \-d 11,31 \-x vmlinux /proc/vmcore dumpfile
 
-  dump | zero | cache|cache  | user | free
- level | page | page |private| data | page
+       |      |cache  |cache  |      |
+  dump | zero |without|with   | user | free
+ level | page |private|private| data | page
 .br
-\-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-
-     0 |      |      |       |      |
-     1 |  X   |      |       |      |
-     2 |      |  X   |       |      |
-     3 |  X   |  X   |       |      |
-     4 |      |  X   |  X    |      |
-     5 |  X   |  X   |  X    |      |
-     6 |      |  X   |  X    |      |
-     7 |  X   |  X   |  X    |      |
-     8 |      |      |       |  X   |
-     9 |  X   |      |       |  X   |
-    10 |      |  X   |       |  X   |
-    11 |  X   |  X   |       |  X   |
-    12 |      |  X   |  X    |  X   |
-    13 |  X   |  X   |  X    |  X   |
-    14 |      |  X   |  X    |  X   |
-    15 |  X   |  X   |  X    |  X   |
-    16 |      |      |       |      |  X
-    17 |  X   |      |       |      |  X
-    18 |      |  X   |       |      |  X
-    19 |  X   |  X   |       |      |  X
-    20 |      |  X   |  X    |      |  X
-    21 |  X   |  X   |  X    |      |  X
-    22 |      |  X   |  X    |      |  X
-    23 |  X   |  X   |  X    |      |  X
-    24 |      |      |       |  X   |  X
-    25 |  X   |      |       |  X   |  X
-    26 |      |  X   |       |  X   |  X
-    27 |  X   |  X   |       |  X   |  X
-    28 |      |  X   |  X    |  X   |  X
-    29 |  X   |  X   |  X    |  X   |  X
-    30 |      |  X   |  X    |  X   |  X
-    31 |  X   |  X   |  X    |  X   |  X
+\-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-\-+\-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-
+     0 |      |       |       |      |
+     1 |  X   |       |       |      |
+     2 |      |   X   |       |      |
+     3 |  X   |   X   |       |      |
+     4 |      |   X   |   X   |      |
+     5 |  X   |   X   |   X   |      |
+     6 |      |   X   |   X   |      |
+     7 |  X   |   X   |   X   |      |
+     8 |      |       |       |  X   |
+     9 |  X   |       |       |  X   |
+    10 |      |   X   |       |  X   |
+    11 |  X   |   X   |       |  X   |
+    12 |      |   X   |   X   |  X   |
+    13 |  X   |   X   |   X   |  X   |
+    14 |      |   X   |   X   |  X   |
+    15 |  X   |   X   |   X   |  X   |
+    16 |      |       |       |      |  X
+    17 |  X   |       |       |      |  X
+    18 |      |   X   |       |      |  X
+    19 |  X   |   X   |       |      |  X
+    20 |      |   X   |   X   |      |  X
+    21 |  X   |   X   |   X   |      |  X
+    22 |      |   X   |   X   |      |  X
+    23 |  X   |   X   |   X   |      |  X
+    24 |      |       |       |  X   |  X
+    25 |  X   |       |       |  X   |  X
+    26 |      |   X   |       |  X   |  X
+    27 |  X   |   X   |       |  X   |  X
+    28 |      |   X   |   X   |  X   |  X
+    29 |  X   |   X   |   X   |  X   |  X
+    30 |      |   X   |   X   |  X   |  X
+    31 |  X   |   X   |   X   |  X   |  X
 
 
 .TP

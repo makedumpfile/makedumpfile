@@ -22,6 +22,19 @@
 
 #include "makedumpfile.h"
 
+#ifdef __x86_64__
+
+int sadump_virt_phys_base(void);
+
+#else
+
+static inline int sadump_virt_phys_base(void)
+{
+	return TRUE;
+}
+
+#endif
+
 #if defined(__x86__) || defined(__x86_64__)
 
 int check_and_get_sadump_header_info(char *filename);

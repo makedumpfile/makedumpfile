@@ -2507,6 +2507,15 @@ initial(void)
 
 		(void) sadump_set_timestamp(&info->timestamp);
 
+		/*
+		 * NOTE: phys_base is never saved by sadump and so
+		 * must be computed in some way. We here choose the
+		 * way of looking at linux_banner. See
+		 * sadump_virt_phys_base(). The processing is
+		 * postponed until debug information becomes
+		 * available.
+		 */
+
 	} else if (!get_phys_base())
 		return FALSE;
 
@@ -2582,6 +2591,9 @@ out:
 		return FALSE;
 
 	if (debug_info) {
+		if (info->flag_sadump)
+			(void) sadump_virt_phys_base();
+
 		if (!get_machdep_info())
 			return FALSE;
 

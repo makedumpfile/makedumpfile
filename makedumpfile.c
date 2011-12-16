@@ -5324,7 +5324,7 @@ get_xen_info(void)
 
 	if ((info->domain_list = (struct domain_list *)
 	      malloc(sizeof(struct domain_list) * (num_domain + 2))) == NULL) {
-		ERRMSG("Can't allcate memory for domain_list.\n");
+		ERRMSG("Can't allocate memory for domain_list.\n");
 		return FALSE;
 	}
 
@@ -6289,7 +6289,7 @@ copy_same_data(int src_fd, int dst_fd, off_t offset, unsigned long size)
 	char *buf = NULL;
 
 	if ((buf = malloc(size)) == NULL) {
-		ERRMSG("Can't allcate memory.\n");
+		ERRMSG("Can't allocate memory.\n");
 		return FALSE;
 	}
 	if (lseek(src_fd, offset, SEEK_SET) < 0) {
@@ -6391,7 +6391,7 @@ reassemble_kdump_header(void)
 	offset = (DISKDUMP_HEADER_BLOCKS + dh.sub_hdr_size) * dh.block_size;
 	info->len_bitmap = dh.bitmap_blocks * dh.block_size;
 	if ((buf_bitmap = malloc(info->len_bitmap)) == NULL) {
-		ERRMSG("Can't allcate memory for bitmap.\n");
+		ERRMSG("Can't allocate memory for bitmap.\n");
 		goto out;
 	}
 	if (lseek(fd, offset, SEEK_SET) < 0) {
@@ -6468,7 +6468,7 @@ reassemble_kdump_pages(void)
 		return FALSE;
 	}
 	if ((data = malloc(data_buf_size)) == NULL) {
-		ERRMSG("Can't allcate memory for page data.\n");
+		ERRMSG("Can't allocate memory for page data.\n");
 		free_cache_data(&cd_pd);
 		free_cache_data(&cd_data);
 		return FALSE;
@@ -6582,7 +6582,7 @@ reassemble_kdump_pages(void)
 		if (SPLITTING_SIZE_EI(i) > data_buf_size) {
 			data_buf_size = SPLITTING_SIZE_EI(i);
 			if ((data = realloc(data, data_buf_size)) == NULL) {
-				ERRMSG("Can't allcate memory for eraseinfo"
+				ERRMSG("Can't allocate memory for eraseinfo"
 					" data.\n");
 				goto out;
 			}

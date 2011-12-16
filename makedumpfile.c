@@ -2546,28 +2546,6 @@ clear_bit_on_2nd_bitmap_for_kernel(unsigned long long pfn)
 }
 
 static inline int
-is_on(char *bitmap, int i)
-{
-	return bitmap[i>>3] & (1 << (i & 7));
-}
-
-static inline int
-is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
-{
-	off_t offset;
-	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
-		offset = bitmap->offset + BUFSIZE_BITMAP*(pfn/PFN_BUFBITMAP);
-		lseek(bitmap->fd, offset, SEEK_SET);
-		read(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP);
-		if (pfn == 0)
-			bitmap->no_block = 0;
-		else
-			bitmap->no_block = pfn/PFN_BUFBITMAP;
-	}
-	return is_on(bitmap->buf, pfn%PFN_BUFBITMAP);
-}
-
-static inline int
 is_in_segs(unsigned long long paddr)
 {
 	if (info->flag_refiltering) {

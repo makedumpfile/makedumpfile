@@ -56,6 +56,8 @@ enum {
 	FLATMEM
 };
 
+int get_mem_type(void);
+
 /*
  * Page flags
  *
@@ -1248,5 +1250,27 @@ int get_xen_info_ia64(void);
 #define kvtop_xen(X)	FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* s390x */
+
+static inline int
+is_on(char *bitmap, int i)
+{
+	return bitmap[i>>3] & (1 << (i & 7));
+}
+
+static inline int
+is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
+{
+	off_t offset;
+	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
+		offset = bitmap->offset + BUFSIZE_BITMAP*(pfn/PFN_BUFBITMAP);
+		lseek(bitmap->fd, offset, SEEK_SET);
+		read(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP);
+		if (pfn == 0)
+			bitmap->no_block = 0;
+		else
+			bitmap->no_block = pfn/PFN_BUFBITMAP;
+	}
+	return is_on(bitmap->buf, pfn%PFN_BUFBITMAP);
+}
 
 #endif /* MAKEDUMPFILE_H */

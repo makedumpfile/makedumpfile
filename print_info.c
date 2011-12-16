@@ -69,6 +69,11 @@ print_usage(void)
 	MSG("  # makedumpfile -g VMCOREINFO --xen-syms XEN-SYMS\n");
 	MSG("\n");
 	MSG("\n");
+	MSG("  Creating DUMPFILE from multiple VMCOREs generated on sadump diskset configuration:\n");
+	MSG("  # makedumpfile [-c] [-d DL] -x VMLINUX --diskset=VMCORE1 --diskset=VMCORE2\n");
+	MSG("    [--diskset=VMCORE3 ..] DUMPFILE\n");
+	MSG("\n");
+	MSG("\n");
 	MSG("Available options:\n");
 	MSG("  [-c]:\n");
 	MSG("      Compress dump data by each page.\n");
@@ -162,6 +167,11 @@ print_usage(void)
 	MSG("  [-X]:\n");
 	MSG("      Exclude all the user domain pages from Xen kdump's VMCORE, and extract\n");
 	MSG("      the part of Xen and domain-0.\n");
+	MSG("\n");
+	MSG("  [--diskset=VMCORE]:\n");
+	MSG("      Specify multiple VMCOREs created on sadump diskset configuration the same\n");
+	MSG("      number of times as the number of VMCOREs in increasing order from left to\n");
+	MSG("      right.\n");
 	MSG("\n");
 	MSG("  [--message-level ML]:\n");
 	MSG("      Specify the message types.\n");

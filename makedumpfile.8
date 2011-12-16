@@ -89,9 +89,9 @@ a user needs to transport the dump data to a remote host. To transport the dump
 data by SSH, makedumpfile outputs the dump data in the intermediate format (the
 flattened format) to the standard output. By piping the output data to SSH,
 a user can transport the dump data to a remote host. Note that analysis tools
-cannot read the flattened format directly, so on a remote host the received
-data in the flattened format needs to be rearranged to a readable
-\fIDUMPFILE\fR format by makedumpfile (or makedumpfile\-R.pl).
+(crash utility before version 5.1.2 or GDB) cannot read the flattened format 
+directly, so on a remote host the received data in the flattened format needs
+to be rearranged to a readable \fIDUMPFILE\fR format by makedumpfile (or makedumpfile\-R.pl).
 .PP
 makedumpfile can read a \fIDUMPFILE\fR in the kdump-compressed format instead
 of \fIVMCORE\fR and re-filter it. This feature is useful in situation that
@@ -267,10 +267,11 @@ command syntax please refer to \fBmakedumpfile.conf(8)\fR.
 Output the dump data in the flattened format to the standard output for
 transporting the dump data by SSH.
 .br
-Analysis tools cannot read the flattened format directly. For analysis, the
-dump data in the flattened format should be rearranged to a normal
-\fIDUMPFILE\fR (readable with analysis tools) by \-R option. By which option is
-specified with \-F option, the format of the rearranged \fIDUMPFILE\fR is fixed.
+Analysis tools (crash utility before version 5.1.2 or GDB) cannot read the 
+flattened format directly. For analysis, the dump data in the flattened format
+should be rearranged to a normal \fIDUMPFILE\fR (readable with analysis tools)
+by \-R option. By which option is specified with \-F option, the format of the
+rearranged \fIDUMPFILE\fR is fixed.
 In other words, it is impossible to specify the \fIDUMPFILE\fR format when the
 dump data is rearranged with \-R option. If specifying \-E option with \-F option,
 the format of the rearranged \fIDUMPFILE\fR is the ELF format. Otherwise, it

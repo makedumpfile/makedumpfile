@@ -34,6 +34,7 @@
 #include "common.h"
 #include "dwarf_info.h"
 #include "diskdump_mod.h"
+#include "sadump_mod.h"
 
 /*
  * Result of command
@@ -894,6 +895,12 @@ struct DumpInfo {
 	 */
 	unsigned long long split_start_pfn;  
 	unsigned long long split_end_pfn;  
+
+	/*
+	 * sadump info:
+	 */
+	int flag_sadump_diskset;
+	enum sadump_format_type flag_sadump;         /* sadump format type */
 };
 extern struct DumpInfo		*info;
 

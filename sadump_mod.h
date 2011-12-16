@@ -171,4 +171,14 @@ struct sadump_media_header {
 
 #endif /* defined(__x86__) && defined(__x86_64__) */
 
+/*
+ * Type of sadump related formats
+ */
+enum sadump_format_type {
+	SADUMP_UNKNOWN = 0,
+	SADUMP_SINGLE_PARTITION,
+	SADUMP_DISKSET,
+	SADUMP_MEDIA_BACKUP
+};
+
 #endif /* _SADUMP_MOD_H */

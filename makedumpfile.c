@@ -346,6 +346,9 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 	if (info->flag_refiltering)
 		return readpmem_kdump_compressed(paddr, bufptr, read_size);
 
+	if (info->flag_sadump)
+		return readpmem_sadump(paddr, bufptr, read_size);
+
 	if (!(offset = paddr_to_offset(paddr))) {
 		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
 		    paddr);
@@ -3439,6 +3442,9 @@ create_1st_bitmap(void)
 	if (info->flag_refiltering)
 		return copy_1st_bitmap_from_memory();
 
+	if (info->flag_sadump)
+		return sadump_copy_1st_bitmap_from_memory();
+
 	/*
 	 * At first, clear all the bits on the 1st-bitmap.
 	 */
@@ -4538,7 +4544,7 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 	size_t size1, size2;
 
 	paddr = pfn_to_paddr(pfn);
-	if (info->flag_refiltering) {
+	if (info->flag_refiltering || info->flag_sadump) {
 		if (!readmem(PADDR, paddr, buf, info->page_size)) {
 			ERRMSG("Can't get the page data.\n");
 			return FALSE;

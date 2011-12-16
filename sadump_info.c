@@ -50,6 +50,9 @@ static int read_device_diskset(struct sadump_diskset_info *sdi, void *buf,
 			       size_t bytes, ulong *offset);
 static int read_sadump_header(char *filename);
 static int read_sadump_header_diskset(int diskid, struct sadump_diskset_info *sdi);
+static unsigned long long pfn_to_block(unsigned long long pfn);
+static int lookup_diskset(unsigned long long whole_offset, int *diskid,
+			  unsigned long long *disk_offset);
 
 static struct sadump_info sadump_info = {};
 static struct sadump_info *si = &sadump_info;
@@ -83,6 +86,45 @@ check_and_get_sadump_header_info(char *filename)
 			if (!read_sadump_header_diskset(i, sdi))
 				return FALSE;
 		}
+	}
+
+	return TRUE;
+}
+
+int
+sadump_copy_1st_bitmap_from_memory(void)
+{
+	struct sadump_header *sh = si->sh_memory;
+	char buf[si->sh_memory->block_size];
+	off_t offset_page;
+	unsigned long bitmap_offset, bitmap_len;
+
+	bitmap_offset =	si->sub_hdr_offset + sh->block_size*sh->sub_hdr_size;
+	bitmap_len = sh->block_size * sh->bitmap_blocks;
+
+	if (lseek(info->fd_memory, bitmap_offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n",
+		       info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (lseek(info->bitmap1->fd, info->bitmap1->offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the bitmap(%s). %s\n",
+		       info->bitmap1->file_name, strerror(errno));
+		return FALSE;
+	}
+	offset_page = 0;
+	while (offset_page < bitmap_len) {
+		if (read(info->fd_memory, buf, sizeof(buf)) != sizeof(buf)) {
+			ERRMSG("Can't read %s. %s\n",
+			       info->name_memory, strerror(errno));
+			return FALSE;
+		}
+		if (write(info->bitmap1->fd, buf, sizeof(buf)) != sizeof(buf)) {
+			ERRMSG("Can't write the bitmap(%s). %s\n",
+			       info->bitmap1->file_name, strerror(errno));
+			return FALSE;
+		}
+		offset_page += sizeof(buf);
 	}
 
 	return TRUE;
@@ -622,6 +664,109 @@ unsigned long long
 sadump_get_max_mapnr(void)
 {
 	return si->sh_memory->max_mapnr;
+}
+
+int
+readpmem_sadump(unsigned long long paddr, void *bufptr, size_t size)
+{
+	unsigned long long pfn, block, whole_offset, perdisk_offset;
+	ulong page_offset;
+	char buf[info->page_size];
+	int fd_memory;
+
+	pfn = paddr_to_pfn(paddr);
+	page_offset = paddr % info->page_size;
+
+	if (pfn >= si->sh_memory->max_mapnr)
+		goto error;
+
+	if (!is_dumpable(info->bitmap_memory, pfn)) {
+		ERRMSG("pfn(%llx) is excluded from %s.\n", pfn,
+		       info->name_memory);
+		goto error;
+	}
+
+	block = pfn_to_block(pfn);
+	whole_offset = block * si->sh_memory->block_size;
+
+	if (info->flag_sadump == SADUMP_DISKSET) {
+		int diskid;
+
+		if (!lookup_diskset(whole_offset, &diskid, &perdisk_offset))
+			goto error;
+
+		fd_memory = si->diskset_info[diskid].fd_memory;
+		perdisk_offset += si->diskset_info[diskid].data_offset;
+
+	} else {
+		fd_memory = info->fd_memory;
+		perdisk_offset = whole_offset + si->data_offset;
+
+	}
+
+	if (lseek(fd_memory, perdisk_offset, SEEK_SET) < 0)
+		goto error;
+
+	if (read(fd_memory, buf, sizeof(buf)) != sizeof(buf))
+		goto error;
+
+	memcpy(bufptr, buf + page_offset, size);
+
+	return size;
+
+error:
+	DEBUG_MSG("type_addr: %d, addr:%llx, size:%zd\n", PADDR, paddr, size);
+
+	return FALSE;
+}
+
+static unsigned long long
+pfn_to_block(unsigned long long pfn)
+{
+	unsigned long long block, section, p;
+
+	section = pfn / SADUMP_PF_SECTION_NUM;
+
+	if (section)
+		block = si->block_table[section - 1];
+	else
+		block = 0;
+
+	for (p = section * SADUMP_PF_SECTION_NUM; p < pfn; ++p)
+		if (is_dumpable(info->bitmap_memory, p))
+			block++;
+
+	return block;
+}
+
+static int
+lookup_diskset(unsigned long long whole_offset, int *diskid,
+	       unsigned long long *disk_offset)
+{
+	unsigned long long offset = whole_offset;
+	int i;
+
+	for (i = 0; i < si->num_disks; ++i) {
+		struct sadump_diskset_info *sdi = &si->diskset_info[i];
+		unsigned long long used_device_i, data_offset_i, ram_size;
+
+		used_device_i = sdi->sph_memory->used_device;
+		data_offset_i = sdi->data_offset;
+
+		ram_size = used_device_i - data_offset_i;
+
+		if (offset < ram_size)
+			break;
+		offset -= ram_size;
+	}
+
+	if (i == si->num_disks)
+		return FALSE;
+
+	*diskid = i;
+	*disk_offset = offset;
+
+	return TRUE;
 }
 
 int

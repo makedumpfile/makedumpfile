@@ -1000,6 +1000,7 @@ struct symbol_table {
 	unsigned long long	crash_notes;
 	unsigned long long	__per_cpu_offset;
 	unsigned long long	__per_cpu_load;
+	unsigned long long	cpu_online_mask;
 };
 
 struct size_table {
@@ -1029,6 +1030,8 @@ struct size_table {
 	long	percpu_data;
 	long	elf_prstatus;
 	long	user_regs_struct;
+	long	cpumask;
+	long	cpumask_t;
 };
 
 struct offset_table {

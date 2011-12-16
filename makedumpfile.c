@@ -827,6 +827,9 @@ get_symbol_info(void)
 	SYMBOL_INIT(crash_notes, "crash_notes");
 	SYMBOL_INIT(__per_cpu_load, "__per_cpu_load");
 	SYMBOL_INIT(__per_cpu_offset, "__per_cpu_offset");
+	SYMBOL_INIT(cpu_online_mask, "cpu_online_mask");
+	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL)
+		SYMBOL_INIT(cpu_online_mask, "cpu_online_map");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -961,6 +964,13 @@ get_structure_info(void)
 	 */
 	SIZE_INIT(elf_prstatus, "elf_prstatus");
 	OFFSET_INIT(elf_prstatus.pr_reg, "elf_prstatus", "pr_reg");
+
+	/*
+	 * Get size of cpumask and cpumask_t.
+	 */
+	SIZE_INIT(cpumask, "cpumask");
+
+	TYPEDEF_SIZE_INIT(cpumask_t, "cpumask_t");
 
 	/*
 	 * Get offset of the user_regs_struct members.
@@ -2492,8 +2502,6 @@ initial(void)
 			return FALSE;
 
 	} else if (info->flag_sadump) {
-		int nr_cpus;
-
 		if (info->flag_elf_dumpfile) {
 			MSG("'-E' option is disable, ");
 			MSG("because %s is sadump %s format.\n",
@@ -2505,11 +2513,6 @@ initial(void)
 
 		if (!sadump_initialize_bitmap_memory())
 			return FALSE;
-
-		if (!sadump_get_nr_cpus(&nr_cpus))
-			return FALSE;
-
-		set_nr_cpus(nr_cpus);
 
 		(void) sadump_set_timestamp(&info->timestamp);
 
@@ -2602,6 +2605,16 @@ out:
 
 		if (!get_machdep_info())
 			return FALSE;
+
+		if (info->flag_sadump) {
+			int online_cpus;
+
+			online_cpus = sadump_num_online_cpus();
+			if (!online_cpus)
+				return FALSE;
+
+			set_nr_cpus(online_cpus);
+		}
 
 		if (!check_release())
 			return FALSE;

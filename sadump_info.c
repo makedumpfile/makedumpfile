@@ -46,6 +46,14 @@
 			  KEXEC_CORE_NOTE_NAME_BYTES +		       \
 			  KEXEC_CORE_NOTE_DESC_BYTES )
 
+#define for_each_online_cpu(cpu)					\
+	for (cpu = 0; cpu < BITPERBYTE * si->cpumask_size; ++cpu)	\
+		if (is_online_cpu(cpu))
+
+enum {
+	BITPERWORD = BITPERBYTE * sizeof(unsigned long)
+};
+
 struct sadump_diskset_info {
 	char *name_memory;
 	int fd_memory;
@@ -67,7 +75,8 @@ struct sadump_info {
 	unsigned long *__per_cpu_offset;
 	unsigned long __per_cpu_load;
 	FILE *file_elf_note;
-
+	char *cpu_online_mask_buf;
+	size_t cpumask_size;
 };
 
 static char *guid_to_str(efi_guid_t *guid, char *buf, size_t buflen);
@@ -81,6 +90,7 @@ static int read_sadump_header_diskset(int diskid, struct sadump_diskset_info *sd
 static unsigned long long pfn_to_block(unsigned long long pfn);
 static int lookup_diskset(unsigned long long whole_offset, int *diskid,
 			  unsigned long long *disk_offset);
+static int cpu_online_mask_init(void);
 static int per_cpu_init(void);
 static int get_data_from_elf_note_desc(const char *note_buf, uint32_t n_descsz,
 				       char *name, uint32_t n_type, char **data);
@@ -88,6 +98,7 @@ static int alignfile(unsigned long *offset);
 static int
 write_elf_note_header(char *name, void *data, size_t descsz, uint32_t type,
 		      unsigned long *offset, unsigned long *desc_offset);
+static int is_online_cpu(int cpu);
 static unsigned long legacy_per_cpu_ptr(unsigned long ptr, int cpu);
 static unsigned long per_cpu_ptr(unsigned long ptr, int cpu);
 static int get_prstatus_from_crash_notes(int cpu, char *prstatus_buf);
@@ -250,8 +261,10 @@ sadump_generate_elf_note_from_dumpfile(void)
 		       strerror(errno));
 		goto cleanup;
 	}
+	if (!cpu_online_mask_init())
+		goto cleanup;
 	offset = 0;
-	for (x_cpu = 0; x_cpu < get_nr_cpus(); ++x_cpu) {
+	for_each_online_cpu(x_cpu) {
 		struct elf_prstatus prstatus;
 
 		memset(&prstatus, 0, sizeof(prstatus));
@@ -756,32 +769,68 @@ sadump_initialize_bitmap_memory(void)
 	return TRUE;
 }
 
-int
-sadump_get_nr_cpus(int *nr_cpus)
+static int
+cpu_online_mask_init(void)
 {
-	unsigned long offset;
-	struct sadump_smram_cpu_state scs, zero;
-	uint32_t x_cpu;
-	int count;
+	ulong cpu_online_mask_addr;
 
-	memset(&zero, 0, sizeof(zero));
+	if (si->cpu_online_mask_buf && si->cpumask_size)
+		return TRUE;
 
-	offset = si->sub_hdr_offset + sizeof(uint32_t) +
-		si->sh_memory->nr_cpus * sizeof(struct sadump_apic_state);
+	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL ||
+	    (SIZE(cpumask) == NOT_FOUND_STRUCTURE &&
+	     SIZE(cpumask_t) == NOT_FOUND_STRUCTURE))
+		return FALSE;
 
-	count = 0;
-	for (x_cpu = 0; x_cpu < si->sh_memory->nr_cpus; ++x_cpu) {
-		if (!read_device(&scs, sizeof(scs), &offset))
-			return FALSE;
-		if (memcmp(&scs, &zero, sizeof(scs)) != 0)
-			count++;
+	si->cpumask_size = SIZE(cpumask) == NOT_FOUND_STRUCTURE
+		? SIZE(cpumask_t)
+		: SIZE(cpumask);
+
+	if (!(si->cpu_online_mask_buf = calloc(1, si->cpumask_size))) {
+		ERRMSG("Can't allocate cpu_online_mask buffer. %s\n",
+		       strerror(errno));
+		return FALSE;
 	}
 
-	*nr_cpus = count;
+	if (SIZE(cpumask) == NOT_FOUND_STRUCTURE)
+		cpu_online_mask_addr = SYMBOL(cpu_online_mask);
 
-	DEBUG_MSG("sadump: nr_cpus: %d\n", *nr_cpus);
+	else {
+		if (!readmem(VADDR, SYMBOL(cpu_online_mask),
+			     &cpu_online_mask_addr, sizeof(unsigned long))) {
+			ERRMSG("Can't read cpu_online_mask pointer.\n");
+			return FALSE;
+		}
+
+	}
+
+	if (!readmem(VADDR, cpu_online_mask_addr, si->cpu_online_mask_buf,
+		     si->cpumask_size)) {
+		ERRMSG("Can't read cpu_online_mask memory.\n");
+		return FALSE;
+	}
 
 	return TRUE;
+}
+
+int
+sadump_num_online_cpus(void)
+{
+	int cpu, count = 0;
+
+	if (!cpu_online_mask_init())
+		return FALSE;
+
+	DEBUG_MSG("sadump: online cpus:");
+
+	for_each_online_cpu(cpu) {
+		count++;
+		DEBUG_MSG(" %d", cpu);
+	}
+
+	DEBUG_MSG("\nsadump: nr_cpus: %d\n", count);
+
+	return count;
 }
 
 int
@@ -1199,6 +1248,17 @@ write_elf_note_header(char *name, void *data, size_t descsz, uint32_t type,
 		return FALSE;
 
 	return TRUE;
+}
+
+static int
+is_online_cpu(int cpu)
+{
+	unsigned long mask;
+
+	mask = ULONG(si->cpu_online_mask_buf +
+		     (cpu / BITPERWORD) * sizeof(unsigned long));
+
+	return (mask & (1UL << (cpu % BITPERWORD))) ? TRUE : FALSE;
 }
 
 static unsigned long
@@ -1710,6 +1770,8 @@ free_sadump_info(void)
 		free(si->block_table);
 	if (si->file_elf_note)
 		fclose(si->file_elf_note);
+	if (si->cpu_online_mask_buf)
+		free(si->cpu_online_mask_buf);
 }
 
 #endif /* defined(__x86__) && defined(__x86_64__) */

@@ -19,6 +19,7 @@
 #include "elf_info.h"
 #include "erase_info.h"
 #include "sadump_info.h"
+#include <stddef.h>
 #include <sys/time.h>
 
 struct symbol_table	symbol_table;
@@ -810,6 +811,19 @@ get_symbol_info(void)
 	SYMBOL_INIT(max_pfn, "max_pfn");
 	SYMBOL_INIT(modules, "modules");
 	SYMBOL_INIT(high_memory, "high_memory");
+	SYMBOL_INIT(linux_banner, "linux_banner");
+	SYMBOL_INIT(bios_cpu_apicid, "bios_cpu_apicid");
+	SYMBOL_INIT(x86_bios_cpu_apicid, "x86_bios_cpu_apicid");
+	if (SYMBOL(x86_bios_cpu_apicid) == NOT_FOUND_SYMBOL)
+		SYMBOL_INIT(x86_bios_cpu_apicid,
+			    "per_cpu__x86_bios_cpu_apicid");
+	SYMBOL_INIT(x86_bios_cpu_apicid_early_ptr,
+		    "x86_bios_cpu_apicid_early_ptr");
+	SYMBOL_INIT(x86_bios_cpu_apicid_early_map,
+		    "x86_bios_cpu_apicid_early_map");
+	SYMBOL_INIT(crash_notes, "crash_notes");
+	SYMBOL_INIT(__per_cpu_load, "__per_cpu_load");
+	SYMBOL_INIT(__per_cpu_offset, "__per_cpu_offset");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -819,6 +833,8 @@ get_symbol_info(void)
 		SYMBOL_ARRAY_LENGTH_INIT(mem_section, "mem_section");
 	if (SYMBOL(node_memblk) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_LENGTH_INIT(node_memblk, "node_memblk");
+	if (SYMBOL(__per_cpu_offset) != NOT_FOUND_SYMBOL)
+		SYMBOL_ARRAY_LENGTH_INIT(__per_cpu_offset, "__per_cpu_offset");
 
 	return TRUE;
 }
@@ -934,6 +950,158 @@ get_structure_info(void)
 	ENUM_NUMBER_INIT(PG_swapcache, "PG_swapcache");
 
 	TYPEDEF_SIZE_INIT(nodemask_t, "nodemask_t");
+
+	SIZE_INIT(percpu_data, "percpu_data");
+
+	/*
+	 * Get offset of the elf_prstatus members.
+	 */
+	SIZE_INIT(elf_prstatus, "elf_prstatus");
+	OFFSET_INIT(elf_prstatus.pr_reg, "elf_prstatus", "pr_reg");
+
+	/*
+	 * Get offset of the user_regs_struct members.
+	 */
+	SIZE_INIT(user_regs_struct, "user_regs_struct");
+
+#ifdef __x86__
+	if (SIZE(user_regs_struct) != NOT_FOUND_STRUCTURE) {
+		OFFSET_INIT(user_regs_struct.bx, "user_regs_struct", "bx");
+		OFFSET_INIT(user_regs_struct.cx, "user_regs_struct", "cx");
+		OFFSET_INIT(user_regs_struct.dx, "user_regs_struct", "dx");
+		OFFSET_INIT(user_regs_struct.si, "user_regs_struct", "si");
+		OFFSET_INIT(user_regs_struct.di, "user_regs_struct", "di");
+		OFFSET_INIT(user_regs_struct.bp, "user_regs_struct", "bp");
+		OFFSET_INIT(user_regs_struct.ax, "user_regs_struct", "ax");
+		OFFSET_INIT(user_regs_struct.ds, "user_regs_struct", "ds");
+		OFFSET_INIT(user_regs_struct.es, "user_regs_struct", "es");
+		OFFSET_INIT(user_regs_struct.fs, "user_regs_struct", "fs");
+		OFFSET_INIT(user_regs_struct.gs, "user_regs_struct", "gs");
+		OFFSET_INIT(user_regs_struct.orig_ax, "user_regs_struct",
+			    "orig_ax");
+		OFFSET_INIT(user_regs_struct.ip, "user_regs_struct", "ip");
+		OFFSET_INIT(user_regs_struct.cs, "user_regs_struct", "cs");
+		OFFSET_INIT(user_regs_struct.flags, "user_regs_struct",
+			    "flags");
+		OFFSET_INIT(user_regs_struct.sp, "user_regs_struct", "sp");
+		OFFSET_INIT(user_regs_struct.ss, "user_regs_struct", "ss");
+
+		if (OFFSET(user_regs_struct.bx) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.bx, "user_regs_struct", "ebx");
+		if (OFFSET(user_regs_struct.cx) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.cx, "user_regs_struct", "ecx");
+		if (OFFSET(user_regs_struct.dx) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.dx, "user_regs_struct", "edx");
+		if (OFFSET(user_regs_struct.si) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.si, "user_regs_struct", "esi");
+		if (OFFSET(user_regs_struct.di) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.di, "user_regs_struct", "edi");
+		if (OFFSET(user_regs_struct.bp) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.bp, "user_regs_struct", "ebp");
+		if (OFFSET(user_regs_struct.ax) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.ax, "user_regs_struct", "eax");
+		if (OFFSET(user_regs_struct.orig_ax) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.orig_ax, "user_regs_struct", "orig_eax");
+		if (OFFSET(user_regs_struct.ip) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.ip, "user_regs_struct", "eip");
+		if (OFFSET(user_regs_struct.flags) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.flags, "user_regs_struct", "eflags");
+		if (OFFSET(user_regs_struct.sp) == NOT_FOUND_STRUCTURE)
+			OFFSET_INIT(user_regs_struct.sp, "user_regs_struct", "esp");
+	} else {
+		/*
+		 * Note: Sometimes kernel debuginfo doesn't contain
+		 * user_regs_struct structure information. Instead, we
+		 * take offsets from actual datatype.
+		 */
+		OFFSET(user_regs_struct.bx) = offsetof(struct user_regs_struct, bx);
+		OFFSET(user_regs_struct.cx) = offsetof(struct user_regs_struct, cx);
+		OFFSET(user_regs_struct.dx) = offsetof(struct user_regs_struct, dx);
+		OFFSET(user_regs_struct.si) = offsetof(struct user_regs_struct, si);
+		OFFSET(user_regs_struct.di) = offsetof(struct user_regs_struct, di);
+		OFFSET(user_regs_struct.bp) = offsetof(struct user_regs_struct, bp);
+		OFFSET(user_regs_struct.ax) = offsetof(struct user_regs_struct, ax);
+		OFFSET(user_regs_struct.ds) = offsetof(struct user_regs_struct, ds);
+		OFFSET(user_regs_struct.es) = offsetof(struct user_regs_struct, es);
+		OFFSET(user_regs_struct.fs) = offsetof(struct user_regs_struct, fs);
+		OFFSET(user_regs_struct.gs) = offsetof(struct user_regs_struct, gs);
+		OFFSET(user_regs_struct.orig_ax) = offsetof(struct user_regs_struct, orig_ax);
+		OFFSET(user_regs_struct.ip) = offsetof(struct user_regs_struct, ip);
+		OFFSET(user_regs_struct.cs) = offsetof(struct user_regs_struct, cs);
+		OFFSET(user_regs_struct.flags) = offsetof(struct user_regs_struct, flags);
+		OFFSET(user_regs_struct.sp) = offsetof(struct user_regs_struct, sp);
+		OFFSET(user_regs_struct.ss) = offsetof(struct user_regs_struct, ss);
+	}
+#endif /* __x86__ */
+
+#ifdef __x86_64__
+	if (SIZE(user_regs_struct) != NOT_FOUND_STRUCTURE) {
+		OFFSET_INIT(user_regs_struct.r15, "user_regs_struct", "r15");
+		OFFSET_INIT(user_regs_struct.r14, "user_regs_struct", "r14");
+		OFFSET_INIT(user_regs_struct.r13, "user_regs_struct", "r13");
+		OFFSET_INIT(user_regs_struct.r12, "user_regs_struct", "r12");
+		OFFSET_INIT(user_regs_struct.bp, "user_regs_struct", "bp");
+		OFFSET_INIT(user_regs_struct.bx, "user_regs_struct", "bx");
+		OFFSET_INIT(user_regs_struct.r11, "user_regs_struct", "r11");
+		OFFSET_INIT(user_regs_struct.r10, "user_regs_struct", "r10");
+		OFFSET_INIT(user_regs_struct.r9, "user_regs_struct", "r9");
+		OFFSET_INIT(user_regs_struct.r8, "user_regs_struct", "r8");
+		OFFSET_INIT(user_regs_struct.ax, "user_regs_struct", "ax");
+		OFFSET_INIT(user_regs_struct.cx, "user_regs_struct", "cx");
+		OFFSET_INIT(user_regs_struct.dx, "user_regs_struct", "dx");
+		OFFSET_INIT(user_regs_struct.si, "user_regs_struct", "si");
+		OFFSET_INIT(user_regs_struct.di, "user_regs_struct", "di");
+		OFFSET_INIT(user_regs_struct.orig_ax, "user_regs_struct",
+			    "orig_ax");
+		OFFSET_INIT(user_regs_struct.ip, "user_regs_struct", "ip");
+		OFFSET_INIT(user_regs_struct.cs, "user_regs_struct", "cs");
+		OFFSET_INIT(user_regs_struct.flags, "user_regs_struct",
+			    "flags");
+		OFFSET_INIT(user_regs_struct.sp, "user_regs_struct", "sp");
+		OFFSET_INIT(user_regs_struct.ss, "user_regs_struct", "ss");
+		OFFSET_INIT(user_regs_struct.fs_base, "user_regs_struct",
+			    "fs_base");
+		OFFSET_INIT(user_regs_struct.gs_base, "user_regs_struct",
+			    "gs_base");
+		OFFSET_INIT(user_regs_struct.ds, "user_regs_struct", "ds");
+		OFFSET_INIT(user_regs_struct.es, "user_regs_struct", "es");
+		OFFSET_INIT(user_regs_struct.fs, "user_regs_struct", "fs");
+		OFFSET_INIT(user_regs_struct.gs, "user_regs_struct", "gs");
+	} else {
+		/*
+		 * Note: Sometimes kernel debuginfo doesn't contain
+		 * user_regs_struct structure information. Instead, we
+		 * take offsets from actual datatype.
+		 */
+		OFFSET(user_regs_struct.r15) = offsetof(struct user_regs_struct, r15);
+		OFFSET(user_regs_struct.r14) = offsetof(struct user_regs_struct, r14);
+		OFFSET(user_regs_struct.r13) = offsetof(struct user_regs_struct, r13);
+		OFFSET(user_regs_struct.r12) = offsetof(struct user_regs_struct, r12);
+		OFFSET(user_regs_struct.bp) = offsetof(struct user_regs_struct, bp);
+		OFFSET(user_regs_struct.bx) = offsetof(struct user_regs_struct, bx);
+		OFFSET(user_regs_struct.r11) = offsetof(struct user_regs_struct, r11);
+		OFFSET(user_regs_struct.r10) = offsetof(struct user_regs_struct, r10);
+		OFFSET(user_regs_struct.r9) = offsetof(struct user_regs_struct, r9);
+		OFFSET(user_regs_struct.r8) = offsetof(struct user_regs_struct, r8);
+		OFFSET(user_regs_struct.ax) = offsetof(struct user_regs_struct, ax);
+		OFFSET(user_regs_struct.cx) = offsetof(struct user_regs_struct, cx);
+		OFFSET(user_regs_struct.dx) = offsetof(struct user_regs_struct, dx);
+		OFFSET(user_regs_struct.si) = offsetof(struct user_regs_struct, si);
+		OFFSET(user_regs_struct.di) = offsetof(struct user_regs_struct, di);
+		OFFSET(user_regs_struct.orig_ax) = offsetof(struct user_regs_struct, orig_ax);
+		OFFSET(user_regs_struct.ip) = offsetof(struct user_regs_struct, ip);
+		OFFSET(user_regs_struct.cs) = offsetof(struct user_regs_struct, cs);
+		OFFSET(user_regs_struct.flags) = offsetof(struct user_regs_struct, flags);
+		OFFSET(user_regs_struct.sp) = offsetof(struct user_regs_struct, sp);
+		OFFSET(user_regs_struct.ss) = offsetof(struct user_regs_struct, ss);
+		OFFSET(user_regs_struct.fs_base) = offsetof(struct user_regs_struct, fs_base);
+		OFFSET(user_regs_struct.gs_base) = offsetof(struct user_regs_struct, gs_base);
+		OFFSET(user_regs_struct.ds) = offsetof(struct user_regs_struct, ds);
+		OFFSET(user_regs_struct.es) = offsetof(struct user_regs_struct, es);
+		OFFSET(user_regs_struct.fs) = offsetof(struct user_regs_struct, fs);
+		OFFSET(user_regs_struct.gs) = offsetof(struct user_regs_struct, gs);
+	}
+#endif /* __x86_64__ */
 
 	return TRUE;
 }

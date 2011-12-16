@@ -988,6 +988,18 @@ struct symbol_table {
 	 * vmalloc_start address on s390x arch
 	 */
 	unsigned long long	high_memory;
+
+	/*
+	 * for sadump
+	 */
+	unsigned long long	linux_banner;
+	unsigned long long	bios_cpu_apicid;
+	unsigned long long	x86_bios_cpu_apicid;
+	unsigned long long	x86_bios_cpu_apicid_early_ptr;
+	unsigned long long	x86_bios_cpu_apicid_early_map;
+	unsigned long long	crash_notes;
+	unsigned long long	__per_cpu_offset;
+	unsigned long long	__per_cpu_load;
 };
 
 struct size_table {
@@ -1010,6 +1022,13 @@ struct size_table {
 	 * for loading module symbol data
 	 */
 	long	module;
+
+	/*
+	 * for sadump
+	 */
+	long	percpu_data;
+	long	elf_prstatus;
+	long	user_regs_struct;
 };
 
 struct offset_table {
@@ -1078,6 +1097,46 @@ struct offset_table {
 		long	symtab;
 		long	strtab;
 	} module;
+
+	/*
+	 * for loading elf_prstaus symbol data
+	 */
+	struct elf_prstatus_s {
+		long	pr_reg;
+	} elf_prstatus;
+
+	/*
+	 * for loading user_regs_struct symbol data
+	 */
+	struct user_regs_struct_s {
+		long	r15;
+		long	r14;
+		long	r13;
+		long	r12;
+		long	bp;
+		long	bx;
+		long	r11;
+		long	r10;
+		long	r9;
+		long	r8;
+		long	ax;
+		long	cx;
+		long	dx;
+		long	si;
+		long	di;
+		long	orig_ax;
+		long	ip;
+		long	cs;
+		long	flags;
+		long	sp;
+		long	ss;
+		long	fs_base;
+		long	gs_base;
+		long	ds;
+		long	es;
+		long	fs;
+		long	gs;
+	} user_regs_struct;
 };
 
 /*
@@ -1091,6 +1150,7 @@ struct array_table {
 	long	pgdat_list;
 	long	mem_section;
 	long	node_memblk;
+	long	__per_cpu_offset;
 
 	/*
 	 * Structure
@@ -1272,5 +1332,75 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 	}
 	return is_on(bitmap->buf, pfn%PFN_BUFBITMAP);
 }
+
+#ifdef __x86__
+
+struct user_regs_struct {
+	unsigned long bx;
+	unsigned long cx;
+	unsigned long dx;
+	unsigned long si;
+	unsigned long di;
+	unsigned long bp;
+	unsigned long ax;
+	unsigned long ds;
+	unsigned long es;
+	unsigned long fs;
+	unsigned long gs;
+	unsigned long orig_ax;
+	unsigned long ip;
+	unsigned long cs;
+	unsigned long flags;
+	unsigned long sp;
+	unsigned long ss;
+};
+
+struct elf_prstatus {
+	char pad1[72];
+	struct user_regs_struct pr_reg;
+	char pad2[4];
+};
+
+#endif
+
+#ifdef __x86_64__
+
+struct user_regs_struct {
+	unsigned long r15;
+	unsigned long r14;
+	unsigned long r13;
+	unsigned long r12;
+	unsigned long bp;
+	unsigned long bx;
+	unsigned long r11;
+	unsigned long r10;
+	unsigned long r9;
+	unsigned long r8;
+	unsigned long ax;
+	unsigned long cx;
+	unsigned long dx;
+	unsigned long si;
+	unsigned long di;
+	unsigned long orig_ax;
+	unsigned long ip;
+	unsigned long cs;
+	unsigned long flags;
+	unsigned long sp;
+	unsigned long ss;
+	unsigned long fs_base;
+	unsigned long gs_base;
+	unsigned long ds;
+	unsigned long es;
+	unsigned long fs;
+	unsigned long gs;
+};
+
+struct elf_prstatus {
+	char pad1[112];
+	struct user_regs_struct pr_reg;
+	char pad2[4];
+};
+
+#endif
 
 #endif /* MAKEDUMPFILE_H */

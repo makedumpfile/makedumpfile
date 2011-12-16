@@ -54,6 +54,7 @@ long sadump_page_size(void);
 char *sadump_head_disk_name_memory(void);
 char *sadump_format_type_name(void);
 void free_sadump_info(void);
+void sadump_kdump_backup_region_init(void);
 
 static inline int sadump_is_supported_arch(void)
 {
@@ -152,6 +153,11 @@ static inline void free_sadump_info(void)
 static inline int sadump_is_supported_arch(void)
 {
 	return FALSE;
+}
+
+static inline void sadump_kdump_backup_region_init(void)
+{
+	return;
 }
 
 #endif

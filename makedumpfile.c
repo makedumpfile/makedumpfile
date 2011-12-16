@@ -830,6 +830,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(cpu_online_mask, "cpu_online_mask");
 	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL)
 		SYMBOL_INIT(cpu_online_mask, "cpu_online_map");
+	SYMBOL_INIT(kexec_crash_image, "kexec_crash_image");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -1115,6 +1116,23 @@ get_structure_info(void)
 		OFFSET(user_regs_struct.gs) = offsetof(struct user_regs_struct, gs);
 	}
 #endif /* __x86_64__ */
+
+	OFFSET_INIT(kimage.segment, "kimage", "segment");
+
+	MEMBER_ARRAY_LENGTH_INIT(kimage.segment, "kimage", "segment");
+
+	SIZE_INIT(kexec_segment, "kexec_segment");
+	OFFSET_INIT(kexec_segment.mem, "kexec_segment", "mem");
+
+	OFFSET_INIT(elf64_hdr.e_phnum, "elf64_hdr", "e_phnum");
+	OFFSET_INIT(elf64_hdr.e_phentsize, "elf64_hdr", "e_phentsize");
+	OFFSET_INIT(elf64_hdr.e_phoff, "elf64_hdr", "e_phoff");
+
+	SIZE_INIT(elf64_hdr, "elf64_hdr");
+	OFFSET_INIT(elf64_phdr.p_type, "elf64_phdr", "p_type");
+	OFFSET_INIT(elf64_phdr.p_offset, "elf64_phdr", "p_offset");
+	OFFSET_INIT(elf64_phdr.p_paddr, "elf64_phdr", "p_paddr");
+	OFFSET_INIT(elf64_phdr.p_memsz, "elf64_phdr", "p_memsz");
 
 	return TRUE;
 }
@@ -2622,6 +2640,16 @@ out:
 		if (!get_versiondep_info())
 			return FALSE;
 
+		/*
+		 * NOTE: This must be done before refering to
+		 * VMALLOC'ed memory. The first 640kB contains data
+		 * necessary for paging, like PTE. The absence of the
+		 * region affects reading VMALLOC'ed memory such as
+		 * module data.
+		 */
+		if (info->flag_sadump)
+			sadump_kdump_backup_region_init();
+
 		if (!get_numnodes())
 			return FALSE;
 
@@ -2759,6 +2787,12 @@ set_bit_on_1st_bitmap(unsigned long long pfn)
 }
 
 int
+clear_bit_on_1st_bitmap(unsigned long long pfn)
+{
+	return set_bitmap(info->bitmap1, pfn, 0);
+}
+
+int
 clear_bit_on_2nd_bitmap(unsigned long long pfn)
 {
 	return set_bitmap(info->bitmap2, pfn, 0);
@@ -2797,17 +2831,6 @@ is_in_segs(unsigned long long paddr)
 		return TRUE;
 	else
 		return FALSE;
-}
-
-static inline int
-is_zero_page(unsigned char *buf, long page_size)
-{
-	size_t i;
-
-	for (i = 0; i < page_size; i++)
-		if (buf[i])
-			return FALSE;
-	return TRUE;
 }
 
 int

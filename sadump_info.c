@@ -77,6 +77,12 @@ struct sadump_info {
 	FILE *file_elf_note;
 	char *cpu_online_mask_buf;
 	size_t cpumask_size;
+/* Backup Region, First 640K of System RAM. */
+#define KEXEC_BACKUP_SRC_END    0x0009ffff
+        unsigned long long backup_src_start;
+        unsigned long backup_src_size;
+        unsigned long long backup_offset;
+	int kdump_backed_up;
 };
 
 static char *guid_to_str(efi_guid_t *guid, char *buf, size_t buflen);
@@ -186,6 +192,30 @@ sadump_copy_1st_bitmap_from_memory(void)
 			return FALSE;
 		}
 		offset_page += sizeof(buf);
+	}
+
+	/*
+	 * kdump uses the first 640kB on the 2nd kernel. But both
+	 * bitmaps should reflect the 1st kernel memory situation. We
+	 * modify bitmap accordingly.
+	 */
+	if (si->kdump_backed_up) {
+		unsigned long long paddr, pfn, backup_src_pfn;
+
+		for (paddr = si->backup_src_start;
+		     paddr < si->backup_src_start + si->backup_src_size;
+		     paddr += info->page_size) {
+
+			pfn = paddr_to_pfn(paddr);
+			backup_src_pfn = paddr_to_pfn(paddr +
+						      si->backup_offset -
+						      si->backup_src_start);
+
+			if (is_dumpable(info->bitmap_memory, backup_src_pfn))
+				set_bit_on_1st_bitmap(pfn);
+			else
+				clear_bit_on_1st_bitmap(pfn);
+		}
 	}
 
 	return TRUE;
@@ -919,6 +949,11 @@ readpmem_sadump(unsigned long long paddr, void *bufptr, size_t size)
 	ulong page_offset;
 	char buf[info->page_size];
 	int fd_memory;
+
+	if (si->kdump_backed_up &&
+	    paddr >= si->backup_src_start &&
+	    paddr < si->backup_src_start + si->backup_src_size)
+		paddr += si->backup_offset - si->backup_src_start;
 
 	pfn = paddr_to_pfn(paddr);
 	page_offset = paddr % info->page_size;
@@ -1772,6 +1807,139 @@ free_sadump_info(void)
 		fclose(si->file_elf_note);
 	if (si->cpu_online_mask_buf)
 		free(si->cpu_online_mask_buf);
+}
+
+void
+sadump_kdump_backup_region_init(void)
+{
+	unsigned char buf[BUFSIZE];
+	unsigned long i, total, kexec_crash_image_p, elfcorehdr_p;
+	Elf64_Off e_phoff;
+	uint16_t e_phnum, e_phentsize;
+	unsigned long long backup_offset;
+	unsigned long backup_src_start, backup_src_size;
+	size_t bufsize;
+	
+	if (!readmem(VADDR, SYMBOL(kexec_crash_image), &kexec_crash_image_p,
+		     sizeof(unsigned long))) {
+		ERRMSG("Can't read kexec_crash_image pointer. %s\n",
+		       strerror(errno));
+		return;
+	}
+
+	if (!kexec_crash_image_p) {
+		DEBUG_MSG("sadump: kexec crash image was not loaded\n");
+		return;
+	}
+
+	if (!readmem(VADDR, kexec_crash_image_p+OFFSET(kimage.segment),
+		     buf, SIZE(kexec_segment)*ARRAY_LENGTH(kimage.segment))) {
+		ERRMSG("Can't read kexec_crash_image->segment. %s\n",
+		       strerror(errno));
+		return;
+	}
+
+	elfcorehdr_p = 0;
+	for (i = 0; i < ARRAY_LENGTH(kimage.segment); ++i) {
+		char e_ident[EI_NIDENT];
+		unsigned mem;
+
+		mem=ULONG(buf+i*SIZE(kexec_segment)+OFFSET(kexec_segment.mem));
+		if (!mem)
+			continue;
+
+		if (!readmem(PADDR, mem, e_ident, SELFMAG)) {
+			DEBUG_MSG("sadump: failed to read elfcorehdr buffer\n");
+			return;
+		}
+
+		if (strncmp(ELFMAG, e_ident, SELFMAG) == 0) {
+			elfcorehdr_p = mem;
+			break;
+		}
+	}
+	if (!elfcorehdr_p) {
+		DEBUG_MSG("sadump: kexec_crash_image contains no elfcorehdr "
+			  "segment\n");
+		return;
+	}
+
+        if (!readmem(PADDR, elfcorehdr_p, buf, SIZE(elf64_hdr))) {
+		ERRMSG("Can't read elfcorehdr ELF header. %s\n",
+		       strerror(errno));
+		return;
+	}
+
+	e_phnum = USHORT(buf + OFFSET(elf64_hdr.e_phnum));
+	e_phentsize = USHORT(buf + OFFSET(elf64_hdr.e_phentsize));
+	e_phoff = ULONG(buf + OFFSET(elf64_hdr.e_phoff));
+
+	backup_src_start = backup_src_size = backup_offset = 0;
+	for (i = 0; i < e_phnum; ++i) {
+		unsigned long p_type, p_offset, p_paddr, p_memsz;
+
+		if (!readmem(PADDR, elfcorehdr_p+e_phoff+i*e_phentsize, buf,
+			     e_phentsize)) {
+			ERRMSG("Can't read elfcorehdr program header. %s\n",
+			       strerror(errno));
+			return;
+		}
+
+		p_type = UINT(buf + OFFSET(elf64_phdr.p_type));
+		p_offset = ULONG(buf + OFFSET(elf64_phdr.p_offset));
+		p_paddr = ULONG(buf + OFFSET(elf64_phdr.p_paddr));
+		p_memsz = ULONG(buf + OFFSET(elf64_phdr.p_memsz));
+
+		if (p_type == PT_LOAD &&
+		    p_paddr <= KEXEC_BACKUP_SRC_END &&
+		    p_paddr + p_memsz <= p_offset) {
+
+			backup_src_start = p_paddr;
+			backup_src_size = p_memsz;
+			backup_offset = p_offset;
+
+DEBUG_MSG("sadump: SRC_START: %#016lx SRC_SIZE: %#016lx SRC_OFFSET: %#016llx\n",
+	  backup_src_start, backup_src_size, backup_offset);
+
+			break;
+		}
+	}
+	if (i == e_phnum) {
+DEBUG_MSG("sadump: No PT_LOAD in elfcorehdr for backup area\n");
+		return;
+	}
+
+	bufsize = BUFSIZE;
+	for (total = 0; total < backup_src_size; total += bufsize) {
+
+		if (backup_src_size - total < BUFSIZE)
+			bufsize = backup_src_size - total;
+
+		if (!readmem(PADDR, backup_offset + total, buf, bufsize)) {
+			ERRMSG("Can't read bacckup region. %s\n",
+			       strerror(errno));
+			return;
+		}
+
+		/*
+		 * We're assuming that the backup region is full of 0
+		 * before kdump saves the first 640kB memory of the
+		 * 1st kernel in the region.
+		 */
+		if (!is_zero_page(buf, bufsize)) {
+
+			si->kdump_backed_up = TRUE;
+			si->backup_src_start = backup_src_start;
+			si->backup_src_size = backup_src_size;
+			si->backup_offset = backup_offset;
+
+			DEBUG_MSG("sadump: kdump backup region used\n");
+
+			return;
+		}
+	}
+
+	DEBUG_MSG("sadump: kdump backup region unused\n");
 }
 
 #endif /* defined(__x86__) && defined(__x86_64__) */

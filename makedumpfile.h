@@ -181,6 +181,7 @@ isAnon(unsigned long mapping)
 #define STRNEQ(A, B)	(A && B && \
 	(strncmp((char *)(A), (char *)(B), strlen((char *)(B))) == 0))
 
+#define USHORT(ADDR)	*((unsigned short *)(ADDR))
 #define UINT(ADDR)	*((unsigned int *)(ADDR))
 #define ULONG(ADDR)	*((unsigned long *)(ADDR))
 
@@ -1001,6 +1002,7 @@ struct symbol_table {
 	unsigned long long	__per_cpu_offset;
 	unsigned long long	__per_cpu_load;
 	unsigned long long	cpu_online_mask;
+	unsigned long long	kexec_crash_image;
 };
 
 struct size_table {
@@ -1032,6 +1034,8 @@ struct size_table {
 	long	user_regs_struct;
 	long	cpumask;
 	long	cpumask_t;
+	long	kexec_segment;
+	long	elf64_hdr;
 };
 
 struct offset_table {
@@ -1140,6 +1144,27 @@ struct offset_table {
 		long	fs;
 		long	gs;
 	} user_regs_struct;
+
+	struct kimage_s {
+		long	segment;
+	} kimage;
+
+	struct kexec_segment_s {
+		long	mem;
+	} kexec_segment;
+
+	struct elf64_hdr_s {
+		long	e_phnum;
+		long	e_phentsize;
+		long	e_phoff;
+	} elf64_hdr;
+
+	struct elf64_phdr_s {
+		long	p_type;
+		long	p_offset;
+		long	p_paddr;
+		long	p_memsz;
+	} elf64_phdr;
 };
 
 /*
@@ -1164,6 +1189,9 @@ struct array_table {
 	struct free_area_at {
 		long	free_list;
 	} free_area;
+	struct kimage_at {
+		long	segment;
+	} kimage;
 };
 
 struct number_table {
@@ -1336,7 +1364,20 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 	return is_on(bitmap->buf, pfn%PFN_BUFBITMAP);
 }
 
+static inline int
+is_zero_page(unsigned char *buf, long page_size)
+{
+	size_t i;
+
+	for (i = 0; i < page_size; i++)
+		if (buf[i])
+			return FALSE;
+	return TRUE;
+}
+
 void write_vmcoreinfo_data(void);
+int set_bit_on_1st_bitmap(unsigned long long pfn);
+int clear_bit_on_1st_bitmap(unsigned long long pfn);
 
 #ifdef __x86__
 

@@ -628,11 +628,16 @@ open_dump_memory(void)
 	if (status == TRUE) {
 		info->flag_refiltering = TRUE;
 		return get_kdump_compressed_header_info(info->name_memory);
-	} else if (status == FALSE) {
-		return TRUE;
-	} else {
-		return FALSE;
 	}
+
+	status = check_and_get_sadump_header_info(info->name_memory);
+	if (status == TRUE)
+		return TRUE;
+
+	if (status == ERROR)
+		return TRUE;
+
+	return FALSE;
 }
 
 int
@@ -3010,7 +3015,7 @@ dump_dmesg()
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
-	if (!info->flag_refiltering) {
+	if (!info->flag_refiltering && !info->flag_sadump) {
 		if (!get_elf_info(info->fd_memory, info->name_memory))
 			return FALSE;
 	}
@@ -5760,7 +5765,7 @@ create_dumpfile(void)
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
-	if (!info->flag_refiltering) {
+	if (!info->flag_refiltering && !info->flag_sadump) {
 		if (!get_elf_info(info->fd_memory, info->name_memory))
 			return FALSE;
 	}

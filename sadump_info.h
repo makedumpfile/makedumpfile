@@ -24,6 +24,7 @@
 
 #if defined(__x86__) || defined(__x86_64__)
 
+int check_and_get_sadump_header_info(char *filename);
 int sadump_add_diskset_info(char *name_memory);
 char *sadump_head_disk_name_memory(void);
 void free_sadump_info(void);
@@ -34,6 +35,15 @@ static inline int sadump_is_supported_arch(void)
 }
 
 #else
+
+static inline int check_and_get_sadump_header_info(char *filename)
+{
+	info->flag_sadump = SADUMP_UNKNOWN;
+
+	DEBUG_MSG("sadump: unsupported architecture\n");
+
+	return TRUE;
+}
 
 static inline int sadump_add_diskset_info(char *name_memory)
 {

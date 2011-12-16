@@ -44,7 +44,12 @@ int sadump_get_nr_cpus(int *nr_cpus);
 int sadump_set_timestamp(struct timeval *ts);
 unsigned long long sadump_get_max_mapnr(void);
 int readpmem_sadump(unsigned long long paddr, void *bufptr, size_t size);
+int sadump_check_debug_info(void);
+int sadump_generate_vmcoreinfo_from_vmlinux(size_t *vmcoreinfo_size);
+int sadump_generate_elf_note_from_dumpfile(void);
+int sadump_copy_1st_bitmap_from_memory(void);
 int sadump_add_diskset_info(char *name_memory);
+int sadump_read_elf_note(char *buf, size_t size_note);
 long sadump_page_size(void);
 char *sadump_head_disk_name_memory(void);
 char *sadump_format_type_name(void);
@@ -97,9 +102,30 @@ static inline int readpmem_sadump(unsigned long long paddr,
 	return FALSE;
 }
 
+static inline int sadump_check_debug_info(void)
+{
+	return FALSE;
+}
+
+static inline int
+sadump_generate_vmcoreinfo_from_vmlinux(size_t *vmcoreinfo_size)
+{
+	return FALSE;
+}
+
+static inline int sadump_generate_elf_note_from_dumpfile(void)
+{
+	return FALSE;
+}
+
 static inline int sadump_add_diskset_info(char *name_memory)
 {
 	return TRUE;
+}
+
+static inline int sadump_read_elf_note(char *buf, size_t size_note)
+{
+	return FALSE;
 }
 
 static inline long sadump_page_size(void)

@@ -1222,40 +1222,9 @@ get_mem_type(void)
 	return ret;
 }
 
-int
-generate_vmcoreinfo(void)
+void
+write_vmcoreinfo_data(void)
 {
-	if (!set_page_size(sysconf(_SC_PAGE_SIZE)))
-		return FALSE;
-
-	set_dwarf_debuginfo("vmlinux", NULL,
-			    info->name_vmlinux, info->fd_vmlinux);
-
-	if (!get_symbol_info())
-		return FALSE;
-
-	if (!get_structure_info())
-		return FALSE;
-
-	if (!get_srcfile_info())
-		return FALSE;
-
-	if ((SYMBOL(system_utsname) == NOT_FOUND_SYMBOL)
-	    && (SYMBOL(init_uts_ns) == NOT_FOUND_SYMBOL)) {
-		ERRMSG("Can't get the symbol of system_utsname.\n");
-		return FALSE;
-	}
-	if (!get_str_osrelease_from_vmlinux())
-		return FALSE;
-
-	if (!(info->kernel_version = get_kernel_version(info->release)))
-		return FALSE;
-
-	if (get_mem_type() == NOT_FOUND_MEMTYPE) {
-		ERRMSG("Can't find the memory type.\n");
-		return FALSE;
-	}
-
 	/*
 	 * write 1st kernel's OSRELEASE
 	 */
@@ -1359,6 +1328,43 @@ generate_vmcoreinfo(void)
 	 * write the source file of 1st kernel
 	 */
 	WRITE_SRCFILE("pud_t", pud_t);
+}
+
+int
+generate_vmcoreinfo(void)
+{
+	if (!set_page_size(sysconf(_SC_PAGE_SIZE)))
+		return FALSE;
+
+	set_dwarf_debuginfo("vmlinux", NULL,
+			    info->name_vmlinux, info->fd_vmlinux);
+
+	if (!get_symbol_info())
+		return FALSE;
+
+	if (!get_structure_info())
+		return FALSE;
+
+	if (!get_srcfile_info())
+		return FALSE;
+
+	if ((SYMBOL(system_utsname) == NOT_FOUND_SYMBOL)
+	    && (SYMBOL(init_uts_ns) == NOT_FOUND_SYMBOL)) {
+		ERRMSG("Can't get the symbol of system_utsname.\n");
+		return FALSE;
+	}
+	if (!get_str_osrelease_from_vmlinux())
+		return FALSE;
+
+	if (!(info->kernel_version = get_kernel_version(info->release)))
+		return FALSE;
+
+	if (get_mem_type() == NOT_FOUND_MEMTYPE) {
+		ERRMSG("Can't find the memory type.\n");
+		return FALSE;
+	}
+
+	write_vmcoreinfo_data();
 
 	return TRUE;
 }
@@ -2608,6 +2614,12 @@ out:
 
 		if (!get_mem_map())
 			return FALSE;
+
+		if (!info->flag_dmesg && info->flag_sadump &&
+		    sadump_check_debug_info() &&
+		    !sadump_generate_elf_note_from_dumpfile())
+			return FALSE;
+
 	} else {
 		if (!get_mem_map_without_mm())
 			return FALSE;
@@ -4239,16 +4251,23 @@ write_kdump_header(void)
 			    strerror(errno));
 			return FALSE;
 		}
-		if (lseek(info->fd_memory, offset_note, SEEK_SET) < 0) {
-			ERRMSG("Can't seek the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			goto out;
+
+		if (!info->flag_sadump) {
+			if (lseek(info->fd_memory, offset_note, SEEK_SET) < 0) {
+				ERRMSG("Can't seek the dump memory(%s). %s\n",
+				       info->name_memory, strerror(errno));
+				goto out;
+			}
+			if (read(info->fd_memory, buf, size_note) != size_note) {
+				ERRMSG("Can't read the dump memory(%s). %s\n",
+				       info->name_memory, strerror(errno));
+				goto out;
+			}
+		} else {
+			if (!sadump_read_elf_note(buf, size_note))
+				goto out;
 		}
-		if (read(info->fd_memory, buf, size_note) != size_note) {
-			ERRMSG("Can't read the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			goto out;
-		}
+
 		if (!write_buffer(info->fd_dumpfile, kh.offset_note, buf,
 		    kh.size_note, info->name_dumpfile))
 			goto out;

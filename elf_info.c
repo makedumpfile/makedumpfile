@@ -24,6 +24,7 @@
 #include "common.h"
 #include "print_info.h"
 #include "elf_info.h"
+#include "makedumpfile.h"
 
 #define ELF32		(1)
 #define ELF64		(2)
@@ -760,7 +761,10 @@ get_nr_cpus(void)
 int
 has_pt_note(void)
 {
-	if (offset_pt_note_memory && size_pt_note_memory)
+	if (info->flag_sadump) {
+		if (size_pt_note_memory)
+			return TRUE;
+	} else if (offset_pt_note_memory && size_pt_note_memory)
 		return TRUE;
 	return FALSE;
 }

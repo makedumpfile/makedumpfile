@@ -1333,6 +1333,8 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 	return is_on(bitmap->buf, pfn%PFN_BUFBITMAP);
 }
 
+void write_vmcoreinfo_data(void);
+
 #ifdef __x86__
 
 struct user_regs_struct {

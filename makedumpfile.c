@@ -321,7 +321,7 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		break;
 	case MADDR_XEN:
 		paddr = addr;
-  		break;
+		break;
 	default:
 		ERRMSG("Invalid address type (%d).\n", type_addr);
 		goto error;
@@ -396,7 +396,7 @@ get_kernel_version(char *release)
 	start = end + 1;
 	rel = strtol(start, &end, 10);
 	if (rel == LONG_MAX)
-  		return FALSE;
+		return FALSE;
 
 	version = KERNEL_VERSION(maj, min, rel);
 
@@ -4248,7 +4248,7 @@ write_kdump_header(void)
 	 */
 	strncpy(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE));
 	dh->header_version = 5;
-  	dh->block_size     = info->page_size;
+	dh->block_size     = info->page_size;
 	dh->sub_hdr_size   = sizeof(kh) + size_note;
 	dh->sub_hdr_size   = divideup(dh->sub_hdr_size, dh->block_size);
 	dh->max_mapnr      = info->max_mapnr;

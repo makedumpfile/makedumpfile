@@ -79,9 +79,9 @@ struct sadump_info {
 	size_t cpumask_size;
 /* Backup Region, First 640K of System RAM. */
 #define KEXEC_BACKUP_SRC_END    0x0009ffff
-        unsigned long long backup_src_start;
-        unsigned long backup_src_size;
-        unsigned long long backup_offset;
+	unsigned long long backup_src_start;
+	unsigned long backup_src_size;
+	unsigned long long backup_offset;
 	int kdump_backed_up;
 };
 
@@ -906,38 +906,38 @@ sadump_get_max_mapnr(void)
 int
 sadump_virt_phys_base(void)
 {
-        char buf[BUFSIZE];
-        unsigned long phys, linux_banner_phys;
+	char buf[BUFSIZE];
+	unsigned long phys, linux_banner_phys;
 
 	if (SYMBOL(linux_banner) == NOT_FOUND_SYMBOL) {
 		DEBUG_MSG("sadump: symbol linux_banner is not found\n");
 		goto failed;
 	}
 
-        linux_banner_phys = SYMBOL(linux_banner) - __START_KERNEL_map;
+	linux_banner_phys = SYMBOL(linux_banner) - __START_KERNEL_map;
 
-        if (readmem(PADDR, linux_banner_phys + info->phys_base, buf,
+	if (readmem(PADDR, linux_banner_phys + info->phys_base, buf,
 		    strlen("Linux version")) && STRNEQ(buf, "Linux version"))
                 return TRUE;
 
-        for (phys = (-MEGABYTES(16)); phys != MEGABYTES(16+1);
+	for (phys = (-MEGABYTES(16)); phys != MEGABYTES(16+1);
              phys += MEGABYTES(1)) {
-                if (readmem(PADDR, linux_banner_phys + phys, buf,
+		if (readmem(PADDR, linux_banner_phys + phys, buf,
 			    strlen("Linux version")) &&
 		    STRNEQ(buf, "Linux version")) {
-                        DEBUG_MSG("sadump: phys_base: %lx %s\n", phys,
+			DEBUG_MSG("sadump: phys_base: %lx %s\n", phys,
 				  info->phys_base != phys ? "override" : "");
-                        info->phys_base = phys;
-                        return TRUE;
-                }
-        }
+			info->phys_base = phys;
+			return TRUE;
+		}
+	}
 
 failed:
 	info->phys_base = 0;
 
 	DEBUG_MSG("sadump: failed to calculate phys_base; default to 0\n");
 
-        return FALSE;
+	return FALSE;
 }
 
 #endif /* __x86_64__ */
@@ -1114,7 +1114,7 @@ sadump_check_debug_info(void)
 		return FALSE;
 	if (OFFSET(user_regs_struct.fs) == NOT_FOUND_STRUCTURE)
 		return FALSE;
-        if (OFFSET(user_regs_struct.gs) == NOT_FOUND_STRUCTURE)
+	if (OFFSET(user_regs_struct.gs) == NOT_FOUND_STRUCTURE)
 		return FALSE;
 #endif /* __x86_64__ */
 	return TRUE;
@@ -1864,7 +1864,7 @@ sadump_kdump_backup_region_init(void)
 		return;
 	}
 
-        if (!readmem(PADDR, elfcorehdr_p, buf, SIZE(elf64_hdr))) {
+	if (!readmem(PADDR, elfcorehdr_p, buf, SIZE(elf64_hdr))) {
 		ERRMSG("Can't read elfcorehdr ELF header. %s\n",
 		       strerror(errno));
 		return;

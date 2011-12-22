@@ -641,7 +641,7 @@ get_config_token(char *expected_token, unsigned char flag, int *line,
 		fc->token       = NULL;
 		fc->saved_token = NULL;
 
-	} else  if (fc->saved_token) {
+	} else if (fc->saved_token) {
 		fc->token       = fc->saved_token;
 		fc->saved_token = NULL;
 

@@ -1941,4 +1941,4 @@ DEBUG_MSG("sadump: No PT_LOAD in elfcorehdr for backup area\n");
 	DEBUG_MSG("sadump: kdump backup region unused\n");
 }
 
-#endif /* defined(__x86__) && defined(__x86_64__) */
+#endif /* defined(__x86__) || defined(__x86_64__) */

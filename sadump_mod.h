@@ -171,7 +171,7 @@ struct sadump_media_header {
 
 #define SADUMP_PF_SECTION_NUM 4096
 
-#endif /* defined(__x86__) && defined(__x86_64__) */
+#endif /* defined(__x86__) || defined(__x86_64__) */
 
 /*
  * Type of sadump related formats

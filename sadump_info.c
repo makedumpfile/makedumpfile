@@ -21,7 +21,6 @@
 #include "makedumpfile.h"
 #include "elf_info.h"
 #include "print_info.h"
-#include "elf_info.h"
 #include "sadump_mod.h"
 
 #ifdef __x86__

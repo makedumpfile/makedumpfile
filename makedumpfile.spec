@@ -1,6 +1,6 @@
 Name: makedumpfile
 Summary: makedumpfile package
-Version: 1.3.8
+Version: 1.4.1
 Release: 1
 Group: Applications/Text
 License: GPL
@@ -25,6 +25,8 @@ make
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/bin
+mkdir -p %{buildroot}/etc
+mkdir -p %{buildroot}/usr/share/man/man5
 mkdir -p %{buildroot}/usr/share/man/man8
 make install DESTDIR=%{buildroot}
 
@@ -32,11 +34,12 @@ make install DESTDIR=%{buildroot}
 rm -rf %{buildroot}
 
 %files
+/etc/makedumpfile.conf.sample
 /bin/makedumpfile
 /bin/makedumpfile-R.pl
+/usr/share/man/man5/makedumpfile.conf.5.gz
 /usr/share/man/man8/makedumpfile.8.gz
 
 %changelog
 * Fri Aug 21 2008 Ken'ichi Ohmichi <oomichi@mxs.nes.nec.co.jp>
 - initial release.
-

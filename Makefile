@@ -1,7 +1,7 @@
 # makedumpfile
 
-VERSION=1.4.0
-DATE=12 September 2011
+VERSION=1.4.1
+DATE=6 January 2012
 
 CC	= gcc
 CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
@@ -57,4 +57,3 @@ install:
 	cp makedumpfile.8.gz ${DESTDIR}/usr/share/man/man8
 	cp makedumpfile.conf.5.gz ${DESTDIR}/usr/share/man/man5
 	cp makedumpfile.conf ${DESTDIR}/etc/makedumpfile.conf.sample
-

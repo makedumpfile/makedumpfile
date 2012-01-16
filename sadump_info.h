@@ -82,7 +82,7 @@ static inline int sadump_initialize_bitmap_memory(void)
 	return FALSE;
 }
 
-static inline int sadump_num_online_cpus(void);
+static inline int sadump_num_online_cpus(void)
 {
 	return 0;
 }

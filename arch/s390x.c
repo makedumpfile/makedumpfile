@@ -60,6 +60,28 @@
 #define pte_offset(x)		(pte_index(x) * sizeof(unsigned long))
 
 int
+set_s390x_max_physmem_bits(void)
+{
+	long array_len = ARRAY_LENGTH(mem_section);
+	/*
+	 * The older s390x kernels uses _MAX_PHYSMEM_BITS as 42 and the
+	 * newer kernels uses 46 bits.
+	 */
+
+	info->max_physmem_bits  = _MAX_PHYSMEM_BITS_ORIG ;
+	if ((array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
+		|| (array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT())))
+		return TRUE;
+
+	info->max_physmem_bits  = _MAX_PHYSMEM_BITS_3_3;
+	if ((array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
+		|| (array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT())))
+		return TRUE;
+
+	return FALSE;
+}
+
+int
 get_machdep_info_s390x(void)
 {
 	unsigned long vmalloc_start;
@@ -70,7 +92,10 @@ get_machdep_info_s390x(void)
 		flag_ignore_r_char = 1;
 
 	info->section_size_bits = _SECTION_SIZE_BITS;
-	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
+	if (!set_s390x_max_physmem_bits()) {
+		ERRMSG("Can't detect max_physmem_bits.\n");
+		return FALSE;
+	}
 	info->page_offset = __PAGE_OFFSET;
 
 	if (SYMBOL(_stext) == NOT_FOUND_SYMBOL) {

@@ -535,7 +535,8 @@ do { \
 #define KERNELBASE		(0)
 #define KVBASE			KERNELBASE
 #define _SECTION_SIZE_BITS	(28)
-#define _MAX_PHYSMEM_BITS	(42)
+#define _MAX_PHYSMEM_BITS_ORIG          (42)
+#define _MAX_PHYSMEM_BITS_3_3           (46)
 
 /* Bits in the segment/region table address-space-control-element */
 #define _ASCE_TYPE_MASK		0x0c

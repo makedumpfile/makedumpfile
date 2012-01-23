@@ -1,7 +1,7 @@
 # makedumpfile
 
-VERSION=1.4.1
-DATE=6 January 2012
+VERSION=1.4.2
+DATE=25 January 2012
 
 CC	= gcc
 CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \

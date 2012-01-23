@@ -124,8 +124,12 @@
        run while the second kernel, which may not mount root filesystem and may
        not contain dynamic library files, is running.
        If the dynamic library files, which are needed by makedumpfile, exist
-       while the second kernel is running, we can remove -static option from
-       Makefile. This is a workaround for some linux distributions which does
+       while the second kernel is running, we can use dynamic libraries by 
+       "LINKTYPE" parameter. 
+
+       $ make LINKTYPE=dynamic
+
+       This is a workaround for some linux distributions which does
        not contain static library files needed by makedumpfile.
 
 

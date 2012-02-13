@@ -5691,9 +5691,9 @@ initial_xen(void)
 	off_t offset;
 	unsigned long size;
 
-#ifdef __powerpc64__
+#if defined(__powerpc64__) || defined(__powerpc32__)
 	MSG("\n");
-	MSG("ppc64 xen is not supported.\n");
+	MSG("Xen is not supported on powerpc.\n");
 	return FALSE;
 #else
 	if(!info->flag_elf_dumpfile) {

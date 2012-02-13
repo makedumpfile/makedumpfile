@@ -530,6 +530,17 @@ do { \
 #define _MAX_PHYSMEM_BITS	(44)
 #endif
 
+#ifdef __powerpc32__
+
+#define __PAGE_OFFSET		(0xc0000000)
+#define KERNELBASE		PAGE_OFFSET
+#define VMALL_START     	(info->vmalloc_start)
+#define KVBASE			(SYMBOL(_stext))
+#define _SECTION_SIZE_BITS	(24)
+#define _MAX_PHYSMEM_BITS	(44)
+
+#endif
+
 #ifdef __s390x__
 #define __PAGE_OFFSET		(info->page_size - 1)
 #define KERNELBASE		(0)
@@ -667,6 +678,15 @@ unsigned long long vaddr_to_paddr_ppc64(unsigned long vaddr);
 #define get_versiondep_info()	TRUE
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc64(X)
 #endif          /* powerpc64 */
+
+#ifdef __powerpc32__ /* powerpc32 */
+int get_machdep_info_ppc(void);
+unsigned long long vaddr_to_paddr_ppc(unsigned long vaddr);
+#define get_phys_base()		TRUE
+#define get_machdep_info()	get_machdep_info_ppc()
+#define get_versiondep_info()	TRUE
+#define vaddr_to_paddr(X)	vaddr_to_paddr_ppc(X)
+#endif          /* powerpc32 */
 
 #ifdef __s390x__ /* s390x */
 int get_machdep_info_s390x(void);
@@ -1333,10 +1353,10 @@ int get_xen_info_ia64(void);
 
 #endif	/* __ia64 */
 
-#ifdef __powerpc64__ /* powerpc64 */
+#if defined(__powerpc64__) || defined(__powerpc32__) /* powerpcXX */
 #define kvtop_xen(X)	FALSE
 #define get_xen_info_arch(X) FALSE
-#endif	/* powerpc64 */
+#endif	/* powerpcXX */
 
 #ifdef __s390x__ /* s390x */
 #define kvtop_xen(X)	FALSE

@@ -24,7 +24,7 @@ endif
 ARCH := $(shell echo ${TARGET}  | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
 			       -e s/arm.*/arm/ -e s/sa110/arm/ \
 			       -e s/s390x/s390/ -e s/parisc64/parisc/ \
-			       -e s/ppc64/powerpc64/ )
+			       -e s/ppc64/powerpc64/ -e s/ppc/powerpc32/)
 
 CFLAGS += -D__$(ARCH)__
 CFLAGS_ARCH += -D__$(ARCH)__
@@ -34,11 +34,16 @@ CFLAGS += -m64
 CFLAGS_ARCH += -m64
 endif
 
+ifeq ($(ARCH), powerpc32)
+CFLAGS += -m32
+CFLAGS_ARCH += -m32
+endif
+
 SRC	= makedumpfile.c makedumpfile.h diskdump_mod.h sadump_mod.h sadump_info.h
 SRC_PART = print_info.c dwarf_info.c elf_info.c erase_info.c sadump_info.c
 OBJ_PART = print_info.o dwarf_info.o elf_info.o erase_info.o sadump_info.o
-SRC_ARCH = arch/arm.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c
-OBJ_ARCH = arch/arm.o arch/x86.o arch/x86_64.o arch/ia64.o arch/ppc64.o arch/s390x.o
+SRC_ARCH = arch/arm.c arch/x86.c arch/x86_64.c arch/ia64.c arch/ppc64.c arch/s390x.c arch/ppc.c
+OBJ_ARCH = arch/arm.o arch/x86.o arch/x86_64.o arch/ia64.o arch/ppc64.o arch/s390x.o arch/ppc.o
 
 LIBS = -ldw -lbz2 -lebl -ldl -lelf -lz
 ifneq ($(LINKTYPE), dynamic)

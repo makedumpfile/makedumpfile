@@ -24,11 +24,12 @@ endif
 ARCH := $(shell echo ${TARGET}  | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
 			       -e s/arm.*/arm/ -e s/sa110/arm/ \
 			       -e s/s390x/s390/ -e s/parisc64/parisc/ \
-			       -e s/ppc64/powerpc/ )
+			       -e s/ppc64/powerpc64/ )
+
 CFLAGS += -D__$(ARCH)__
 CFLAGS_ARCH += -D__$(ARCH)__
 
-ifeq ($(ARCH), powerpc)
+ifeq ($(ARCH), powerpc64)
 CFLAGS += -m64
 CFLAGS_ARCH += -m64
 endif

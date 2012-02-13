@@ -521,7 +521,7 @@ do { \
 
 #endif /* x86_64 */
 
-#ifdef __powerpc__
+#ifdef __powerpc64__
 #define __PAGE_OFFSET		(0xc000000000000000)
 #define KERNELBASE		PAGE_OFFSET
 #define VMALLOCBASE     	(0xD000000000000000)
@@ -659,14 +659,14 @@ unsigned long long vaddr_to_paddr_x86_64(unsigned long vaddr);
 #define vaddr_to_paddr(X)	vaddr_to_paddr_x86_64(X)
 #endif /* x86_64 */
 
-#ifdef __powerpc__ /* powerpc */
+#ifdef __powerpc64__ /* powerpc64 */
 int get_machdep_info_ppc64(void);
 unsigned long long vaddr_to_paddr_ppc64(unsigned long vaddr);
 #define get_phys_base()		TRUE
 #define get_machdep_info()	get_machdep_info_ppc64()
 #define get_versiondep_info()	TRUE
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc64(X)
-#endif          /* powerpc */
+#endif          /* powerpc64 */
 
 #ifdef __s390x__ /* s390x */
 int get_machdep_info_s390x(void);
@@ -1333,10 +1333,10 @@ int get_xen_info_ia64(void);
 
 #endif	/* __ia64 */
 
-#ifdef __powerpc__ /* powerpc */
+#ifdef __powerpc64__ /* powerpc64 */
 #define kvtop_xen(X)	FALSE
 #define get_xen_info_arch(X) FALSE
-#endif	/* powerpc */
+#endif	/* powerpc64 */
 
 #ifdef __s390x__ /* s390x */
 #define kvtop_xen(X)	FALSE

@@ -18,7 +18,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifdef __powerpc__
+#ifdef __powerpc64__
 
 #include "../print_info.h"
 #include "../elf_info.h"
@@ -93,4 +93,4 @@ vaddr_to_paddr_ppc64(unsigned long vaddr)
 	return NOT_PADDR;
 }
 
-#endif /* powerpc */
+#endif /* powerpc64 */

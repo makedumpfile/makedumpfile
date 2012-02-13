@@ -5691,7 +5691,7 @@ initial_xen(void)
 	off_t offset;
 	unsigned long size;
 
-#ifdef __powerpc__
+#ifdef __powerpc64__
 	MSG("\n");
 	MSG("ppc64 xen is not supported.\n");
 	return FALSE;

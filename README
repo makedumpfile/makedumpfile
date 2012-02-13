@@ -37,6 +37,11 @@
     # cd makedumpfile-x.y.z
   4.Build, and install:
     # make; make install
+  5.Build for a different architecture than the host :
+    # make TARGET=<arch> ; make install
+    where <arch> is the 'uname -m' of the target architecture. 
+    The user has to set the environment variable CC to appropriate
+    compiler for the target architecture.
 
 * SUPPORTED KERNELS
   This makedumpfile supports the following kernels.

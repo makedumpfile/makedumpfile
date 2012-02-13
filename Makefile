@@ -3,7 +3,11 @@
 VERSION=1.4.2
 DATE=25 January 2012
 
+# Honour the environment variable CC
+ifeq ($(strip $CC),)
 CC	= gcc
+endif
+
 CFLAGS = -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
 	  -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE \
 	  -DVERSION='"$(VERSION)"' -DRELEASE_DATE='"$(DATE)"'
@@ -11,7 +15,13 @@ CFLAGS_ARCH	= -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
 		    -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 # LDFLAGS = -L/usr/local/lib -I/usr/local/include
 
-ARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
+# Use TARGET as the target architecture if specified.
+# Defaults to uname -m
+ifeq ($(strip($TARGET)),)
+TARGET := $(shell uname -m)
+endif
+
+ARCH := $(shell echo ${TARGET}  | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
 			       -e s/arm.*/arm/ -e s/sa110/arm/ \
 			       -e s/s390x/s390/ -e s/parisc64/parisc/ \
 			       -e s/ppc64/powerpc/ )

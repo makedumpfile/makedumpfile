@@ -982,6 +982,9 @@ struct symbol_table {
 	unsigned long long	log_buf_len;
 	unsigned long long	log_end;
 	unsigned long long	max_pfn;
+	unsigned long long	node_remap_start_vaddr;
+	unsigned long long	node_remap_end_vaddr;
+	unsigned long long	node_remap_start_pfn;
 
 	/*
 	 * for Xen extraction
@@ -1200,6 +1203,7 @@ struct array_table {
 	long	mem_section;
 	long	node_memblk;
 	long	__per_cpu_offset;
+	long	node_remap_start_pfn;
 
 	/*
 	 * Structure

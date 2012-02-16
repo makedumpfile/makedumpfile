@@ -831,6 +831,9 @@ get_symbol_info(void)
 	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL)
 		SYMBOL_INIT(cpu_online_mask, "cpu_online_map");
 	SYMBOL_INIT(kexec_crash_image, "kexec_crash_image");
+	SYMBOL_INIT(node_remap_start_vaddr, "node_remap_start_vaddr");
+	SYMBOL_INIT(node_remap_end_vaddr, "node_remap_end_vaddr");
+	SYMBOL_INIT(node_remap_start_pfn, "node_remap_start_pfn");
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_TYPE_INIT(node_data, "node_data");
@@ -842,6 +845,9 @@ get_symbol_info(void)
 		SYMBOL_ARRAY_LENGTH_INIT(node_memblk, "node_memblk");
 	if (SYMBOL(__per_cpu_offset) != NOT_FOUND_SYMBOL)
 		SYMBOL_ARRAY_LENGTH_INIT(__per_cpu_offset, "__per_cpu_offset");
+	if (SYMBOL(node_remap_start_pfn) != NOT_FOUND_SYMBOL)
+		SYMBOL_ARRAY_LENGTH_INIT(node_remap_start_pfn,
+					"node_remap_start_pfn");
 
 	return TRUE;
 }
@@ -1290,6 +1296,9 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("log_end", log_end);
 	WRITE_SYMBOL("max_pfn", max_pfn);
 	WRITE_SYMBOL("high_memory", high_memory);
+	WRITE_SYMBOL("node_remap_start_vaddr", node_remap_start_vaddr);
+	WRITE_SYMBOL("node_remap_end_vaddr", node_remap_end_vaddr);
+	WRITE_SYMBOL("node_remap_start_pfn", node_remap_start_pfn);
 
 	/*
 	 * write the structure size of 1st kernel
@@ -1341,6 +1350,9 @@ write_vmcoreinfo_data(void)
 		WRITE_ARRAY_LENGTH("mem_section", mem_section);
 	if (SYMBOL(node_memblk) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("node_memblk", node_memblk);
+	if (SYMBOL(node_remap_start_pfn) != NOT_FOUND_SYMBOL)
+		WRITE_ARRAY_LENGTH("node_remap_start_pfn",
+				   node_remap_start_pfn);
 
 	WRITE_ARRAY_LENGTH("zone.free_area", zone.free_area);
 	WRITE_ARRAY_LENGTH("free_area.free_list", free_area.free_list);
@@ -1586,6 +1598,9 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("log_end", log_end);
 	READ_SYMBOL("max_pfn", max_pfn);
 	READ_SYMBOL("high_memory", high_memory);
+	READ_SYMBOL("node_remap_start_vaddr", node_remap_start_vaddr);
+	READ_SYMBOL("node_remap_end_vaddr", node_remap_end_vaddr);
+	READ_SYMBOL("node_remap_start_pfn", node_remap_start_pfn);
 
 	READ_STRUCTURE_SIZE("page", page);
 	READ_STRUCTURE_SIZE("mem_section", mem_section);
@@ -1628,6 +1643,7 @@ read_vmcoreinfo(void)
 	READ_ARRAY_LENGTH("node_memblk", node_memblk);
 	READ_ARRAY_LENGTH("zone.free_area", zone.free_area);
 	READ_ARRAY_LENGTH("free_area.free_list", free_area.free_list);
+	READ_ARRAY_LENGTH("node_remap_start_pfn", node_remap_start_pfn);
 
 	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	READ_NUMBER("N_ONLINE", N_ONLINE);

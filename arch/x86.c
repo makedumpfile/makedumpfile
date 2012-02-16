@@ -19,6 +19,53 @@
 #include "../elf_info.h"
 #include "../makedumpfile.h"
 
+static int max_numnodes;
+static unsigned long *remap_start_vaddr;
+static unsigned long *remap_end_vaddr;
+static unsigned long *remap_start_pfn;
+
+static int
+remap_init(void)
+{
+	int n;
+
+	if (SYMBOL(node_remap_start_vaddr) == NOT_FOUND_SYMBOL)
+		return TRUE;
+	if (SYMBOL(node_remap_end_vaddr) == NOT_FOUND_SYMBOL)
+		return TRUE;
+	if (SYMBOL(node_remap_start_pfn) == NOT_FOUND_SYMBOL)
+		return TRUE;
+	if (ARRAY_LENGTH(node_remap_start_pfn) == NOT_FOUND_STRUCTURE)
+		return TRUE;
+
+	n = ARRAY_LENGTH(node_remap_start_pfn);
+	remap_start_vaddr = calloc(3 * n, sizeof(unsigned long));
+	if (!remap_start_vaddr) {
+		ERRMSG("Can't allocate remap allocator info.\n");
+		return FALSE;
+	}
+	remap_end_vaddr = remap_start_vaddr + n;
+	remap_start_pfn = remap_end_vaddr + n;
+
+	if (!readmem(VADDR, SYMBOL(node_remap_start_vaddr), remap_start_vaddr,
+		     n * sizeof(unsigned long))) {
+		ERRMSG("Can't get node_remap_start_vaddr.\n");
+		return FALSE;
+	}
+	if (!readmem(VADDR, SYMBOL(node_remap_end_vaddr), remap_end_vaddr,
+		     n * sizeof(unsigned long))) {
+		ERRMSG("Can't get node_remap_end_vaddr.\n");
+		return FALSE;
+	}
+	if (!readmem(VADDR, SYMBOL(node_remap_start_pfn), remap_start_pfn,
+		     n * sizeof(unsigned long))) {
+		ERRMSG("Can't get node_remap_start_pfn.\n");
+		return FALSE;
+	}
+
+	max_numnodes = n;
+}
+
 int
 get_machdep_info_x86(void)
 {
@@ -47,6 +94,9 @@ get_machdep_info_x86(void)
 	}
 	info->kernel_start = SYMBOL(_stext) & ~KVBASE_MASK;
 	DEBUG_MSG("kernel_start : %lx\n", info->kernel_start);
+
+	if (!remap_init())
+		return FALSE;
 
 	/*
 	 * For the compatibility, makedumpfile should run without the symbol
@@ -87,6 +137,18 @@ get_versiondep_info_x86(void)
 		info->section_size_bits = _SECTION_SIZE_BITS;
 
 	return TRUE;
+}
+
+unsigned long long
+vtop_x86_remap(unsigned long vaddr)
+{
+	int i;
+	for (i = 0; i < max_numnodes; ++i)
+		if (vaddr >= remap_start_vaddr[i] &&
+		    vaddr < remap_end_vaddr[i])
+			return pfn_to_paddr(remap_start_pfn[i]) +
+				vaddr - remap_start_vaddr[i];
+	return NOT_PADDR;
 }
 
 unsigned long long
@@ -151,6 +213,9 @@ unsigned long long
 vaddr_to_paddr_x86(unsigned long vaddr)
 {
 	unsigned long long paddr;
+
+	if ((paddr = vtop_x86_remap(vaddr)) != NOT_PADDR)
+		return paddr;
 
 	if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
 		return paddr;

@@ -204,6 +204,16 @@ search_module_debuginfo(char *os_release)
 	return FALSE;
 }
 
+static int
+dwarf_no_debuginfo_found(Dwfl_Module *mod, void **userdata,
+            const char *modname, Dwarf_Addr base,
+            const char *file_name,
+            const char *debuglink_file, GElf_Word debuglink_crc,
+            char **debuginfo_file_name)
+{
+    return -1;
+}
+
 /*
  * Initialize the dwarf info.
  * Linux kernel module debuginfo are of ET_REL (relocatable) type.
@@ -219,6 +229,21 @@ init_dwarf_info(void)
 	int dwfl_fd = -1;
 	static const Dwfl_Callbacks callbacks = {
 		.section_address = dwfl_offline_section_address,
+	/*
+	 * By the time init_dwarf_info() function is called, we already
+	 * know absolute path of debuginfo either resolved through
+	 * search_module_debuginfo() call OR user specified vmlinux
+	 * debuginfo through '-x' option. In which case .find_debuginfo
+	 * callback is never invoked.
+	 * But we can not deny a situation where user may pass invalid
+	 * file name through '-x' option, where .find_debuginfo gets
+	 * invoked to find a valid vmlinux debuginfo and hence we run
+	 * into seg fault issue. Hence, set .find_debuginfo to a
+	 * funtion pointer that returns -1 to avoid seg fault and let
+	 * the makedumpfile throw error messages against the invalid
+	 * vmlinux file input.
+	 */
+		.find_debuginfo  = dwarf_no_debuginfo_found
 	};
 
 	dwarf_info.elfd = NULL;

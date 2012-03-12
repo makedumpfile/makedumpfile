@@ -20,8 +20,12 @@
 #define FALSE		(0)
 #define ERROR		(-1)
 
+#ifndef LONG_MAX
 #define LONG_MAX	((long)(~0UL>>1))
+#endif
+#ifndef ULONG_MAX
 #define ULONG_MAX	(~0UL)
+#endif
 #define ULONGLONG_MAX	(~0ULL)
 
 #define MAX(a,b)	((a) > (b) ? (a) : (b))

@@ -31,6 +31,7 @@
 #include <libelf.h>
 #include <byteswap.h>
 #include <getopt.h>
+#include <lzo/lzo1x.h>
 #include "common.h"
 #include "dwarf_info.h"
 #include "diskdump_mod.h"
@@ -787,6 +788,7 @@ struct DumpInfo {
 	int		num_dump_level;      /* number of dump level */
 	int		array_dump_level[NUM_ARRAY_DUMP_LEVEL];
 	int		flag_compress;       /* flag of compression */
+	int		flag_lzo_support;    /* flag of LZO compression support */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
 	int		flag_generate_vmcoreinfo;/* flag of generating vmcoreinfo file */
 	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */

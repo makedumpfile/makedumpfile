@@ -34,7 +34,11 @@ print_usage(void)
 {
 	MSG("\n");
 	MSG("LZO support:\n");
+#ifdef USELZO
 	MSG("  enabled\n");
+#else
+	MSG("  disabled ('-l' option will be ignored.)\n");
+#endif
 	MSG("\n");
 	MSG("Usage:\n");
 	MSG("  Creating DUMPFILE:\n");

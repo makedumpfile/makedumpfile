@@ -42,6 +42,9 @@
     where <arch> is the 'uname -m' of the target architecture. 
     The user has to set the environment variable CC to appropriate
     compiler for the target architecture.
+  6.Build with lzo support:
+    # make USELZO=on ; make install
+    The user has to prepare lzo library.
 
 * SUPPORTED KERNELS
   This makedumpfile supports the following kernels.

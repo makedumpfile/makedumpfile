@@ -123,6 +123,7 @@ configuration, you need to use --diskset option.
 .TP
 \fB\-c,\-l\fR
 Compress dump data by each page using zlib for -c option or lzo for -l option.
+(-l option needs USELZO=on when building.)
 .br
 A user cannot specify this option with \-E option, because the ELF format does
 not support compressed data.

@@ -50,6 +50,11 @@ ifneq ($(LINKTYPE), dynamic)
 LIBS := -static $(LIBS)
 endif
 
+ifeq ($(USELZO), on)
+LIBS := -llzo2 $(LIBS)
+CFLAGS += -DUSELZO
+endif
+
 all: makedumpfile
 
 $(OBJ_PART): $(SRC_PART)

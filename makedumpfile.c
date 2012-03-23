@@ -266,6 +266,7 @@ readpmem_kdump_compressed(unsigned long long paddr, void *bufptr, size_t size)
 			goto error;
 		}
 		memcpy(bufptr, buf2 + page_offset, size);
+#ifdef USELZO
 	} else if (info->flag_lzo_support
 		   && (pd.flags & DUMP_DH_COMPRESSED_LZO)) {
 		retlen = info->page_size;
@@ -277,6 +278,7 @@ readpmem_kdump_compressed(unsigned long long paddr, void *bufptr, size_t size)
 			goto error;
 		}
 		memcpy(bufptr, buf2 + page_offset, size);
+#endif
 	} else
 		memcpy(bufptr, buf + page_offset, size);
 
@@ -2525,8 +2527,16 @@ initial(void)
 	unsigned long size;
 	int debug_info = FALSE;
 
+#ifdef USELZO
 	if (lzo_init() == LZO_E_OK)
 		info->flag_lzo_support = TRUE;
+#else
+	if (info->flag_compress == DUMP_DH_COMPRESSED_LZO) {
+		MSG("'-l' option is disabled, ");
+		MSG("because this binary doesn't support lzo compression.\n");
+		MSG("Try `make USELZO=on` when building.\n");
+	}
+#endif
 
 	if (!is_xen_memory() && info->flag_exclude_xen_dom) {
 		MSG("'-X' option is disable,");
@@ -4695,11 +4705,10 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	off_t offset_data = 0;
 	struct disk_dump_header *dh = info->dump_header;
 	unsigned char buf[info->page_size], *buf_out = NULL;
-	unsigned long len_buf_out, len_buf_out_zlib, len_buf_out_lzo;
+	unsigned long len_buf_out;
 	struct dump_bitmap bitmap2;
 	struct timeval tv_start;
 	const off_t failed = (off_t)-1;
-	lzo_bytep wrkmem = NULL;
 
 	int ret = FALSE;
 
@@ -4707,6 +4716,10 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		return FALSE;
 
 	initialize_2nd_bitmap(&bitmap2);
+
+#ifdef USELZO
+	unsigned long len_buf_out_zlib, len_buf_out_lzo;
+	lzo_bytep wrkmem;
 
 	if ((wrkmem = malloc(LZO1X_1_MEM_COMPRESS)) == NULL) {
 		ERRMSG("Can't allocate memory for the working memory. %s\n",
@@ -4717,6 +4730,9 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	len_buf_out_zlib = compressBound(info->page_size);
 	len_buf_out_lzo = info->page_size + info->page_size / 16 + 64 + 3;
 	len_buf_out = MAX(len_buf_out_zlib, len_buf_out_lzo);
+#else
+	len_buf_out = compressBound(info->page_size);
+#endif
 
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
@@ -4807,6 +4823,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			pd.flags = DUMP_DH_COMPRESSED_ZLIB;
 			pd.size  = size_out;
 			memcpy(buf, buf_out, pd.size);
+#ifdef USELZO
 		} else if (info->flag_lzo_support
 			   && (info->flag_compress & DUMP_DH_COMPRESSED_LZO)
 			   && ((size_out = info->page_size),
@@ -4816,6 +4833,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			pd.flags = DUMP_DH_COMPRESSED_LZO;
 			pd.size  = size_out;
 			memcpy(buf, buf_out, pd.size);
+#endif
 		} else {
 			pd.flags = 0;
 			pd.size  = info->page_size;
@@ -4856,8 +4874,10 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 out:
 	if (buf_out != NULL)
 		free(buf_out);
+#ifdef USELZO
 	if (wrkmem != NULL)
 		free(wrkmem);
+#endif
 
 	return ret;
 }

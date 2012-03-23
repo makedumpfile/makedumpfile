@@ -121,8 +121,8 @@ configuration, you need to use --diskset option.
 .SH OPTIONS
 
 .TP
-\fB\-c\fR
-Compress dump data by each page.
+\fB\-c,\-l\fR
+Compress dump data by each page using zlib for -c option or lzo for -l option.
 .br
 A user cannot specify this option with \-E option, because the ELF format does
 not support compressed data.
@@ -196,8 +196,8 @@ by dump_level 11, makedumpfile retries it by dump_level 31.
 \fB\-E\fR
 Create \fIDUMPFILE\fR in the ELF format.
 .br
-This option cannot be specified with \-c option, because the ELF format does not
-support compressed data.
+This option cannot be specified with either of \-c option or \-l option, because
+the ELF format does not support compressed data.
 .br
 .B Example:
 .br
@@ -491,7 +491,7 @@ Print debugging message.
 
 .TP
 \fB\-h\fR
-Show help message.
+Show help message and LZO support status (enabled/disabled).
 
 .TP
 \fB\-v\fR

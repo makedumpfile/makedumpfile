@@ -33,17 +33,21 @@ void
 print_usage(void)
 {
 	MSG("\n");
+	MSG("LZO support:\n");
+	MSG("  enabled\n");
+	MSG("\n");
 	MSG("Usage:\n");
 	MSG("  Creating DUMPFILE:\n");
-	MSG("  # makedumpfile    [-c|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE DUMPFILE\n");
+	MSG("  # makedumpfile    [-c|-l|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
+	MSG("    DUMPFILE\n");
 	MSG("\n");
 	MSG("  Creating DUMPFILE with filtered kernel data specified through filter config\n");
 	MSG("  file:\n");
-	MSG("  # makedumpfile    [-c|-E] [-d DL] -x VMLINUX --config FILTERCONFIGFILE VMCORE\n");
-	MSG("    DUMPFILE\n");
+	MSG("  # makedumpfile    [-c|-l|-E] [-d DL] -x VMLINUX --config FILTERCONFIGFILE\n");
+	MSG("    VMCORE DUMPFILE\n");
 	MSG("\n");
 	MSG("  Outputting the dump data in the flattened format to the standard output:\n");
-	MSG("  # makedumpfile -F [-c|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
+	MSG("  # makedumpfile -F [-c|-l|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
 	MSG("\n");
 	MSG("  Rearranging the dump data in the flattened format to a readable DUMPFILE:\n");
 	MSG("  # makedumpfile -R DUMPFILE\n");
@@ -70,15 +74,15 @@ print_usage(void)
 	MSG("\n");
 	MSG("\n");
 	MSG("  Creating DUMPFILE from multiple VMCOREs generated on sadump diskset configuration:\n");
-	MSG("  # makedumpfile [-c] [-d DL] -x VMLINUX --diskset=VMCORE1 --diskset=VMCORE2\n");
+	MSG("  # makedumpfile [-c|-l] [-d DL] -x VMLINUX --diskset=VMCORE1 --diskset=VMCORE2\n");
 	MSG("    [--diskset=VMCORE3 ..] DUMPFILE\n");
 	MSG("\n");
 	MSG("\n");
 	MSG("Available options:\n");
-	MSG("  [-c]:\n");
-	MSG("      Compress dump data by each page.\n");
-	MSG("      A user cannot specify this option with -E option, because the ELF format\n");
-	MSG("      does not support compressed data.\n");
+	MSG("  [-c|-l]:\n");
+	MSG("      Compress dump data by each page using zlib for -c option and lzo for\n");
+	MSG("      -l option. A user cannot specify either of these options with -E option,\n");
+	MSG("      because the ELF format does not support compressed data.\n");
 	MSG("      THIS IS ONLY FOR THE CRASH UTILITY.\n");
 	MSG("\n");
 	MSG("  [-d DL]:\n");
@@ -103,8 +107,8 @@ print_usage(void)
 	MSG("\n");
 	MSG("  [-E]:\n");
 	MSG("      Create DUMPFILE in the ELF format.\n");
-	MSG("      This option cannot be specified with -c option, because the ELF\n");
-	MSG("      format does not support compressed data.\n");
+	MSG("      This option cannot be specified with either of -c option or -l option,\n");
+	MSG("      because the ELF format does not support compressed data.\n");
 	MSG("\n");
 	MSG("  [-x VMLINUX]:\n");
 	MSG("      Specify the first kernel's VMLINUX to analyze the first kernel's\n");
@@ -214,7 +218,7 @@ print_usage(void)
 	MSG("      Overwrite DUMPFILE even if it already exists.\n");
 	MSG("\n");
 	MSG("  [-h]:\n");
-	MSG("      Show help message.\n");
+	MSG("      Show help message and LZO support status (enabled/disabled).\n");
 	MSG("\n");
 	MSG("  [-b <order>]\n");
 	MSG("      Specify the cache 2^order pages in ram when generating vmcore info\n");

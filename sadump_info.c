@@ -46,7 +46,7 @@
 			  KEXEC_CORE_NOTE_DESC_BYTES )
 
 #define for_each_online_cpu(cpu)					\
-	for (cpu = 0; cpu < BITPERBYTE * si->cpumask_size; ++cpu)	\
+	for (cpu = 0; cpu < max_mask_cpu(); ++cpu)	\
 		if (is_online_cpu(cpu))
 
 enum {
@@ -95,6 +95,7 @@ static int read_sadump_header_diskset(int diskid, struct sadump_diskset_info *sd
 static unsigned long long pfn_to_block(unsigned long long pfn);
 static int lookup_diskset(unsigned long long whole_offset, int *diskid,
 			  unsigned long long *disk_offset);
+static int max_mask_cpu(void);
 static int cpu_online_mask_init(void);
 static int per_cpu_init(void);
 static int get_data_from_elf_note_desc(const char *note_buf, uint32_t n_descsz,
@@ -799,6 +800,12 @@ sadump_initialize_bitmap_memory(void)
 }
 
 static int
+max_mask_cpu(void)
+{
+	return BITPERBYTE * si->cpumask_size;
+}
+
+static int
 cpu_online_mask_init(void)
 {
 	ulong cpu_online_mask_addr;
@@ -1289,6 +1296,9 @@ is_online_cpu(int cpu)
 {
 	unsigned long mask;
 
+	if (cpu < 0 || cpu >= max_mask_cpu())
+		return FALSE;
+
 	mask = ULONG(si->cpu_online_mask_buf +
 		     (cpu / BITPERWORD) * sizeof(unsigned long));
 
@@ -1300,7 +1310,7 @@ legacy_per_cpu_ptr(unsigned long ptr, int cpu)
 {
 	unsigned long addr;
 
-	if (cpu < 0 || cpu >= get_nr_cpus())
+	if (!is_online_cpu(cpu))
 		return 0UL;
 
 	if (!readmem(VADDR, ~ptr + cpu*sizeof(unsigned long), &addr,
@@ -1313,7 +1323,7 @@ legacy_per_cpu_ptr(unsigned long ptr, int cpu)
 static unsigned long
 per_cpu_ptr(unsigned long ptr, int cpu)
 {
-	if (cpu < 0 || cpu >= get_nr_cpus())
+	if (!is_online_cpu(cpu))
 		return 0UL;
 
 	if (si->__per_cpu_offset[cpu] == si->__per_cpu_load)
@@ -1329,7 +1339,7 @@ get_prstatus_from_crash_notes(int cpu, char *prstatus_buf)
 	char note_buf[KEXEC_NOTE_BYTES], zero_buf[KEXEC_NOTE_BYTES];
 	char *prstatus_ptr;
 
-	if (cpu < 0 || get_nr_cpus() <= cpu)
+	if (!is_online_cpu(cpu))
 		return FALSE;
 
 	if (SYMBOL(crash_notes) == NOT_FOUND_SYMBOL)

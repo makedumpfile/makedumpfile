@@ -34,6 +34,9 @@
 #ifdef USELZO
 #include <lzo/lzo1x.h>
 #endif
+#ifdef USESNAPPY
+#include <snappy-c.h>
+#endif
 #include "common.h"
 #include "dwarf_info.h"
 #include "diskdump_mod.h"

@@ -5280,6 +5280,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	struct dump_bitmap bitmap2;
 	struct timeval tv_start;
 	const off_t failed = (off_t)-1;
+	unsigned long len_buf_out_zlib, len_buf_out_lzo, len_buf_out_snappy;
 
 	int ret = FALSE;
 
@@ -5288,8 +5289,9 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 
 	initialize_2nd_bitmap(&bitmap2);
 
+	len_buf_out_zlib = len_buf_out_lzo = len_buf_out_snappy = 0;
+
 #ifdef USELZO
-	unsigned long len_buf_out_zlib, len_buf_out_lzo;
 	lzo_bytep wrkmem;
 
 	if ((wrkmem = malloc(LZO1X_1_MEM_COMPRESS)) == NULL) {
@@ -5298,12 +5300,18 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		goto out;
 	}
 
-	len_buf_out_zlib = compressBound(info->page_size);
 	len_buf_out_lzo = info->page_size + info->page_size / 16 + 64 + 3;
-	len_buf_out = MAX(len_buf_out_zlib, len_buf_out_lzo);
-#else
-	len_buf_out = compressBound(info->page_size);
 #endif
+
+#ifdef USESNAPPY
+	len_buf_out_snappy = snappy_max_compressed_length(info->page_size);
+#endif
+
+	len_buf_out_zlib = compressBound(info->page_size);
+	
+	len_buf_out = MAX(len_buf_out_zlib,
+			  MAX(len_buf_out_lzo,
+			      len_buf_out_snappy));
 
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
@@ -5405,6 +5413,18 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			pd.size  = size_out;
 			memcpy(buf, buf_out, pd.size);
 #endif
+#ifdef USESNAPPY
+		} else if ((info->flag_compress & DUMP_DH_COMPRESSED_SNAPPY)
+			   && ((size_out = len_buf_out_snappy),
+			       snappy_compress((char *)buf, info->page_size,
+					       (char *)buf_out,
+					       (size_t *)&size_out)
+			       == SNAPPY_OK)
+			   && (size_out < info->page_size)) {
+			pd.flags = DUMP_DH_COMPRESSED_SNAPPY;
+			pd.size  = size_out;
+			memcpy(buf, buf_out, pd.size);
+#endif
 		} else {
 			pd.flags = 0;
 			pd.size  = info->page_size;
@@ -5464,14 +5484,16 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
 	const off_t failed = (off_t)-1;
+	unsigned long len_buf_out_zlib, len_buf_out_lzo, len_buf_out_snappy;
 
 	int ret = FALSE;
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
 
+	len_buf_out_zlib = len_buf_out_lzo = len_buf_out_snappy = 0;
+
 #ifdef USELZO
-	unsigned long len_buf_out_zlib, len_buf_out_lzo;
 	lzo_bytep wrkmem;
 
 	if ((wrkmem = malloc(LZO1X_1_MEM_COMPRESS)) == NULL) {
@@ -5480,12 +5502,17 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		goto out;
 	}
 
-	len_buf_out_zlib = compressBound(info->page_size);
 	len_buf_out_lzo = info->page_size + info->page_size / 16 + 64 + 3;
-	len_buf_out = MAX(len_buf_out_zlib, len_buf_out_lzo);
-#else
-	len_buf_out = compressBound(info->page_size);
 #endif
+#ifdef USESNAPPY
+	len_buf_out_snappy = snappy_max_compressed_length(info->page_size);
+#endif
+
+	len_buf_out_zlib = compressBound(info->page_size);
+
+	len_buf_out = MAX(len_buf_out_zlib,
+			  MAX(len_buf_out_lzo,
+			      len_buf_out_snappy));
 
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
@@ -5561,6 +5588,18 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 						&size_out, wrkmem) == LZO_E_OK)
 			   && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_LZO;
+			pd.size  = size_out;
+			memcpy(buf, buf_out, pd.size);
+#endif
+#ifdef USESNAPPY
+		} else if ((info->flag_compress & DUMP_DH_COMPRESSED_SNAPPY)
+			   && ((size_out = len_buf_out_snappy),
+			       snappy_compress((char *)buf, info->page_size,
+					       (char *)buf_out,
+					       (size_t *)&size_out)
+			       == SNAPPY_OK)
+			   && (size_out < info->page_size)) {
+			pd.flags = DUMP_DH_COMPRESSED_SNAPPY;
 			pd.size  = size_out;
 			memcpy(buf, buf_out, pd.size);
 #endif

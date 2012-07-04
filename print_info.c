@@ -39,6 +39,12 @@ print_usage(void)
 #else
 	MSG("  disabled ('-l' option will be ignored.)\n");
 #endif
+	MSG("snappy support:\n");
+#ifdef USESNAPPY
+	MSG("  enabled\n");
+#else
+	MSG("  disabled ('-p' option will be ignored.)\n");
+#endif
 	MSG("\n");
 	MSG("Usage:\n");
 	MSG("  Creating DUMPFILE:\n");
@@ -83,10 +89,10 @@ print_usage(void)
 	MSG("\n");
 	MSG("\n");
 	MSG("Available options:\n");
-	MSG("  [-c|-l]:\n");
-	MSG("      Compress dump data by each page using zlib for -c option and lzo for\n");
-	MSG("      -l option. A user cannot specify either of these options with -E option,\n");
-	MSG("      because the ELF format does not support compressed data.\n");
+	MSG("  [-c|-l|-p]:\n");
+	MSG("      Compress dump data by each page using zlib for -c option, lzo for -l option\n");
+	MSG("      or snappy for -p option. A user cannot specify either of these options with\n");
+	MSG("      -E option, because the ELF format does not support compressed data.\n");
 	MSG("      THIS IS ONLY FOR THE CRASH UTILITY.\n");
 	MSG("\n");
 	MSG("  [-d DL]:\n");
@@ -238,7 +244,7 @@ print_usage(void)
 	MSG("      Overwrite DUMPFILE even if it already exists.\n");
 	MSG("\n");
 	MSG("  [-h]:\n");
-	MSG("      Show help message and LZO support status (enabled/disabled).\n");
+	MSG("      Show help message and LZO/snappy support status (enabled/disabled).\n");
 	MSG("\n");
 	MSG("  [-b <order>]\n");
 	MSG("      Specify the cache 2^order pages in ram when generating vmcore info\n");

@@ -121,9 +121,10 @@ configuration, you need to use --diskset option.
 .SH OPTIONS
 
 .TP
-\fB\-c,\-l\fR
-Compress dump data by each page using zlib for -c option or lzo for -l option.
-(-l option needs USELZO=on when building.)
+\fB\-c,\-l,\-p\fR
+Compress dump data by each page using zlib for -c option, lzo for -l
+option or snappy for -p option.
+(-l option needs USELZO=on and -p option needs USESNAPPY=on when building)
 .br
 A user cannot specify this option with \-E option, because the ELF format does
 not support compressed data.
@@ -517,7 +518,7 @@ Print debugging message.
 
 .TP
 \fB\-h\fR
-Show help message and LZO support status (enabled/disabled).
+Show help message and LZO/snappy support status (enabled/disabled).
 
 .TP
 \fB\-v\fR

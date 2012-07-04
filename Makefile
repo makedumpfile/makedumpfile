@@ -55,6 +55,11 @@ LIBS := -llzo2 $(LIBS)
 CFLAGS += -DUSELZO
 endif
 
+ifeq ($(USESNAPPY), on)
+LIBS := -lsnappy $(LIBS)
+CFLAGS += -DUSESNAPPY
+endif
+
 all: makedumpfile
 
 $(OBJ_PART): $(SRC_PART)

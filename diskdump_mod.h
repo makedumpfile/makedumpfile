@@ -80,6 +80,8 @@ struct kdump_sub_header {
 /* page flags */
 #define DUMP_DH_COMPRESSED_ZLIB	0x1	/* page is compressed with zlib */
 #define DUMP_DH_COMPRESSED_LZO	0x2	/* paged is compressed with lzo */
+#define DUMP_DH_COMPRESSED_SNAPPY	0x4
+					/* paged is compressed with snappy */
 
 /* descriptor of each page for vmcore */
 typedef struct page_desc {

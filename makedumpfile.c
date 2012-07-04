@@ -7807,7 +7807,7 @@ main(int argc, char *argv[])
 	
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:lMRrsvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:lMpRrsvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
 		case 'b':
@@ -7864,6 +7864,9 @@ main(int argc, char *argv[])
 			break;
 		case 'M':
 			info->flag_dmesg = 1;
+			break;
+		case 'p':
+			info->flag_compress = DUMP_DH_COMPRESSED_SNAPPY;
 			break;
 		case 'P':
 			info->xen_phys_start = strtoul(optarg, NULL, 0);

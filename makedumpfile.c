@@ -282,6 +282,22 @@ readpmem_kdump_compressed(unsigned long long paddr, void *bufptr, size_t size)
 		}
 		memcpy(bufptr, buf2 + page_offset, size);
 #endif
+#ifdef USESNAPPY
+	} else if ((pd.flags & DUMP_DH_COMPRESSED_SNAPPY)) {
+
+		ret = snappy_uncompressed_length(buf, pd.size, &retlen);
+		if (ret != SNAPPY_OK) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			goto error;
+		}
+
+		ret = snappy_uncompress(buf, pd.size, buf2, &retlen);
+		if ((ret != SNAPPY_OK) || (retlen != info->page_size)) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			goto error;
+		}
+		memcpy(bufptr, buf2 + page_offset, size);
+#endif
 	} else
 		memcpy(bufptr, buf + page_offset, size);
 

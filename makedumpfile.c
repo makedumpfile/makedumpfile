@@ -2533,6 +2533,15 @@ initial(void)
 	}
 #endif
 
+#ifndef USESNAPPY
+	if (info->flag_compress == DUMP_DH_COMPRESSED_SNAPPY) {
+		MSG("'-p' option is disabled, ");
+		MSG("because this binary doesn't support snappy "
+		    "compression.\n");
+		MSG("Try `make USESNAPPY=on` when building.\n");
+	}
+#endif
+
 	if (info->flag_cyclic) {
 		/*
 		 * buffer size is specified as Kbyte

@@ -6,13 +6,13 @@
 * REQUIREMENTS
   Please download the following library file and install it exactly as below;
   do NOT use "make install".
-  - elfutils-0.137.tar.gz
+  - elfutils-0.142.tar.gz
     The "make install" of elfutils installs some commands (ld, readelf, etc.),
     and compiling problems sometimes happen due to using the installed
     commands. To install only the library & header files, use the following
     method:
-     # tar -zxvf elfutils-0.137.tar.gz
-     # cd elfutils-0.137
+     # tar -zxvf elfutils-0.142.tar.gz
+     # cd elfutils-0.142
      # ./configure
      # make
      #

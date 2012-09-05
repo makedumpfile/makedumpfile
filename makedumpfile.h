@@ -1418,6 +1418,15 @@ is_dumpable_cyclic(char *bitmap, unsigned long long pfn)
 }
 
 static inline int
+is_cyclic_region(unsigned long long pfn)
+{
+	if (pfn < info->cyclic_start_pfn || info->cyclic_end_pfn <= pfn)
+		return FALSE;
+	else
+		return TRUE;
+}
+
+static inline int
 is_zero_page(unsigned char *buf, long page_size)
 {
 	size_t i;

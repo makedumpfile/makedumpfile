@@ -3926,6 +3926,27 @@ exclude_unnecessary_pages_cyclic(void)
 }
 
 int
+update_cyclic_region(unsigned long long pfn)
+{
+	if (is_cyclic_region(pfn))
+		return TRUE;
+
+	info->cyclic_start_pfn = round(pfn, PFN_CYCLIC);
+	info->cyclic_end_pfn = info->cyclic_start_pfn + PFN_CYCLIC;
+
+	if (info->cyclic_end_pfn > info->max_mapnr)
+		info->cyclic_end_pfn = info->max_mapnr;
+
+	if (!create_1st_bitmap_cyclic())
+		return FALSE;
+
+	if (!exclude_unnecessary_pages_cyclic())
+		return FALSE;
+
+	return TRUE;
+}
+
+int
 copy_bitmap(void)
 {
 	off_t offset;

@@ -5477,6 +5477,13 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	start_pfn = info->cyclic_start_pfn;
 	end_pfn   = info->cyclic_end_pfn;
 
+	if (info->flag_split) {
+		if (start_pfn < info->split_start_pfn)
+			start_pfn = info->split_start_pfn;
+		if (end_pfn > info->split_end_pfn)
+			end_pfn = info->split_end_pfn;
+	}
+
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 
 		if ((num_dumped % per) == 0)
@@ -6762,22 +6769,31 @@ setup_splitting(void)
 	if (info->num_dumpfile <= 1)
 		return FALSE;
 
-	initialize_2nd_bitmap(&bitmap2);
-
-	pfn_per_dumpfile = num_dumpable / info->num_dumpfile;
-	start_pfn = end_pfn = 0;
-	for (i = 0; i < info->num_dumpfile; i++) {
-		start_pfn = end_pfn;
-		if (i == (info->num_dumpfile - 1)) {
-			end_pfn  = info->max_mapnr;
-		} else {
-			for (j = 0; j < pfn_per_dumpfile; end_pfn++) {
-				if (is_dumpable(&bitmap2, end_pfn))
-					j++;
-			}
+	if (info->flag_cyclic) {
+		for (i = 0; i < info->num_dumpfile; i++) {
+			SPLITTING_START_PFN(i) = divideup(info->max_mapnr, info->num_dumpfile) * i;
+			SPLITTING_END_PFN(i)   = divideup(info->max_mapnr, info->num_dumpfile) * (i + 1);
 		}
-		SPLITTING_START_PFN(i) = start_pfn;
-		SPLITTING_END_PFN(i)   = end_pfn;
+		if (SPLITTING_END_PFN(i-1) > info->max_mapnr)
+			SPLITTING_END_PFN(i-1) = info->max_mapnr;
+        } else {
+		initialize_2nd_bitmap(&bitmap2);
+
+		pfn_per_dumpfile = num_dumpable / info->num_dumpfile;
+		start_pfn = end_pfn = 0;
+		for (i = 0; i < info->num_dumpfile; i++) {
+			start_pfn = end_pfn;
+			if (i == (info->num_dumpfile - 1)) {
+				end_pfn  = info->max_mapnr;
+			} else {
+				for (j = 0; j < pfn_per_dumpfile; end_pfn++) {
+					if (is_dumpable(&bitmap2, end_pfn))
+						j++;
+				}
+			}
+			SPLITTING_START_PFN(i) = start_pfn;
+			SPLITTING_END_PFN(i)   = end_pfn;
+		}
 	}
 
 	return TRUE;

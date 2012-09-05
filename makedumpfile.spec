@@ -1,6 +1,6 @@
 Name: makedumpfile
 Summary: makedumpfile package
-Version: 1.4.4
+Version: 1.5.0
 Release: 1
 Group: Applications/Text
 License: GPL

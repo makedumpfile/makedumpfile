@@ -1516,5 +1516,7 @@ struct elf_prstatus {
  * Function Prototype.
  */
 unsigned long long get_num_dumpable_cyclic(void);
+int get_loads_dumpfile_cyclic(void);
+
 
 #endif /* MAKEDUMPFILE_H */

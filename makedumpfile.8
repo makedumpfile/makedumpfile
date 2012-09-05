@@ -347,6 +347,22 @@ on the following example.
 # makedumpfile \-\-reassemble dumpfile1 dumpfile2 dumpfile
 
 .TP
+\fB\-\-cyclic\-buffer\fR \fIbuffer_size\fR
+Specify the buffer size in kilo bytes for analysis in the cyclic mode.
+Actually, the double of \fIbuffer_size\fR kilo bytes will be allocated in memory.
+In the cyclic mode, the number of cycles is represented as:
+
+    num_of_cycles = system_memory / (\fIbuffer_size\fR * 1024 * bit_per_bytes * page_size )
+
+The lesser number of cycles, the faster working speed is expected.
+Default \fIbuffer_size\fR is 1024.
+
+.br
+.B Example:
+.br
+# makedumpfile \-\-cyclic\-buffer 1024 \-d 31 \-x vmlinux /proc/vmcore dumpfile
+
+.TP
 \fB\-\-non\-cyclic\fR
 Running in the non-cyclic mode, this mode uses the old filtering logic same as v1.4.4 or before.
 If you feel the cyclic mode is too slow, please try this mode.

@@ -175,8 +175,7 @@ isAnon(unsigned long mapping)
 /*
  * For cyclic processing
  */
-#define BUFSIZE_CYCLIC         (1024 * 1024)
-#define PFN_CYCLIC             (BUFSIZE_CYCLIC * BITPERBYTE)
+#define DEFAULT_BUFSIZE_CYCLIC         (1024 * 1024)
 
 /*
  * Minimam vmcore has 2 ProgramHeaderTables(PT_NOTE and PT_LOAD).
@@ -939,6 +938,8 @@ struct DumpInfo {
 	unsigned long long cyclic_start_pfn;
 	unsigned long long cyclic_end_pfn;  
 	unsigned long long num_dumpable;
+	unsigned long      bufsize_cyclic;
+	unsigned long      pfn_cyclic;
 
 	/*
 	 * sadump info:

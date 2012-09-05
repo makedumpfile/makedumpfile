@@ -162,6 +162,17 @@ print_usage(void)
 	MSG("      Reassemble multiple DUMPFILEs, which are created by --split option,\n");
 	MSG("      into one DUMPFILE. dumpfile1 and dumpfile2 are reassembled into dumpfile.\n");
 	MSG("\n");
+	MSG("  [--cyclic-buffer BUFFER_SIZE]:\n");
+	MSG("      Specify the buffer size in kilo bytes for analysis in the cyclic mode.\n");
+	MSG("      Actually, the double of BUFFER_SIZE kilo bytes will be allocated in memory.\n");
+	MSG("      In the cyclic mode, the number of cycles is represented as:\n");
+	MSG("\n");
+	MSG("          num_of_cycles = system_memory / \n");
+	MSG("                          (BUFFER_SIZE * 1024 * bit_per_bytes * page_size)\n");
+	MSG("\n");
+	MSG("      The lesser number of cycles, the faster working speed is expected.\n");
+	MSG("      Default BUFFER_SIZE is 1024.\n");
+	MSG("\n");
 	MSG("  [--non-cyclic]:\n");
 	MSG("      Running in the non-cyclic mode, this mode uses the old filtering logic\n");
 	MSG("      same as v1.4.4 or before.\n");

@@ -2541,6 +2541,29 @@ initial(void)
 	}
 #endif
 
+	if (info->flag_cyclic) {
+		/*
+		 * buffer size is specified as Kbyte
+		 */
+		if (info->bufsize_cyclic == 0)
+			info->bufsize_cyclic = DEFAULT_BUFSIZE_CYCLIC;
+		else
+			info->bufsize_cyclic <<= 10;
+	
+		/*
+		 * Max buffer size is 100 MB
+		 */
+		if (info->bufsize_cyclic > (100 << 20)) {
+			MSG("Specified buffer size is too large, ");
+			MSG("The buffer size for the cyclic mode will be truncated to 100 MB.\n");
+			info->bufsize_cyclic = (100 << 20);
+		}
+		info->pfn_cyclic = info->bufsize_cyclic * BITPERBYTE;
+
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Buffer size for the cyclic mode: %ld\n", info->bufsize_cyclic);
+	}
+
 	if (info->flag_exclude_xen_dom) {
 		if(info->flag_cyclic) {
 			info->flag_cyclic = FALSE;
@@ -2746,7 +2769,7 @@ initialize_bitmap(struct dump_bitmap *bitmap)
 void
 initialize_bitmap_cyclic(char *bitmap)
 {
-	memset(bitmap, 0, BUFSIZE_CYCLIC);
+	memset(bitmap, 0, info->bufsize_cyclic);
 }
 
 void
@@ -3879,7 +3902,7 @@ exclude_unnecessary_pages(void)
 void
 copy_bitmap_cyclic(void)
 {
-	memcpy(info->partial_bitmap2, info->partial_bitmap1, BUFSIZE_CYCLIC);
+	memcpy(info->partial_bitmap2, info->partial_bitmap1, info->bufsize_cyclic);
 }
 
 int
@@ -3939,8 +3962,8 @@ update_cyclic_region(unsigned long long pfn)
 	if (is_cyclic_region(pfn))
 		return TRUE;
 
-	info->cyclic_start_pfn = round(pfn, PFN_CYCLIC);
-	info->cyclic_end_pfn = info->cyclic_start_pfn + PFN_CYCLIC;
+	info->cyclic_start_pfn = round(pfn, info->pfn_cyclic);
+	info->cyclic_end_pfn = info->cyclic_start_pfn + info->pfn_cyclic;
 
 	if (info->cyclic_end_pfn > info->max_mapnr)
 		info->cyclic_end_pfn = info->max_mapnr;
@@ -4111,12 +4134,12 @@ prepare_bitmap_buffer_cyclic(void)
 	/*
 	 * Prepare partial bitmap buffers for cyclic processing.
 	 */
-	if ((info->partial_bitmap1 = (char *)malloc(BUFSIZE_CYCLIC)) == NULL) {
+	if ((info->partial_bitmap1 = (char *)malloc(info->bufsize_cyclic)) == NULL) {
 		ERRMSG("Can't allocate memory for the 1st-bitmap. %s\n",
 		       strerror(errno));
 		return FALSE;
 	}
-	if ((info->partial_bitmap2 = (char *)malloc(BUFSIZE_CYCLIC)) == NULL) {
+	if ((info->partial_bitmap2 = (char *)malloc(info->bufsize_cyclic)) == NULL) {
 		ERRMSG("Can't allocate memory for the 2nd-bitmap. %s\n",
 		       strerror(errno));
 		return FALSE;
@@ -4951,7 +4974,7 @@ get_loads_dumpfile_cyclic(void)
 	 * Initialize target region and bitmap.
 	 */
 	info->cyclic_start_pfn = 0;
-	info->cyclic_end_pfn = PFN_CYCLIC;
+	info->cyclic_end_pfn = info->pfn_cyclic;
 	if (!create_1st_bitmap_cyclic())
 		return FALSE;
 	if (!exclude_unnecessary_pages_cyclic())
@@ -7763,6 +7786,7 @@ static struct option longopts[] = {
 	{"help", no_argument, NULL, 'h'},
 	{"diskset", required_argument, NULL, 'k'},
 	{"non-cyclic", no_argument, NULL, 'Y'},
+	{"cyclic-buffer", required_argument, NULL, 'Z'},
 	{0, 0, 0, 0}
 };
 
@@ -7882,6 +7906,9 @@ main(int argc, char *argv[])
 		case 'z':
 			info->flag_read_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
+			break;
+		case 'Z':
+			info->bufsize_cyclic = atoi(optarg);
 			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");

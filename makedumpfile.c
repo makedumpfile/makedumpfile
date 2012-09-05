@@ -3286,9 +3286,9 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 				}
 				for (i = 0; i < (1<<order); i++) {
 					pfn = start_pfn + i;
-					clear_bit_on_2nd_bitmap_for_kernel(pfn);
+					if (clear_bit_on_2nd_bitmap_for_kernel(pfn))
+						found_free_pages++;
 				}
-				found_free_pages += i;
 
 				previous = curr;
 				if (!readmem(VADDR, curr+OFFSET(list_head.next),
@@ -3322,7 +3322,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones)
 		ERRMSG("Can't get free_pages.\n");
 		return FALSE;
 	}
-	if (free_pages != found_free_pages) {
+	if (free_pages != found_free_pages && !info->flag_cyclic) {
 		/*
 		 * On linux-2.6.21 or later, the number of free_pages is
 		 * sometimes different from the one of the list "free_area",
@@ -3662,6 +3662,39 @@ create_1st_bitmap(void)
 	return TRUE;
 }
 
+int
+create_1st_bitmap_cyclic()
+{
+	int i;
+	unsigned long long pfn, pfn_bitmap1;
+	unsigned long long phys_start, phys_end;
+	unsigned long long pfn_start, pfn_end;
+
+	/*
+	 * At first, clear all the bits on the 1st-bitmap.
+	 */
+	initialize_bitmap_cyclic(info->partial_bitmap1);
+
+	/*
+	 * If page is on memory hole, set bit on the 1st-bitmap.
+	 */
+	pfn_bitmap1 = 0;
+	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
+		pfn_start = paddr_to_pfn(phys_start);
+		pfn_end   = paddr_to_pfn(phys_end);
+
+		if (!is_in_segs(pfn_to_paddr(pfn_start)))
+			pfn_start++;
+		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
+			if (set_bit_on_1st_bitmap(pfn))
+				pfn_bitmap1++;
+		}
+	}
+	pfn_memhole -= pfn_bitmap1;
+
+	return TRUE;
+}
+
 /*
  * Exclude the page filled with zero in case of creating an elf dumpfile.
  */
@@ -3702,8 +3735,8 @@ exclude_zero_pages(void)
 			}
 		}
 		if (is_zero_page(buf, info->page_size)) {
-			clear_bit_on_2nd_bitmap(pfn);
-			pfn_zero++;
+			if (clear_bit_on_2nd_bitmap(pfn))
+				pfn_zero++;
 		}
 	}
 
@@ -3780,8 +3813,8 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		if ((info->dump_level & DL_EXCLUDE_CACHE)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isPrivate(flags) && !isAnon(mapping)) {
-			clear_bit_on_2nd_bitmap_for_kernel(pfn);
-			pfn_cache++;
+			if (clear_bit_on_2nd_bitmap_for_kernel(pfn))
+				pfn_cache++;
 		}
 		/*
 		 * Exclude the cache page with the private page.
@@ -3789,16 +3822,16 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isAnon(mapping)) {
-			clear_bit_on_2nd_bitmap_for_kernel(pfn);
-			pfn_cache_private++;
+			if (clear_bit_on_2nd_bitmap_for_kernel(pfn))
+				pfn_cache_private++;
 		}
 		/*
 		 * Exclude the data page of the user process.
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
 		    && isAnon(mapping)) {
-			clear_bit_on_2nd_bitmap_for_kernel(pfn);
-			pfn_user++;
+			if (clear_bit_on_2nd_bitmap_for_kernel(pfn))
+				pfn_user++;
 		}
 	}
 	return TRUE;
@@ -3831,6 +3864,63 @@ exclude_unnecessary_pages(void)
 	 */
 	print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
 	print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
+
+	return TRUE;
+}
+
+void
+copy_bitmap_cyclic(void)
+{
+	memcpy(info->partial_bitmap2, info->partial_bitmap1, BUFSIZE_CYCLIC);
+}
+
+int
+exclude_unnecessary_pages_cyclic(void)
+{
+	unsigned int mm;
+	struct mem_map_data *mmd;
+	struct timeval tv_start;
+
+	/*
+	 * Copy 1st-bitmap to 2nd-bitmap.
+	 */
+	copy_bitmap_cyclic();
+
+	if (info->dump_level & DL_EXCLUDE_FREE)
+		if (!exclude_free_page())
+			return FALSE;
+
+	/*
+	 * Exclude cache pages, cache private pages, user data pages, and free pages.
+	 */
+	if (info->dump_level & DL_EXCLUDE_CACHE ||
+	    info->dump_level & DL_EXCLUDE_CACHE_PRI ||
+	    info->dump_level & DL_EXCLUDE_USER_DATA) {
+
+		gettimeofday(&tv_start, NULL);
+
+		for (mm = 0; mm < info->num_mem_map; mm++) {
+
+			print_progress(PROGRESS_UNN_PAGES, mm, info->num_mem_map);
+
+			mmd = &info->mem_map_data[mm];
+
+			if (mmd->mem_map == NOT_MEMMAP_ADDR)
+				continue;
+
+			if (mmd->pfn_end >= info->cyclic_start_pfn || mmd->pfn_start <= info->cyclic_end_pfn) {
+				if (!__exclude_unnecessary_pages(mmd->mem_map,
+								 mmd->pfn_start, mmd->pfn_end))
+					return FALSE;
+			}
+		}
+
+		/*
+		 * print [100 %]
+		 */
+		print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
+		print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
+	}
 
 	return TRUE;
 }

@@ -938,6 +938,7 @@ struct DumpInfo {
 	char               *partial_bitmap2;
 	unsigned long long cyclic_start_pfn;
 	unsigned long long cyclic_end_pfn;  
+	unsigned long long num_dumpable;
 
 	/*
 	 * sadump info:
@@ -1510,5 +1511,10 @@ struct elf_prstatus {
 };
 
 #endif
+
+/*
+ * Function Prototype.
+ */
+unsigned long long get_num_dumpable_cyclic(void);
 
 #endif /* MAKEDUMPFILE_H */

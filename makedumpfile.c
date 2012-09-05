@@ -4142,6 +4142,8 @@ create_dump_bitmap(void)
 	if (info->flag_cyclic) {
 		if (!prepare_bitmap_buffer_cyclic())
 			goto out;
+
+		info->num_dumpable = get_num_dumpable_cyclic();
 	} else {
 		if (!prepare_bitmap_buffer())
 			goto out;
@@ -4603,6 +4605,21 @@ get_num_dumpable(void)
 	return num_dumpable;
 }
 
+unsigned long long
+get_num_dumpable_cyclic(void)
+{
+	unsigned long long pfn, num_dumpable=0;
+
+	for (pfn = 0; pfn < info->max_mapnr; pfn++) {
+		if (!update_cyclic_region(pfn))
+			return FALSE;
+
+		if (is_dumpable_cyclic(info->partial_bitmap2, pfn))
+			num_dumpable++;
+	}
+
+	return num_dumpable;
+}
 
 int
 write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,

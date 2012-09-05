@@ -122,6 +122,22 @@
      does not exclude Xen user domain pages. So user should specify '-X'
      option for excluding Xen user domain pages.
 
+  4. There are two running mode in makedumpfile-1.5.0 or later.
+    cyclic mode:
+      In this mode, makedumpfile reads regions of a fixed size from
+      /proc/vmcore, analyzes it, and writes pages to dumpfile cyclically from
+      start of memory to the end. Each cycle consume constant memory for
+      analysis of constant region, so the memory usage of makedumpfile will
+      be kept constant regardless of system memory size.
+      This mode is default mode. 
+
+    non-cyclic mode:
+      In this mode, makedumpfile creates temporary bitmap file in TMPDIR for
+      analysis. The size of bitmap increases linearly based on physical memory
+      size. Therefore, if your machine has a lots of memory and you use tmpfs
+      on TMPDIR in 2nd kernel, makedumpfile can fail due to lack of memory.
+      makedumpfile-1.4.4 or before has only this mode.
+
 * FAQ
   001: If installing elfutils-0.137 into older elfutils by the above way, the
        following problem happens sometimes. If seeing, try to enable LDFLAGS

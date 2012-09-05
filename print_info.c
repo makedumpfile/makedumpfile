@@ -162,6 +162,11 @@ print_usage(void)
 	MSG("      Reassemble multiple DUMPFILEs, which are created by --split option,\n");
 	MSG("      into one DUMPFILE. dumpfile1 and dumpfile2 are reassembled into dumpfile.\n");
 	MSG("\n");
+	MSG("  [--non-cyclic]:\n");
+	MSG("      Running in the non-cyclic mode, this mode uses the old filtering logic\n");
+	MSG("      same as v1.4.4 or before.\n");
+	MSG("      If you feel the cyclic mode is too slow, please try this mode.\n");
+	MSG("\n");
 	MSG("  [--xen-syms XEN-SYMS]:\n");
 	MSG("      Specify the XEN-SYMS to analyze Xen's memory usage.\n");
 	MSG("\n");

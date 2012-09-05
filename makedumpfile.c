@@ -2538,12 +2538,20 @@ initial(void)
 	}
 #endif
 
-	if (!is_xen_memory() && info->flag_exclude_xen_dom) {
-		MSG("'-X' option is disable,");
-		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
-		MSG("Commandline parameter is invalid.\n");
-		MSG("Try `makedumpfile --help' for more information.\n");
-		return FALSE;
+	if (info->flag_exclude_xen_dom) {
+		if(info->flag_cyclic) {
+			info->flag_cyclic = FALSE;
+			MSG("Switched running mode from cyclic to non-cyclic,\n");
+			MSG("because the cyclic mode doesn't support Xen.\n");
+		}
+
+		if (!is_xen_memory()) {
+			MSG("'-X' option is disable,");
+			MSG("because %s is not Xen's memory core image.\n", info->name_memory);
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
+			return FALSE;
+		}
 	}
 
 	if (info->flag_refiltering) {
@@ -2553,6 +2561,14 @@ initial(void)
 							info->name_memory);
 			return FALSE;
 		}
+
+		if(info->flag_cyclic) {
+			info->flag_cyclic = FALSE;
+			MSG("Switched running mode from cyclic to non-cyclic,\n");
+			MSG("because the cyclic mode doesn't support refiltering\n");
+			MSG("kdump compressed format.\n");
+		}
+
 		info->phys_base = info->kh_memory->phys_base;
 		info->max_dump_level |= info->kh_memory->dump_level;
 
@@ -2565,6 +2581,12 @@ initial(void)
 			MSG("because %s is sadump %s format.\n",
 			    info->name_memory, sadump_format_type_name());
 			return FALSE;
+		}
+
+		if(info->flag_cyclic) {
+			info->flag_cyclic = FALSE;
+			MSG("Switched running mode from cyclic to non-cyclic,\n");
+			MSG("because the cyclic mode doesn't support sadump format.\n");
 		}
 
 		set_page_size(sadump_page_size());
@@ -6945,6 +6967,7 @@ static struct option longopts[] = {
 	{"config", required_argument, NULL, 'C'},
 	{"help", no_argument, NULL, 'h'},
 	{"diskset", required_argument, NULL, 'k'},
+	{"non-cyclic", no_argument, NULL, 'Y'},
 	{0, 0, 0, 0}
 };
 
@@ -6966,6 +6989,11 @@ main(int argc, char *argv[])
 	}
 	initialize_tables();
 
+	/*
+	 * By default, makedumpfile works in constant memory space.
+	 */
+	info->flag_cyclic = TRUE;
+	
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
 	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:lMRrsvXx:", longopts,
@@ -7052,6 +7080,9 @@ main(int argc, char *argv[])
 			break;
 		case 'y':
 			info->name_xen_syms = optarg;
+			break;
+		case 'Y':
+			info->flag_cyclic = FALSE;
 			break;
 		case 'z':
 			info->flag_read_vmcoreinfo = 1;

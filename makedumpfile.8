@@ -347,6 +347,15 @@ on the following example.
 # makedumpfile \-\-reassemble dumpfile1 dumpfile2 dumpfile
 
 .TP
+\fB\-\-non\-cyclic\fR
+Running in the non-cyclic mode, this mode uses the old filtering logic same as v1.4.4 or before.
+If you feel the cyclic mode is too slow, please try this mode.
+.br
+.B Example:
+.br
+# makedumpfile \-\-non\-cyclic \-d 31 \-x vmlinux /proc/vmcore dumpfile
+
+.TP
 \fB\-\-xen-syms\fR \fIXEN-SYMS\fR
 Specify the \fIXEN-SYMS\fR with debug information to analyze the xen's memory usage.
 This option extracts the part of xen and domain-0.
@@ -502,12 +511,12 @@ Show the version of makedumpfile.
 
 .TP 8
 .B TMPDIR
-This environment variable is for a temporary memory bitmap file.
-If your machine has a lots of memory and you use tmpfs on /tmp, makedumpfile 
-can fail for a little memory in the 2nd kernel because makedumpfile makes a 
-very large temporary memory bitmap file in this case. To avoid this failure, 
-you can set a TMPDIR environment variable. If you do not set a TMPDIR 
-environment variable, makedumpfile uses /tmp directory for a temporary 
+This environment variable is for a temporary memory bitmap file only in the non-cyclic mode.
+If your machine has a lots of memory and you use tmpfs on /tmp, makedumpfile
+can fail for a little memory in the 2nd kernel because makedumpfile makes a
+very large temporary memory bitmap file in this case. To avoid this failure,
+you can set a TMPDIR environment variable. If you do not set a TMPDIR
+environment variable, makedumpfile uses /tmp directory for a temporary
 bitmap file as a default.
 
 .SH DIAGNOSTICS

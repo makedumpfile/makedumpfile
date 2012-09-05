@@ -877,15 +877,7 @@ get_structure_info(void)
 	SIZE_INIT(page, "page");
 	OFFSET_INIT(page.flags, "page", "flags");
 	OFFSET_INIT(page._count, "page", "_count");
-
 	OFFSET_INIT(page.mapping, "page", "mapping");
-
-	/*
-	 * On linux-2.6.16 or later, page.mapping is defined
-	 * in anonymous union.
-	 */
-	if (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE)
-		OFFSET_IN_UNION_INIT(page.mapping, "page", "mapping");
 
 	/*
 	 * Some vmlinux(s) don't have debugging information about

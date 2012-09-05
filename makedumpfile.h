@@ -244,12 +244,6 @@ do { \
 	     == FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
-#define OFFSET_IN_UNION_INIT(X, Y, Z) \
-do { \
-	if ((OFFSET(X) = get_member_offset(Y, Z, DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION)) \
-	     == FAILED_DWARFINFO) \
-		return FALSE; \
-} while (0)
 #define SYMBOL_ARRAY_LENGTH_INIT(X, Y) \
 do { \
 	if ((ARRAY_LENGTH(X) = get_array_length(Y, NULL, DWARF_INFO_GET_SYMBOL_ARRAY_LENGTH)) == FAILED_DWARFINFO) \

@@ -64,7 +64,6 @@ is_search_structure(int cmd)
 	if ((cmd == DWARF_INFO_GET_STRUCT_SIZE)
 	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET)
 	    || (cmd == DWARF_INFO_GET_MEMBER_TYPE)
-	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION)
 	    || (cmd == DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION)
 	    || (cmd == DWARF_INFO_GET_MEMBER_ARRAY_LENGTH))
 		return TRUE;
@@ -447,75 +446,41 @@ get_dwarf_base_type(Dwarf_Die *die)
 	return TRUE;
 }
 
-/*
- * Function for searching struct page.union.struct.mapping.
- */
 static int
-__search_mapping(Dwarf_Die *die, long *offset)
+is_anonymous_container(Dwarf_Die *die)
 {
-	int tag;
-	const char *name;
-	Dwarf_Die child, *walker;
-
-	if (dwarf_child(die, &child) != 0)
+	if (dwarf_diename(die))
 		return FALSE;
-
-	walker = &child;
-	do {
-		tag  = dwarf_tag(walker);
-		name = dwarf_diename(walker);
-
-		if (tag != DW_TAG_member)
-			continue;
-		if ((!name) || strcmp(name, dwarf_info.member_name))
-			continue;
-		if (!get_data_member_location(walker, offset))
-			continue;
+	if (dwarf_tag(die) == DW_TAG_structure_type)
 		return TRUE;
-
-	} while (!dwarf_siblingof(walker, walker));
-
-	return FALSE;
-}
-
-/*
- * Function for searching struct page.union.struct.
- */
-static int
-search_mapping(Dwarf_Die *die, long *offset)
-{
-	Dwarf_Die child, *walker;
-	Dwarf_Die die_struct;
-
-	if (dwarf_child(die, &child) != 0)
-		return FALSE;
-
-	walker = &child;
-
-	do {
-		if (dwarf_tag(walker) != DW_TAG_member)
-			continue;
-		if (!get_die_type(walker, &die_struct))
-			continue;
-		if (dwarf_tag(&die_struct) != DW_TAG_structure_type)
-			continue;
-		if (__search_mapping(&die_struct, offset))
-			return TRUE;
-	} while (!dwarf_siblingof(walker, walker));
-
+	if (dwarf_info.cmd != DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION
+	    && dwarf_tag(die) == DW_TAG_union_type)
+		return TRUE;
 	return FALSE;
 }
 
 static void
+adjust_member_offset(Dwarf_Die *die)
+{
+	long offset;
+
+	if (dwarf_info.member_offset == NOT_FOUND_STRUCTURE)
+		return;
+	if (!get_data_member_location(die, &offset))
+		return;
+	dwarf_info.member_offset += offset;
+}
+
+static int
 search_member(Dwarf_Die *die)
 {
 	int tag;
-	long offset, offset_union;
+	long offset;
 	const char *name;
-	Dwarf_Die child, *walker, die_union;
+	Dwarf_Die child, *walker, die_type;
 
 	if (dwarf_child(die, &child) != 0)
-		return;
+		return FALSE;
 
 	walker = &child;
 
@@ -525,6 +490,20 @@ search_member(Dwarf_Die *die)
 
 		if (tag != DW_TAG_member)
 			continue;
+
+		/*
+		 * Descend into anonymous members and search for member
+		 * there.
+		 */
+		if (!name) {
+			if (!get_die_type(walker, &die_type))
+				continue;
+			if (is_anonymous_container(&die_type))
+				if (search_member(&die_type)) {
+					adjust_member_offset(walker);
+					return TRUE;
+				}
+		}
 
 		switch (dwarf_info.cmd) {
 		case DWARF_INFO_GET_MEMBER_TYPE:
@@ -535,39 +514,23 @@ search_member(Dwarf_Die *die)
 			 */
 			if (!get_dwarf_base_type(walker))
 				continue;
-			return;
+			return TRUE;
 		case DWARF_INFO_GET_MEMBER_OFFSET:
 			if ((!name) || strcmp(name, dwarf_info.member_name))
 				continue;
 			/*
 			 * Get the member offset.
 			 */
-			if (!get_data_member_location(walker, &offset))
+			if (dwarf_tag(die) == DW_TAG_union_type)
+				offset = 0;
+			else if (!get_data_member_location(walker, &offset))
 				continue;
 			dwarf_info.member_offset = offset;
-			return;
-		case DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION:
-			if (!get_die_type(walker, &die_union))
-				continue;
-			if (dwarf_tag(&die_union) != DW_TAG_union_type)
-				continue;
-			/*
-			 * Search page.mapping in union.
-			 */
-			if (!search_mapping(&die_union, &offset_union))
-				continue;
-
-			/*
-			 * Get the member offset.
-			 */
-			if (!get_data_member_location(walker, &offset))
- 				continue;
-			dwarf_info.member_offset = offset + offset_union;
- 			return;
+			return TRUE;
 		case DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION:
-			if (!get_die_type(walker, &die_union))
+			if (!get_die_type(walker, &die_type))
 				continue;
-			if (dwarf_tag(&die_union) != DW_TAG_union_type)
+			if (dwarf_tag(&die_type) != DW_TAG_union_type)
 				continue;
 			/*
 			 * Get the member offset.
@@ -575,7 +538,7 @@ search_member(Dwarf_Die *die)
 			if (!get_data_member_location(walker, &offset))
 				continue;
 			dwarf_info.member_offset = offset;
-			return;
+			return TRUE;
 		case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
 			if ((!name) || strcmp(name, dwarf_info.member_name))
 				continue;
@@ -584,14 +547,14 @@ search_member(Dwarf_Die *die)
 			 */
 			if (!get_data_array_length(walker))
 				continue;
-			return;
+			return TRUE;
 		}
 	} while (!dwarf_siblingof(walker, walker));
 
 	/*
 	 * Return even if not found.
 	 */
-	return;
+	return FALSE;
 }
 
 static void
@@ -636,7 +599,6 @@ search_structure(Dwarf_Die *die, int *found)
 		break;
 	case DWARF_INFO_GET_MEMBER_TYPE:
 	case DWARF_INFO_GET_MEMBER_OFFSET:
-	case DWARF_INFO_GET_MEMBER_OFFSET_IN_UNION:
 	case DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION:
 	case DWARF_INFO_GET_MEMBER_ARRAY_LENGTH:
 		search_member(die);

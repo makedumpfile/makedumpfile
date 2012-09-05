@@ -173,6 +173,12 @@ isAnon(unsigned long mapping)
 #define FILENAME_STDOUT		"STDOUT"
 
 /*
+ * For cyclic processing
+ */
+#define BUFSIZE_CYCLIC         (1024 * 1024)
+#define PFN_CYCLIC             (BUFSIZE_CYCLIC * BITPERBYTE)
+
+/*
  * Minimam vmcore has 2 ProgramHeaderTables(PT_NOTE and PT_LOAD).
  */
 #define MIN_ELF32_HEADER_SIZE \
@@ -926,6 +932,14 @@ struct DumpInfo {
 	unsigned long long split_end_pfn;  
 
 	/*
+	 * for cyclic processing
+	 */
+	char               *partial_bitmap1;
+	char               *partial_bitmap2;
+	unsigned long long cyclic_start_pfn;
+	unsigned long long cyclic_end_pfn;  
+
+	/*
 	 * sadump info:
 	 */
 	int flag_sadump_diskset;
@@ -1392,6 +1406,15 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 			bitmap->no_block = pfn/PFN_BUFBITMAP;
 	}
 	return is_on(bitmap->buf, pfn%PFN_BUFBITMAP);
+}
+
+static inline int
+is_dumpable_cyclic(char *bitmap, unsigned long long pfn)
+{
+	if (pfn < info->cyclic_start_pfn || info->cyclic_end_pfn <= pfn)
+		return FALSE;
+	else
+		return is_on(bitmap, pfn - info->cyclic_start_pfn);
 }
 
 static inline int

@@ -3771,6 +3771,12 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 	for (pfn = pfn_start; pfn < pfn_end; pfn++, mem_map += SIZE(page)) {
 
 		/*
+		 * If this pfn doesn't belong to target region, skip this pfn.
+		 */
+		if (info->flag_cyclic && !is_cyclic_region(pfn))
+			continue;
+
+		/*
 		 * Exclude the memory hole.
 		 */
 		if (is_xen_memory()) {

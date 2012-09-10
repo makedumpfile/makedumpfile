@@ -64,6 +64,7 @@ remap_init(void)
 	}
 
 	max_numnodes = n;
+	return TRUE;
 }
 
 int

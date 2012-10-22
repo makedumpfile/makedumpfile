@@ -566,6 +566,7 @@ do { \
 #define _REGION_ENTRY_TYPE_MASK	0x0c	/* region table type mask */
 #define _REGION_ENTRY_INVALID	0x20	/* invalid region table entry */
 #define _REGION_ENTRY_LENGTH	0x03	/* region table length */
+#define _REGION_ENTRY_LARGE	0x400
 #define _REGION_OFFSET_MASK	0x7ffUL	/* region/segment table offset mask */
 
 #define RSG_TABLE_LEVEL(x)	(((x) & _REGION_ENTRY_TYPE_MASK) >> 2)

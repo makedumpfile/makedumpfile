@@ -247,6 +247,11 @@ vtop_s390x(unsigned long vaddr)
 			return NOT_PADDR;
 		}
 		table = entry & _REGION_ENTRY_ORIGIN;
+		if ((entry & _REGION_ENTRY_LARGE) && (level == 1)) {
+			table &= ~0x7fffffffUL;
+			paddr = table + (vaddr & 0x7fffffffUL);
+			return paddr;
+		}
 		len = RSG_TABLE_LENGTH(entry);
 		level--;
 	}
@@ -257,6 +262,7 @@ vtop_s390x(unsigned long vaddr)
 	 * if no, then get the page table entry using PX index.
 	 */
 	if (entry & _SEGMENT_ENTRY_LARGE) {
+		table &= ~_PAGE_BYTE_INDEX_MASK;
 		paddr = table + (vaddr &  _PAGE_BYTE_INDEX_MASK);
 	} else {
 		entry = _kl_pg_table_deref_s390x(vaddr,

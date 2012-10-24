@@ -447,10 +447,8 @@ get_dwarf_base_type(Dwarf_Die *die)
 }
 
 static int
-is_anonymous_container(Dwarf_Die *die)
+is_container(Dwarf_Die *die)
 {
-	if (dwarf_diename(die))
-		return FALSE;
 	if (dwarf_tag(die) == DW_TAG_structure_type)
 		return TRUE;
 	if (dwarf_info.cmd != DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION
@@ -492,13 +490,13 @@ search_member(Dwarf_Die *die)
 			continue;
 
 		/*
-		 * Descend into anonymous members and search for member
+		 * Descend into structures/unions and search for member
 		 * there.
 		 */
-		if (!name) {
+		if ((!name) || (strcmp(name, dwarf_info.member_name) != 0)) {
 			if (!get_die_type(walker, &die_type))
 				continue;
-			if (is_anonymous_container(&die_type))
+			if (is_container(&die_type))
 				if (search_member(&die_type)) {
 					adjust_member_offset(walker);
 					return TRUE;
@@ -1047,8 +1045,15 @@ get_member_offset(char *structname, char *membername, int cmd)
 	dwarf_info.cmd = cmd;
 	dwarf_info.struct_name = structname;
 	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
-	dwarf_info.member_name = membername;
 	dwarf_info.member_offset = NOT_FOUND_STRUCTURE;
+
+	/*
+	 * When searching a offset of 1st union, member_name is unnecessary.
+	 */
+	if (dwarf_info.cmd == DWARF_INFO_GET_MEMBER_OFFSET_1ST_UNION)
+		dwarf_info.member_name = "";
+	else
+		dwarf_info.member_name = membername;
 
 	if (!get_debug_info())
 		return FAILED_DWARFINFO;

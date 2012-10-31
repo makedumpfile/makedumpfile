@@ -968,6 +968,10 @@ struct DumpInfo {
 	unsigned long *p2m_mfn_frame_list;
 	int	num_domain;
 	struct domain_list *domain_list;
+#if defined(__x86_64__)
+	unsigned long xen_virt_start;
+	unsigned long directmap_virt_end;
+#endif
 
 	/*
 	 * for splitting
@@ -1348,6 +1352,7 @@ struct domain_list {
 #define HYPERVISOR_VIRT_END		(0xFFFFFFFFUL)
 #define DIRECTMAP_VIRT_START		(0xFF000000UL)
 #define DIRECTMAP_VIRT_END		(0xFFC00000UL)
+#define FRAMETABLE_VIRT_START		(0xF6800000UL)
 
 #define is_xen_vaddr(x) \
 	((x) >= HYPERVISOR_VIRT_START_PAE && (x) < HYPERVISOR_VIRT_END)
@@ -1376,15 +1381,21 @@ int get_xen_info_x86(void);
 #define HYPERVISOR_VIRT_START (0xffff800000000000)
 #define HYPERVISOR_VIRT_END   (0xffff880000000000)
 #define DIRECTMAP_VIRT_START  (0xffff830000000000)
-#define DIRECTMAP_VIRT_END    (0xffff840000000000)
-#define XEN_VIRT_START        (0xffff828c80000000)
+#define DIRECTMAP_VIRT_END_V3 (0xffff840000000000)
+#define DIRECTMAP_VIRT_END_V4 (0xffff880000000000)
+#define DIRECTMAP_VIRT_END    (info->directmap_virt_end)
+#define XEN_VIRT_START_V3     (0xffff828c80000000)
+#define XEN_VIRT_START_V4     (0xffff82c480000000)
+#define XEN_VIRT_START        (info->xen_virt_start)
+#define XEN_VIRT_END          (XEN_VIRT_START + (1UL << 30))
+#define FRAMETABLE_VIRT_START 0xffff82f600000000
 
 #define is_xen_vaddr(x) \
 	((x) >= HYPERVISOR_VIRT_START && (x) < HYPERVISOR_VIRT_END)
 #define is_direct(x) \
 	((x) >= DIRECTMAP_VIRT_START && (x) < DIRECTMAP_VIRT_END)
 #define is_xen_text(x) \
-	((x) >= XEN_VIRT_START && (x) < DIRECTMAP_VIRT_START)
+	((x) >= XEN_VIRT_START && (x) < XEN_VIRT_END)
 
 unsigned long long kvtop_xen_x86_64(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_x86_64(X)

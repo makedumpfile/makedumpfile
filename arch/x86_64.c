@@ -375,6 +375,15 @@ int get_xen_basic_info_x86_64(void)
 		info->xen_phys_start = info->xen_crash_info.v2->xen_phys_start;
 	}
 
+	if (info->xen_crash_info.com &&
+	    info->xen_crash_info.com->xen_major_version >= 4) {
+		info->xen_virt_start = XEN_VIRT_START_V4;
+		info->directmap_virt_end = DIRECTMAP_VIRT_END_V4;
+	} else {
+		info->xen_virt_start = XEN_VIRT_START_V3;
+		info->directmap_virt_end = DIRECTMAP_VIRT_END_V3;
+	}
+
 	if (SYMBOL(pgd_l4) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get pml4.\n");
 		return FALSE;

@@ -6181,10 +6181,7 @@ get_structure_info_xen(void)
 {
 	SIZE_INIT(page_info, "page_info");
 	OFFSET_INIT(page_info.count_info, "page_info", "count_info");
-	/*
-	 * _domain is the first member of union u
-	 */
-	OFFSET_INIT(page_info._domain, "page_info", "u");
+	OFFSET_INIT(page_info._domain, "page_info", "_domain");
 
 	SIZE_INIT(domain, "domain");
 	OFFSET_INIT(domain.domain_id, "domain", "domain_id");

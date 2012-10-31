@@ -193,7 +193,7 @@ vtop4_x86_64(unsigned long vaddr)
 	/*
 	 * Get PUD.
 	 */
-	pgd_paddr  = pml4 & PHYSICAL_PAGE_MASK;
+	pgd_paddr  = pml4 & ENTRY_MASK;
 	pgd_paddr += pgd_index(vaddr) * sizeof(unsigned long);
 	if (!readmem(PADDR, pgd_paddr, &pgd_pte, sizeof pgd_pte)) {
 		ERRMSG("Can't get pgd_pte (pgd_paddr:%lx).\n", pgd_paddr);
@@ -206,11 +206,14 @@ vtop4_x86_64(unsigned long vaddr)
 		ERRMSG("Can't get a valid pgd_pte.\n");
 		return NOT_PADDR;
 	}
+	if (pgd_pte & _PAGE_PSE)	/* 1GB pages */
+		return (pgd_pte & ENTRY_MASK & PGDIR_MASK) +
+			(vaddr & ~PGDIR_MASK);
 
 	/*
 	 * Get PMD.
 	 */
-	pmd_paddr  = pgd_pte & PHYSICAL_PAGE_MASK;
+	pmd_paddr  = pgd_pte & ENTRY_MASK;
 	pmd_paddr += pmd_index(vaddr) * sizeof(unsigned long);
 	if (!readmem(PADDR, pmd_paddr, &pmd_pte, sizeof pmd_pte)) {
 		ERRMSG("Can't get pmd_pte (pmd_paddr:%lx).\n", pmd_paddr);
@@ -223,14 +226,14 @@ vtop4_x86_64(unsigned long vaddr)
 		ERRMSG("Can't get a valid pmd_pte.\n");
 		return NOT_PADDR;
 	}
-	if (pmd_pte & _PAGE_PSE)
-		return (PAGEBASE(pmd_pte) & PHYSICAL_PAGE_MASK)
-			+ (vaddr & ~_2MB_PAGE_MASK);
+	if (pmd_pte & _PAGE_PSE)	/* 2MB pages */
+		return (pmd_pte & ENTRY_MASK & PMD_MASK) +
+			(vaddr & ~PMD_MASK);
 
 	/*
 	 * Get PTE.
 	 */
-	pte_paddr  = pmd_pte & PHYSICAL_PAGE_MASK;
+	pte_paddr  = pmd_pte & ENTRY_MASK;
 	pte_paddr += pte_index(vaddr) * sizeof(unsigned long);
 	if (!readmem(PADDR, pte_paddr, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (pte_paddr:%lx).\n", pte_paddr);
@@ -243,7 +246,7 @@ vtop4_x86_64(unsigned long vaddr)
 		ERRMSG("Can't get a valid pte.\n");
 		return NOT_PADDR;
 	}
-	return (PAGEBASE(pte) & PHYSICAL_PAGE_MASK) + PAGEOFFSET(vaddr);
+	return (pte & ENTRY_MASK) + PAGEOFFSET(vaddr);
 }
 
 unsigned long long
@@ -312,6 +315,10 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	if (!(entry & _PAGE_PRESENT))
 		return NOT_PADDR;
 
+	if (entry & _PAGE_PSE)		/* 1GB pages */
+		return (entry & ENTRY_MASK & PGDIR_MASK) +
+			(kvaddr & ~PGDIR_MASK);
+
 	dirp = entry & ENTRY_MASK;
 	dirp += pmd_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
@@ -320,10 +327,10 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	if (!(entry & _PAGE_PRESENT))
 		return NOT_PADDR;
 
-	if (entry & _PAGE_PSE) {
-		entry = (entry & ENTRY_MASK) + (kvaddr & ((1UL << PMD_SHIFT) - 1));
-		return entry;
-	}
+	if (entry & _PAGE_PSE)		/* 2MB pages */
+		return (entry & ENTRY_MASK & PMD_MASK) +
+			(kvaddr & ~PMD_MASK);
+
 	dirp = entry & ENTRY_MASK;
 	dirp += pte_index(kvaddr) * sizeof(unsigned long long);
 	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
@@ -333,9 +340,7 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 		return NOT_PADDR;
 	}
 
-	entry = (entry & ENTRY_MASK) + (kvaddr & ((1UL << PTE_SHIFT) - 1));
-
-	return entry;
+	return (entry & ENTRY_MASK) + PAGEOFFSET(kvaddr);
 }
 
 int get_xen_info_x86_64(void)

@@ -121,7 +121,6 @@ isAnon(unsigned long mapping)
 #define PAGESHIFT()		(info->page_shift)
 #define PAGEOFFSET(X)		(((unsigned long)(X)) & (PAGESIZE() - 1))
 #define PAGEBASE(X)		(((unsigned long)(X)) & ~(PAGESIZE() - 1))
-#define _2MB_PAGE_MASK		(~((2*1048576)-1))
 
 /*
  * for SPARSEMEM
@@ -473,7 +472,10 @@ do { \
 #define _PAGE_PRESENT		(0x001)
 #define _PAGE_PSE		(0x080)
 
-#define ENTRY_MASK		(~0x8000000000000fffULL)
+/* Physical addresses are up to 52 bits (AMD64).
+ * Mask off bits 52-62 (reserved) and bit 63 (NX).
+ */
+#define ENTRY_MASK		(~0xfff0000000000fffULL)
 
 #endif /* x86 */
 
@@ -506,8 +508,12 @@ do { \
 #define PML4_SHIFT		(39)
 #define PTRS_PER_PML4		(512)
 #define PGDIR_SHIFT		(30)
+#define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+#define PGDIR_MASK		(~(PGDIR_SIZE - 1))
 #define PTRS_PER_PGD		(512)
 #define PMD_SHIFT		(21)
+#define PMD_SIZE		(1UL << PMD_SHIFT)
+#define PMD_MASK		(~(PMD_SIZE - 1))
 #define PTRS_PER_PMD		(512)
 #define PTRS_PER_PTE		(512)
 #define PTE_SHIFT		(12)
@@ -518,11 +524,7 @@ do { \
 #define pte_index(address)  (((address) >> PTE_SHIFT) & (PTRS_PER_PTE - 1))
 
 #define _PAGE_PRESENT		(0x001)
-#define _PAGE_PSE		(0x080)    /* 2MB page */
-
-#define __PHYSICAL_MASK_SHIFT	(40)
-#define __PHYSICAL_MASK		((1UL << __PHYSICAL_MASK_SHIFT) - 1)
-#define PHYSICAL_PAGE_MASK	(~(PAGESIZE()-1) & (__PHYSICAL_MASK << PAGESHIFT()))
+#define _PAGE_PSE		(0x080)    /* 2MB or 1GB page */
 
 #endif /* x86_64 */
 
@@ -1316,7 +1318,10 @@ int get_xen_info_x86(void);
 
 #ifdef __x86_64__
 
-#define ENTRY_MASK		(~0x8000000000000fffULL)
+/* The architectural limit for physical addresses is 52 bits.
+ * Mask off bits 52-62 (available for OS use) and bit 63 (NX).
+ */
+#define ENTRY_MASK		(~0xfff0000000000fffULL)
 #define MAX_X86_64_FRAMES	(info->page_size / sizeof(unsigned long))
 
 #define PAGE_OFFSET_XEN_DOM0  (0xffff880000000000) /* different from linux */

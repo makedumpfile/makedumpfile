@@ -410,12 +410,26 @@ int get_xen_info_x86_64(void)
 {
 	int i;
 
-	/*
-	 * pickled_id == domain addr for x86_64
-	 */
-	for (i = 0; i < info->num_domain; i++) {
-		info->domain_list[i].pickled_id =
-			info->domain_list[i].domain_addr;
+	if (info->xen_crash_info.com &&
+	    (info->xen_crash_info.com->xen_major_version >= 4 ||
+	     (info->xen_crash_info.com->xen_major_version == 3 &&
+	      info->xen_crash_info.com->xen_minor_version >= 4))) {
+		/*
+		 * cf. changeset 0858f961c77a
+		 */
+		for (i = 0; i < info->num_domain; i++) {
+			info->domain_list[i].pickled_id =
+				(info->domain_list[i].domain_addr -
+				 DIRECTMAP_VIRT_START) >> PAGESHIFT();
+		}
+	} else {
+		/*
+		 * pickled_id == domain addr for x86_64
+		 */
+		for (i = 0; i < info->num_domain; i++) {
+			info->domain_list[i].pickled_id =
+				info->domain_list[i].domain_addr;
+		}
 	}
 
 	return TRUE;

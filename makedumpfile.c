@@ -6260,6 +6260,12 @@ get_xen_info(void)
 	unsigned int domain_id;
 	int num_domain;
 
+	/*
+	 * Get architecture specific basic data
+	 */
+	if (!get_xen_basic_info_arch())
+		return FALSE;
+
 	if (SYMBOL(alloc_bitmap) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of alloc_bitmap.\n");
 		return FALSE;

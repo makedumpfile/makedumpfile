@@ -1338,6 +1338,7 @@ struct domain_list {
 
 #ifdef __arm__
 #define kvtop_xen(X)	FALSE
+#define get_xen_basic_info_arch(X) FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* arm */
 
@@ -1356,6 +1357,8 @@ struct domain_list {
 unsigned long long kvtop_xen_x86(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_x86(X)
 
+int get_xen_basic_info_x86(void);
+#define get_xen_basic_info_arch(X) get_xen_basic_info_x86(X)
 int get_xen_info_x86(void);
 #define get_xen_info_arch(X) get_xen_info_x86(X)
 
@@ -1386,6 +1389,8 @@ int get_xen_info_x86(void);
 unsigned long long kvtop_xen_x86_64(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_x86_64(X)
 
+int get_xen_basic_info_x86_64(void);
+#define get_xen_basic_info_arch(X) get_xen_basic_info_x86_64(X)
 int get_xen_info_x86_64(void);
 #define get_xen_info_arch(X) get_xen_info_x86_64(X)
 
@@ -1421,6 +1426,8 @@ int get_xen_info_x86_64(void);
 unsigned long long kvtop_xen_ia64(unsigned long kvaddr);
 #define kvtop_xen(X)	kvtop_xen_ia64(X)
 
+int get_xen_basic_info_ia64(void);
+#define get_xen_basic_info_arch(X) get_xen_basic_info_ia64(X)
 int get_xen_info_ia64(void);
 #define get_xen_info_arch(X) get_xen_info_ia64(X)
 
@@ -1428,11 +1435,13 @@ int get_xen_info_ia64(void);
 
 #if defined(__powerpc64__) || defined(__powerpc32__) /* powerpcXX */
 #define kvtop_xen(X)	FALSE
+#define get_xen_basic_info_arch(X) FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* powerpcXX */
 
 #ifdef __s390x__ /* s390x */
 #define kvtop_xen(X)	FALSE
+#define get_xen_basic_info_arch(X) FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* s390x */
 

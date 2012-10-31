@@ -292,11 +292,10 @@ kvtop_xen_x86(unsigned long kvaddr)
 	return entry;
 }
 
-int get_xen_info_x86(void)
+int get_xen_basic_info_x86(void)
 {
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;
-	int i;
 
 	if (SYMBOL(pgd_l2) == NOT_FOUND_SYMBOL &&
 	    SYMBOL(pgd_l3) == NOT_FOUND_SYMBOL) {
@@ -331,6 +330,13 @@ int get_xen_info_x86(void)
 	}
 	info->xen_heap_start = 0;
 	info->xen_heap_end   = paddr_to_pfn(xen_end);
+
+	return TRUE;
+}
+
+int get_xen_info_x86(void)
+{
+	int i;
 
 	/*
 	 * pickled_id == domain addr for x86

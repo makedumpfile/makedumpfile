@@ -361,11 +361,10 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 	return (entry & ENTRY_MASK) + PAGEOFFSET(kvaddr);
 }
 
-int get_xen_info_x86_64(void)
+int get_xen_basic_info_x86_64(void)
 {
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;
-	int i;
 
 	if (SYMBOL(pgd_l4) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get pml4.\n");
@@ -394,6 +393,13 @@ int get_xen_info_x86_64(void)
 	}
 	info->xen_heap_start = 0;
 	info->xen_heap_end   = paddr_to_pfn(xen_end);
+
+	return TRUE;
+}
+
+int get_xen_info_x86_64(void)
+{
+	int i;
 
 	/*
 	 * pickled_id == domain addr for x86_64

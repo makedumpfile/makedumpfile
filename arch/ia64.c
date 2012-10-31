@@ -329,10 +329,9 @@ kvtop_xen_ia64(unsigned long kvaddr)
 }
 
 int
-get_xen_info_ia64(void)
+get_xen_basic_info_ia64(void)
 {
-	unsigned long xen_start, xen_end, xen_heap_start;
-	int i;
+	unsigned long xen_start, xen_end;
 
 	info->frame_table_vaddr = VIRT_FRAME_TABLE_ADDR; /* "frame_table" is same value */
 
@@ -356,6 +355,15 @@ get_xen_info_ia64(void)
 	}
 	info->xen_heap_start = paddr_to_pfn(xen_start);
 	info->xen_heap_end   = paddr_to_pfn(xen_end);
+
+	return TRUE;
+}
+
+int
+get_xen_info_ia64(void)
+{
+	unsigned long xen_heap_start;
+	int i;
 
 	if (SYMBOL(xen_heap_start) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of xen_heap_start.\n");

@@ -366,6 +366,15 @@ int get_xen_basic_info_x86_64(void)
 	unsigned long frame_table_vaddr;
 	unsigned long xen_end;
 
+ 	if (!info->xen_phys_start) {
+		if (info->xen_crash_info_v < 2) {
+			ERRMSG("Can't get Xen physical start address.\n"
+			       "Please use the --xen_phys_start option.");
+			return FALSE;
+		}
+		info->xen_phys_start = info->xen_crash_info.v2->xen_phys_start;
+	}
+
 	if (SYMBOL(pgd_l4) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get pml4.\n");
 		return FALSE;

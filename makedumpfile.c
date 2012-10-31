@@ -6240,20 +6240,6 @@ init_xen_crash_info(void)
 }
 
 int
-get_xen_phys_start(void)
-{
-	if (info->xen_phys_start)
-		return TRUE;
-
-#if defined(__x86__) || defined(__x86_64__)
-	if (info->xen_crash_info_v >= 2)
-		info->xen_phys_start = info->xen_crash_info.v2->xen_phys_start;
-#endif
-
-	return TRUE;
-}
-
-int
 get_xen_info(void)
 {
 	unsigned long domain;
@@ -6752,8 +6738,6 @@ initial_xen(void)
 		if (!read_vmcoreinfo_from_vmcore(offset, size, TRUE))
 			return FALSE;
 	}
-	if (!get_xen_phys_start())
-		return FALSE;
 	if (!get_xen_info())
 		return FALSE;
 

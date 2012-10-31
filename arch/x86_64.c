@@ -30,6 +30,18 @@ is_vmalloc_addr(ulong vaddr)
 	    || (vaddr >= MODULES_VADDR && vaddr <= MODULES_END));
 }
 
+static unsigned long
+get_xen_p2m_mfn(void)
+{
+	if (info->xen_crash_info_v >= 2)
+		return info->xen_crash_info.v2->
+			dom0_pfn_to_mfn_frame_list_list;
+	if (info->xen_crash_info_v >= 1)
+		return info->xen_crash_info.v1->
+			dom0_pfn_to_mfn_frame_list_list;
+	return NOT_FOUND_LONG_VALUE;
+}
+
 int
 get_phys_base_x86_64(void)
 {
@@ -59,6 +71,7 @@ get_phys_base_x86_64(void)
 int
 get_machdep_info_x86_64(void)
 {
+	unsigned long p2m_mfn;
 	int i, j, mfns[MAX_X86_64_FRAMES];
 	unsigned long frame_mfn[MAX_X86_64_FRAMES];
 	unsigned long buf[MFNS_PER_FRAME];
@@ -72,9 +85,14 @@ get_machdep_info_x86_64(void)
 	 * Get the information for translating domain-0's physical
 	 * address into machine address.
 	 */
-	if (!readmem(MADDR_XEN, pfn_to_paddr(get_xen_p2m_mfn()),
-					 &frame_mfn, PAGESIZE())) {
-		ERRMSG("Can't get p2m_mfn.\n");
+	p2m_mfn = get_xen_p2m_mfn();
+	if (p2m_mfn == (unsigned long)NOT_FOUND_LONG_VALUE) {
+		ERRMSG("Can't get p2m_mfn address.\n");
+		return FALSE;
+	}
+	if (!readmem(MADDR_XEN, pfn_to_paddr(p2m_mfn),
+		     &frame_mfn, PAGESIZE())) {
+		ERRMSG("Can't read p2m_mfn.\n");
 		return FALSE;
 	}
 

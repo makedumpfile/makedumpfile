@@ -6191,32 +6191,64 @@ get_structure_info_xen(void)
 }
 
 int
+init_xen_crash_info(void)
+{
+	off_t		offset_xen_crash_info;
+	unsigned long	size_xen_crash_info;
+	void		*buf;
+
+	get_xen_crash_info(&offset_xen_crash_info, &size_xen_crash_info);
+	if (!size_xen_crash_info) {
+		info->xen_crash_info_v = -1;
+		return TRUE;		/* missing info is non-fatal */
+	}
+
+	if (size_xen_crash_info < sizeof(xen_crash_info_com_t)) {
+		ERRMSG("Xen crash info too small (%lu bytes).\n",
+		       size_xen_crash_info);
+		return FALSE;
+	}
+
+	buf = malloc(size_xen_crash_info);
+	if (!buf) {
+		ERRMSG("Can't allocate note (%lu bytes). %s\n",
+		       size_xen_crash_info, strerror(errno));
+		return FALSE;
+	}
+
+	if (lseek(info->fd_memory, offset_xen_crash_info, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		       info->name_memory, strerror(errno));
+		return FALSE;
+	}
+	if (read(info->fd_memory, buf, size_xen_crash_info)
+	    != size_xen_crash_info) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		       info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	info->xen_crash_info.com = buf;
+	if (size_xen_crash_info >= sizeof(xen_crash_info_v2_t))
+		info->xen_crash_info_v = 2;
+	else if (size_xen_crash_info >= sizeof(xen_crash_info_t))
+		info->xen_crash_info_v = 1;
+	else
+		info->xen_crash_info_v = 0;
+
+	return TRUE;
+}
+
+int
 get_xen_phys_start(void)
 {
-	off_t offset, offset_xen_crash_info;
-	unsigned long xen_phys_start, size_xen_crash_info;
-	const off_t failed = (off_t)-1;
-
 	if (info->xen_phys_start)
 		return TRUE;
 
-	get_xen_crash_info(&offset_xen_crash_info, &size_xen_crash_info);
-	if (size_xen_crash_info >= SIZE_XEN_CRASH_INFO_V2) {
-		offset = offset_xen_crash_info + size_xen_crash_info
-			 - sizeof(unsigned long) * 2;
-		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
-			ERRMSG("Can't seek the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			return FALSE;
-		}
-		if (read(info->fd_memory, &xen_phys_start, sizeof(unsigned long))
-		    != sizeof(unsigned long)) {
-			ERRMSG("Can't read the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			return FALSE;
-		}
-		info->xen_phys_start = xen_phys_start;
-	}
+#if defined(__x86__) || defined(__x86_64__)
+	if (info->xen_crash_info_v >= 2)
+		info->xen_phys_start = info->xen_crash_info.v2->xen_phys_start;
+#endif
 
 	return TRUE;
 }
@@ -6381,6 +6413,12 @@ show_data_xen(void)
 	MSG("OFFSET(domain.next_in_list): %ld\n", OFFSET(domain.next_in_list));
 
 	MSG("\n");
+	if (info->xen_crash_info.com) {
+		MSG("xen_major_version: %lx\n",
+		    info->xen_crash_info.com->xen_major_version);
+		MSG("xen_minor_version: %lx\n",
+		    info->xen_crash_info.com->xen_minor_version);
+	}
 	MSG("xen_phys_start: %lx\n", info->xen_phys_start);
 	MSG("frame_table_vaddr: %lx\n", info->frame_table_vaddr);
 	MSG("xen_heap_start: %lx\n", info->xen_heap_start);
@@ -6660,6 +6698,8 @@ initial_xen(void)
 		return FALSE;
 	}
 #endif
+	if (!init_xen_crash_info())
+		return FALSE;
 	if (!fallback_to_current_page_size())
 		return FALSE;
 	/*

@@ -88,7 +88,6 @@ static unsigned long		size_eraseinfo;
  */
 static off_t			offset_xen_crash_info;
 static unsigned long		size_xen_crash_info;
-static unsigned long		xen_p2m_mfn;
 
 
 /*
@@ -292,8 +291,7 @@ static int
 get_pt_note_info(void)
 {
 	int n_type, size_desc;
-	unsigned long p2m_mfn;
-	off_t offset, offset_desc, off_p2m = 0;
+	off_t offset, offset_desc;
 	char buf[VMCOREINFO_XEN_NOTE_NAME_BYTES];
 	char note[MAX_SIZE_NHDR];
 
@@ -348,21 +346,6 @@ get_pt_note_info(void)
 			flags_memory |= MEMORY_XEN;
 			offset_xen_crash_info = offset_desc;
 			size_xen_crash_info   = size_desc;
-
-			off_p2m = offset + offset_next_note(note)
-					 - sizeof(p2m_mfn);
-			if (lseek(fd_memory, off_p2m, SEEK_SET) < 0){
-				ERRMSG("Can't seek the dump memory(%s). %s\n",
-				    name_memory, strerror(errno));
-				return FALSE;
-			}
-			if (read(fd_memory, &p2m_mfn, sizeof(p2m_mfn))
-			     != sizeof(p2m_mfn)) {
-				ERRMSG("Can't read the dump memory(%s). %s\n",
-				    name_memory, strerror(errno));
-				return FALSE;
-			}
-			xen_p2m_mfn = p2m_mfn;
 
 		/*
 		 * Check whether a source dumpfile contains eraseinfo.
@@ -857,11 +840,5 @@ set_eraseinfo(off_t offset, unsigned long size)
 {
 	offset_eraseinfo = offset;
 	size_eraseinfo   = size;
-}
-
-unsigned long
-get_xen_p2m_mfn(void)
-{
-	return xen_p2m_mfn;
 }
 

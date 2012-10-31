@@ -68,8 +68,6 @@ int has_eraseinfo(void);
 void get_eraseinfo(off_t *offset, unsigned long *size);
 void set_eraseinfo(off_t offset, unsigned long size);
 
-unsigned long get_xen_p2m_mfn(void);
-
 #endif  /* ELF_INFO_H */
 
 

@@ -417,8 +417,6 @@ do { \
 #define SIZE_BUF_STDIN	(4096)
 #define STRLEN_OSRELEASE (65)	/* same length as diskdump.h */
 
-#define SIZE_XEN_CRASH_INFO_V2	(sizeof(unsigned long) * 10)
-
 /*
  * The value of dependence on machine
  */
@@ -724,6 +722,43 @@ unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define pfn_to_paddr(X) \
 	(((unsigned long long)(X) + ARCH_PFN_OFFSET) << PAGESHIFT())
 
+/* Format of Xen crash info ELF note */
+typedef struct {
+	unsigned long xen_major_version;
+	unsigned long xen_minor_version;
+	unsigned long xen_extra_version;
+	unsigned long xen_changeset;
+	unsigned long xen_compiler;
+	unsigned long xen_compile_date;
+	unsigned long xen_compile_time;
+	unsigned long tainted;
+} xen_crash_info_com_t;
+
+typedef struct {
+	xen_crash_info_com_t com;
+#if defined(__x86__) || defined(__x86_64__)
+	/* added by changeset 2b43fb3afb3e: */
+	unsigned long dom0_pfn_to_mfn_frame_list_list;
+#endif
+#if defined(__ia64__)
+	/* added by changeset d7c3b12014b3: */
+	unsigned long dom0_mm_pgd_mfn;
+#endif
+} xen_crash_info_t;
+
+/* changeset 439a3e9459f2 added xen_phys_start
+ * to the middle of the struct... */
+typedef struct {
+	xen_crash_info_com_t com;
+#if defined(__x86__) || defined(__x86_64__)
+	unsigned long xen_phys_start;
+	unsigned long dom0_pfn_to_mfn_frame_list_list;
+#endif
+#if defined(__ia64__)
+	unsigned long dom0_mm_pgd_mfn;
+#endif
+} xen_crash_info_v2_t;
+
 struct mem_map_data {
 	unsigned long long	pfn_start;
 	unsigned long long	pfn_end;
@@ -908,6 +943,16 @@ struct DumpInfo {
 	/*
 	 * for Xen extraction
 	 */
+	union {				/* Both versions of Xen crash info: */
+		xen_crash_info_com_t *com;   /* common fields */
+		xen_crash_info_t *v1;	     /* without xen_phys_start */
+		xen_crash_info_v2_t *v2;     /* changeset 439a3e9459f2 */
+	} xen_crash_info;
+	int xen_crash_info_v;		/* Xen crash info version:
+					 *   0 .. xen_crash_info_com_t
+					 *   1 .. xen_crash_info_t
+					 *   2 .. xen_crash_info_v2_t */
+
 	unsigned long long	dom0_mapnr;  /* The number of page in domain-0.
 					      * Different from max_mapnr.
 					      * max_mapnr is the number of page

@@ -19,6 +19,7 @@
 #include "elf_info.h"
 #include "erase_info.h"
 #include "sadump_info.h"
+#include "cache.h"
 #include <stddef.h>
 #include <ctype.h>
 #include <sys/time.h>
@@ -230,64 +231,88 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 	return TRUE;
 }
 
-int
-readpmem_kdump_compressed(unsigned long long paddr, void *bufptr, size_t size)
+static int
+readpage_elf(unsigned long long paddr, void *bufptr)
+{
+	const off_t failed = (off_t)-1;
+	off_t offset = 0;
+
+	if (!(offset = paddr_to_offset(paddr))) {
+		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
+		       paddr);
+		return FALSE;
+	}
+
+	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
+		       info->name_memory, (unsigned long long)offset, strerror(errno));
+		return FALSE;
+	}
+
+	if (read(info->fd_memory, bufptr, info->page_size) != info->page_size) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		       info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static int
+readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 {
 	page_desc_t pd;
-	char buf[info->page_size];
-	char buf2[info->page_size];
+	char buf[info->page_size], *rdbuf;
 	int ret;
-	unsigned long retlen, page_offset;
-
-	page_offset = paddr % info->page_size;
+	unsigned long retlen;
 
 	if (!is_dumpable(info->bitmap_memory, paddr_to_pfn(paddr))) {
 		ERRMSG("pfn(%llx) is excluded from %s.\n",
 				paddr_to_pfn(paddr), info->name_memory);
-		goto error;
+		return FALSE;
 	}
 
 	if (!read_page_desc(paddr, &pd)) {
 		ERRMSG("Can't read page_desc: %llx\n", paddr);
-		goto error;
+		return FALSE;
 	}
 
 	if (lseek(info->fd_memory, pd.offset, SEEK_SET) < 0) {
 		ERRMSG("Can't seek %s. %s\n",
 				info->name_memory, strerror(errno));
-		goto error;
+		return FALSE;
 	}
 
 	/*
 	 * Read page data
 	 */
-	if (read(info->fd_memory, buf, pd.size) != pd.size) {
+	rdbuf = pd.flags & (DUMP_DH_COMPRESSED_ZLIB | DUMP_DH_COMPRESSED_LZO |
+		DUMP_DH_COMPRESSED_SNAPPY) ? buf : bufptr;
+	if (read(info->fd_memory, rdbuf, pd.size) != pd.size) {
 		ERRMSG("Can't read %s. %s\n",
 				info->name_memory, strerror(errno));
-		goto error;
+		return FALSE;
 	}
 
 	if (pd.flags & DUMP_DH_COMPRESSED_ZLIB) {
 		retlen = info->page_size;
-		ret = uncompress((unsigned char *)buf2, &retlen,
+		ret = uncompress((unsigned char *)bufptr, &retlen,
 					(unsigned char *)buf, pd.size);
 		if ((ret != Z_OK) || (retlen != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			goto error;
+			return FALSE;
 		}
-		memcpy(bufptr, buf2 + page_offset, size);
 #ifdef USELZO
 	} else if (info->flag_lzo_support
 		   && (pd.flags & DUMP_DH_COMPRESSED_LZO)) {
 		retlen = info->page_size;
 		ret = lzo1x_decompress_safe((unsigned char *)buf, pd.size,
-					    (unsigned char *)buf2, &retlen,
+					    (unsigned char *)bufptr, &retlen,
 					    LZO1X_MEM_DECOMPRESS);
 		if ((ret != LZO_E_OK) || (retlen != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			goto error;
+			return FALSE;
 		}
-		memcpy(bufptr, buf2 + page_offset, size);
 #endif
 #ifdef USESNAPPY
 	} else if ((pd.flags & DUMP_DH_COMPRESSED_SNAPPY)) {
@@ -295,34 +320,29 @@ readpmem_kdump_compressed(unsigned long long paddr, void *bufptr, size_t size)
 		ret = snappy_uncompressed_length(buf, pd.size, &retlen);
 		if (ret != SNAPPY_OK) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			goto error;
+			return FALSE;
 		}
 
-		ret = snappy_uncompress(buf, pd.size, buf2, &retlen);
+		ret = snappy_uncompress(buf, pd.size, bufptr, &retlen);
 		if ((ret != SNAPPY_OK) || (retlen != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			goto error;
+			return FALSE;
 		}
-		memcpy(bufptr, buf2 + page_offset, size);
 #endif
-	} else
-		memcpy(bufptr, buf + page_offset, size);
+	}
 
-	return size;
-error:
-	ERRMSG("type_addr: %d, addr:%llx, size:%zd\n", PADDR, paddr, size);
-	return FALSE;
+	return TRUE;
 }
 
 int
 readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 {
 	size_t read_size, next_size;
-	off_t offset = 0;
 	unsigned long long next_addr;
 	unsigned long long paddr, maddr = NOT_PADDR;
+	unsigned long long pgaddr;
+	void *pgbuf;
 	char *next_ptr;
-	const off_t failed = (off_t)-1;
 
 	switch (type_addr) {
 	case VADDR:
@@ -382,31 +402,29 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 			goto error;
 	}
 
-	if (info->flag_refiltering)
-		return readpmem_kdump_compressed(paddr, bufptr, read_size);
+	pgaddr = PAGEBASE(paddr);
+	pgbuf = cache_search(pgaddr);
+	if (!pgbuf) {
+		pgbuf = cache_alloc(pgaddr);
+		if (!pgbuf)
+			goto error;
 
-	if (info->flag_sadump)
-		return readpmem_sadump(paddr, bufptr, read_size);
-
-	if (!(offset = paddr_to_offset(paddr))) {
-		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
-		    paddr);
-		goto error;
+		if (info->flag_refiltering) {
+			if (!readpage_kdump_compressed(pgaddr, pgbuf))
+				goto error;
+		} else if (info->flag_sadump) {
+			if (!readpage_sadump(pgaddr, pgbuf))
+				goto error;
+		} else {
+			if (!readpage_elf(pgaddr, pgbuf))
+				goto error;
+		}
+		cache_add(pgaddr);
 	}
 
-	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-		    info->name_memory, (unsigned long long)offset, strerror(errno));
-		goto error;
-	}
-
-	if (read(info->fd_memory, bufptr, read_size) != read_size) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		    info->name_memory, strerror(errno));
-		goto error;
-	}
-
+	memcpy(bufptr, pgbuf + PAGEOFFSET(paddr), read_size);
 	return size;
+
 error:
 	ERRMSG("type_addr: %d, addr:%llx, size:%zd\n", type_addr, addr, size);
 	return FALSE;

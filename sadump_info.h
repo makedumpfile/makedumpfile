@@ -43,7 +43,7 @@ int sadump_initialize_bitmap_memory(void);
 int sadump_num_online_cpus(void);
 int sadump_set_timestamp(struct timeval *ts);
 unsigned long long sadump_get_max_mapnr(void);
-int readpmem_sadump(unsigned long long paddr, void *bufptr, size_t size);
+int readpage_sadump(unsigned long long paddr, void *bufptr);
 int sadump_check_debug_info(void);
 int sadump_generate_vmcoreinfo_from_vmlinux(size_t *vmcoreinfo_size);
 int sadump_generate_elf_note_from_dumpfile(void);

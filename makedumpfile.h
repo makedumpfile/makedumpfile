@@ -81,6 +81,30 @@ int get_mem_type(void);
 #define LSEEKED_PDATA	(3)
 
 /*
+ * Xen page flags
+ */
+#define BITS_PER_LONG (BITPERBYTE * sizeof(long))
+#define PG_shift(idx)	(BITS_PER_LONG - (idx))
+#define PG_mask(x, idx)	(x ## UL << PG_shift(idx))
+ /* Cleared when the owning guest 'frees' this page. */
+#define PGC_allocated       PG_mask(1, 1)
+ /* Page is Xen heap? */
+#define PGC_xen_heap        PG_mask(1, 2)
+ /* Page is broken? */
+#define PGC_broken          PG_mask(1, 7)
+ /* Mutually-exclusive page states: { inuse, offlining, offlined, free }. */
+#define PGC_state           PG_mask(3, 9)
+#define PGC_state_inuse     PG_mask(0, 9)
+#define PGC_state_offlining PG_mask(1, 9)
+#define PGC_state_offlined  PG_mask(2, 9)
+#define PGC_state_free      PG_mask(3, 9)
+#define page_state_is(ci, st) (((ci)&PGC_state) == PGC_state_##st)
+
+ /* Count of references to this frame. */
+#define PGC_count_width   PG_shift(9)
+#define PGC_count_mask    ((1UL<<PGC_count_width)-1)
+
+/*
  * Memory flags
  */
 #define MEMORY_PAGETABLE_4L	(1 << 0)

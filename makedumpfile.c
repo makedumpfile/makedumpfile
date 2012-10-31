@@ -6594,7 +6594,7 @@ is_select_domain(unsigned int id)
 }
 
 int
-exclude_xen_user_domain(void)
+exclude_xen3_user_domain(void)
 {
 	int i;
 	unsigned int count_info, _domain;
@@ -6603,9 +6603,6 @@ exclude_xen_user_domain(void)
 	unsigned long long phys_start, phys_end;
 	unsigned long long pfn, pfn_end;
 	unsigned long long j, size;
-	struct timeval tv_start;
-
-	gettimeofday(&tv_start, NULL);
 
 	/*
 	 * NOTE: the first half of bitmap is not used for Xen extraction
@@ -6656,13 +6653,106 @@ exclude_xen_user_domain(void)
 		}
 	}
 
+	return TRUE;
+}
+
+int
+exclude_xen4_user_domain(void)
+{
+	int i;
+	unsigned long count_info;
+	unsigned int  _domain;
+	unsigned int num_pt_loads = get_num_pt_loads();
+	unsigned long page_info_addr;
+	unsigned long long phys_start, phys_end;
+	unsigned long long pfn, pfn_end;
+	unsigned long long j, size;
+
+	/*
+	 * NOTE: the first half of bitmap is not used for Xen extraction
+	 */
+	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
+
+		print_progress(PROGRESS_XEN_DOMAIN, i, num_pt_loads);
+
+		pfn     = paddr_to_pfn(phys_start);
+		pfn_end = paddr_to_pfn(phys_end);
+		size    = pfn_end - pfn;
+
+		for (j = 0; pfn < pfn_end; pfn++, j++) {
+			print_progress(PROGRESS_XEN_DOMAIN, j + (size * i),
+					size * num_pt_loads);
+
+			page_info_addr = info->frame_table_vaddr + pfn * SIZE(page_info);
+			if (!readmem(VADDR_XEN,
+			      page_info_addr + OFFSET(page_info.count_info),
+		 	      &count_info, sizeof(count_info))) {
+				clear_bit_on_2nd_bitmap(pfn);
+				continue;	/* page_info may not exist */
+			}
+
+			/* always keep Xen heap pages */
+			if (count_info & PGC_xen_heap)
+				continue;
+
+			/* delete free, offlined and broken pages */
+			if (page_state_is(count_info, free) ||
+			    page_state_is(count_info, offlined) ||
+			    count_info & PGC_broken) {
+				clear_bit_on_2nd_bitmap(pfn);
+				continue;
+			}
+
+			/* keep inuse pages not allocated to any domain
+			 * this covers e.g. Xen static data
+			 */
+			if (! (count_info & PGC_allocated))
+				continue;
+
+			/* Need to check the domain
+			 * keep:
+			 *  - anonymous (_domain == 0), or
+			 *  - selected domain page
+			 */
+			if (!readmem(VADDR_XEN,
+			      page_info_addr + OFFSET(page_info._domain),
+			      &_domain, sizeof(_domain))) {
+				ERRMSG("Can't get page_info._domain.\n");
+				return FALSE;
+			}
+
+			if (_domain == 0)
+				continue;
+			if (is_select_domain(_domain))
+				continue;
+			clear_bit_on_2nd_bitmap(pfn);
+		}
+	}
+
+	return TRUE;
+}
+
+int
+exclude_xen_user_domain(void)
+{
+	struct timeval tv_start;
+	int ret;
+
+	gettimeofday(&tv_start, NULL);
+
+	if (info->xen_crash_info.com &&
+	    info->xen_crash_info.com->xen_major_version >= 4)
+		ret = exclude_xen4_user_domain();
+	else
+		ret = exclude_xen3_user_domain();
+
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_XEN_DOMAIN, num_pt_loads, num_pt_loads);
+	print_progress(PROGRESS_XEN_DOMAIN, 1, 1);
 	print_execution_time(PROGRESS_XEN_DOMAIN, &tv_start);
 
-	return TRUE;
+	return ret;
 }
 
 int

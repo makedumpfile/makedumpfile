@@ -1610,6 +1610,6 @@ struct elf_prstatus {
  */
 unsigned long long get_num_dumpable_cyclic(void);
 int get_loads_dumpfile_cyclic(void);
-
+int initial_xen(void);
 
 #endif /* MAKEDUMPFILE_H */

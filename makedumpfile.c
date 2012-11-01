@@ -2532,6 +2532,9 @@ initial(void)
 	unsigned long size;
 	int debug_info = FALSE;
 
+	if (is_xen_memory() && !initial_xen())
+		return FALSE;
+
 #ifdef USELZO
 	if (lzo_init() == LZO_E_OK)
 		info->flag_lzo_support = TRUE;
@@ -7108,10 +7111,6 @@ create_dumpfile(void)
 
 	if (!info->flag_refiltering && !info->flag_sadump) {
 		if (!get_elf_info(info->fd_memory, info->name_memory))
-			return FALSE;
-	}
-	if (is_xen_memory()) {
-		if (!initial_xen())
 			return FALSE;
 	}
 	if (!initial())

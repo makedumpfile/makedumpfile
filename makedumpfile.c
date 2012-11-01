@@ -6252,23 +6252,26 @@ get_xen_info(void)
 	if (!get_xen_basic_info_arch())
 		return FALSE;
 
-	if (SYMBOL(alloc_bitmap) == NOT_FOUND_SYMBOL) {
-		ERRMSG("Can't get the symbol of alloc_bitmap.\n");
-		return FALSE;
-	}
-	if (!readmem(VADDR_XEN, SYMBOL(alloc_bitmap), &info->alloc_bitmap,
-	      sizeof(info->alloc_bitmap))) {
-		ERRMSG("Can't get the value of alloc_bitmap.\n");
-		return FALSE;
-	}
-	if (SYMBOL(max_page) == NOT_FOUND_SYMBOL) {
-		ERRMSG("Can't get the symbol of max_page.\n");
-		return FALSE;
-	}
-	if (!readmem(VADDR_XEN, SYMBOL(max_page), &info->max_page,
-	    sizeof(info->max_page))) {
-		ERRMSG("Can't get the value of max_page.\n");
-		return FALSE;
+	if (!info->xen_crash_info.com ||
+	    info->xen_crash_info.com->xen_major_version < 4) {
+		if (SYMBOL(alloc_bitmap) == NOT_FOUND_SYMBOL) {
+			ERRMSG("Can't get the symbol of alloc_bitmap.\n");
+			return FALSE;
+		}
+		if (!readmem(VADDR_XEN, SYMBOL(alloc_bitmap), &info->alloc_bitmap,
+		      sizeof(info->alloc_bitmap))) {
+			ERRMSG("Can't get the value of alloc_bitmap.\n");
+			return FALSE;
+		}
+		if (SYMBOL(max_page) == NOT_FOUND_SYMBOL) {
+			ERRMSG("Can't get the symbol of max_page.\n");
+			return FALSE;
+		}
+		if (!readmem(VADDR_XEN, SYMBOL(max_page), &info->max_page,
+		    sizeof(info->max_page))) {
+			ERRMSG("Can't get the value of max_page.\n");
+			return FALSE;
+		}
 	}
 
 	/*

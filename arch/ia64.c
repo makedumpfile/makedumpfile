@@ -335,26 +335,29 @@ get_xen_basic_info_ia64(void)
 
 	info->frame_table_vaddr = VIRT_FRAME_TABLE_ADDR; /* "frame_table" is same value */
 
-	if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
-		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
-		return FALSE;
+	if (!info->xen_crash_info.com ||
+	    info->xen_crash_info.com->xen_major_version < 4) {
+		if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
+			ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
+			return FALSE;
+		}
+		if (!readmem(VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+			     sizeof(xen_end))) {
+			ERRMSG("Can't get the value of xenheap_phys_end.\n");
+			return FALSE;
+		}
+		if (SYMBOL(xen_pstart) == NOT_FOUND_SYMBOL) {
+			ERRMSG("Can't get the symbol of xen_pstart.\n");
+			return FALSE;
+		}
+		if (!readmem(VADDR_XEN, SYMBOL(xen_pstart), &xen_start,
+			     sizeof(xen_start))) {
+			ERRMSG("Can't get the value of xen_pstart.\n");
+			return FALSE;
+		}
+		info->xen_heap_start = paddr_to_pfn(xen_start);
+		info->xen_heap_end   = paddr_to_pfn(xen_end);
 	}
-	if (!readmem(VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
-	      sizeof(xen_end))) {
-		ERRMSG("Can't get the value of xenheap_phys_end.\n");
-		return FALSE;
-	}
-	if (SYMBOL(xen_pstart) == NOT_FOUND_SYMBOL) {
-		ERRMSG("Can't get the symbol of xen_pstart.\n");
-		return FALSE;
-	}
-	if (!readmem(VADDR_XEN, SYMBOL(xen_pstart), &xen_start,
-	    sizeof(xen_start))) {
-		ERRMSG("Can't get the value of xen_pstart.\n");
-		return FALSE;
-	}
-	info->xen_heap_start = paddr_to_pfn(xen_start);
-	info->xen_heap_end   = paddr_to_pfn(xen_end);
 
 	return TRUE;
 }

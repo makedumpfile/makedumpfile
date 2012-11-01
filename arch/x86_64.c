@@ -363,9 +363,6 @@ kvtop_xen_x86_64(unsigned long kvaddr)
 
 int get_xen_basic_info_x86_64(void)
 {
-	unsigned long frame_table_vaddr;
-	unsigned long xen_end;
-
  	if (!info->xen_phys_start) {
 		if (info->xen_crash_info_v < 2) {
 			ERRMSG("Can't get Xen physical start address.\n"
@@ -389,28 +386,34 @@ int get_xen_basic_info_x86_64(void)
 		return FALSE;
 	}
 
-	if (SYMBOL(frame_table) == NOT_FOUND_SYMBOL) {
-		ERRMSG("Can't get the symbol of frame_table.\n");
-		return FALSE;
-	}
-	if (!readmem(VADDR_XEN, SYMBOL(frame_table), &frame_table_vaddr,
-	    sizeof(frame_table_vaddr))) {
-		ERRMSG("Can't get the value of frame_table.\n");
-		return FALSE;
-	}
-	info->frame_table_vaddr = frame_table_vaddr;
+	if (SYMBOL(frame_table) != NOT_FOUND_SYMBOL) {
+		unsigned long frame_table_vaddr;
 
-	if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
-		ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
-		return FALSE;
+		if (!readmem(VADDR_XEN, SYMBOL(frame_table),
+			     &frame_table_vaddr, sizeof(frame_table_vaddr))) {
+			ERRMSG("Can't get the value of frame_table.\n");
+			return FALSE;
+		}
+		info->frame_table_vaddr = frame_table_vaddr;
+	} else
+		info->frame_table_vaddr = FRAMETABLE_VIRT_START;
+
+	if (!info->xen_crash_info.com ||
+	    info->xen_crash_info.com->xen_major_version < 4) {
+		unsigned long xen_end;
+
+		if (SYMBOL(xenheap_phys_end) == NOT_FOUND_SYMBOL) {
+			ERRMSG("Can't get the symbol of xenheap_phys_end.\n");
+			return FALSE;
+		}
+		if (!readmem(VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
+			     sizeof(xen_end))) {
+			ERRMSG("Can't get the value of xenheap_phys_end.\n");
+			return FALSE;
+		}
+		info->xen_heap_start = 0;
+		info->xen_heap_end   = paddr_to_pfn(xen_end);
 	}
-	if (!readmem(VADDR_XEN, SYMBOL(xenheap_phys_end), &xen_end,
-	    sizeof(xen_end))) {
-		ERRMSG("Can't get the value of xenheap_phys_end.\n");
-		return FALSE;
-	}
-	info->xen_heap_start = 0;
-	info->xen_heap_end   = paddr_to_pfn(xen_end);
 
 	return TRUE;
 }

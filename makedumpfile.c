@@ -7954,6 +7954,40 @@ out:
 	return ret;
 }
 
+/*
+ * Get the amount of free memory from /proc/meminfo.
+ */
+unsigned long long
+get_free_memory_size(void) {
+	char buf[BUFSIZE_FGETS];
+	char unit[4];
+	unsigned long long free_size = 0;
+	char *name_meminfo = "/proc/meminfo";
+	FILE *file_meminfo;
+
+	if ((file_meminfo = fopen(name_meminfo, "r")) == NULL) {
+		ERRMSG("Can't open the %s. %s\n", name_meminfo, strerror(errno));
+		return FALSE;
+	}
+
+	while (fgets(buf, BUFSIZE_FGETS, file_meminfo) != NULL) {
+		if (sscanf(buf, "MemFree: %llu %s", &free_size, unit) == 2) {
+			if (strcmp(unit, "kB") == 0) {
+				free_size *= 1024;
+				goto out;
+			}
+		}
+	}
+
+	ERRMSG("Can't get free memory size.\n");
+	free_size = 0;
+out:
+	if (fclose(file_meminfo) < 0)
+		ERRMSG("Can't close the %s. %s\n", name_meminfo, strerror(errno));
+
+	return free_size;
+}
+
 static struct option longopts[] = {
 	{"split", no_argument, NULL, 's'}, 
 	{"reassemble", no_argument, NULL, 'r'},

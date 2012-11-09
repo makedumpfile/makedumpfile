@@ -199,11 +199,6 @@ isAnon(unsigned long mapping)
 #define FILENAME_STDOUT		"STDOUT"
 
 /*
- * For cyclic processing
- */
-#define DEFAULT_BUFSIZE_CYCLIC         (1024 * 1024)
-
-/*
  * Minimam vmcore has 2 ProgramHeaderTables(PT_NOTE and PT_LOAD).
  */
 #define MIN_ELF32_HEADER_SIZE \
@@ -1612,5 +1607,6 @@ unsigned long long get_num_dumpable_cyclic(void);
 int get_loads_dumpfile_cyclic(void);
 int initial_xen(void);
 unsigned long long get_free_memory_size(void);
+int calculate_cyclic_buffer_size(void);
 
 #endif /* MAKEDUMPFILE_H */

@@ -2555,29 +2555,6 @@ initial(void)
 	}
 #endif
 
-	if (info->flag_cyclic) {
-		/*
-		 * buffer size is specified as Kbyte
-		 */
-		if (info->bufsize_cyclic == 0)
-			info->bufsize_cyclic = DEFAULT_BUFSIZE_CYCLIC;
-		else
-			info->bufsize_cyclic <<= 10;
-	
-		/*
-		 * Max buffer size is 100 MB
-		 */
-		if (info->bufsize_cyclic > (100 << 20)) {
-			MSG("Specified buffer size is too large, ");
-			MSG("The buffer size for the cyclic mode will be truncated to 100 MB.\n");
-			info->bufsize_cyclic = (100 << 20);
-		}
-		info->pfn_cyclic = info->bufsize_cyclic * BITPERBYTE;
-
-		DEBUG_MSG("\n");
-		DEBUG_MSG("Buffer size for the cyclic mode: %ld\n", info->bufsize_cyclic);
-	}
-
 	if (info->flag_exclude_xen_dom) {
 		if(info->flag_cyclic) {
 			info->flag_cyclic = FALSE;
@@ -2718,6 +2695,41 @@ out:
 	}
 	if (!get_max_mapnr())
 		return FALSE;
+
+	if (info->flag_cyclic) {
+		if (info->bufsize_cyclic == 0) {
+			if (!calculate_cyclic_buffer_size())
+				return FALSE;
+		} else {
+			unsigned long long free_memory;
+
+			/*
+                        * The buffer size is specified as Kbyte with
+                        * --cyclic-buffer <size> option.
+                        */
+			info->bufsize_cyclic <<= 10;
+
+			/*
+			 * Truncate the buffer size to free memory size.
+			 */
+			free_memory = get_free_memory_size();
+			if (info->bufsize_cyclic > free_memory) {
+				MSG("Specified buffer size is larger than free memory.\n");
+				MSG("The buffer size for the cyclic mode will ");
+				MSG("be truncated to %lld byte.\n", free_memory);
+				/*
+				 * bufsize_cyclic is used to allocate 1st and 2nd bitmap, 
+				 * so it should be truncated to the half of free_memory.
+				 */
+				info->bufsize_cyclic = free_memory / 2;
+			}
+		}
+
+		info->pfn_cyclic = info->bufsize_cyclic * BITPERBYTE;
+
+		DEBUG_MSG("\n");
+		DEBUG_MSG("Buffer size for the cyclic mode: %ld\n", info->bufsize_cyclic);
+	}
 
 	if (debug_info) {
 		if (info->flag_sadump)
@@ -7986,6 +7998,34 @@ out:
 		ERRMSG("Can't close the %s. %s\n", name_meminfo, strerror(errno));
 
 	return free_size;
+}
+
+
+/*
+ * Choose the lesser value of the two below as the size of cyclic buffer.
+ *  - the size enough for storing the 1st/2nd bitmap for the whole of vmcore
+ *  - 80% of free memory (as safety limit)
+ */
+int
+calculate_cyclic_buffer_size(void) {
+	unsigned long long free_size, needed_size;
+
+	if (info->max_mapnr <= 0) {
+		ERRMSG("Invalid max_mapnr(%llu).\n", info->max_mapnr);
+		return FALSE;
+	}
+
+	/*
+	 * free_size will be used to allocate 1st and 2nd bitmap, so it
+	 * should be 40% of free memory to keep the size of cyclic buffer
+	 * within 80% of free memory.
+	 */
+	free_size = get_free_memory_size() * 0.4;
+	needed_size = (info->max_mapnr * 2) / BITPERBYTE;
+
+	info->bufsize_cyclic = (free_size <= needed_size) ? free_size : needed_size;
+
+	return TRUE;
 }
 
 static struct option longopts[] = {

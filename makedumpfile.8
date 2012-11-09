@@ -356,7 +356,8 @@ In the cyclic mode, the number of cycles is represented as:
     num_of_cycles = system_memory / (\fIbuffer_size\fR * 1024 * bit_per_bytes * page_size )
 
 The lesser number of cycles, the faster working speed is expected.
-Default \fIbuffer_size\fR is 1024.
+By default, \fIbuffer_size\fR will be calculated automatically depending on system memory
+size, so ordinary users don't need to specify this option.
 
 .br
 .B Example:

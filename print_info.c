@@ -177,7 +177,8 @@ print_usage(void)
 	MSG("                          (BUFFER_SIZE * 1024 * bit_per_bytes * page_size)\n");
 	MSG("\n");
 	MSG("      The lesser number of cycles, the faster working speed is expected.\n");
-	MSG("      Default BUFFER_SIZE is 1024.\n");
+	MSG("      By default, BUFFER_SIZE will be calculated automatically depending on\n");
+	MSG("      system memory size, so ordinary users don't need to specify this option.\n");
 	MSG("\n");
 	MSG("  [--non-cyclic]:\n");
 	MSG("      Running in the non-cyclic mode, this mode uses the old filtering logic\n");

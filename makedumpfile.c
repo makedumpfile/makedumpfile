@@ -3663,6 +3663,20 @@ exclude_free_page(void)
 }
 
 /*
+ * For the kernel versions from v2.6.15 to v2.6.17.
+ */
+static int
+page_is_buddy_v1(unsigned long flags, unsigned int _mapcount,
+			unsigned long private, unsigned int _count)
+{
+	if ((flags & (1UL << NUMBER(PG_private)))
+	    && _count == 0)
+		return TRUE;
+
+	return FALSE;
+}
+
+/*
  * For the kernel versions from v2.6.17 to v2.6.37.
  */
 static int
@@ -3701,6 +3715,9 @@ setup_page_is_buddy(void)
 		if (NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) != NOT_FOUND_NUMBER) {
 			if (OFFSET(page._mapcount) != NOT_FOUND_STRUCTURE)
 				info->page_is_buddy = page_is_buddy_v3;
+		} else if (SIZE(pageflags) == NOT_FOUND_STRUCTURE) {
+			if (OFFSET(page._count) != NOT_FOUND_STRUCTURE)
+				info->page_is_buddy = page_is_buddy_v1;
 		}
 	} else
 		info->page_is_buddy = page_is_buddy_v2;

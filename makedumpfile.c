@@ -2682,8 +2682,6 @@ initial(void)
 		debug_info = TRUE;
 	}
 
-	if (!get_value_for_old_linux())
-		return FALSE;
 out:
 	if (!info->page_size) {
 		/*
@@ -2781,6 +2779,9 @@ out:
 	}
 
 	if (is_xen_memory() && !get_dom0_mapnr())
+		return FALSE;
+
+	if (!get_value_for_old_linux())
 		return FALSE;
 
 	return TRUE;

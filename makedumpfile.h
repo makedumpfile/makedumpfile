@@ -1158,6 +1158,8 @@ struct size_table {
 	long	cpumask_t;
 	long	kexec_segment;
 	long	elf64_hdr;
+
+	long	pageflags;
 };
 
 struct offset_table {
@@ -1166,6 +1168,8 @@ struct offset_table {
 		long	_count;
 		long	mapping;
 		long	lru;
+		long	_mapcount;
+		long	private;
 	} page;
 	struct mem_section {
 		long	section_mem_map;
@@ -1327,6 +1331,10 @@ struct number_table {
 	long	PG_lru;
 	long	PG_private;
 	long	PG_swapcache;
+	long	PG_buddy;
+	long	PG_slab;
+
+	long	PAGE_BUDDY_MAPCOUNT_VALUE;
 };
 
 struct srcfile_table {

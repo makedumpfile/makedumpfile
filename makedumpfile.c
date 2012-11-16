@@ -57,6 +57,8 @@ do { \
 		*ptr_long_table = value; \
 } while (0)
 
+static void setup_page_is_buddy(void);
+
 void
 initialize_tables(void)
 {
@@ -2835,6 +2837,9 @@ out:
 	if (!get_value_for_old_linux())
 		return FALSE;
 
+	if (info->flag_cyclic && (info->dump_level & DL_EXCLUDE_FREE))
+		setup_page_is_buddy();
+
 	return TRUE;
 }
 
@@ -3657,6 +3662,18 @@ exclude_free_page(void)
 	return TRUE;
 }
 
+static void
+setup_page_is_buddy(void)
+{
+	if (OFFSET(page.private) == NOT_FOUND_STRUCTURE)
+		goto out;
+
+out:
+	if (!info->page_is_buddy)
+		DEBUG_MSG("Can't select page_is_buddy handler; "
+			  "follow free lists instead of mem_map array.\n");
+}
+
 /*
  * If using a dumpfile in kdump-compressed format as a source file
  * instead of /proc/vmcore, 1st-bitmap of a new dumpfile must be
@@ -3867,8 +3884,8 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 	unsigned long long pfn_read_start, pfn_read_end, index_pg;
 	unsigned char page_cache[SIZE(page) * PGMM_CACHED];
 	unsigned char *pcache;
-	unsigned int _count;
-	unsigned long flags, mapping;
+	unsigned int _count, _mapcount = 0;
+	unsigned long flags, mapping, private = 0;
 
 	/*
 	 * Refresh the buffer of struct page, when changing mem_map.
@@ -3922,11 +3939,28 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		flags   = ULONG(pcache + OFFSET(page.flags));
 		_count  = UINT(pcache + OFFSET(page._count));
 		mapping = ULONG(pcache + OFFSET(page.mapping));
+		if (OFFSET(page._mapcount) != NOT_FOUND_STRUCTURE)
+			_mapcount = UINT(pcache + OFFSET(page._mapcount));
+		if (OFFSET(page.private) != NOT_FOUND_STRUCTURE)
+			private = ULONG(pcache + OFFSET(page.private));
 
+		/*
+		 * Exclude the free page managed by a buddy
+		 */
+		if ((info->dump_level & DL_EXCLUDE_FREE)
+		    && info->flag_cyclic
+		    && info->page_is_buddy
+		    && info->page_is_buddy(flags, _mapcount, private, _count)) {
+			int i;
+
+			for (i = 0; i < (1 << private); ++i)
+				clear_bit_on_2nd_bitmap_for_kernel(pfn + i);
+			pfn_free += i;
+		}
 		/*
 		 * Exclude the cache page without the private page.
 		 */
-		if ((info->dump_level & DL_EXCLUDE_CACHE)
+		else if ((info->dump_level & DL_EXCLUDE_CACHE)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isPrivate(flags) && !isAnon(mapping)) {
 			if (clear_bit_on_2nd_bitmap_for_kernel(pfn))
@@ -4007,7 +4041,7 @@ exclude_unnecessary_pages_cyclic(void)
 	 */
 	copy_bitmap_cyclic();
 
-	if (info->dump_level & DL_EXCLUDE_FREE)
+	if ((info->dump_level & DL_EXCLUDE_FREE) && !info->page_is_buddy)
 		if (!exclude_free_page())
 			return FALSE;
 
@@ -4016,7 +4050,8 @@ exclude_unnecessary_pages_cyclic(void)
 	 */
 	if (info->dump_level & DL_EXCLUDE_CACHE ||
 	    info->dump_level & DL_EXCLUDE_CACHE_PRI ||
-	    info->dump_level & DL_EXCLUDE_USER_DATA) {
+	    info->dump_level & DL_EXCLUDE_USER_DATA ||
+	    ((info->dump_level & DL_EXCLUDE_FREE) && info->page_is_buddy)) {
 
 		gettimeofday(&tv_start, NULL);
 

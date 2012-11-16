@@ -607,7 +607,7 @@ search_structure(Dwarf_Die *die, int *found)
 static void
 search_number(Dwarf_Die *die, int *found)
 {
-	int tag;
+	int tag, bytesize;
 	Dwarf_Word const_value;
 	Dwarf_Attribute attr;
 	Dwarf_Die child, *walker;
@@ -617,6 +617,22 @@ search_number(Dwarf_Die *die, int *found)
 		tag  = dwarf_tag(die);
 		if (tag != DW_TAG_enumeration_type)
 			continue;
+
+		if (dwarf_info.cmd == DWARF_INFO_GET_ENUMERATION_TYPE_SIZE) {
+		   		   name = dwarf_diename(die);
+
+			if (!name || strcmp(name, dwarf_info.struct_name))
+			   	     continue;
+
+			if ((bytesize = dwarf_bytesize(die)) <= 0)
+			   	      	continue;
+
+			*found = TRUE;
+
+			dwarf_info.struct_size = bytesize;
+
+			return;
+				}
 
 		if (dwarf_child(die, &child) != 0)
 			continue;

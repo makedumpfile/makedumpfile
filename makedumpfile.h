@@ -251,13 +251,22 @@ do { \
 #define ARRAY_LENGTH(X)		(array_table.X)
 #define SIZE_INIT(X, Y) \
 do { \
-	if ((SIZE(X) = get_structure_size(Y, 0)) == FAILED_DWARFINFO) \
+	if ((SIZE(X) = get_structure_size(Y, DWARF_INFO_GET_STRUCT_SIZE))	\
+		== FAILED_DWARFINFO) \
 		return FALSE; \
 } while (0)
 #define TYPEDEF_SIZE_INIT(X, Y) \
 do { \
-	if ((SIZE(X) = get_structure_size(Y, 1)) == FAILED_DWARFINFO) \
+	if ((SIZE(X) = get_structure_size(Y, DWARF_INFO_GET_TYPEDEF_SIZE)) \
+		== FAILED_DWARFINFO) \
 		return FALSE; \
+} while (0)
+#define ENUM_TYPE_SIZE_INIT(X, Y) \
+do { \
+	if ((SIZE(X) = get_structure_size(Y,	\
+		DWARF_INFO_GET_ENUMERATION_TYPE_SIZE))	\
+			== FAILED_DWARFINFO)				\
+	return FALSE; \
 } while (0)
 #define OFFSET_INIT(X, Y, Z) \
 do { \

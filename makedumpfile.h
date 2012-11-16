@@ -71,8 +71,17 @@ int get_mem_type(void);
  * The following values are for linux-2.6.25 or former.
  */
 #define PG_lru_ORIGINAL	 	(5)
+#define PG_slab_ORIGINAL	(7)
 #define PG_private_ORIGINAL	(11)	/* Has something at ->private */
 #define PG_swapcache_ORIGINAL	(15)	/* Swap page: swp_entry_t in private */
+
+#define PG_buddy_v2_6_17_to_v2_6_26	(19)
+#define PG_buddy_v2_6_27_to_v2_6_37	(18)
+
+#define PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_38	(-2)
+#define PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_39_to_latest_version	(-128)
+
+#define PAGE_FLAGS_SIZE_v2_6_27_to_latest_version	(4)
 
 #define PAGE_MAPPING_ANON	(1)
 

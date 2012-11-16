@@ -1192,6 +1192,38 @@ get_value_for_old_linux(void)
 		NUMBER(PG_private) = PG_private_ORIGINAL;
 	if (NUMBER(PG_swapcache) == NOT_FOUND_NUMBER)
 		NUMBER(PG_swapcache) = PG_swapcache_ORIGINAL;
+	if (NUMBER(PG_slab) == NOT_FOUND_NUMBER)
+		NUMBER(PG_slab) = PG_slab_ORIGINAL;
+	/*
+	 * The values from here are for free page filtering based on
+	 * mem_map array. These are minimum effort to cover old
+	 * kernels.
+	 *
+	 * The logic also needs offset values for some members of page
+	 * structure. But it much depends on kernel versions. We avoid
+	 * to hard code the values.
+	 */
+	if (NUMBER(PG_buddy) == NOT_FOUND_NUMBER) {
+		if (info->kernel_version >= KERNEL_VERSION(2, 6, 17)
+		    && info->kernel_version <= KERNEL_VERSION(2, 6, 26))
+			NUMBER(PG_buddy) = PG_buddy_v2_6_17_to_v2_6_26;
+		if (info->kernel_version >= KERNEL_VERSION(2, 6, 27)
+		    && info->kernel_version <= KERNEL_VERSION(2, 6, 37))
+			NUMBER(PG_buddy) = PG_buddy_v2_6_27_to_v2_6_37;
+	}
+	if (NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) == NOT_FOUND_NUMBER) {
+		if (info->kernel_version == KERNEL_VERSION(2, 6, 38))
+			NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) =
+				PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_38;
+		if (info->kernel_version >= KERNEL_VERSION(2, 6, 39))
+			NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) =
+			PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_39_to_latest_version;
+	}
+	if (SIZE(pageflags) == NOT_FOUND_STRUCTURE) {
+		if (info->kernel_version >= KERNEL_VERSION(2, 6, 27))
+			SIZE(pageflags) =
+				PAGE_FLAGS_SIZE_v2_6_27_to_latest_version;
+	}
 	return TRUE;
 }
 

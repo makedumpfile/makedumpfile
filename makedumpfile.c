@@ -4187,7 +4187,8 @@ exclude_unnecessary_pages_cyclic(void)
 			if (mmd->mem_map == NOT_MEMMAP_ADDR)
 				continue;
 
-			if (mmd->pfn_end >= info->cyclic_start_pfn || mmd->pfn_start <= info->cyclic_end_pfn) {
+			if (mmd->pfn_end >= info->cyclic_start_pfn &&
+			    mmd->pfn_start <= info->cyclic_end_pfn) {
 				if (!__exclude_unnecessary_pages(mmd->mem_map,
 								 mmd->pfn_start, mmd->pfn_end))
 					return FALSE;

@@ -75,9 +75,6 @@ int get_mem_type(void);
 #define PG_private_ORIGINAL	(11)	/* Has something at ->private */
 #define PG_swapcache_ORIGINAL	(15)	/* Swap page: swp_entry_t in private */
 
-#define PG_buddy_v2_6_17_to_v2_6_26	(19)
-#define PG_buddy_v2_6_27_to_v2_6_37	(18)
-
 #define PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_38	(-2)
 #define PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_39_to_latest_version	(-128)
 

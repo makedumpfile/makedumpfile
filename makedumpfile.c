@@ -1206,14 +1206,6 @@ get_value_for_old_linux(void)
 	 * structure. But it much depends on kernel versions. We avoid
 	 * to hard code the values.
 	 */
-	if (NUMBER(PG_buddy) == NOT_FOUND_NUMBER) {
-		if (info->kernel_version >= KERNEL_VERSION(2, 6, 17)
-		    && info->kernel_version <= KERNEL_VERSION(2, 6, 26))
-			NUMBER(PG_buddy) = PG_buddy_v2_6_17_to_v2_6_26;
-		if (info->kernel_version >= KERNEL_VERSION(2, 6, 27)
-		    && info->kernel_version <= KERNEL_VERSION(2, 6, 37))
-			NUMBER(PG_buddy) = PG_buddy_v2_6_27_to_v2_6_37;
-	}
 	if (NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) == NOT_FOUND_NUMBER) {
 		if (info->kernel_version == KERNEL_VERSION(2, 6, 38))
 			NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) =

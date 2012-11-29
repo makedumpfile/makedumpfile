@@ -294,15 +294,6 @@ kvtop_xen_x86(unsigned long kvaddr)
 
 int get_xen_basic_info_x86(void)
 {
-	if (!info->xen_phys_start) {
-		if (info->xen_crash_info_v < 2) {
-			ERRMSG("Can't get Xen physical start address.\n"
-			       "Please use the --xen_phys_start option.");
-			return FALSE;
-		}
-		info->xen_phys_start = info->xen_crash_info.v2->xen_phys_start;
-	}
-
 	if (SYMBOL(pgd_l2) == NOT_FOUND_SYMBOL &&
 	    SYMBOL(pgd_l3) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get pgd.\n");

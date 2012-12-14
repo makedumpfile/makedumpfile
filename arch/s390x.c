@@ -195,10 +195,10 @@ static ulong _kl_pg_table_deref_s390x(unsigned long vaddr, unsigned long table)
 	readmem(VADDR, table + offset, &entry, sizeof(entry));
 	/*
 	 * Check if the page table entry could be read and doesn't have
-	 * any of the reserved bits set.
+	 * the reserved bit set.
 	 * Check if the page table entry has the invalid bit set.
 	 */
-	if (entry &  (_PAGE_CO | _PAGE_ZERO | _PAGE_INVALID)) {
+	if (entry &  (_PAGE_ZERO | _PAGE_INVALID)) {
 		ERRMSG("Invalid page table entry.\n");
 		return 0;
 	}

@@ -613,7 +613,6 @@ do { \
 #define _SEGMENT_INDEX_SHIFT	20
 
 /* Hardware bits in the page table entry */
-#define _PAGE_CO		0x100	/* HW Change-bit override */
 #define _PAGE_ZERO		0x800	/* Bit pos 52 must conatin zero */
 #define _PAGE_INVALID		0x400	/* HW invalid bit */
 #define _PAGE_INDEX_SHIFT	12

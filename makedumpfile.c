@@ -43,6 +43,7 @@ unsigned long long pfn_cache;
 unsigned long long pfn_cache_private;
 unsigned long long pfn_user;
 unsigned long long pfn_free;
+unsigned long long pfn_hwpoison;
 
 unsigned long long num_dumped;
 
@@ -994,6 +995,7 @@ get_structure_info(void)
 	ENUM_NUMBER_INIT(PG_swapcache, "PG_swapcache");
 	ENUM_NUMBER_INIT(PG_buddy, "PG_buddy");
 	ENUM_NUMBER_INIT(PG_slab, "PG_slab");
+	ENUM_NUMBER_INIT(PG_hwpoison, "PG_hwpoison");
 
 	ENUM_TYPE_SIZE_INIT(pageflags, "pageflags");
 
@@ -1427,6 +1429,7 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER("PG_swapcache", PG_swapcache);
 	WRITE_NUMBER("PG_buddy", PG_buddy);
 	WRITE_NUMBER("PG_slab", PG_slab);
+	WRITE_NUMBER("PG_hwpoison", PG_hwpoison);
 
 	WRITE_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 
@@ -1722,6 +1725,8 @@ read_vmcoreinfo(void)
 	READ_NUMBER("PG_swapcache", PG_swapcache);
 	READ_NUMBER("PG_slab", PG_slab);
 	READ_NUMBER("PG_buddy", PG_buddy);
+	READ_NUMBER("PG_hwpoison", PG_hwpoison);
+
 	READ_SRCFILE("pud_t", pud_t);
 
 	READ_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
@@ -4081,6 +4086,13 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 			if (clear_bit_on_2nd_bitmap_for_kernel(pfn))
 				pfn_user++;
 		}
+		/*
+		 * Exclude the hwpoison page.
+		 */
+		else if (isHWPOISON(flags)) {
+			if (clear_bit_on_2nd_bitmap_for_kernel(pfn))
+				pfn_hwpoison++;
+		}
 	}
 	return TRUE;
 }
@@ -4144,11 +4156,13 @@ exclude_unnecessary_pages_cyclic(void)
 			return FALSE;
 
 	/*
-	 * Exclude cache pages, cache private pages, user data pages, and free pages.
+	 * Exclude cache pages, cache private pages, user data pages,
+	 * free pages and hwpoison pages.
 	 */
 	if (info->dump_level & DL_EXCLUDE_CACHE ||
 	    info->dump_level & DL_EXCLUDE_CACHE_PRI ||
 	    info->dump_level & DL_EXCLUDE_USER_DATA ||
+	    NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER ||
 	    ((info->dump_level & DL_EXCLUDE_FREE) && info->page_is_buddy)) {
 
 		gettimeofday(&tv_start, NULL);
@@ -4250,11 +4264,13 @@ create_2nd_bitmap(void)
 	}
 
 	/*
-	 * Exclude cache pages, cache private pages, user data pages.
+	 * Exclude cache pages, cache private pages, user data pages,
+	 * and hwpoison pages.
 	 */
 	if (info->dump_level & DL_EXCLUDE_CACHE ||
 	    info->dump_level & DL_EXCLUDE_CACHE_PRI ||
-	    info->dump_level & DL_EXCLUDE_USER_DATA) {
+	    info->dump_level & DL_EXCLUDE_USER_DATA ||
+	    NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER) {
 		if (!exclude_unnecessary_pages()) {
 			ERRMSG("Can't exclude unnecessary pages.\n");
 			return FALSE;
@@ -5294,7 +5310,8 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	/*
 	 * Reset counter for debug message.
 	 */
-	pfn_zero =  pfn_cache = pfn_cache_private = pfn_user = pfn_free = 0;
+	pfn_zero = pfn_cache = pfn_cache_private = 0;
+	pfn_user = pfn_free = pfn_hwpoison = 0;
 	pfn_memhole = info->max_mapnr;
 
 	info->cyclic_start_pfn = 0;
@@ -6173,7 +6190,8 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	/*
 	 * Reset counter for debug message.
 	 */
-	pfn_zero =  pfn_cache = pfn_cache_private = pfn_user = pfn_free = 0;
+	pfn_zero = pfn_cache = pfn_cache_private = 0;
+	pfn_user = pfn_free = pfn_hwpoison = 0;
 	pfn_memhole = info->max_mapnr;
 
 	cd_header->offset
@@ -7078,7 +7096,7 @@ print_report(void)
 	pfn_original = info->max_mapnr - pfn_memhole;
 
 	pfn_excluded = pfn_zero + pfn_cache + pfn_cache_private
-	    + pfn_user + pfn_free;
+	    + pfn_user + pfn_free + pfn_hwpoison;
 	shrinking = (pfn_original - pfn_excluded) * 100;
 	shrinking = shrinking / pfn_original;
 
@@ -7091,6 +7109,7 @@ print_report(void)
 	    pfn_cache_private);
 	REPORT_MSG("    User process data pages : 0x%016llx\n", pfn_user);
 	REPORT_MSG("    Free pages              : 0x%016llx\n", pfn_free);
+	REPORT_MSG("    Hwpoison pages          : 0x%016llx\n", pfn_hwpoison);
 	REPORT_MSG("  Remaining pages  : 0x%016llx\n",
 	    pfn_original - pfn_excluded);
 	REPORT_MSG("  (The number of pages is reduced to %lld%%.)\n",

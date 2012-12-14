@@ -140,6 +140,8 @@ test_bit(int nr, unsigned long addr)
 #define isLRU(flags)		test_bit(NUMBER(PG_lru), flags)
 #define isPrivate(flags)	test_bit(NUMBER(PG_private), flags)
 #define isSwapCache(flags)	test_bit(NUMBER(PG_swapcache), flags)
+#define isHWPOISON(flags)	(test_bit(NUMBER(PG_hwpoison), flags) \
+				&& (NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER))
 
 static inline int
 isAnon(unsigned long mapping)
@@ -1343,6 +1345,7 @@ struct number_table {
 	long	PG_swapcache;
 	long	PG_buddy;
 	long	PG_slab;
+	long    PG_hwpoison;
 
 	long	PAGE_BUDDY_MAPCOUNT_VALUE;
 };

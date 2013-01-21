@@ -215,7 +215,9 @@ isAnon(unsigned long mapping)
 	sizeof(Elf64_Ehdr)+sizeof(Elf64_Phdr)+sizeof(Elf64_Phdr)
 #define MIN_ELF_HEADER_SIZE \
 	MAX(MIN_ELF32_HEADER_SIZE, MIN_ELF64_HEADER_SIZE)
-#define STRNEQ(A, B)	(A && B && \
+static inline int string_exists(char *s) { return (s ? TRUE : FALSE); }
+#define STRNEQ(A, B)(string_exists((char *)(A)) &&	\
+		     string_exists((char *)(B)) &&	\
 	(strncmp((char *)(A), (char *)(B), strlen((char *)(B))) == 0))
 
 #define USHORT(ADDR)	*((unsigned short *)(ADDR))

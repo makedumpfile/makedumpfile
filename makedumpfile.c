@@ -3032,7 +3032,7 @@ clear_bit_on_2nd_bitmap_for_kernel(unsigned long long pfn)
 static inline int
 is_in_segs(unsigned long long paddr)
 {
-	if (info->flag_refiltering) {
+	if (info->flag_refiltering || info->flag_sadump) {
 		static struct dump_bitmap bitmap1 = {0};
 
 		if (bitmap1.fd == 0)

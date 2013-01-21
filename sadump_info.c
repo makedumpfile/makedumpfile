@@ -751,15 +751,13 @@ sadump_initialize_bitmap_memory(void)
 {
 	struct sadump_header *sh = si->sh_memory;
 	struct dump_bitmap *bmp;
-	unsigned long dumpable_bitmap_offset, dumpable_bitmap_len;
+	unsigned long dumpable_bitmap_offset;
 	unsigned long long section, max_section, pfn;
 	unsigned long long *block_table;
 
 	dumpable_bitmap_offset =
 		si->sub_hdr_offset +
 		sh->block_size * (sh->sub_hdr_size + sh->bitmap_blocks);
-
-	dumpable_bitmap_len = sh->block_size * sh->dumpable_bitmap_blocks;
 
 	bmp = malloc(sizeof(struct dump_bitmap));
 	if (bmp == NULL) {

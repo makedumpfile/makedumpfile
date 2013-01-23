@@ -790,7 +790,6 @@ open_files_for_rearranging_dumpdata(void)
 /*
  * Open the following files when it creates the dump file.
  * - dump mem
- * - dump file
  * - bit map
  * if it reads the vmcoreinfo file
  *   - vmcoreinfo file
@@ -6335,7 +6334,6 @@ close_files_for_rearranging_dumpdata(void)
 /*
  * Close the following files when it creates the dump file.
  * - dump mem
- * - dump file
  * - bit map
  * if it reads the vmcoreinfo file
  *   - vmcoreinfo file

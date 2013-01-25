@@ -151,8 +151,8 @@ isAnon(unsigned long mapping)
 
 #define PAGESIZE()		(info->page_size)
 #define PAGESHIFT()		(info->page_shift)
-#define PAGEOFFSET(X)		(((unsigned long)(X)) & (PAGESIZE() - 1))
-#define PAGEBASE(X)		(((unsigned long)(X)) & ~(PAGESIZE() - 1))
+#define PAGEOFFSET(X)		(((unsigned long long)(X)) & (PAGESIZE() - 1))
+#define PAGEBASE(X)		(((unsigned long long)(X)) & ~(PAGESIZE() - 1))
 
 /*
  * for SPARSEMEM

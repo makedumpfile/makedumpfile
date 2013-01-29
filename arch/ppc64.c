@@ -25,12 +25,37 @@
 #include "../makedumpfile.h"
 
 int
+set_ppc64_max_physmem_bits(void)
+{
+	long array_len = ARRAY_LENGTH(mem_section);
+	/*
+	 * The older ppc64 kernels uses _MAX_PHYSMEM_BITS as 42 and the
+	 * newer kernels 3.7 onwards uses 46 bits.
+	 */
+
+	info->max_physmem_bits  = _MAX_PHYSMEM_BITS_ORIG ;
+	if ((array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
+		|| (array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT())))
+		return TRUE;
+
+	info->max_physmem_bits  = _MAX_PHYSMEM_BITS_3_7;
+	if ((array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
+		|| (array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT())))
+		return TRUE;
+
+	return FALSE;
+}
+
+int
 get_machdep_info_ppc64(void)
 {
 	unsigned long vmlist, vmalloc_start;
 
 	info->section_size_bits = _SECTION_SIZE_BITS;
-	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
+	if (!set_ppc64_max_physmem_bits()) {
+		ERRMSG("Can't detect max_physmem_bits.\n");
+		return FALSE;
+	}
 	info->page_offset = __PAGE_OFFSET;
 
 	if (SYMBOL(_stext) == NOT_FOUND_SYMBOL) {

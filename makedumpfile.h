@@ -570,7 +570,8 @@ do { \
 #define VMALLOCBASE     	(0xD000000000000000)
 #define KVBASE			(SYMBOL(_stext))
 #define _SECTION_SIZE_BITS	(24)
-#define _MAX_PHYSMEM_BITS	(44)
+#define _MAX_PHYSMEM_BITS_ORIG  (44)
+#define _MAX_PHYSMEM_BITS_3_7   (46)
 #endif
 
 #ifdef __powerpc32__

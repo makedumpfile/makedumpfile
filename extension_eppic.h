@@ -27,6 +27,8 @@
  * for makedumpfile extension.
  */
 
+#define MAX_ARRAY_DIMENSION 16
+
 /* member information */
 typedef MEMBER_S {
 

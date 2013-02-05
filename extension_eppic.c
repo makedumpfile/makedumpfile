@@ -19,9 +19,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <dwarf.h>
 
 #include "makedumpfile.h"
 #include "extension_eppic.h"
+#include "print_info.h"
 
 /*
  * Most of the functions included in this file performs similar
@@ -66,6 +68,35 @@ reg_callback(char *name, int load)
 }
 
 /*
+ * This function is a copy of eppic_setupidx() function in
+ * applications/crash/eppic.c file from eppic source code
+ * repository.
+ *
+ * set idx value to actual array indexes from specified size
+ */
+static void
+eppic_setupidx(TYPE_S *t, int ref, int nidx, int *idxlst)
+{
+	/* put the idxlst in index size format */
+	if (nidx) {
+		int i;
+		for (i = 0; i < nidx - 1; i++) {
+			/* kludge for array dimensions of [1] */
+			if (idxlst[i + 1] == 0)
+				idxlst[i + 1] = 1;
+			idxlst[i] = idxlst[i] / idxlst[i + 1];
+		}
+
+		/* divide by element size for last element bound */
+		if (ref)
+			idxlst[i] /= eppic_defbsize();
+		else
+			idxlst[i] /= eppic_type_getsize(t);
+		eppic_type_setidxlst(t, idxlst);
+	}
+}
+
+/*
  * Call back functions for eppic to query the dump image
  */
 
@@ -81,11 +112,151 @@ apiputmem(ull iaddr, void *p, int nbytes)
 	return 1;
 }
 
+/*
+ * Drill down the type of the member and update eppic with information
+ * about the member
+ */
 static char *
-apimember(char *mname, ull pidx, type_t *tm,
-		member_t *m, ull *lidx)
+drilldown(ull offset, type_t *t)
 {
-	return 0;
+	int type_flag, len = 0, t_len = 0, nidx = 0;
+	int fctflg = 0, ref = 0, *idxlst = 0;
+	ull die_off = offset, t_die_off;
+	char *tstr = NULL;
+
+	while (get_die_attr_type(die_off, &type_flag, &t_die_off)) {
+		switch (type_flag) {
+		/* typedef inserts a level of reference to the actual type */
+		case DW_TAG_pointer_type:
+			ref++;
+			die_off = t_die_off;
+			/*
+			 * This could be a void *, in which case the drill
+			 * down stops here
+			 */
+			if (!get_die_attr_type(die_off, &type_flag,
+						&t_die_off)) {
+				/* make it a char* */
+				eppic_parsetype("char", t, ref);
+				return eppic_strdup("");
+			}
+			break;
+		/* Handle pointer to function */
+		case DW_TAG_subroutine_type:
+			fctflg = 1;
+			die_off = t_die_off;
+			break;
+		/* Handle arrays */
+		case DW_TAG_array_type:
+			if (!idxlst) {
+				idxlst = eppic_calloc(sizeof(int) * \
+					(MAX_ARRAY_DIMENSION + 1));
+				if (!idxlst) {
+					ERRMSG("Out of memory\n");
+					return NULL;
+				}
+			}
+			if (nidx >= MAX_ARRAY_DIMENSION) {
+				ERRMSG("Too many array indexes. Max=%d\n",
+						MAX_ARRAY_DIMENSION);
+				return NULL;
+			}
+
+			/* handle multi-dimensional array */
+			len = get_die_length(die_off, FALSE);
+			t_len = get_die_length(t_die_off, FALSE);
+			if (len > 0 && t_len > 0)
+				idxlst[nidx++] = len / t_len;
+			die_off = t_die_off;
+			break;
+		/* Handle typedef */
+		case DW_TAG_typedef:
+			die_off = t_die_off;
+			break;
+		case DW_TAG_base_type:
+			eppic_parsetype(tstr = get_die_name(t_die_off), t, 0);
+			goto out;
+		case DW_TAG_union_type:
+			eppic_type_mkunion(t);
+			goto label;
+		case DW_TAG_enumeration_type:
+			eppic_type_mkenum(t);
+			goto label;
+		case DW_TAG_structure_type:
+			eppic_type_mkstruct(t);
+			goto label;
+		/* Unknown TAG ? */
+		default:
+			die_off = t_die_off;
+			break;
+		}
+	}
+
+label:
+	eppic_type_setsize(t, get_die_length(t_die_off, TRUE));
+	eppic_type_setidx(t, (ull)t_die_off);
+	tstr = get_die_name(t_die_off);
+
+out:
+	eppic_setupidx(t, ref, nidx, idxlst);
+	if (fctflg)
+		eppic_type_setfct(t, 1);
+	eppic_pushref(t, ref + (nidx ? 1 : 0));
+	if (tstr)
+		return eppic_strdup(tstr);
+	return eppic_strdup("");
+}
+
+/*
+ * Get the type, size and position information for a member of a structure.
+ */
+static char *
+apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
+{
+	int index, nfields = -1, size;
+	int nbits = 0, fbits = 0;
+	long offset;
+	ull m_die, die_off = idx;
+	char *name;
+
+	nfields = get_die_nfields(die_off);
+	/*
+	 * get_die_nfields() returns < 0 if the die is not structure type
+	 * or union type
+	 */
+	if (nfields <= 0)
+		return NULL;
+
+	/* if we're being asked the next member in a getfirst/getnext
+	 * sequence
+	 */
+	if (mname && !mname[0] && last_index && (*last_index))
+		index = *last_index;
+	else
+		index = 0;
+
+	while (index < nfields) {
+		size = get_die_member(die_off, index, &offset, &name, &nbits,
+				&fbits, &m_die);
+
+		if (size < 0)
+			return NULL;
+
+		if (!mname || !mname[0] || !strcmp(mname, name)) {
+			eppic_member_ssize(m, size);
+			if (name)
+				eppic_member_sname(m, name);
+			else
+				eppic_member_sname(m, "");
+			eppic_member_soffset(m, offset);
+			eppic_member_snbits(m, nbits);
+			eppic_member_sfbit(m, fbits);
+			*last_index = index + 1;
+			return drilldown(m_die, tm);
+		}
+		index++;
+	}
+	return NULL;
 }
 
 static int
@@ -123,7 +294,7 @@ apigetctype(int ctype, char *name, type_t *tout)
 static char *
 apigetrtype(ull idx, type_t *t)
 {
-	return "";
+	return drilldown(idx, t);
 }
 
 static int

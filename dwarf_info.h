@@ -70,6 +70,13 @@ long get_array_length(char *name01, char *name02, unsigned int cmd);
 long get_enum_number(char *enum_name);
 int get_source_filename(char *structname, char *src_name, int cmd);
 long get_domain(char *symname, int cmd, unsigned long long *die);
+int get_die_nfields(unsigned long long die_off);
+int get_die_member(unsigned long long die_off, int index, long *offset,
+	char **name, int *nbits, int *fbits, unsigned long long *m_die);
+int get_die_attr_type(unsigned long long die_off, int *type_flag,
+	unsigned long long *die_attr_off);
+char *get_die_name(unsigned long long die_off);
+int get_die_length(unsigned long long die_off, int flag);
 int set_dwarf_debuginfo(char *mod_name, char *os_release, char *name_debuginfo, int fd_debuginfo);
 
 #endif  /* DWARF_INFO_H */

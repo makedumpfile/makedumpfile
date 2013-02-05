@@ -463,6 +463,29 @@ get_dwarf_base_type(Dwarf_Die *die)
 	return TRUE;
 }
 
+/*
+ * Get the die, given the offset
+ */
+static int
+get_die_from_offset(Dwarf_Off offset, Dwarf_Die *die)
+{
+	if (!init_dwarf_info())
+		return FALSE;
+
+	if ((!offset) || (!die))
+		return FALSE;
+
+	if (!dwarf_offdie(dwarf_info.dwarfd, offset, die)) {
+		ERRMSG("Can't find the DIE.\n");
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+/*
+ * Function for searching struct page.union.struct.mapping.
+ */
 static int
 is_container(Dwarf_Die *die)
 {
@@ -1272,6 +1295,189 @@ get_domain(char *symname, int cmd, unsigned long long *die)
 		*die = (unsigned long long) dwarf_info.die_offset;
 
 	return dwarf_info.struct_size;
+}
+
+/*
+ * Get the number of fields in a structure or union provided the
+ * die offset of the structure or union
+ */
+int
+get_die_nfields(unsigned long long die_off)
+{
+	int tag, nfields = 0;
+	Dwarf_Die result, child, *die;
+
+	if (!get_die_from_offset((Dwarf_Off) die_off, &result)) {
+		ERRMSG("Can't find the DIE.\n");
+		return -1;
+	}
+
+	die = &result;
+	tag = dwarf_tag(die);
+	if (tag != DW_TAG_structure_type && tag != DW_TAG_union_type) {
+		ERRMSG("DIE is not of structure or union type.\n");
+		return -1;
+	}
+
+	if (dwarf_child(die, &child) != 0)
+		return -1;
+
+	/* Find the number of fields in the structure */
+	die = &child;
+	do {
+		tag = dwarf_tag(die);
+		if (tag == DW_TAG_member)
+			nfields++;
+		else
+			continue;
+	} while (!dwarf_siblingof(die, die));
+
+	return nfields;
+}
+
+/*
+ * Get the information of the structure member given by index
+ */
+int
+get_die_member(unsigned long long die_off, int index, long *offset,
+		char **name, int *nbits, int *fbits, unsigned long long *m_die)
+{
+	int tag, size, nfields = 0;
+	Dwarf_Die result, child, die_base, *die;
+
+	if (!offset || !nbits || !fbits || !name || !m_die)
+		return -1;
+
+	if (!get_die_from_offset((Dwarf_Off) die_off, &result)) {
+		ERRMSG("Can't find the DIE.\n");
+		return -1;
+	}
+
+	die = &result;
+	tag = dwarf_tag(die);
+	if (tag != DW_TAG_structure_type && tag != DW_TAG_union_type) {
+		ERRMSG("DIE is not of structure or union type.\n");
+		return -1;
+	}
+
+	if (dwarf_child(die, &child) != 0)
+		return -1;
+
+	/* Find the correct field in the structure */
+	die = &child;
+	do {
+		tag = dwarf_tag(die);
+		if (tag == DW_TAG_member) {
+			if (nfields == index)
+				break;
+			else
+				nfields++;
+		}
+	} while (!dwarf_siblingof(die, die));
+
+	if (nfields != index) {
+		ERRMSG("No member found at index %d.\n", index);
+		return -1;
+	}
+
+	/* Fill in the required info for the member */
+	if (!get_data_member_location(die, offset))
+		*offset = 0;
+
+	*name = dwarf_diename(die);
+	*m_die = dwarf_dieoffset(die);
+
+	get_die_type(die, &die_base);
+	if (dwarf_tag(&die_base) == DW_TAG_array_type) {
+		dwarf_info.array_length = 0;
+		get_data_array_length(die);
+		size = dwarf_info.array_length;
+	} else {
+		size = dwarf_bytesize(&die_base);
+	}
+
+	/* TODO
+	 * Correctly update fbits and nbits
+	 */
+	*nbits = *fbits = 0;
+
+	if (size < 0)
+		return 0;
+	else
+		return size;
+}
+
+/*
+ * Get the die attribute type
+ */
+int
+get_die_attr_type(unsigned long long die_off, int *type_flag,
+		unsigned long long *die_attr_off)
+{
+	Dwarf_Die result;
+
+	if (!die_attr_off)
+		return FALSE;
+
+	if (!get_die_from_offset((Dwarf_Off) die_off, &result)) {
+		ERRMSG("Can't find the DIE.\n");
+		return FALSE;
+	}
+
+	if (!get_die_type(&result, &result))
+		return FALSE;
+
+	*die_attr_off = dwarf_dieoffset(&result);
+	*type_flag = dwarf_tag(&result);
+	return TRUE;
+}
+
+/*
+ * Get name attribute given the die offset
+ */
+char *
+get_die_name(unsigned long long die_off)
+{
+	Dwarf_Die result;
+
+	if (!die_off)
+		return NULL;
+
+	if (!get_die_from_offset((Dwarf_Off) die_off, &result)) {
+		ERRMSG("Can't find the DIE.\n");
+		return NULL;
+	}
+
+	return dwarf_diename(&result);
+}
+
+/*
+ * Get length attribute given the die offset
+ */
+int
+get_die_length(unsigned long long die_off, int flag)
+{
+	Dwarf_Die result, die_base;
+
+	if (!die_off)
+		return FALSE;
+
+	if (!get_die_from_offset((Dwarf_Off) die_off, &result)) {
+		ERRMSG("Can't find the DIE.\n");
+		return FALSE;
+	}
+
+	if (flag)
+		return dwarf_bytesize(&result);
+
+	get_die_type(&result, &die_base);
+	if (dwarf_tag(&die_base) == DW_TAG_array_type) {
+		dwarf_info.array_length = 0;
+		get_data_array_length(&result);
+		return dwarf_info.array_length;
+	} else {
+		return dwarf_bytesize(&die_base);
+	}
 }
 
 /*

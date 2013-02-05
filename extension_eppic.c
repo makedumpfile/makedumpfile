@@ -91,7 +91,33 @@ apimember(char *mname, ull pidx, type_t *tm,
 static int
 apigetctype(int ctype, char *name, type_t *tout)
 {
-	return 0;
+	long size = 0;
+	unsigned long long die = 0;
+
+	switch (ctype) {
+	case V_TYPEDEF:
+		size = get_domain(name, DWARF_INFO_GET_DOMAIN_TYPEDEF, &die);
+		break;
+	case V_STRUCT:
+		size = get_domain(name, DWARF_INFO_GET_DOMAIN_STRUCT, &die);
+		break;
+	case V_UNION:
+		size = get_domain(name, DWARF_INFO_GET_DOMAIN_UNION, &die);
+		break;
+	/* TODO
+	 * Implement for all the domains
+	 */
+	}
+
+	if (size <= 0 || !die)
+		return 0;
+
+	/* populate */
+	eppic_type_settype(tout, ctype);
+	eppic_type_setsize(tout, size);
+	eppic_type_setidx(tout, (ull)(unsigned long)die);
+	eppic_pushref(tout, 0);
+	return 1;
 }
 
 static char *

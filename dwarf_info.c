@@ -51,6 +51,7 @@ struct dwarf_info {
 	long	enum_number;		/* OUT */
 	unsigned char	type_flag;	/* OUT */
 	char	src_name[LEN_SRCFILE];	/* OUT */
+	Dwarf_Off die_offset;		/* OUT */
 };
 static struct dwarf_info	dwarf_info;
 
@@ -96,6 +97,22 @@ is_search_typedef(int cmd)
 {
 	if ((cmd == DWARF_INFO_GET_TYPEDEF_SIZE)
 	    || (cmd == DWARF_INFO_GET_TYPEDEF_SRCNAME))
+		return TRUE;
+	else
+		return FALSE;
+}
+
+static int
+is_search_domain(int cmd)
+{
+	if ((cmd == DWARF_INFO_GET_DOMAIN_STRUCT)
+		|| (cmd == DWARF_INFO_GET_DOMAIN_TYPEDEF)
+		|| (cmd == DWARF_INFO_GET_DOMAIN_ARRAY)
+		|| (cmd == DWARF_INFO_GET_DOMAIN_UNION)
+		|| (cmd == DWARF_INFO_GET_DOMAIN_ENUM)
+		|| (cmd == DWARF_INFO_GET_DOMAIN_REF)
+		|| (cmd == DWARF_INFO_GET_DOMAIN_STRING)
+		|| (cmd == DWARF_INFO_GET_DOMAIN_BASE))
 		return TRUE;
 	else
 		return FALSE;
@@ -750,6 +767,74 @@ search_symbol(Dwarf_Die *die, int *found)
 }
 
 static void
+search_domain(Dwarf_Die *die, int *found)
+{
+	int tag;
+	const char *name;
+	short flag = 0;
+	Dwarf_Die die_type;
+
+	do {
+		tag  = dwarf_tag(die);
+		name = dwarf_diename(die);
+
+		/*
+		 * Descend into members and search for the
+		 * needed domain there.
+		 */
+		if ((!name) || strcmp(name, dwarf_info.symbol_name)) {
+			if (!get_die_type(die, &die_type))
+				continue;
+
+			if (is_container(&die_type)) {
+				Dwarf_Die child;
+
+				if (dwarf_child(&die_type, &child) != 0)
+					continue;
+
+				search_domain(&child, found);
+
+				if (*found)
+					return;
+			}
+		}
+
+		if ((!name) || strcmp(name, dwarf_info.symbol_name))
+			continue;
+
+		switch (dwarf_info.cmd) {
+		case DWARF_INFO_GET_DOMAIN_STRUCT:
+			if (tag == DW_TAG_structure_type)
+				flag = 1;
+			break;
+		case DWARF_INFO_GET_DOMAIN_UNION:
+			if (tag == DW_TAG_union_type)
+				flag = 1;
+			break;
+		case DWARF_INFO_GET_DOMAIN_TYPEDEF:
+			if (tag == DW_TAG_typedef)
+				flag = 1;
+			break;
+		/* TODO
+		 * Implement functionality for the rest of the domains
+		 */
+		}
+
+		if (!flag)
+			continue;
+
+		dwarf_info.struct_size = dwarf_bytesize(die);
+
+		if (dwarf_info.struct_size > 0) {
+			if (found)
+				*found = TRUE;
+			dwarf_info.die_offset = dwarf_dieoffset(die);
+			break;
+		}
+	} while (!dwarf_siblingof(die, die));
+}
+
+static void
 search_die_tree(Dwarf_Die *die, int *found)
 {
 	Dwarf_Die child;
@@ -774,6 +859,9 @@ search_die_tree(Dwarf_Die *die, int *found)
 
 	else if (is_search_typedef(dwarf_info.cmd))
 		search_typedef(die, found);
+
+	else if (is_search_domain(dwarf_info.cmd))
+		search_domain(die, found);
 }
 
 static int
@@ -1163,6 +1251,27 @@ get_source_filename(char *structname, char *src_name, int cmd)
 	strncpy(src_name, dwarf_info.src_name, LEN_SRCFILE);
 
 	return TRUE;
+}
+
+/*
+ * Get the domain information of the symbol
+ */
+long
+get_domain(char *symname, int cmd, unsigned long long *die)
+{
+	dwarf_info.cmd         = cmd;
+	dwarf_info.symbol_name = symname;
+	dwarf_info.type_name   = NULL;
+	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
+	dwarf_info.die_offset  = 0;
+
+	if (!get_debug_info())
+		return 0;
+
+	if (die)
+		*die = (unsigned long long) dwarf_info.die_offset;
+
+	return dwarf_info.struct_size;
 }
 
 /*

@@ -47,6 +47,14 @@ enum {
 	DWARF_INFO_GET_SYMBOL_TYPE,
 	DWARF_INFO_GET_MEMBER_TYPE,
 	DWARF_INFO_GET_ENUMERATION_TYPE_SIZE,
+	DWARF_INFO_GET_DOMAIN_STRUCT,
+	DWARF_INFO_GET_DOMAIN_TYPEDEF,
+	DWARF_INFO_GET_DOMAIN_ARRAY,
+	DWARF_INFO_GET_DOMAIN_UNION,
+	DWARF_INFO_GET_DOMAIN_ENUM,
+	DWARF_INFO_GET_DOMAIN_REF,
+	DWARF_INFO_GET_DOMAIN_STRING,
+	DWARF_INFO_GET_DOMAIN_BASE,
 };
 
 char *get_dwarf_module_name(void);
@@ -61,6 +69,7 @@ char *get_member_type_name(char *structname, char *membername, int cmd, long *si
 long get_array_length(char *name01, char *name02, unsigned int cmd);
 long get_enum_number(char *enum_name);
 int get_source_filename(char *structname, char *src_name, int cmd);
+long get_domain(char *symname, int cmd, unsigned long long *die);
 int set_dwarf_debuginfo(char *mod_name, char *os_release, char *name_debuginfo, int fd_debuginfo);
 
 #endif  /* DWARF_INFO_H */

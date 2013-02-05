@@ -206,6 +206,7 @@ isAnon(unsigned long mapping)
 #define FILENAME_BITMAP		"kdump_bitmapXXXXXX"
 #define FILENAME_STDOUT		"STDOUT"
 
+
 /*
  * Minimam vmcore has 2 ProgramHeaderTables(PT_NOTE and PT_LOAD).
  */
@@ -223,6 +224,8 @@ static inline int string_exists(char *s) { return (s ? TRUE : FALSE); }
 #define USHORT(ADDR)	*((unsigned short *)(ADDR))
 #define UINT(ADDR)	*((unsigned int *)(ADDR))
 #define ULONG(ADDR)	*((unsigned long *)(ADDR))
+#define ULONGLONG(ADDR)	*((unsigned long long *)(ADDR))
+
 
 /*
  * for symbol
@@ -819,6 +822,8 @@ struct cache_data {
 	size_t	cache_size;
 	off_t	offset;
 };
+typedef unsigned long int ulong;
+typedef unsigned long long int ulonglong;
 
 /*
  * makedumpfile header
@@ -1094,6 +1099,8 @@ struct symbol_table {
 	unsigned long long	log_buf;
 	unsigned long long	log_buf_len;
 	unsigned long long	log_end;
+	unsigned long long	log_first_idx;
+	unsigned long long	log_next_idx;
 	unsigned long long	max_pfn;
 	unsigned long long	node_remap_start_vaddr;
 	unsigned long long	node_remap_end_vaddr;
@@ -1173,6 +1180,7 @@ struct size_table {
 	long	cpumask_t;
 	long	kexec_segment;
 	long	elf64_hdr;
+	long	log;
 
 	long	pageflags;
 };
@@ -1306,6 +1314,13 @@ struct offset_table {
 		long	p_paddr;
 		long	p_memsz;
 	} elf64_phdr;
+
+	struct log_s {
+		long ts_nsec;
+		long len;
+		long text_len;
+	} log;
+
 };
 
 /*

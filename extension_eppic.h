@@ -70,4 +70,6 @@ typedef TYPE_S {
 	ull rtype;  /* type_t a reference refers too */
 } type_t;
 
+extern int update_filter_info_raw(unsigned long long, int, int);
+
 #endif /* _EXTENSION_EPPIC_H */

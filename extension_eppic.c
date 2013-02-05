@@ -387,6 +387,22 @@ apiops icops = {
 	apifindsym
 };
 
+/* Extensions to built-in functions */
+VALUE_S *
+eppic_memset(VALUE_S *vaddr, VALUE_S *vch, VALUE_S *vlen)
+{
+	ull addr = eppic_getval(vaddr);
+	int len = eppic_getval(vlen);
+	int ch = eppic_getval(vch);
+
+	/*
+	 * Set the value at address from iaddr till iaddr + nbytes
+	 * to the value specified in variable ch
+	 */
+	update_filter_info_raw(addr, ch, len);
+	return eppic_makebtype(1);
+}
+
 
 /* Initialize eppic */
 int
@@ -399,6 +415,10 @@ eppic_init()
 
 		/* set the new function callback */
 		eppic_setcallback(reg_callback);
+
+		/* Extend built-in functions to include memset */
+		eppic_builtin("int memset(char *, int, int)",
+				(bf_t *)eppic_memset);
 
 		return 0;
 	}

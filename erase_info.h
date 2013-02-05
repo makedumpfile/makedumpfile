@@ -38,6 +38,7 @@ int gather_filter_info(void);
 void clear_filter_info(void);
 void filter_data_buffer(unsigned char *buf, unsigned long long paddr, size_t size);
 unsigned long get_size_eraseinfo(void);
+int update_filter_info_raw(unsigned long long, int, int);
 
 #endif /* _ERASE_INFO_H */
 

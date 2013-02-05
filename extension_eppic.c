@@ -313,6 +313,30 @@ apigetval(char *name, ull *val, VALUE_S *value)
 		return 0;
 
 	*val = ptr;
+
+	if (!value)
+		return 1;
+
+	/* Support for fully typed symbol access */
+	ull type;
+	TYPE_S *stype;
+
+	type = get_die_offset(name);
+	stype = eppic_gettype(value);
+
+	apigetrtype(type, stype);
+
+	eppic_pushref(stype, 1);
+	eppic_setmemaddr(value, *val);
+	eppic_do_deref(1, value, value);
+
+	*val = eppic_getval(value);
+
+	if (!eppic_typeislocal(stype) && eppic_type_getidx(stype) > 100) {
+		char *tname = get_die_name(eppic_type_getidx(stype));
+		if (tname)
+			eppic_chktype(stype, tname);
+	}
 	return 1;
 }
 

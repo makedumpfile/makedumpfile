@@ -55,6 +55,7 @@ enum {
 	DWARF_INFO_GET_DOMAIN_REF,
 	DWARF_INFO_GET_DOMAIN_STRING,
 	DWARF_INFO_GET_DOMAIN_BASE,
+	DWARF_INFO_GET_DIE,
 };
 
 char *get_dwarf_module_name(void);
@@ -76,6 +77,7 @@ int get_die_member(unsigned long long die_off, int index, long *offset,
 int get_die_attr_type(unsigned long long die_off, int *type_flag,
 	unsigned long long *die_attr_off);
 char *get_die_name(unsigned long long die_off);
+unsigned long long get_die_offset(char *sysname);
 int get_die_length(unsigned long long die_off, int flag);
 int set_dwarf_debuginfo(char *mod_name, char *os_release, char *name_debuginfo, int fd_debuginfo);
 

@@ -119,6 +119,15 @@ is_search_domain(int cmd)
 }
 
 static int
+is_search_die(int cmd)
+{
+	if (cmd == DWARF_INFO_GET_DIE)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+static int
 process_module (Dwfl_Module *dwflmod,
 		void **userdata __attribute__ ((unused)),
 		const char *name __attribute__ ((unused)),
@@ -858,6 +867,25 @@ search_domain(Dwarf_Die *die, int *found)
 }
 
 static void
+search_die(Dwarf_Die *die, int *found)
+{
+	const char *name;
+
+	do {
+		name = dwarf_diename(die);
+
+		if ((!name) || strcmp(name, dwarf_info.symbol_name))
+			continue;
+
+		if (found)
+			*found = TRUE;
+
+		dwarf_info.die_offset = dwarf_dieoffset(die);
+		return;
+	} while (!dwarf_siblingof(die, die));
+}
+
+static void
 search_die_tree(Dwarf_Die *die, int *found)
 {
 	Dwarf_Die child;
@@ -885,6 +913,9 @@ search_die_tree(Dwarf_Die *die, int *found)
 
 	else if (is_search_domain(dwarf_info.cmd))
 		search_domain(die, found);
+
+	else if (is_search_die(dwarf_info.cmd))
+		search_die(die, found);
 }
 
 static int
@@ -1449,6 +1480,27 @@ get_die_name(unsigned long long die_off)
 	}
 
 	return dwarf_diename(&result);
+}
+
+/*
+ * Get the die offset given the die name
+ */
+unsigned long long
+get_die_offset(char *sysname)
+{
+	dwarf_info.cmd         = DWARF_INFO_GET_DIE;
+	dwarf_info.symbol_name = sysname;
+	dwarf_info.type_name   = NULL;
+	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
+	dwarf_info.die_offset  = 0;
+
+	if (!sysname)
+		return 0;
+
+	if (!get_debug_info())
+		return 0;
+
+	return (unsigned long long)dwarf_info.die_offset;
 }
 
 /*

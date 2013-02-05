@@ -7508,7 +7508,8 @@ retry:
 		}
 	}
 
-	if (info->name_filterconfig && !gather_filter_info())
+	if ((info->name_filterconfig || info->name_eppic_config)
+			&& !gather_filter_info())
 		return FALSE;
 
 	if (!create_dump_bitmap())
@@ -8406,6 +8407,7 @@ static struct option longopts[] = {
 	{"diskset", required_argument, NULL, 'k'},
 	{"non-cyclic", no_argument, NULL, 'Y'},
 	{"cyclic-buffer", required_argument, NULL, 'Z'},
+	{"eppic", required_argument, NULL, 'S'},
 	{0, 0, 0, 0}
 };
 
@@ -8503,6 +8505,9 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			info->flag_split = 1;
+			break;
+		case 'S':
+			info->name_eppic_config = optarg;
 			break;
 		case 'r':
 			info->flag_reassemble = 1;

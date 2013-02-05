@@ -914,6 +914,12 @@ struct DumpInfo {
 	FILE		*file_filterconfig;
 
 	/*
+	 * Filter config file containing eppic language filtering rules
+	 * to filter out kernel data from vmcore
+	 */
+	char		*name_eppic_config;
+
+	/*
 	 * diskdimp info:
 	 */
 	int		block_order;

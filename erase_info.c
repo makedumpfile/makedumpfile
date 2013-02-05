@@ -21,6 +21,8 @@
 #include "dwarf_info.h"
 #include "erase_info.h"
 
+#include <dlfcn.h>
+
 struct erase_info	*erase_info = NULL;
 unsigned long		num_erase_info = 1; /* Node 0 is unused. */
 
@@ -1811,6 +1813,59 @@ process_config_file(const char *name_config)
 	return TRUE;
 }
 
+
+/* Process the eppic macro using eppic library */
+static int
+process_eppic_file(char *name_config)
+{
+	void *handle;
+	void (*eppic_load)(char *), (*eppic_unload)(char *);
+	int (*eppic_init)();
+
+	/*
+	 * Dynamically load the eppic_makedumpfile.so library.
+	 */
+	handle = dlopen("eppic_makedumpfile.so", RTLD_LAZY);
+	if (!handle) {
+		ERRMSG("dlopen failed: %s\n", dlerror());
+		return FALSE;
+	}
+
+	/* TODO
+	 * Support specifying eppic macros in makedumpfile.conf file
+	 */
+
+	eppic_init = dlsym(handle, "eppic_init");
+	if (!eppic_init) {
+		ERRMSG("Could not find eppic_init function\n");
+		return FALSE;
+	}
+
+	eppic_load = dlsym(handle, "eppic_load");
+	if (!eppic_load) {
+		ERRMSG("Could not find eppic_load function\n");
+		return FALSE;
+	}
+
+	eppic_unload = dlsym(handle, "eppic_unload");
+	if (!eppic_unload)
+		ERRMSG("Could not find eppic_unload function\n");
+
+	if (eppic_init()) {
+		ERRMSG("Init failed \n");
+		return FALSE;
+	}
+
+	/* Load/compile, execute and unload the eppic macro */
+	eppic_load(name_config);
+	eppic_unload(name_config);
+
+	if (dlclose(handle))
+		ERRMSG("dlclose failed: %s\n", dlerror());
+
+	return TRUE;
+}
+
 static void
 split_filter_info(struct filter_info *prev, unsigned long long next_paddr,
 						size_t size)
@@ -1904,7 +1959,7 @@ extract_filter_info(unsigned long long start_paddr,
 int
 gather_filter_info(void)
 {
-	int ret;
+	int ret = TRUE;
 
 	/*
 	 * Before processing filter config file, load the symbol data of
@@ -1915,7 +1970,17 @@ gather_filter_info(void)
 	if (!load_module_symbols())
 		return FALSE;
 
-	ret = process_config_file(info->name_filterconfig);
+	/*
+	 * XXX: We support specifying both makedumpfile.conf and
+	 * eppic macro at the same time. Whether to retain or discard the
+	 * functionality provided by makedumpfile.conf is open for
+	 * discussion
+	 */
+	if (info->name_filterconfig)
+		ret = process_config_file(info->name_filterconfig);
+
+	if (info->name_eppic_config)
+		ret &= process_eppic_file(info->name_eppic_config);
 
 	/*
 	 * Remove modules symbol information, we dont need now.

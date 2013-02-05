@@ -48,6 +48,10 @@
   7.Build with snappy support:
     # make USESNAPPY=on ; make install
     The user has to prepare snappy library.
+  8.Build the extension module for --eppic option.
+    # make eppic_makedumpfile.so
+    The user has to prepare eppic library from the following site:
+    http://code.google.com/p/eppic/
 
 * SUPPORTED KERNELS
   This makedumpfile supports the following kernels.

@@ -6,7 +6,7 @@ makedumpfile \- make a small dumpfile of kdump
 .br
 \fBmakedumpfile\fR \-F [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR
 .br
-\fBmakedumpfile\fR   [\fIOPTION\fR] \-x \fIVMLINUX\fR \-\-config \fIFILTERCONFIGFILE\fR \fIVMCORE\fR \fIDUMPFILE\fR
+\fBmakedumpfile\fR   [\fIOPTION\fR] \-x \fIVMLINUX\fR [\-\-config \fIFILTERCONFIGFILE\fR] [\-\-eppic \fIEPPICMACRO\fR] \fIVMCORE\fR \fIDUMPFILE\fR
 .br
 \fBmakedumpfile\fR \-R \fIDUMPFILE\fR
 .br
@@ -69,6 +69,15 @@ config and builds the list of memory addresses and its sizes after processing
 filter commands. The memory locations that require to be filtered out are
 then poisoned with character 'X' (58 in Hex). Refer to
 \fBmakedumpfile.conf(5)\fR for file format.
+.PP
+Eppic macros can also be used to specify kernel symbols and its members that
+need to be filtered. Eppic provides C semantics including language constructs
+such as conditional statements, logical and arithmetic operators, functions,
+nested loops to traverse and erase kernel data. --eppic requires
+\fBeppic_makedumpfile.so\fR and eppic library. \fBeppic_makedumpfile.so\fR
+can be built from makedumpfile source. Refer to
+\fBhttp://code.google.com/p/eppic/\fR to build eppic library \fBlibeppic.a\fR
+and for more information on writing eppic macros.
 .PP
 To analyze the first kernel's memory usage, makedumpfile can refer to
 \fIVMCOREINFO\fR instead of \fIVMLINUX\fR. \fIVMCOREINFO\fR contains the first
@@ -263,6 +272,13 @@ Used in conjunction with \-x \fIVMLINUX\fR option, to specify the filter
 config file \fIFILTERCONFIGFILE\fR that contains erase commands to filter out
 desired kernel data from vmcore while creating \fIDUMPFILE\fR. For filter
 command syntax please refer to \fBmakedumpfile.conf(5)\fR.
+
+.TP
+\fB\-\-eppic\fR \fIEPPICMACRO\fR
+Used in conjunction with \-x \fIVMLINUX\fR option, to specify the eppic macro
+file that contains filter rules or directory that contains eppic macro
+files to filter out desired kernel data from vmcore while creating \fIDUMPFILE\fR.
+When directory is specified, all the eppic macros in the directory are processed.
 
 .TP
 \fB\-F\fR

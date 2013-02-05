@@ -52,9 +52,9 @@ print_usage(void)
 	MSG("    DUMPFILE\n");
 	MSG("\n");
 	MSG("  Creating DUMPFILE with filtered kernel data specified through filter config\n");
-	MSG("  file:\n");
-	MSG("  # makedumpfile    [-c|-l|-E] [-d DL] -x VMLINUX --config FILTERCONFIGFILE\n");
-	MSG("    VMCORE DUMPFILE\n");
+	MSG("  file or eppic macro:\n");
+	MSG("  # makedumpfile    [-c|-l|-E] [-d DL] -x VMLINUX [--config FILTERCONFIGFILE]\n");
+	MSG("    [--eppic EPPICMACRO] VMCORE DUMPFILE\n");
 	MSG("\n");
 	MSG("  Outputting the dump data in the flattened format to the standard output:\n");
 	MSG("  # makedumpfile -F [-c|-l|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
@@ -144,6 +144,13 @@ print_usage(void)
 	MSG("      Used in conjunction with -x VMLINUX option, to specify the filter config\n");
 	MSG("      file that contains filter commands to filter out desired kernel data\n");
 	MSG("      from vmcore while creating DUMPFILE.\n");
+	MSG("\n");
+	MSG("  [--eppic EPPICMACRO]:\n");
+	MSG("      Used in conjunction with -x VMLINUX option, to specify the eppic macro\n");
+	MSG("      file that contains filter rules or directory that contains eppic macro\n");
+	MSG("      files to filter out desired kernel data from vmcore while creating DUMPFILE.\n");
+	MSG("      When directory is specified, all the eppic macros in the directory are\n");
+	MSG("      processed\n");
 	MSG("\n");
 	MSG("  [-F]:\n");
 	MSG("      Output the dump data in the flattened format to the standard output\n");

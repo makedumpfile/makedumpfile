@@ -3,7 +3,7 @@
  *
  * Created by: Aravinda Prasad <aravinda@linux.vnet.ibm.com>
  *
- * Copyright (C) 2012  IBM Corporation
+ * Copyright (C) 2012, 2013  IBM Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
 
 #include "makedumpfile.h"
 #include "extension_eppic.h"
-#include "print_info.h"
 
 /*
  * Most of the functions included in this file performs similar
@@ -103,7 +102,7 @@ eppic_setupidx(TYPE_S *t, int ref, int nidx, int *idxlst)
 static int
 apigetmem(ull iaddr, void *p, int nbytes)
 {
-	return readmem(VADDR, iaddr, p, nbytes);
+	return READMEM(VADDR, iaddr, p, nbytes);
 }
 
 static int
@@ -124,7 +123,7 @@ drilldown(ull offset, type_t *t)
 	ull die_off = offset, t_die_off;
 	char *tstr = NULL;
 
-	while (get_die_attr_type(die_off, &type_flag, &t_die_off)) {
+	while (GET_DIE_ATTR_TYPE(die_off, &type_flag, &t_die_off)) {
 		switch (type_flag) {
 		/* typedef inserts a level of reference to the actual type */
 		case DW_TAG_pointer_type:
@@ -134,7 +133,7 @@ drilldown(ull offset, type_t *t)
 			 * This could be a void *, in which case the drill
 			 * down stops here
 			 */
-			if (!get_die_attr_type(die_off, &type_flag,
+			if (!GET_DIE_ATTR_TYPE(die_off, &type_flag,
 						&t_die_off)) {
 				/* make it a char* */
 				eppic_parsetype("char", t, ref);
@@ -163,8 +162,8 @@ drilldown(ull offset, type_t *t)
 			}
 
 			/* handle multi-dimensional array */
-			len = get_die_length(die_off, FALSE);
-			t_len = get_die_length(t_die_off, FALSE);
+			len = GET_DIE_LENGTH(die_off, FALSE);
+			t_len = GET_DIE_LENGTH(t_die_off, FALSE);
 			if (len > 0 && t_len > 0)
 				idxlst[nidx++] = len / t_len;
 			die_off = t_die_off;
@@ -174,7 +173,7 @@ drilldown(ull offset, type_t *t)
 			die_off = t_die_off;
 			break;
 		case DW_TAG_base_type:
-			eppic_parsetype(tstr = get_die_name(t_die_off), t, 0);
+			eppic_parsetype(tstr = GET_DIE_NAME(t_die_off), t, 0);
 			goto out;
 		case DW_TAG_union_type:
 			eppic_type_mkunion(t);
@@ -193,9 +192,9 @@ drilldown(ull offset, type_t *t)
 	}
 
 label:
-	eppic_type_setsize(t, get_die_length(t_die_off, TRUE));
+	eppic_type_setsize(t, GET_DIE_LENGTH(t_die_off, TRUE));
 	eppic_type_setidx(t, (ull)t_die_off);
-	tstr = get_die_name(t_die_off);
+	tstr = GET_DIE_NAME(t_die_off);
 
 out:
 	eppic_setupidx(t, ref, nidx, idxlst);
@@ -219,9 +218,9 @@ apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
 	ull m_die, die_off = idx;
 	char *name;
 
-	nfields = get_die_nfields(die_off);
+	nfields = GET_DIE_NFIELDS(die_off);
 	/*
-	 * get_die_nfields() returns < 0 if the die is not structure type
+	 * GET_DIE_NFIELDS() returns < 0 if the die is not structure type
 	 * or union type
 	 */
 	if (nfields <= 0)
@@ -236,7 +235,7 @@ apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
 		index = 0;
 
 	while (index < nfields) {
-		size = get_die_member(die_off, index, &offset, &name, &nbits,
+		size = GET_DIE_MEMBER(die_off, index, &offset, &name, &nbits,
 				&fbits, &m_die);
 
 		if (size < 0)
@@ -267,13 +266,13 @@ apigetctype(int ctype, char *name, type_t *tout)
 
 	switch (ctype) {
 	case V_TYPEDEF:
-		size = get_domain(name, DWARF_INFO_GET_DOMAIN_TYPEDEF, &die);
+		size = GET_DOMAIN(name, DWARF_INFO_GET_DOMAIN_TYPEDEF, &die);
 		break;
 	case V_STRUCT:
-		size = get_domain(name, DWARF_INFO_GET_DOMAIN_STRUCT, &die);
+		size = GET_DOMAIN(name, DWARF_INFO_GET_DOMAIN_STRUCT, &die);
 		break;
 	case V_UNION:
-		size = get_domain(name, DWARF_INFO_GET_DOMAIN_UNION, &die);
+		size = GET_DOMAIN(name, DWARF_INFO_GET_DOMAIN_UNION, &die);
 		break;
 	/* TODO
 	 * Implement for all the domains
@@ -308,7 +307,7 @@ apigetval(char *name, ull *val, VALUE_S *value)
 {
 	ull ptr = 0;
 
-	ptr = get_symbol_addr(name);
+	ptr = GET_SYMBOL_ADDR(name);
 	if (!ptr)
 		return 0;
 
@@ -321,7 +320,7 @@ apigetval(char *name, ull *val, VALUE_S *value)
 	ull type;
 	TYPE_S *stype;
 
-	type = get_die_offset(name);
+	type = GET_DIE_OFFSET(name);
 	stype = eppic_gettype(value);
 
 	apigetrtype(type, stype);
@@ -333,7 +332,7 @@ apigetval(char *name, ull *val, VALUE_S *value)
 	*val = eppic_getval(value);
 
 	if (!eppic_typeislocal(stype) && eppic_type_getidx(stype) > 100) {
-		char *tname = get_die_name(eppic_type_getidx(stype));
+		char *tname = GET_DIE_NAME(eppic_type_getidx(stype));
 		if (tname)
 			eppic_chktype(stype, tname);
 	}
@@ -356,7 +355,7 @@ static uint8_t
 apigetuint8(void *ptr)
 {
 	uint8_t val;
-	if (!readmem(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
+	if (!READMEM(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
 		return (uint8_t) -1;
 	return val;
 }
@@ -365,7 +364,7 @@ static uint16_t
 apigetuint16(void *ptr)
 {
 	uint16_t val;
-	if (!readmem(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
+	if (!READMEM(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
 		return (uint16_t) -1;
 	return val;
 }
@@ -374,7 +373,7 @@ static uint32_t
 apigetuint32(void *ptr)
 {
 	uint32_t val;
-	if (!readmem(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
+	if (!READMEM(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
 		return (uint32_t) -1;
 	return val;
 }
@@ -383,7 +382,7 @@ static uint64_t
 apigetuint64(void *ptr)
 {
 	uint64_t val;
-	if (!readmem(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
+	if (!READMEM(VADDR, (unsigned long)ptr, (char *)&val, sizeof(val)))
 		return (uint64_t) -1;
 	return val;
 }
@@ -423,15 +422,17 @@ eppic_memset(VALUE_S *vaddr, VALUE_S *vch, VALUE_S *vlen)
 	 * Set the value at address from iaddr till iaddr + nbytes
 	 * to the value specified in variable ch
 	 */
-	update_filter_info_raw(addr, ch, len);
+	UPDATE_FILTER_INFO_RAW(addr, ch, len);
 	return eppic_makebtype(1);
 }
 
 
 /* Initialize eppic */
 int
-eppic_init()
+eppic_init(void *fun_ptr)
 {
+	cb = (struct call_back *)fun_ptr;
+
 	if (eppic_open() >= 0) {
 
 		/* Register call back functions */

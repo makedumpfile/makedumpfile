@@ -3,7 +3,7 @@
  *
  * Created by: Aravinda Prasad <aravinda@linux.vnet.ibm.com>
  *
- * Copyright (C) 2012  IBM Corporation
+ * Copyright (C) 2012, 2013  IBM Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 #define _EXTENSION_EPPIC_H
 
 #include "eppic_api.h"
+#include "erase_info.h"
 
 /*
  * MEMBER_S, ENUM_S, DEF_S and TYPE_S are extracts from eppic header
@@ -70,6 +71,25 @@ typedef TYPE_S {
 	ull rtype;  /* type_t a reference refers too */
 } type_t;
 
-extern int update_filter_info_raw(unsigned long long, int, int);
+#define ERRMSG(x...) \
+do { \
+		fprintf(stderr, __FUNCTION__); \
+		fprintf(stderr, ": "); \
+		fprintf(stderr, x); \
+} while (0)
+
+
+struct call_back *cb;
+
+#define GET_DOMAIN cb->get_domain
+#define READMEM cb->readmem
+#define GET_DIE_ATTR_TYPE cb->get_die_attr_type
+#define GET_DIE_NAME cb->get_die_name
+#define GET_DIE_OFFSET cb->get_die_offset
+#define GET_DIE_LENGTH cb->get_die_length
+#define GET_DIE_MEMBER cb->get_die_member
+#define GET_DIE_NFIELDS cb->get_die_nfields
+#define GET_SYMBOL_ADDR cb->get_symbol_addr
+#define UPDATE_FILTER_INFO_RAW cb->update_filter_info_raw
 
 #endif /* _EXTENSION_EPPIC_H */

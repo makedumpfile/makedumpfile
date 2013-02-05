@@ -26,6 +26,20 @@
 struct erase_info	*erase_info = NULL;
 unsigned long		num_erase_info = 1; /* Node 0 is unused. */
 
+struct call_back eppic_cb = {
+	&get_domain,
+	&readmem,
+	&get_die_attr_type,
+	&get_die_name,
+	&get_die_offset,
+	&get_die_length,
+	&get_die_member,
+	&get_die_nfields,
+	&get_symbol_addr,
+	&update_filter_info_raw
+};
+
+
 /*
  * flags for config_entry.flag
  */ 
@@ -1882,7 +1896,7 @@ process_eppic_file(char *name_config)
 	if (!eppic_unload)
 		ERRMSG("Could not find eppic_unload function\n");
 
-	if (eppic_init()) {
+	if (eppic_init(&eppic_cb)) {
 		ERRMSG("Init failed \n");
 		return FALSE;
 	}

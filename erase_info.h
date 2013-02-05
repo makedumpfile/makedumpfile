@@ -31,6 +31,22 @@ struct erase_info {
 	int		erased;		/* 1= erased, 0= Not erased */
 };
 
+struct call_back {
+    long (*get_domain)(char *, int, unsigned long long *);
+    int (*readmem)(int type_addr, unsigned long long addr, void *bufptr,
+             size_t size);
+    int (*get_die_attr_type)(unsigned long long die_off, int *type_flag,
+            unsigned long long *die_attr_off);
+    char * (*get_die_name)(unsigned long long die_off);
+    unsigned long long (*get_die_offset)(char *sysname);
+    int (*get_die_length)(unsigned long long die_off, int flag);
+    int (*get_die_member)(unsigned long long die_off, int index, long *offset,
+            char **name, int *nbits, int *fbits, unsigned long long *m_die);
+    int (*get_die_nfields)(unsigned long long die_off);
+    unsigned long long (*get_symbol_addr)(char *symname);
+    int (*update_filter_info_raw)(unsigned long long, int, int);
+};
+
 extern struct erase_info	*erase_info;
 extern unsigned long		num_erase_info;
 

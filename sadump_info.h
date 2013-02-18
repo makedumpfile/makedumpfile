@@ -97,8 +97,8 @@ static inline unsigned long long sadump_get_max_mapnr(void)
 	return 0;
 }
 
-static inline int readpmem_sadump(unsigned long long paddr,
-				  void *bufptr, size_t size)
+static inline int
+readpage_sadump(unsigned long long paddr, void *bufptr)
 {
 	return FALSE;
 }

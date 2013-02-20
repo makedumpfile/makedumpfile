@@ -337,13 +337,12 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 int
 readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 {
-	size_t read_size, next_size;
-	unsigned long long next_addr;
+	size_t read_size, size_orig = size;
 	unsigned long long paddr, maddr = NOT_PADDR;
 	unsigned long long pgaddr;
 	void *pgbuf;
-	char *next_ptr;
 
+next_page:
 	switch (type_addr) {
 	case VADDR:
 		if ((paddr = vaddr_to_paddr(addr)) == NOT_PADDR) {
@@ -386,21 +385,11 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 		goto error;
 	}
 
-	read_size = size;
-
 	/*
 	 * Read each page, because pages are not necessarily continuous.
 	 * Ex) pages in vmalloc area
 	 */
-	if (!is_in_same_page(addr, addr + size - 1)) {
-		read_size = info->page_size - (addr % info->page_size);
-		next_addr = roundup(addr + 1, info->page_size);
-		next_size = size - read_size;
-		next_ptr  = (char *)bufptr + read_size;
-
-		if (!readmem(type_addr, next_addr, next_ptr, next_size))
-			goto error;
-	}
+	read_size = MIN(info->page_size - PAGEOFFSET(paddr), size);
 
 	pgaddr = PAGEBASE(paddr);
 	pgbuf = cache_search(pgaddr);
@@ -423,10 +412,18 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 	}
 
 	memcpy(bufptr, pgbuf + PAGEOFFSET(paddr), read_size);
-	return size;
+
+	addr += read_size;
+	bufptr += read_size;
+	size -= read_size;
+
+	if (size > 0)
+		goto next_page;
+
+	return size_orig;
 
 error:
-	ERRMSG("type_addr: %d, addr:%llx, size:%zd\n", type_addr, addr, size);
+	ERRMSG("type_addr: %d, addr:%llx, size:%zd\n", type_addr, addr, size_orig);
 	return FALSE;
 }
 

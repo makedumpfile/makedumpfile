@@ -251,6 +251,84 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
  * from region 5, and gets the remaining data from region 7.
  */
 static int
+update_mmap_range(off_t offset) {
+	off_t start_offset;
+	off_t map_size;
+	off_t max_offset = info->max_mapnr * info->page_size;
+
+	munmap(info->mmap_buf,
+	       info->mmap_end_offset - info->mmap_start_offset);
+
+	/*
+	 * offset for mmap() must be page aligned.
+	 */
+	start_offset = round(offset, info->page_size);
+
+	map_size = MIN(max_offset - start_offset, info->mmap_region_size);
+
+	info->mmap_buf = mmap(NULL, map_size, PROT_READ, MAP_PRIVATE,
+				     info->fd_memory, start_offset);
+
+	if (info->mmap_buf == MAP_FAILED) {
+		ERRMSG("Can't map [%llx-%llx] with mmap()\n %s",
+		       (ulonglong)start_offset,
+		       (ulonglong)(start_offset + map_size),
+		       strerror(errno));
+		return FALSE;
+	}
+
+	info->mmap_start_offset = start_offset;
+	info->mmap_end_offset = start_offset + map_size;
+
+	return TRUE;
+}
+
+static int
+is_mapped_with_mmap(off_t offset) {
+
+	if (info->flag_usemmap
+	    && offset >= info->mmap_start_offset
+	    && offset < info->mmap_end_offset)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+int
+initialize_mmap(void) {
+	info->mmap_region_size = MAP_REGION;
+	info->mmap_buf = MAP_FAILED;
+	if (!update_mmap_range(0))
+		return FALSE;
+
+	return TRUE;
+}
+
+static int
+read_with_mmap(off_t offset, void *bufptr, unsigned long size) {
+	size_t read_size;
+
+next_region:
+
+	if (!is_mapped_with_mmap(offset))
+		update_mmap_range(offset);
+
+	read_size = MIN(info->mmap_end_offset - offset, size);
+
+	memcpy(bufptr, info->mmap_buf +
+	       (offset - info->mmap_start_offset), read_size);
+
+	offset += read_size;
+	bufptr += read_size;
+	size -= read_size;
+
+	if (size > 0)
+		goto next_region;
+
+	return TRUE;
+}
+
+static int
 readpage_elf(unsigned long long paddr, void *bufptr)
 {
 	const off_t failed = (off_t)-1;
@@ -273,16 +351,20 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 		}
 	}
 
-	if (lseek(info->fd_memory, offset1, SEEK_SET) == failed) {
-		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-		       info->name_memory, (unsigned long long)offset1, strerror(errno));
-		return FALSE;
-	}
+	if (info->flag_usemmap)
+		read_with_mmap(offset1, bufptr, size1);
+	else {
+		if (lseek(info->fd_memory, offset1, SEEK_SET) == failed) {
+			ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
+			       info->name_memory, (unsigned long long)offset1, strerror(errno));
+			return FALSE;
+		}
 
-	if (read(info->fd_memory, bufptr, size1) != size1) {
-		ERRMSG("Can't read the dump memory(%s). %s\n",
-		       info->name_memory, strerror(errno));
-		return FALSE;
+		if (read(info->fd_memory, bufptr, size1) != size1) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			       info->name_memory, strerror(errno));
+			return FALSE;
+		}
 	}
 
 	if (size1 != info->page_size) {
@@ -292,17 +374,21 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 		} else {
 			offset2 = paddr_to_offset(paddr + size1);
 
-			if (lseek(info->fd_memory, offset2, SEEK_SET) == failed) {
-				ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-				       info->name_memory, (unsigned long long)offset2,
-				       strerror(errno));
-				return FALSE;
-			}
+			if (info->flag_usemmap)
+				read_with_mmap(offset2, bufptr + size1, size2);
+			else {
+				if (lseek(info->fd_memory, offset2, SEEK_SET) == failed) {
+					ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
+					       info->name_memory, (unsigned long long)offset2,
+					       strerror(errno));
+					return FALSE;
+				}
 
-			if (read(info->fd_memory, bufptr + size1, size2) != size2) {
-				ERRMSG("Can't read the dump memory(%s). %s\n",
-				       info->name_memory, strerror(errno));
-				return FALSE;
+				if (read(info->fd_memory, bufptr + size1, size2) != size2) {
+					ERRMSG("Can't read the dump memory(%s). %s\n",
+					       info->name_memory, strerror(errno));
+					return FALSE;
+				}
 			}
 		}
 	}
@@ -2955,6 +3041,14 @@ out:
 	/* (this can reduce pages scan of 1TB memory from 60sec to 30sec) */
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		setup_page_is_buddy();
+
+	if (initialize_mmap()) {
+		info->flag_usemmap = TRUE;
+		DEBUG_MSG("read %s with mmap()\n", info->name_memory);
+	} else {
+		info->flag_usemmap = FALSE;
+		DEBUG_MSG("read %s with read()\n", info->name_memory);
+	}
 
 	return TRUE;
 }

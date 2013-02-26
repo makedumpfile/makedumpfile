@@ -31,6 +31,7 @@
 #include <libelf.h>
 #include <byteswap.h>
 #include <getopt.h>
+#include <sys/mman.h>
 #ifdef USELZO
 #include <lzo/lzo1x.h>
 #endif
@@ -205,7 +206,7 @@ isAnon(unsigned long mapping)
 #define PFN_BUFBITMAP		(BITPERBYTE*BUFSIZE_BITMAP)
 #define FILENAME_BITMAP		"kdump_bitmapXXXXXX"
 #define FILENAME_STDOUT		"STDOUT"
-
+#define MAP_REGION		(4096*1024)
 
 /*
  * Minimam vmcore has 2 ProgramHeaderTables(PT_NOTE and PT_LOAD).
@@ -886,6 +887,7 @@ struct DumpInfo {
 						flattened format */
 	int		flag_split;	     /* splitting vmcore */
   	int		flag_cyclic;	     /* cyclic processing to keep memory consumption */
+	int		flag_usemmap;	     /* /proc/vmcore supports mmap(2) */
 	int		flag_reassemble;     /* reassemble multiple dumpfiles into one */
 	int		flag_refiltering;    /* refilter from kdump-compressed file */
 	int		flag_force;	     /* overwrite existing stuff */
@@ -1039,6 +1041,14 @@ struct DumpInfo {
 	unsigned long long num_dumpable;
 	unsigned long      bufsize_cyclic;
 	unsigned long      pfn_cyclic;
+
+	/*
+	 * for mmap
+	 */
+	char	*mmap_buf;
+	off_t	mmap_start_offset;
+	off_t	mmap_end_offset;
+	off_t   mmap_region_size;
 
 	/*
 	 * sadump info:

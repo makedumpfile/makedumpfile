@@ -133,7 +133,9 @@ rsg_table_entry_bad(unsigned long entry, int level)
 {
 	unsigned long mask = ~_REGION_ENTRY_INVALID
 				& ~_REGION_ENTRY_TYPE_MASK
-				& ~_REGION_ENTRY_LENGTH;
+				& ~_REGION_ENTRY_LENGTH
+				& ~_SEGMENT_ENTRY_LARGE
+				& ~_SEGMENT_ENTRY_CO;
 
 	if (level)
 		mask &= ~_REGION_ENTRY_ORIGIN;

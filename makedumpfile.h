@@ -617,6 +617,7 @@ do { \
 /* Bits in the segment table entry */
 #define _SEGMENT_ENTRY_ORIGIN	~0x7ffUL
 #define _SEGMENT_ENTRY_LARGE	0x400
+#define _SEGMENT_ENTRY_CO	0x100
 #define _SEGMENT_PAGE_SHIFT	31
 #define _SEGMENT_INDEX_SHIFT	20
 

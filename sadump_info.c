@@ -37,12 +37,10 @@
 
 #endif
 
-#define KEXEC_CORE_NOTE_NAME "CORE"
-#define KEXEC_CORE_NOTE_NAME_BYTES roundup(sizeof(KEXEC_CORE_NOTE_NAME), 4)
 #define KEXEC_CORE_NOTE_DESC_BYTES roundup(sizeof(struct elf_prstatus), 4)
 
 #define KEXEC_NOTE_BYTES ((KEXEC_NOTE_HEAD_BYTES * 2) +                \
-			  KEXEC_CORE_NOTE_NAME_BYTES +		       \
+			  roundup(KEXEC_CORE_NOTE_NAME_BYTES, 4) +     \
 			  KEXEC_CORE_NOTE_DESC_BYTES )
 
 #define for_each_online_cpu(cpu)					\

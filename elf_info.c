@@ -323,22 +323,17 @@ get_pt_note_info(void)
 		offset_desc = offset + offset_note_desc(note);
 		size_desc   = note_descsz(note);
 
+		if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
+		    VMCOREINFO_NOTE_NAME_BYTES)) {
+			set_vmcoreinfo(offset_desc, size_desc);
 		/*
 		 * Check whether /proc/vmcore contains vmcoreinfo,
 		 * and get both the offset and the size.
-		 *
-		 * NOTE: The owner name of xen should be checked at first,
-		 *       because its name is "VMCOREINFO_XEN" and the one
-		 *       of linux is "VMCOREINFO".
 		 */
-		if (!strncmp(VMCOREINFO_XEN_NOTE_NAME, buf,
+		} else if (!strncmp(VMCOREINFO_XEN_NOTE_NAME, buf,
 		    VMCOREINFO_XEN_NOTE_NAME_BYTES)) {
 			offset_vmcoreinfo_xen = offset_desc;
 			size_vmcoreinfo_xen   = size_desc;
-		} else if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
-		    VMCOREINFO_NOTE_NAME_BYTES)) {
-			set_vmcoreinfo(offset_desc, size_desc);
-
 		/*
 		 * Check whether /proc/vmcore contains xen's note.
 		 */

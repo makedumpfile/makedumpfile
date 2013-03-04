@@ -254,6 +254,23 @@ note_type(void *note)
 }
 
 static int
+note_namesz(void *note)
+{
+	int size;
+	Elf64_Nhdr *note64;
+	Elf32_Nhdr *note32;
+
+	if (is_elf64_memory()) {
+		note64 = (Elf64_Nhdr *)note;
+		size = note64->n_namesz;
+	} else {
+		note32 = (Elf32_Nhdr *)note;
+		size = note32->n_namesz;
+	}
+	return size;
+}
+
+static int
 note_descsz(void *note)
 {
 	int size;
@@ -290,7 +307,7 @@ offset_note_desc(void *note)
 static int
 get_pt_note_info(void)
 {
-	int n_type, size_desc;
+	int n_type, size_name, size_desc;
 	off_t offset, offset_desc;
 	char buf[VMCOREINFO_XEN_NOTE_NAME_BYTES];
 	char note[MAX_SIZE_NHDR];
@@ -308,40 +325,51 @@ get_pt_note_info(void)
 			    name_memory, strerror(errno));
 			return FALSE;
 		}
+
+		n_type = note_type(note);
+		size_name = note_namesz(note);
+		size_desc   = note_descsz(note);
+		offset_desc = offset + offset_note_desc(note);
+
+		if (!size_name || size_name >= sizeof(buf))
+			goto next_note;
+
 		if (read(fd_memory, &buf, sizeof(buf)) != sizeof(buf)) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
 			    name_memory, strerror(errno));
 			return FALSE;
 		}
-		n_type = note_type(note);
 
-		if (n_type == NT_PRSTATUS) {
-			nr_cpus++;
-			offset += offset_next_note(note);
-			continue;
-		}
-		offset_desc = offset + offset_note_desc(note);
-		size_desc   = note_descsz(note);
+		if (!strncmp(KEXEC_CORE_NOTE_NAME, buf,
+			     KEXEC_CORE_NOTE_NAME_BYTES)) {
+			if (n_type == NT_PRSTATUS) {
+				nr_cpus++;
+			}
 
-		if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
-		    VMCOREINFO_NOTE_NAME_BYTES)) {
-			set_vmcoreinfo(offset_desc, size_desc);
+		} else if (!strncmp(VMCOREINFO_NOTE_NAME, buf,
+				    VMCOREINFO_NOTE_NAME_BYTES)) {
+			if (n_type == 0) {
+				set_vmcoreinfo(offset_desc, size_desc);
+			}
 		/*
 		 * Check whether /proc/vmcore contains vmcoreinfo,
 		 * and get both the offset and the size.
 		 */
 		} else if (!strncmp(VMCOREINFO_XEN_NOTE_NAME, buf,
-		    VMCOREINFO_XEN_NOTE_NAME_BYTES)) {
-			offset_vmcoreinfo_xen = offset_desc;
-			size_vmcoreinfo_xen   = size_desc;
+				    VMCOREINFO_XEN_NOTE_NAME_BYTES)) {
+			if (n_type == 0) {
+				offset_vmcoreinfo_xen = offset_desc;
+				size_vmcoreinfo_xen   = size_desc;
+			}
 		/*
 		 * Check whether /proc/vmcore contains xen's note.
 		 */
-		} else if (n_type == XEN_ELFNOTE_CRASH_INFO) {
-			flags_memory |= MEMORY_XEN;
-			offset_xen_crash_info = offset_desc;
-			size_xen_crash_info   = size_desc;
-
+		} else if (!strncmp("Xen", buf, 4)) {
+			if (n_type == XEN_ELFNOTE_CRASH_INFO) {
+				flags_memory |= MEMORY_XEN;
+				offset_xen_crash_info = offset_desc;
+				size_xen_crash_info   = size_desc;
+			}
 		/*
 		 * Check whether a source dumpfile contains eraseinfo.
 		 *   /proc/vmcore does not contain eraseinfo, because eraseinfo
@@ -349,9 +377,13 @@ get_pt_note_info(void)
 		 *   create /proc/vmcore.
 		 */
 		} else if (!strncmp(ERASEINFO_NOTE_NAME, buf,
-		    ERASEINFO_NOTE_NAME_BYTES)) {
-			set_eraseinfo(offset_desc, size_desc);
+				    ERASEINFO_NOTE_NAME_BYTES)) {
+			if (n_type == 0) {
+				set_eraseinfo(offset_desc, size_desc);
+			}
 		}
+
+	next_note:
 		offset += offset_next_note(note);
 	}
 	if (is_xen_memory())

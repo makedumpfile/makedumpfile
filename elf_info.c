@@ -45,6 +45,7 @@ struct pt_load_segment {
 };
 
 static int			nr_cpus;             /* number of cpu */
+static off_t			max_file_offset;
 
 /*
  * File information about /proc/vmcore:
@@ -637,6 +638,12 @@ get_elf_info(int fd, char *filename)
 			return FALSE;
 		j++;
 	}
+	max_file_offset = 0;
+	for (i = 0; i < num_pt_loads; ++i) {
+		struct pt_load_segment *p = &pt_loads[i];
+		max_file_offset = MAX(max_file_offset,
+				      p->file_offset + p->phys_end - p->phys_start);
+	}
 	if (!has_pt_note()) {
 		ERRMSG("Can't find PT_NOTE Phdr.\n");
 		return FALSE;
@@ -869,3 +876,8 @@ set_eraseinfo(off_t offset, unsigned long size)
 	size_eraseinfo   = size;
 }
 
+off_t
+get_max_file_offset(void)
+{
+	return max_file_offset;
+}

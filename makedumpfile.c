@@ -254,7 +254,7 @@ static int
 update_mmap_range(off_t offset) {
 	off_t start_offset;
 	off_t map_size;
-	off_t max_offset = info->max_mapnr * info->page_size;
+	off_t max_offset = get_max_file_offset();
 
 	munmap(info->mmap_buf,
 	       info->mmap_end_offset - info->mmap_start_offset);

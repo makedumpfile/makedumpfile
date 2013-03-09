@@ -71,6 +71,8 @@ int has_eraseinfo(void);
 void get_eraseinfo(off_t *offset, unsigned long *size);
 void set_eraseinfo(off_t offset, unsigned long size);
 
+off_t get_max_file_offset(void);
+
 #endif  /* ELF_INFO_H */
 
 

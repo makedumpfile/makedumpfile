@@ -4221,9 +4221,9 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 				 * See check_cyclic_buffer_overrun()
 				 * for the detail.
 				 */
-				clear_bit_on_2nd_bitmap_for_kernel(pfn + i);
+				if (clear_bit_on_2nd_bitmap_for_kernel(pfn + i))
+					pfn_free++;
 			}
-			pfn_free += i;
 		}
 		/*
 		 * Exclude the cache page without the private page.

@@ -1096,6 +1096,7 @@ struct symbol_table {
 	unsigned long long	swapper_pg_dir;
 	unsigned long long	init_level4_pgt;
 	unsigned long long	vmlist;
+	unsigned long long	vmap_area_list;
 	unsigned long long	phys_base;
 	unsigned long long	node_online_map;
 	unsigned long long	node_states;
@@ -1233,6 +1234,10 @@ struct offset_table {
 	struct vm_struct {
 		long	addr;
 	} vm_struct;
+	struct vmap_area {
+		long	va_start;
+		long	list;
+	} vmap_area;
 
 	/*
 	 * for Xen extraction

@@ -854,6 +854,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(swapper_pg_dir, "swapper_pg_dir");
 	SYMBOL_INIT(init_level4_pgt, "init_level4_pgt");
 	SYMBOL_INIT(vmlist, "vmlist");
+	SYMBOL_INIT(vmap_area_list, "vmap_area_list");
 	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
 	SYMBOL_INIT(node_states, "node_states");
@@ -989,6 +990,8 @@ get_structure_info(void)
 	OFFSET_INIT(node_memblk_s.nid, "node_memblk_s", "nid");
 
 	OFFSET_INIT(vm_struct.addr, "vm_struct", "addr");
+	OFFSET_INIT(vmap_area.va_start, "vmap_area", "va_start");
+	OFFSET_INIT(vmap_area.list, "vmap_area", "list");
 
 	/*
 	 * Get offset of the module members.
@@ -1368,6 +1371,7 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	WRITE_SYMBOL("init_level4_pgt", init_level4_pgt);
 	WRITE_SYMBOL("vmlist", vmlist);
+	WRITE_SYMBOL("vmap_area_list", vmap_area_list);
 	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
 	WRITE_SYMBOL("node_states", node_states);
@@ -1430,6 +1434,8 @@ write_vmcoreinfo_data(void)
 	WRITE_MEMBER_OFFSET("node_memblk_s.size", node_memblk_s.size);
 	WRITE_MEMBER_OFFSET("node_memblk_s.nid", node_memblk_s.nid);
 	WRITE_MEMBER_OFFSET("vm_struct.addr", vm_struct.addr);
+	WRITE_MEMBER_OFFSET("vmap_area.va_start", vmap_area.va_start);
+	WRITE_MEMBER_OFFSET("vmap_area.list", vmap_area.list);
 	WRITE_MEMBER_OFFSET("log.ts_nsec", log.ts_nsec);
 	WRITE_MEMBER_OFFSET("log.len", log.len);
 	WRITE_MEMBER_OFFSET("log.text_len", log.text_len);
@@ -1684,6 +1690,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	READ_SYMBOL("init_level4_pgt", init_level4_pgt);
 	READ_SYMBOL("vmlist", vmlist);
+	READ_SYMBOL("vmap_area_list", vmap_area_list);
 	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
 	READ_SYMBOL("node_states", node_states);
@@ -1739,6 +1746,8 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("node_memblk_s.size", node_memblk_s.size);
 	READ_MEMBER_OFFSET("node_memblk_s.nid", node_memblk_s.nid);
 	READ_MEMBER_OFFSET("vm_struct.addr", vm_struct.addr);
+	READ_MEMBER_OFFSET("vmap_area.va_start", vmap_area.va_start);
+	READ_MEMBER_OFFSET("vmap_area.list", vmap_area.list);
 	READ_MEMBER_OFFSET("log.ts_nsec", log.ts_nsec);
 	READ_MEMBER_OFFSET("log.len", log.len);
 	READ_MEMBER_OFFSET("log.text_len", log.text_len);

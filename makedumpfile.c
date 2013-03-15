@@ -4209,9 +4209,9 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		    && info->flag_cyclic
 		    && info->page_is_buddy
 		    && info->page_is_buddy(flags, _mapcount, private, _count)) {
-			int i;
+			int i, nr_pages = 1 << private;
 
-			for (i = 0; i < (1 << private); ++i) {
+			for (i = 0; i < nr_pages; ++i) {
 				/*
 				 * According to combination of
 				 * MAX_ORDER and size of cyclic
@@ -4224,6 +4224,8 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 				if (clear_bit_on_2nd_bitmap_for_kernel(pfn + i))
 					pfn_free++;
 			}
+			pfn += nr_pages - 1;
+			mem_map += (nr_pages - 1) * SIZE(page);
 		}
 		/*
 		 * Exclude the cache page without the private page.

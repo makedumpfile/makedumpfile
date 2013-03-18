@@ -35,7 +35,7 @@ struct call_back eppic_cb = {
 	&get_die_length,
 	&get_die_member,
 	&get_die_nfields,
-	&get_symbol_addr,
+	&get_symbol_addr_all,
 	&update_filter_info_raw
 };
 
@@ -161,13 +161,27 @@ get_loaded_module(char *mod_name)
 	return &modules[mod_st.current_mod];
 }
 
+static unsigned long long
+find_module_symbol(struct module_info *module_ptr, char *symname)
+{
+	int i;
+	struct symbol_info *sym_info;
+
+	sym_info = module_ptr->sym_info;
+	if (!sym_info)
+		return FALSE;
+	for (i = 1; i < module_ptr->num_syms; i++) {
+		if (sym_info[i].name && !strcmp(sym_info[i].name, symname))
+			return sym_info[i].value;
+	}
+	return NOT_FOUND_SYMBOL;
+}
+
 static int
 sym_in_module(char *symname, unsigned long long *symbol_addr)
 {
-	int i;
 	char *module_name;
 	struct module_info *module_ptr;
-	struct symbol_info *sym_info;
 
 	module_name = get_dwarf_module_name();
 	if (!mod_st.num_modules
@@ -178,16 +192,11 @@ sym_in_module(char *symname, unsigned long long *symbol_addr)
 	module_ptr = get_loaded_module(module_name);
 	if (!module_ptr)
 		return FALSE;
-	sym_info = module_ptr->sym_info;
-	if (!sym_info)
+	*symbol_addr = find_module_symbol(module_ptr, symname);
+	if (*symbol_addr == NOT_FOUND_SYMBOL)
 		return FALSE;
-	for (i = 1; i < module_ptr->num_syms; i++) {
-		if (sym_info[i].name && !strcmp(sym_info[i].name, symname)) {
-			*symbol_addr = sym_info[i].value;
-			return TRUE;
-		}
-	}
-	return FALSE;
+	else
+		return TRUE;
 }
 
 static unsigned int
@@ -1856,6 +1865,88 @@ process_config_file(const char *name_config)
 	fclose(info->file_filterconfig);
 	print_filter_info();
 	return TRUE;
+}
+
+/*
+ * Search for symbol in modules as well as vmlinux
+ */
+unsigned long long
+get_symbol_addr_all(char *name) {
+
+	short vmlinux_searched = 0;
+	unsigned long long symbol_addr = 0;
+	unsigned int i, current_mod;
+	struct module_info *modules;
+
+	/* Search in vmlinux if debuginfo is set to vmlinux */
+	if (!strcmp(get_dwarf_module_name(), "vmlinux")) {
+		symbol_addr = get_symbol_addr(name);
+		if (symbol_addr)
+			return symbol_addr;
+
+		vmlinux_searched = 1;
+	}
+
+	/*
+	 * Proceed the search in modules. Try in the module
+	 * which resulted in a hit in the previous search
+	 */
+
+	modules = mod_st.modules;
+	current_mod = mod_st.current_mod;
+
+	if (strcmp(get_dwarf_module_name(), modules[current_mod].name)) {
+		if (!set_dwarf_debuginfo(modules[current_mod].name,
+				info->system_utsname.release, NULL, -1)) {
+			ERRMSG("Cannot set to current module %s\n",
+					modules[current_mod].name);
+			return NOT_FOUND_SYMBOL;
+		}
+	}
+
+	symbol_addr = find_module_symbol(&modules[current_mod], name);
+	if (symbol_addr)
+		return symbol_addr;
+
+	/* Search in all modules */
+	for (i = 0; i < mod_st.num_modules; i++) {
+
+		/* Already searched. Skip */
+		if (i == current_mod)
+			continue;
+
+		if (!set_dwarf_debuginfo(modules[i].name,
+				info->system_utsname.release, NULL, -1)) {
+			ERRMSG("Skipping Module section %s\n", modules[i].name);
+			continue;
+		}
+
+		symbol_addr = find_module_symbol(&modules[i], name);
+
+		if (!symbol_addr)
+			continue;
+
+		/*
+		 * Symbol found. Set the current_mod to this module index, a
+		 * minor optimization for fast lookup next time
+		 */
+		mod_st.current_mod = i;
+		return symbol_addr;
+	}
+
+	/* Symbol not found in any module. Set debuginfo back to vmlinux  */
+	set_dwarf_debuginfo("vmlinux", NULL, info->name_vmlinux,
+			info->fd_vmlinux);
+
+	/*
+	 * Search vmlinux if not already searched. This can happen when
+	 * this function is called with debuginfo set to a particular
+	 * kernel module and we are looking for symbol in vmlinux
+	 */
+	if (!vmlinux_searched)
+		return get_symbol_addr(name);
+	else
+		return NOT_FOUND_SYMBOL;
 }
 
 

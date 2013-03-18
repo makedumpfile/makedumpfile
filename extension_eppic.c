@@ -307,7 +307,8 @@ apigetval(char *name, ull *val, VALUE_S *value)
 {
 	ull ptr = 0;
 
-	ptr = GET_SYMBOL_ADDR(name);
+	ptr = GET_SYMBOL_ADDR_ALL(name);
+
 	if (!ptr)
 		return 0;
 

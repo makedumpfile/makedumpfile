@@ -31,6 +31,8 @@ struct erase_info {
 	int		erased;		/* 1= erased, 0= Not erased */
 };
 
+unsigned long long get_symbol_addr_all(char *);
+
 struct call_back {
     long (*get_domain)(char *, int, unsigned long long *);
     int (*readmem)(int type_addr, unsigned long long addr, void *bufptr,
@@ -43,7 +45,7 @@ struct call_back {
     int (*get_die_member)(unsigned long long die_off, int index, long *offset,
             char **name, int *nbits, int *fbits, unsigned long long *m_die);
     int (*get_die_nfields)(unsigned long long die_off);
-    unsigned long long (*get_symbol_addr)(char *symname);
+	unsigned long long (*get_symbol_addr_all)(char *symname);
     int (*update_filter_info_raw)(unsigned long long, int, int);
 };
 

@@ -89,7 +89,7 @@ struct call_back *cb;
 #define GET_DIE_LENGTH cb->get_die_length
 #define GET_DIE_MEMBER cb->get_die_member
 #define GET_DIE_NFIELDS cb->get_die_nfields
-#define GET_SYMBOL_ADDR cb->get_symbol_addr
+#define GET_SYMBOL_ADDR_ALL cb->get_symbol_addr_all
 #define UPDATE_FILTER_INFO_RAW cb->update_filter_info_raw
 
 #endif /* _EXTENSION_EPPIC_H */

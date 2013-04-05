@@ -2012,12 +2012,15 @@ split_filter_info(struct filter_info *prev, unsigned long long next_paddr,
 		ERRMSG("Can't allocate memory to split filter info\n");
 		return;
 	}
-	new->nullify        = prev->nullify;
-	new->erase_info_idx = prev->erase_info_idx;
-	new->size_idx       = prev->size_idx;
+
+	/*
+	 * copy over existing data from prev node and only update fields
+	 * that differ. This approach will take care of copying over of any
+	 * future member addition to filter_info structure.
+	 */
+	*new = *prev;
 	new->paddr          = next_paddr;
 	new->size           = size;
-	new->next           = prev->next;
 	prev->next          = new;
 }
 

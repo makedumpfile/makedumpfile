@@ -231,28 +231,80 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 	return TRUE;
 }
 
+/*
+ * This function is specific for reading page from ELF.
+ *
+ * If reading the separated page on different PT_LOAD segments,
+ * this function gets the page data from both segments. This is
+ * worthy of ia64 /proc/vmcore. In ia64 /proc/vmcore, region 5
+ * segment is overlapping to region 7 segment. The following is
+ * example (page_size is 16KBytes):
+ *
+ *  region |       paddr        |       memsz
+ * --------+--------------------+--------------------
+ *     5   | 0x0000000004000000 | 0x0000000000638ce0
+ *     7   | 0x0000000004000000 | 0x0000000000db3000
+ *
+ * In the above example, the last page of region 5 is 0x4638000
+ * and the segment does not contain complete data of this page.
+ * Then this function gets the data of 0x4638000 - 0x4638ce0
+ * from region 5, and gets the remaining data from region 7.
+ */
 static int
 readpage_elf(unsigned long long paddr, void *bufptr)
 {
 	const off_t failed = (off_t)-1;
-	off_t offset = 0;
+	off_t offset1, offset2;
+	size_t size1, size2;
 
-	if (!(offset = paddr_to_offset(paddr))) {
-		ERRMSG("Can't convert a physical address(%llx) to offset.\n",
-		       paddr);
-		return FALSE;
+	offset1 = paddr_to_offset(paddr);
+	offset2 = paddr_to_offset(paddr + info->page_size);
+
+	/*
+         * Check the separated page on different PT_LOAD segments.
+	 */
+	if (offset1 + info->page_size == offset2) {
+		size1 = info->page_size;
+	} else {
+		for (size1 = 1; size1 < info->page_size; size1++) {
+			offset2 = paddr_to_offset(paddr + size1);
+			if (offset1 + size1 != offset2)
+				break;
+		}
 	}
 
-	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+	if (lseek(info->fd_memory, offset1, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-		       info->name_memory, (unsigned long long)offset, strerror(errno));
+		       info->name_memory, (unsigned long long)offset1, strerror(errno));
 		return FALSE;
 	}
 
-	if (read(info->fd_memory, bufptr, info->page_size) != info->page_size) {
+	if (read(info->fd_memory, bufptr, size1) != size1) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		       info->name_memory, strerror(errno));
 		return FALSE;
+	}
+
+	if (size1 != info->page_size) {
+		size2 = info->page_size - size1;
+		if (!offset2) {
+			memset(bufptr + size1, 0, size2);
+		} else {
+			offset2 = paddr_to_offset(paddr + size1);
+
+			if (lseek(info->fd_memory, offset2, SEEK_SET) == failed) {
+				ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
+				       info->name_memory, (unsigned long long)offset2,
+				       strerror(errno));
+				return FALSE;
+			}
+
+			if (read(info->fd_memory, bufptr + size1, size2) != size2) {
+				ERRMSG("Can't read the dump memory(%s). %s\n",
+				       info->name_memory, strerror(errno));
+				return FALSE;
+			}
+		}
 	}
 
 	return TRUE;
@@ -5305,71 +5357,17 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	return TRUE;
 }
 
-/*
- * This function is specific for reading page.
- *
- * If reading the separated page on different PT_LOAD segments,
- * this function gets the page data from both segments. This is
- * worthy of ia64 /proc/vmcore. In ia64 /proc/vmcore, region 5
- * segment is overlapping to region 7 segment. The following is
- * example (page_size is 16KBytes):
- *
- *  region |       paddr        |       memsz
- * --------+--------------------+--------------------
- *     5   | 0x0000000004000000 | 0x0000000000638ce0
- *     7   | 0x0000000004000000 | 0x0000000000db3000
- *
- * In the above example, the last page of region 5 is 0x4638000
- * and the segment does not contain complete data of this page.
- * Then this function gets the data of 0x4638000 - 0x4638ce0
- * from region 5, and gets the remaining data from region 7.
- */
 int
 read_pfn(unsigned long long pfn, unsigned char *buf)
 {
 	unsigned long long paddr;
-	off_t offset1, offset2;
-	size_t size1, size2;
 
 	paddr = pfn_to_paddr(pfn);
-	if (info->flag_refiltering || info->flag_sadump) {
-		if (!readmem(PADDR, paddr, buf, info->page_size)) {
-			ERRMSG("Can't get the page data.\n");
-			return FALSE;
-		}
-		return TRUE;
-	}
-
-	offset1 = paddr_to_offset(paddr);
-	offset2 = paddr_to_offset(paddr + info->page_size);
-
-	/*
-	 * Check the separated page on different PT_LOAD segments.
-	 */
-	if (offset1 + info->page_size == offset2) {
-		size1 = info->page_size;
-	} else {
-		for (size1 = 1; size1 < info->page_size; size1++) {
-			offset2 = paddr_to_offset(paddr + size1);
-			if (offset1 + size1 != offset2)
-				break;
-		}
-	}
-	if (!readmem(PADDR, paddr, buf, size1)) {
+	if (!readmem(PADDR, paddr, buf, info->page_size)) {
 		ERRMSG("Can't get the page data.\n");
 		return FALSE;
 	}
-	if (size1 != info->page_size) {
-		size2 = info->page_size - size1;
-		if (!offset2) {
-			memset(buf + size1, 0, size2);
-		} else {
-			if (!readmem(PADDR, paddr + size1, buf + size1, size2)) {
-				ERRMSG("Can't get the page data.\n");
-				return FALSE;
-			}
-		}
-	}
+
 	return TRUE;
 }
 

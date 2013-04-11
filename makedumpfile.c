@@ -5378,7 +5378,6 @@ get_loads_dumpfile_cyclic(void)
 	long page_size = info->page_size;
 	unsigned char buf[info->page_size];
 	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
-	unsigned long long paddr;
 	unsigned long frac_head, frac_tail;
 	Elf64_Phdr load;
 
@@ -5432,12 +5431,8 @@ get_loads_dumpfile_cyclic(void)
 			 * Exclude zero pages.
 			 */
 			if (info->dump_level & DL_EXCLUDE_ZERO) {
-				paddr = pfn_to_paddr(pfn);
-				if (!readmem(PADDR, paddr, buf, page_size)) {
-					ERRMSG("Can't get the page data(pfn:%llx,max_mapnr:%llx).\n",
-					       pfn, info->max_mapnr);
+				if (!read_pfn(pfn, buf))
 					return FALSE;
-				}
 				if (is_zero_page(buf, page_size)) {
 					num_excluded++;
 					continue;
@@ -5467,7 +5462,6 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	long page_size = info->page_size;
 	unsigned char buf[info->page_size];
 	unsigned long long pfn, pfn_start, pfn_end, paddr, num_excluded;
-	unsigned long long paddr_buf;
 	unsigned long long num_dumpable, per;
 	unsigned long long memsz, filesz;
 	unsigned long frac_head, frac_tail;
@@ -5547,12 +5541,8 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 			 * Exclude zero pages.
 			 */
 			if (info->dump_level & DL_EXCLUDE_ZERO) {
-				paddr_buf = pfn_to_paddr(pfn);
-				if (!readmem(PADDR, paddr_buf, buf, page_size)) {
-					ERRMSG("Can't get the page data(pfn:%llx max_mapnr:%llx).\n",
-					       pfn, info->max_mapnr);
+				if (!read_pfn(pfn, buf))
 					return FALSE;
-				}
 				if (is_zero_page(buf, page_size)) {
 					pfn_zero++;
 					num_excluded++;

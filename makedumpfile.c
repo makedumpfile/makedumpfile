@@ -5337,7 +5337,6 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 			ERRMSG("Can't get the page data.\n");
 			return FALSE;
 		}
-		filter_data_buffer(buf, paddr, info->page_size);
 		return TRUE;
 	}
 
@@ -5360,7 +5359,6 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 		ERRMSG("Can't get the page data.\n");
 		return FALSE;
 	}
-	filter_data_buffer(buf, paddr, size1);
 	if (size1 != info->page_size) {
 		size2 = info->page_size - size1;
 		if (!offset2) {
@@ -5370,7 +5368,6 @@ read_pfn(unsigned long long pfn, unsigned char *buf)
 				ERRMSG("Can't get the page data.\n");
 				return FALSE;
 			}
-			filter_data_buffer(buf + size1, paddr + size1, size2);
 		}
 	}
 	return TRUE;
@@ -5805,6 +5802,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 
 		if (!read_pfn(pfn, buf))
 			goto out;
+		filter_data_buffer(buf, pfn_to_paddr(pfn), info->page_size);
 
 		/*
 		 * Exclude the page filled with zeros.
@@ -5983,6 +5981,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 
 		if (!read_pfn(pfn, buf))
 			goto out;
+		filter_data_buffer(buf, pfn_to_paddr(pfn), info->page_size);
 
 		/*
 		 * Exclude the page filled with zeros.

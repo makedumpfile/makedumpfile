@@ -1347,11 +1347,14 @@ get_die_nfields(unsigned long long die_off)
 	tag = dwarf_tag(die);
 	if (tag != DW_TAG_structure_type && tag != DW_TAG_union_type) {
 		ERRMSG("DIE is not of structure or union type.\n");
+		clean_dwfl_info();
 		return -1;
 	}
 
-	if (dwarf_child(die, &child) != 0)
+	if (dwarf_child(die, &child) != 0) {
+		clean_dwfl_info();
 		return -1;
+	}
 
 	/* Find the number of fields in the structure */
 	die = &child;
@@ -1363,6 +1366,7 @@ get_die_nfields(unsigned long long die_off)
 			continue;
 	} while (!dwarf_siblingof(die, die));
 
+	clean_dwfl_info();
 	return nfields;
 }
 
@@ -1388,11 +1392,14 @@ get_die_member(unsigned long long die_off, int index, long *offset,
 	tag = dwarf_tag(die);
 	if (tag != DW_TAG_structure_type && tag != DW_TAG_union_type) {
 		ERRMSG("DIE is not of structure or union type.\n");
+		clean_dwfl_info();
 		return -1;
 	}
 
-	if (dwarf_child(die, &child) != 0)
+	if (dwarf_child(die, &child) != 0) {
+		clean_dwfl_info();
 		return -1;
+	}
 
 	/* Find the correct field in the structure */
 	die = &child;
@@ -1408,6 +1415,7 @@ get_die_member(unsigned long long die_off, int index, long *offset,
 
 	if (nfields != index) {
 		ERRMSG("No member found at index %d.\n", index);
+		clean_dwfl_info();
 		return -1;
 	}
 
@@ -1416,6 +1424,13 @@ get_die_member(unsigned long long die_off, int index, long *offset,
 		*offset = 0;
 
 	*name = dwarf_diename(die);
+	/*
+	 * Duplicate the string before we pass it to eppic layer. The
+	 * original string returned by dwarf layer will become invalid
+	 * after clean_dwfl_info() call.
+	 */
+	if (*name)
+		*name = strdup(*name);
 	*m_die = dwarf_dieoffset(die);
 
 	get_die_type(die, &die_base);
@@ -1432,6 +1447,7 @@ get_die_member(unsigned long long die_off, int index, long *offset,
 	 */
 	*nbits = *fbits = 0;
 
+	clean_dwfl_info();
 	if (size < 0)
 		return 0;
 	else
@@ -1455,21 +1471,35 @@ get_die_attr_type(unsigned long long die_off, int *type_flag,
 		return FALSE;
 	}
 
-	if (!get_die_type(&result, &result))
+	if (!get_die_type(&result, &result)) {
+		clean_dwfl_info();
 		return FALSE;
+	}
 
 	*die_attr_off = dwarf_dieoffset(&result);
 	*type_flag = dwarf_tag(&result);
+	clean_dwfl_info();
 	return TRUE;
 }
 
 /*
- * Get name attribute given the die offset
+ * Get name attribute given the die offset This function is called by eppic
+ * layer directly as one of the callback functions.
+ *
+ * This function returns a pointer to newly allocated string which is a
+ * duplicate of original string returned from dwarf APIs. The reason for doing
+ * this is because the original string returned by dwarf layer will become
+ * invalid (freed) as soon as we close the dwarf handle through
+ * clean_dwfl_info(). This avoids the segfault when caller (eppic layer) of
+ * this function tries to access the string pointer.
+ *
+ * NOTE: It is callers responsibility to free the memory of new string.
  */
 char *
 get_die_name(unsigned long long die_off)
 {
 	Dwarf_Die result;
+	char *name = NULL;
 
 	if (!die_off)
 		return NULL;
@@ -1479,7 +1509,11 @@ get_die_name(unsigned long long die_off)
 		return NULL;
 	}
 
-	return dwarf_diename(&result);
+	name = dwarf_diename(&result);
+	if (name)
+		name = strdup(name);
+	clean_dwfl_info();
+	return name;
 }
 
 /*
@@ -1510,6 +1544,7 @@ int
 get_die_length(unsigned long long die_off, int flag)
 {
 	Dwarf_Die result, die_base;
+	int size = 0;
 
 	if (!die_off)
 		return FALSE;
@@ -1519,17 +1554,22 @@ get_die_length(unsigned long long die_off, int flag)
 		return FALSE;
 	}
 
-	if (flag)
-		return dwarf_bytesize(&result);
+	if (flag) {
+		size = dwarf_bytesize(&result);
+		goto out;
+	}
 
 	get_die_type(&result, &die_base);
 	if (dwarf_tag(&die_base) == DW_TAG_array_type) {
 		dwarf_info.array_length = 0;
 		get_data_array_length(&result);
-		return dwarf_info.array_length;
+		size = dwarf_info.array_length;
 	} else {
-		return dwarf_bytesize(&die_base);
+		size = dwarf_bytesize(&die_base);
 	}
+out:
+	clean_dwfl_info();
+	return size;
 }
 
 /*

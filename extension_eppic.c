@@ -121,7 +121,7 @@ drilldown(ull offset, type_t *t)
 	int type_flag, len = 0, t_len = 0, nidx = 0;
 	int fctflg = 0, ref = 0, *idxlst = 0;
 	ull die_off = offset, t_die_off;
-	char *tstr = NULL;
+	char *tstr = NULL, *tstr_dup = NULL;
 
 	while (GET_DIE_ATTR_TYPE(die_off, &type_flag, &t_die_off)) {
 		switch (type_flag) {
@@ -201,9 +201,10 @@ out:
 	if (fctflg)
 		eppic_type_setfct(t, 1);
 	eppic_pushref(t, ref + (nidx ? 1 : 0));
-	if (tstr)
-		return eppic_strdup(tstr);
-	return eppic_strdup("");
+	tstr_dup = (tstr) ? eppic_strdup(tstr) : eppic_strdup("");
+	/* Free the memory allocated by makedumpfile. */
+	free(tstr);
+	return tstr_dup;
 }
 
 /*
@@ -216,7 +217,7 @@ apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
 	int nbits = 0, fbits = 0;
 	long offset;
 	ull m_die, die_off = idx;
-	char *name;
+	char *name = NULL;
 
 	nfields = GET_DIE_NFIELDS(die_off);
 	/*
@@ -243,8 +244,13 @@ apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
 
 		if (!mname || !mname[0] || !strcmp(mname, name)) {
 			eppic_member_ssize(m, size);
-			if (name)
+			if (name) {
 				eppic_member_sname(m, name);
+				/*
+				 * Free the memory allocated by makedumpfile.
+				 */
+				free(name);
+			}
 			else
 				eppic_member_sname(m, "");
 			eppic_member_soffset(m, offset);
@@ -334,8 +340,11 @@ apigetval(char *name, ull *val, VALUE_S *value)
 
 	if (!eppic_typeislocal(stype) && eppic_type_getidx(stype) > 100) {
 		char *tname = GET_DIE_NAME(eppic_type_getidx(stype));
-		if (tname)
+		if (tname) {
 			eppic_chktype(stype, tname);
+			/* Free the memory allocated by makedumpfile. */
+			free(tname);
+		}
 	}
 	return 1;
 }

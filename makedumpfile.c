@@ -779,6 +779,24 @@ open_dump_file(void)
 }
 
 int
+check_dump_file(const char *path)
+{
+	char *err_str;
+
+	if (access(path, F_OK) != 0)
+		return TRUE; /* File does not exist */
+	if (info->flag_force) {
+		if (access(path, W_OK) == 0)
+			return TRUE; /* We have write permission */
+		err_str = strerror(errno);
+	} else {
+		err_str = strerror(EEXIST);
+	}
+	ERRMSG("Can't open the dump file (%s). %s\n", path, err_str);
+	return FALSE;
+}
+
+int
 open_dump_bitmap(void)
 {
 	int i, fd;
@@ -8604,6 +8622,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (!check_dump_file(info->name_dumpfile))
+			goto out;
+
 		if (!open_files_for_rearranging_dumpdata())
 			goto out;
 
@@ -8621,9 +8642,11 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
-		if (!reassemble_dumpfile())
+		if (!check_dump_file(info->name_dumpfile))
 			goto out;
 
+		if (!reassemble_dumpfile())
+			goto out;
 		MSG("\n");
 		MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
 	} else if (info->flag_dmesg) {
@@ -8632,6 +8655,8 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (!check_dump_file(info->name_dumpfile))
+			goto out;
 		if (!dump_dmesg())
 			goto out;
 
@@ -8643,6 +8668,16 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->flag_split) {
+			for (i = 0; i < info->num_dumpfile; i++) {
+				if (!check_dump_file(SPLITTING_DUMPFILE(i)))
+					goto out;
+			}
+		} else {
+			if (!check_dump_file(info->name_dumpfile))
+				goto out;
+		}
+
 		if (!create_dumpfile())
 			goto out;
 

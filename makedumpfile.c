@@ -251,7 +251,7 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
  * from region 5, and gets the remaining data from region 7.
  */
 static int
-update_mmap_range(off_t offset) {
+update_mmap_range(off_t offset, int initial) {
 	off_t start_offset;
 	off_t map_size;
 	off_t max_offset = get_max_file_offset();
@@ -270,10 +270,11 @@ update_mmap_range(off_t offset) {
 				     info->fd_memory, start_offset);
 
 	if (info->mmap_buf == MAP_FAILED) {
-		ERRMSG("Can't map [%llx-%llx] with mmap()\n %s",
-		       (ulonglong)start_offset,
-		       (ulonglong)(start_offset + map_size),
-		       strerror(errno));
+		if (!initial)
+			DEBUG_MSG("Can't map [%llx-%llx] with mmap()\n %s",
+				  (ulonglong)start_offset,
+				  (ulonglong)(start_offset + map_size),
+				  strerror(errno));
 		return FALSE;
 	}
 
@@ -298,7 +299,7 @@ int
 initialize_mmap(void) {
 	info->mmap_region_size = MAP_REGION;
 	info->mmap_buf = MAP_FAILED;
-	if (!update_mmap_range(0))
+	if (!update_mmap_range(0, 1))
 		return FALSE;
 
 	return TRUE;
@@ -311,7 +312,7 @@ read_with_mmap(off_t offset, void *bufptr, unsigned long size) {
 next_region:
 
 	if (!is_mapped_with_mmap(offset))
-		if (!update_mmap_range(offset))
+		if (!update_mmap_range(offset, 0))
 			return FALSE;
 
 	read_size = MIN(info->mmap_end_offset - offset, size);
@@ -3047,12 +3048,13 @@ out:
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		setup_page_is_buddy();
 
-	if (initialize_mmap()) {
-		info->flag_usemmap = TRUE;
-		DEBUG_MSG("read %s with mmap()\n", info->name_memory);
-	} else {
+	if (!initialize_mmap()) {
+		/* this kernel does not support mmap of vmcore */
+		DEBUG_MSG("Kernel can't mmap vmcore, using reads.\n");
 		info->flag_usemmap = FALSE;
-		DEBUG_MSG("read %s with read()\n", info->name_memory);
+	} else {
+		DEBUG_MSG("read %s with mmap()\n", info->name_memory);
+		info->flag_usemmap = TRUE;
 	}
 
 	return TRUE;

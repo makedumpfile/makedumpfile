@@ -139,6 +139,10 @@ process_module (Dwfl_Module *dwflmod,
 
 	/* get a debug context descriptor.*/
 	dwarf_info.dwarfd = dwfl_module_getdwarf (dwflmod, &dwbias);
+	if (dwarf_info.dwarfd == NULL) {
+		ERRMSG("dwfl_module_getdwarf error.\n");
+		return DWARF_CB_ABORT;
+	}
 	dwarf_info.elfd = dwarf_getelf(dwarf_info.dwarfd);
 
 	mod_name = dwfl_module_info(dwflmod, NULL, NULL, NULL, NULL, NULL,

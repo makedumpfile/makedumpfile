@@ -311,7 +311,8 @@ read_with_mmap(off_t offset, void *bufptr, unsigned long size) {
 next_region:
 
 	if (!is_mapped_with_mmap(offset))
-		update_mmap_range(offset);
+		if (!update_mmap_range(offset))
+			return FALSE;
 
 	read_size = MIN(info->mmap_end_offset - offset, size);
 
@@ -351,9 +352,13 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 		}
 	}
 
-	if (info->flag_usemmap)
-		read_with_mmap(offset1, bufptr, size1);
-	else {
+	if (info->flag_usemmap) {
+		if (!read_with_mmap(offset1, bufptr, size1)) {
+			ERRMSG("Can't read the dump memory(%s) with mmap().\n",
+                               info->name_memory);
+                        return FALSE;
+		}
+	} else {
 		if (lseek(info->fd_memory, offset1, SEEK_SET) == failed) {
 			ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
 			       info->name_memory, (unsigned long long)offset1, strerror(errno));

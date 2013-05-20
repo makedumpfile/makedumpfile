@@ -2951,7 +2951,9 @@ out:
 	if (!get_value_for_old_linux())
 		return FALSE;
 
-	if (info->flag_cyclic && (info->dump_level & DL_EXCLUDE_FREE))
+	/* use buddy identification of free pages whether cyclic or not */
+	/* (this can reduce pages scan of 1TB memory from 60sec to 30sec) */
+	if (info->dump_level & DL_EXCLUDE_FREE)
 		setup_page_is_buddy();
 
 	return TRUE;
@@ -4141,6 +4143,7 @@ create_1st_bitmap_cyclic()
 
 	/*
 	 * If page is on memory hole, set bit on the 1st-bitmap.
+	 * (note that this is not done in cyclic mode)
 	 */
 	pfn_bitmap1 = 0;
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
@@ -4283,9 +4286,9 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 
 		/*
 		 * Exclude the free page managed by a buddy
+		 * Use buddy identification of free pages whether cyclic or not.
 		 */
 		if ((info->dump_level & DL_EXCLUDE_FREE)
-		    && info->flag_cyclic
 		    && info->page_is_buddy
 		    && info->page_is_buddy(flags, _mapcount, private, _count)) {
 			int i, nr_pages = 1 << private;
@@ -4526,7 +4529,7 @@ create_2nd_bitmap(void)
 	/*
 	 * Exclude free pages.
 	 */
-	if (info->dump_level & DL_EXCLUDE_FREE)
+	if ((info->dump_level & DL_EXCLUDE_FREE) && !info->page_is_buddy)
 		if (!exclude_free_page())
 			return FALSE;
 

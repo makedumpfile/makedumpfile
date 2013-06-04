@@ -175,6 +175,10 @@ print_usage(void)
 	MSG("      Reassemble multiple DUMPFILEs, which are created by --split option,\n");
 	MSG("      into one DUMPFILE. dumpfile1 and dumpfile2 are reassembled into dumpfile.\n");
 	MSG("\n");
+	MSG("  [-b <order>]\n");
+	MSG("      Specify the cache 2^order pages in ram when generating DUMPFILE before\n");
+	MSG("      writing to output. The default value is 4.\n");
+	MSG("\n");
 	MSG("  [--cyclic-buffer BUFFER_SIZE]:\n");
 	MSG("      Specify the buffer size in kilo bytes for analysis in the cyclic mode.\n");
 	MSG("      Actually, the double of BUFFER_SIZE kilo bytes will be allocated in memory.\n");
@@ -253,10 +257,6 @@ print_usage(void)
 	MSG("\n");
 	MSG("  [-h]:\n");
 	MSG("      Show help message and LZO/snappy support status (enabled/disabled).\n");
-	MSG("\n");
-	MSG("  [-b <order>]\n");
-	MSG("      Specify the cache 2^order pages in ram when generating vmcore info\n");
-	MSG("      before writing to output\n");
 	MSG("\n");
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile.\n");

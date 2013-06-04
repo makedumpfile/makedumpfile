@@ -364,6 +364,11 @@ on the following example.
 # makedumpfile \-\-reassemble dumpfile1 dumpfile2 dumpfile
 
 .TP
+\fB\-b\fR \fI<order>\fR
+Cache 2^order pages in ram when generating \fIDUMPFILE\fR before writing to output.
+The default value is 4.
+
+.TP
 \fB\-\-cyclic\-buffer\fR \fIbuffer_size\fR
 Specify the buffer size in kilo bytes for analysis in the cyclic mode.
 Actually, the double of \fIbuffer_size\fR kilo bytes will be allocated in memory.

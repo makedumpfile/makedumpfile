@@ -453,6 +453,42 @@ paddr_to_offset2(unsigned long long paddr, off_t hint)
 }
 
 unsigned long long
+page_head_to_phys_start(unsigned long long head_paddr)
+{
+	int i;
+	struct pt_load_segment *pls;
+
+	for (i = 0; i < num_pt_loads; i++) {
+		pls = &pt_loads[i];
+		if ((pls->phys_start <= head_paddr + info->page_size)
+		    && (head_paddr < pls->phys_end)) {
+			return (pls->phys_start > head_paddr) ?
+				pls->phys_start : head_paddr;
+		}
+	}
+
+	return 0;
+}
+
+unsigned long long
+page_head_to_phys_end(unsigned long long head_paddr)
+{
+	int i;
+	struct pt_load_segment *pls;
+
+	for (i = 0; i < num_pt_loads; i++) {
+		pls = &pt_loads[i];
+		if ((pls->phys_start <= head_paddr + info->page_size)
+		    && (head_paddr < pls->phys_end)) {
+			return (pls->phys_end < head_paddr + info->page_size) ?
+				pls->phys_end : head_paddr + info->page_size;
+		}
+	}
+
+	return 0;
+}
+
+unsigned long long
 vaddr_to_paddr_general(unsigned long long vaddr)
 {
 	int i;

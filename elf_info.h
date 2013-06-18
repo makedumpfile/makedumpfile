@@ -30,6 +30,8 @@
 
 off_t paddr_to_offset(unsigned long long paddr);
 off_t paddr_to_offset2(unsigned long long paddr, off_t hint);
+unsigned long long page_head_to_phys_start(unsigned long long head_paddr);
+unsigned long long page_head_to_phys_end(unsigned long long head_paddr);
 unsigned long long vaddr_to_paddr_general(unsigned long long vaddr);
 off_t vaddr_to_offset_slow(int fd, char *filename, unsigned long long vaddr);
 unsigned long long get_max_paddr(void);

@@ -331,9 +331,36 @@ next_region:
 }
 
 static int
-readpage_elf(unsigned long long paddr, void *bufptr)
+read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 {
 	const off_t failed = (off_t)-1;
+
+	if (info->flag_usemmap) {
+		if (!read_with_mmap(offset, bufptr, size)) {
+			ERRMSG("Can't read the dump memory(%s) with mmap().\n",
+			       info->name_memory);
+			return FALSE;
+		}
+	} else {
+		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+			ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
+			       info->name_memory, (unsigned long long)offset, strerror(errno));
+			return FALSE;
+		}
+
+		if (read(info->fd_memory, bufptr, size) != size) {
+			ERRMSG("Can't read the dump memory(%s). %s\n",
+			       info->name_memory, strerror(errno));
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
+static int
+readpage_elf(unsigned long long paddr, void *bufptr)
+{
 	off_t offset1, offset2;
 	size_t size1, size2;
 
@@ -353,24 +380,10 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 		}
 	}
 
-	if (info->flag_usemmap) {
-		if (!read_with_mmap(offset1, bufptr, size1)) {
-			ERRMSG("Can't read the dump memory(%s) with mmap().\n",
-                               info->name_memory);
-                        return FALSE;
-		}
-	} else {
-		if (lseek(info->fd_memory, offset1, SEEK_SET) == failed) {
-			ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-			       info->name_memory, (unsigned long long)offset1, strerror(errno));
-			return FALSE;
-		}
-
-		if (read(info->fd_memory, bufptr, size1) != size1) {
-			ERRMSG("Can't read the dump memory(%s). %s\n",
-			       info->name_memory, strerror(errno));
-			return FALSE;
-		}
+	if(!read_from_vmcore(offset1, bufptr, size1)) {
+		ERRMSG("Can't read the dump memory(%s).\n",
+		       info->name_memory);
+		return FALSE;
 	}
 
 	if (size1 != info->page_size) {
@@ -380,21 +393,10 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 		} else {
 			offset2 = paddr_to_offset(paddr + size1);
 
-			if (info->flag_usemmap)
-				read_with_mmap(offset2, bufptr + size1, size2);
-			else {
-				if (lseek(info->fd_memory, offset2, SEEK_SET) == failed) {
-					ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-					       info->name_memory, (unsigned long long)offset2,
-					       strerror(errno));
-					return FALSE;
-				}
-
-				if (read(info->fd_memory, bufptr + size1, size2) != size2) {
-					ERRMSG("Can't read the dump memory(%s). %s\n",
-					       info->name_memory, strerror(errno));
-					return FALSE;
-				}
+			if(!read_from_vmcore(offset2, bufptr + size1, size2)) {
+				ERRMSG("Can't read the dump memory(%s).\n",
+				       info->name_memory);
+				return FALSE;
 			}
 		}
 	}

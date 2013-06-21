@@ -363,41 +363,69 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 {
 	off_t offset1, offset2;
 	size_t size1, size2;
+	unsigned long long phys_start, phys_end, frac_head = 0;
 
 	offset1 = paddr_to_offset(paddr);
 	offset2 = paddr_to_offset(paddr + info->page_size);
+	phys_start = paddr;
+	phys_end = paddr + info->page_size;
 
 	/*
-         * Check the separated page on different PT_LOAD segments.
+	 * Check the case phys_start isn't aligned by page size like below:
+	 *
+	 *                           phys_start
+	 *                           = 0x40ffda7000
+	 *         |<-- frac_head -->|------------- PT_LOAD -------------
+	 *     ----+-----------------------+---------------------+----
+	 *         |         pfn:N         |       pfn:N+1       | ...
+	 *     ----+-----------------------+---------------------+----
+	 *         |
+	 *     pfn_to_paddr(pfn:N)               # page size = 16k
+	 *     = 0x40ffda4000
 	 */
-	if (offset1 + info->page_size == offset2) {
-		size1 = info->page_size;
+	if (!offset1) {
+		phys_start = page_head_to_phys_start(paddr);
+		offset1 = paddr_to_offset(phys_start);
+		frac_head = phys_start - paddr;
+		memset(bufptr, 0, frac_head);
+	}
+
+	/*
+	 * Check the case phys_end isn't aligned by page size like the
+	 * phys_start's case.
+	 */
+	if (!offset2) {
+		phys_end = page_head_to_phys_end(paddr);
+		offset2 = paddr_to_offset(phys_end);
+		memset(bufptr + (phys_end - paddr), 0, info->page_size - (phys_end - paddr));
+	}
+
+	/*
+	 * Check the separated page on different PT_LOAD segments.
+	 */
+	if (offset1 + (phys_end - phys_start) == offset2) {
+		size1 = phys_end - phys_start;
 	} else {
-		for (size1 = 1; size1 < info->page_size; size1++) {
-			offset2 = paddr_to_offset(paddr + size1);
+		for (size1 = 1; size1 < info->page_size - frac_head; size1++) {
+			offset2 = paddr_to_offset(phys_start + size1);
 			if (offset1 + size1 != offset2)
 				break;
 		}
 	}
 
-	if(!read_from_vmcore(offset1, bufptr, size1)) {
+	if(!read_from_vmcore(offset1, bufptr + frac_head, size1)) {
 		ERRMSG("Can't read the dump memory(%s).\n",
 		       info->name_memory);
 		return FALSE;
 	}
 
-	if (size1 != info->page_size) {
-		size2 = info->page_size - size1;
-		if (!offset2) {
-			memset(bufptr + size1, 0, size2);
-		} else {
-			offset2 = paddr_to_offset(paddr + size1);
+	if (size1 + frac_head != info->page_size) {
+		size2 = phys_end - (phys_start + size1);
 
-			if(!read_from_vmcore(offset2, bufptr + size1, size2)) {
-				ERRMSG("Can't read the dump memory(%s).\n",
-				       info->name_memory);
-				return FALSE;
-			}
+		if(!read_from_vmcore(offset2, bufptr + frac_head + size1, size2)) {
+			ERRMSG("Can't read the dump memory(%s).\n",
+			       info->name_memory);
+			return FALSE;
 		}
 	}
 
@@ -4210,8 +4238,6 @@ create_1st_bitmap(void)
 		pfn_start = paddr_to_pfn(phys_start);
 		pfn_end   = paddr_to_pfn(phys_end);
 
-		if (!is_in_segs(pfn_to_paddr(pfn_start)))
-			pfn_start++;
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
 			set_bit_on_1st_bitmap(pfn);
 			pfn_bitmap1++;
@@ -4253,8 +4279,6 @@ create_1st_bitmap_cyclic()
 		pfn_start = paddr_to_pfn(phys_start);
 		pfn_end   = paddr_to_pfn(phys_end);
 
-		if (!is_in_segs(pfn_to_paddr(pfn_start)))
-			pfn_start++;
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
 			if (set_bit_on_1st_bitmap(pfn))
 				pfn_bitmap1++;

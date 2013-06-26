@@ -231,25 +231,6 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 	return TRUE;
 }
 
-/*
- * This function is specific for reading page from ELF.
- *
- * If reading the separated page on different PT_LOAD segments,
- * this function gets the page data from both segments. This is
- * worthy of ia64 /proc/vmcore. In ia64 /proc/vmcore, region 5
- * segment is overlapping to region 7 segment. The following is
- * example (page_size is 16KBytes):
- *
- *  region |       paddr        |       memsz
- * --------+--------------------+--------------------
- *     5   | 0x0000000004000000 | 0x0000000000638ce0
- *     7   | 0x0000000004000000 | 0x0000000000db3000
- *
- * In the above example, the last page of region 5 is 0x4638000
- * and the segment does not contain complete data of this page.
- * Then this function gets the data of 0x4638000 - 0x4638ce0
- * from region 5, and gets the remaining data from region 7.
- */
 static int
 update_mmap_range(off_t offset, int initial) {
 	off_t start_offset;
@@ -358,6 +339,25 @@ read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 	return TRUE;
 }
 
+/*
+ * This function is specific for reading page from ELF.
+ *
+ * If reading the separated page on different PT_LOAD segments,
+ * this function gets the page data from both segments. This is
+ * worthy of ia64 /proc/vmcore. In ia64 /proc/vmcore, region 5
+ * segment is overlapping to region 7 segment. The following is
+ * example (page_size is 16KBytes):
+ *
+ *  region |       paddr        |       memsz
+ * --------+--------------------+--------------------
+ *     5   | 0x0000000004000000 | 0x0000000000638ce0
+ *     7   | 0x0000000004000000 | 0x0000000000db3000
+ *
+ * In the above example, the last page of region 5 is 0x4638000
+ * and the segment does not contain complete data of this page.
+ * Then this function gets the data of 0x4638000 - 0x4638ce0
+ * from region 5, and gets the remaining data from region 7.
+ */
 static int
 readpage_elf(unsigned long long paddr, void *bufptr)
 {

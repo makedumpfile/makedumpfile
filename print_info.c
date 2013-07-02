@@ -255,7 +255,7 @@ print_usage(void)
 	MSG("  [-f]:\n");
 	MSG("      Overwrite DUMPFILE even if it already exists.\n");
 	MSG("\n");
-	MSG("  [-h]:\n");
+	MSG("  [-h, --help]:\n");
 	MSG("      Show help message and LZO/snappy support status (enabled/disabled).\n");
 	MSG("\n");
 	MSG("  [-v]:\n");

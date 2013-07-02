@@ -8555,20 +8555,20 @@ calculate_cyclic_buffer_size(void) {
 }
 
 static struct option longopts[] = {
-	{"split", no_argument, NULL, 's'}, 
-	{"reassemble", no_argument, NULL, 'r'},
-	{"xen-syms", required_argument, NULL, 'y'},
-	{"xen-vmcoreinfo", required_argument, NULL, 'z'},
-	{"xen_phys_start", required_argument, NULL, 'P'},
-	{"message-level", required_argument, NULL, 'm'},
-	{"vtop", required_argument, NULL, 'V'},
-	{"dump-dmesg", no_argument, NULL, 'M'}, 
-	{"config", required_argument, NULL, 'C'},
-	{"help", no_argument, NULL, 'h'},
-	{"diskset", required_argument, NULL, 'k'},
-	{"non-cyclic", no_argument, NULL, 'Y'},
-	{"cyclic-buffer", required_argument, NULL, 'Z'},
-	{"eppic", required_argument, NULL, 'S'},
+	{"split", no_argument, NULL, OPT_SPLIT},
+	{"reassemble", no_argument, NULL, OPT_REASSEMBLE},
+	{"xen-syms", required_argument, NULL, OPT_XEN_SYMS},
+	{"xen-vmcoreinfo", required_argument, NULL, OPT_XEN_VMCOREINFO},
+	{"xen_phys_start", required_argument, NULL, OPT_XEN_PHYS_START},
+	{"message-level", required_argument, NULL, OPT_MESSAGE_LEVEL},
+	{"vtop", required_argument, NULL, OPT_VTOP},
+	{"dump-dmesg", no_argument, NULL, OPT_DUMP_DMESG},
+	{"config", required_argument, NULL, OPT_CONFIG},
+	{"help", no_argument, NULL, OPT_HELP},
+	{"diskset", required_argument, NULL, OPT_DISKSET},
+	{"non-cyclic", no_argument, NULL, OPT_NON_CYCLIC},
+	{"cyclic-buffer", required_argument, NULL, OPT_CYCLIC_BUFFER},
+	{"eppic", required_argument, NULL, OPT_EPPIC},
 	{0, 0, 0, 0}
 };
 
@@ -8597,29 +8597,29 @@ main(int argc, char *argv[])
 	
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:lMpRrsvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:lpRvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
-		case 'b':
+		case OPT_BLOCK_ORDER:
 			info->block_order = atoi(optarg);
 			break;
-		case 'C':
+		case OPT_CONFIG:
 			info->name_filterconfig = optarg;
 			break;
-		case 'c':
+		case OPT_COMPRESS_ZLIB:
 			info->flag_compress = DUMP_DH_COMPRESSED_ZLIB;
 			break;
-		case 'D':
+		case OPT_DEBUG:
 			flag_debug = TRUE;
 			break;
-		case 'd':
+		case OPT_DUMP_LEVEL:
 			if (!parse_dump_level(optarg))
 				goto out;
 			break;
-		case 'E':
+		case OPT_ELF_DUMPFILE:
 			info->flag_elf_dumpfile = 1;
 			break;
-		case 'F':
+		case OPT_FLATTEN:
 			info->flag_flatten = 1;
 			/*
 			 * All messages are output to STDERR because STDOUT is
@@ -8627,75 +8627,75 @@ main(int argc, char *argv[])
 			 */
 			flag_strerr_message = TRUE;
 			break;
-		case 'f':
+		case OPT_FORCE:
 			info->flag_force = 1;
 			break;
-		case 'g':
+		case OPT_GENERATE_VMCOREINFO:
 			info->flag_generate_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
 			break;
-		case 'h':
+		case OPT_HELP:
 			info->flag_show_usage = 1;
 			break;
-		case 'i':
+		case OPT_READ_VMCOREINFO:
 			info->flag_read_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
 			break;
-		case 'k':
+		case OPT_DISKSET:
 			if (!sadump_add_diskset_info(optarg))
 				goto out;
 			info->flag_sadump_diskset = 1;
 			break;
-		case 'l':
+		case OPT_COMPRESS_LZO:
 			info->flag_compress = DUMP_DH_COMPRESSED_LZO;
 			break;
-		case 'm':
+		case OPT_MESSAGE_LEVEL:
 			message_level = atoi(optarg);
 			break;
-		case 'M':
+		case OPT_DUMP_DMESG:
 			info->flag_dmesg = 1;
 			break;
-		case 'p':
+		case OPT_COMPRESS_SNAPPY:
 			info->flag_compress = DUMP_DH_COMPRESSED_SNAPPY;
 			break;
-		case 'P':
+		case OPT_XEN_PHYS_START:
 			info->xen_phys_start = strtoul(optarg, NULL, 0);
 			break;
-		case 'R':
+		case OPT_REARRANGE:
 			info->flag_rearrange = 1;
 			break;
-		case 's':
+		case OPT_SPLIT:
 			info->flag_split = 1;
 			break;
-		case 'S':
+		case OPT_EPPIC:
 			info->name_eppic_config = optarg;
 			break;
-		case 'r':
+		case OPT_REASSEMBLE:
 			info->flag_reassemble = 1;
 			break;
-		case 'V':
+		case OPT_VTOP:
 			info->vaddr_for_vtop = strtoul(optarg, NULL, 0);
 			break;
-		case 'v':
+		case OPT_VERSION:
 			info->flag_show_version = 1;
 			break;
-		case 'X':
+		case OPT_EXCLUDE_XEN_DOM:
 			info->flag_exclude_xen_dom = 1;
 			break;
-		case 'x':
+		case OPT_VMLINUX:
 			info->name_vmlinux = optarg;
 			break;
-		case 'y':
+		case OPT_XEN_SYMS:
 			info->name_xen_syms = optarg;
 			break;
-		case 'Y':
+		case OPT_NON_CYCLIC:
 			info->flag_cyclic = FALSE;
 			break;
-		case 'z':
+		case OPT_XEN_VMCOREINFO:
 			info->flag_read_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
 			break;
-		case 'Z':
+		case OPT_CYCLIC_BUFFER:
 			info->bufsize_cyclic = atoi(optarg);
 			break;
 		case '?':

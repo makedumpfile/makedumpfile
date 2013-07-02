@@ -1671,6 +1671,41 @@ struct elf_prstatus {
 #endif
 
 /*
+ * Below are options which getopt_long can recognize. From OPT_START options are
+ * non-printable, just used for implementation.
+ */
+#define OPT_BLOCK_ORDER         'b'
+#define OPT_COMPRESS_ZLIB       'c'
+#define OPT_DEBUG               'D'
+#define OPT_DUMP_LEVEL          'd'
+#define OPT_ELF_DUMPFILE        'E'
+#define OPT_FLATTEN             'F'
+#define OPT_FORCE               'f'
+#define OPT_GENERATE_VMCOREINFO 'g'
+#define OPT_HELP                'h'
+#define OPT_READ_VMCOREINFO     'i'
+#define OPT_COMPRESS_LZO        'l'
+#define OPT_COMPRESS_SNAPPY     'p'
+#define OPT_REARRANGE           'R'
+#define OPT_VERSION             'v'
+#define OPT_EXCLUDE_XEN_DOM     'X'
+#define OPT_VMLINUX             'x'
+#define OPT_START               256
+#define OPT_SPLIT               OPT_START+0
+#define OPT_REASSEMBLE          OPT_START+1
+#define OPT_XEN_SYMS            OPT_START+2
+#define OPT_XEN_VMCOREINFO      OPT_START+3
+#define OPT_XEN_PHYS_START      OPT_START+4
+#define OPT_MESSAGE_LEVEL       OPT_START+5
+#define OPT_VTOP                OPT_START+6
+#define OPT_DUMP_DMESG          OPT_START+7
+#define OPT_CONFIG              OPT_START+8
+#define OPT_DISKSET             OPT_START+9
+#define OPT_NON_CYCLIC          OPT_START+10
+#define OPT_CYCLIC_BUFFER       OPT_START+11
+#define OPT_EPPIC               OPT_START+12
+
+/*
  * Function Prototype.
  */
 unsigned long long get_num_dumpable_cyclic(void);

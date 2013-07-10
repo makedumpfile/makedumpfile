@@ -2997,6 +2997,8 @@ out:
 			 * Truncate the buffer size to free memory size.
 			 */
 			free_memory = get_free_memory_size();
+			if (info->num_dumpfile > 1)
+				free_memory /= info->num_dumpfile;
 			if (info->bufsize_cyclic > free_memory) {
 				MSG("Specified buffer size is larger than free memory.\n");
 				MSG("The buffer size for the cyclic mode will ");
@@ -8548,6 +8550,9 @@ calculate_cyclic_buffer_size(void) {
 	 */
 	free_size = get_free_memory_size() * 0.4;
 	needed_size = (info->max_mapnr * 2) / BITPERBYTE;
+	/* if --split was specified cyclic buffer allocated per dump file */
+	if (info->num_dumpfile > 1)
+		needed_size /= info->num_dumpfile;
 
 	info->bufsize_cyclic = (free_size <= needed_size) ? free_size : needed_size;
 

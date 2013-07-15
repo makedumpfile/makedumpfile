@@ -49,7 +49,7 @@ set_ppc64_max_physmem_bits(void)
 int
 get_machdep_info_ppc64(void)
 {
-	unsigned long vmlist, vmalloc_start;
+	unsigned long vmlist, vmap_area_list, vmalloc_start;
 
 	info->section_size_bits = _SECTION_SIZE_BITS;
 	if (!set_ppc64_max_physmem_bits()) {

@@ -401,8 +401,15 @@ int get_xen_basic_info_x86_64(void)
 			return FALSE;
 		}
 		info->frame_table_vaddr = frame_table_vaddr;
-	} else
-		info->frame_table_vaddr = FRAMETABLE_VIRT_START;
+	} else {
+		if (info->xen_crash_info.com &&
+		    ((info->xen_crash_info.com->xen_major_version == 4 &&
+		      info->xen_crash_info.com->xen_minor_version >= 3) ||
+		      info->xen_crash_info.com->xen_major_version > 4))
+			info->frame_table_vaddr = FRAMETABLE_VIRT_START_V4_3;
+		else
+			info->frame_table_vaddr = FRAMETABLE_VIRT_START_V3;
+	}
 
 	if (!info->xen_crash_info.com ||
 	    info->xen_crash_info.com->xen_major_version < 4) {

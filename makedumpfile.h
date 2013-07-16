@@ -1466,16 +1466,17 @@ int get_xen_info_x86(void);
 #define ENTRY_MASK		(~0xfff0000000000fffULL)
 #define MAX_X86_64_FRAMES	(info->page_size / sizeof(unsigned long))
 
-#define PAGE_OFFSET_XEN_DOM0  (0xffff880000000000) /* different from linux */
-#define HYPERVISOR_VIRT_START (0xffff800000000000)
-#define HYPERVISOR_VIRT_END   (0xffff880000000000)
-#define DIRECTMAP_VIRT_START  (0xffff830000000000)
-#define DIRECTMAP_VIRT_END_V3 (0xffff840000000000)
-#define DIRECTMAP_VIRT_END_V4 (0xffff880000000000)
-#define DIRECTMAP_VIRT_END    (info->directmap_virt_end)
-#define XEN_VIRT_START        (info->xen_virt_start)
-#define XEN_VIRT_END          (XEN_VIRT_START + (1UL << 30))
-#define FRAMETABLE_VIRT_START 0xffff82f600000000
+#define PAGE_OFFSET_XEN_DOM0		(0xffff880000000000) /* different from linux */
+#define HYPERVISOR_VIRT_START		(0xffff800000000000)
+#define HYPERVISOR_VIRT_END		(0xffff880000000000)
+#define DIRECTMAP_VIRT_START		(0xffff830000000000)
+#define DIRECTMAP_VIRT_END_V3		(0xffff840000000000)
+#define DIRECTMAP_VIRT_END_V4		(0xffff880000000000)
+#define DIRECTMAP_VIRT_END		(info->directmap_virt_end)
+#define XEN_VIRT_START			(info->xen_virt_start)
+#define XEN_VIRT_END			(XEN_VIRT_START + (1UL << 30))
+#define FRAMETABLE_VIRT_START_V3	0xffff82f600000000
+#define FRAMETABLE_VIRT_START_V4_3	0xffff82e000000000
 
 #define is_xen_vaddr(x) \
 	((x) >= HYPERVISOR_VIRT_START && (x) < HYPERVISOR_VIRT_END)

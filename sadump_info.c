@@ -948,7 +948,6 @@ int
 readpage_sadump(unsigned long long paddr, void *bufptr)
 {
 	unsigned long long pfn, block, whole_offset, perdisk_offset;
-	ulong page_offset;
 	int fd_memory;
 
 	if (si->kdump_backed_up &&
@@ -957,7 +956,6 @@ readpage_sadump(unsigned long long paddr, void *bufptr)
 		paddr += si->backup_offset - si->backup_src_start;
 
 	pfn = paddr_to_pfn(paddr);
-	page_offset = paddr % info->page_size;
 
 	if (pfn >= si->sh_memory->max_mapnr)
 		return FALSE;

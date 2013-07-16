@@ -1381,6 +1381,7 @@ int
 get_die_member(unsigned long long die_off, int index, long *offset,
 		char **name, int *nbits, int *fbits, unsigned long long *m_die)
 {
+	const char *diename;
 	int tag, size, nfields = 0;
 	Dwarf_Die result, child, die_base, *die;
 
@@ -1427,14 +1428,14 @@ get_die_member(unsigned long long die_off, int index, long *offset,
 	if (!get_data_member_location(die, offset))
 		*offset = 0;
 
-	*name = dwarf_diename(die);
+	diename = dwarf_diename(die);
 	/*
 	 * Duplicate the string before we pass it to eppic layer. The
 	 * original string returned by dwarf layer will become invalid
 	 * after clean_dwfl_info() call.
 	 */
-	if (*name)
-		*name = strdup(*name);
+	if (diename)
+		*name = strdup(diename);
 	*m_die = dwarf_dieoffset(die);
 
 	get_die_type(die, &die_base);
@@ -1504,6 +1505,7 @@ get_die_name(unsigned long long die_off)
 {
 	Dwarf_Die result;
 	char *name = NULL;
+	const char *diename;
 
 	if (!die_off)
 		return NULL;
@@ -1513,9 +1515,9 @@ get_die_name(unsigned long long die_off)
 		return NULL;
 	}
 
-	name = dwarf_diename(&result);
-	if (name)
-		name = strdup(name);
+	diename = dwarf_diename(&result);
+	if (diename)
+		name = strdup(diename);
 	clean_dwfl_info();
 	return name;
 }

@@ -1473,8 +1473,6 @@ int get_xen_info_x86(void);
 #define DIRECTMAP_VIRT_END_V3 (0xffff840000000000)
 #define DIRECTMAP_VIRT_END_V4 (0xffff880000000000)
 #define DIRECTMAP_VIRT_END    (info->directmap_virt_end)
-#define XEN_VIRT_START_V3     (0xffff828c80000000)
-#define XEN_VIRT_START_V4     (0xffff82c480000000)
 #define XEN_VIRT_START        (info->xen_virt_start)
 #define XEN_VIRT_END          (XEN_VIRT_START + (1UL << 30))
 #define FRAMETABLE_VIRT_START 0xffff82f600000000

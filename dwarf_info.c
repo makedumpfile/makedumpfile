@@ -944,7 +944,7 @@ get_debug_info(void)
 	elfd = dwarf_info.elfd;
 	dwarfd = dwarf_info.dwarfd;
 
-	if (elf_getshstrndx(elfd, &shstrndx) < 0) {
+	if (elf_getshdrstrndx(elfd, &shstrndx) < 0) {
 		ERRMSG("Can't get the section index of the string table.\n");
 		goto out;
 	}

@@ -332,7 +332,7 @@ get_pt_note_info(void)
 		size_desc   = note_descsz(note);
 		offset_desc = offset + offset_note_desc(note);
 
-		if (!size_name || size_name >= sizeof(buf))
+		if (!size_name || size_name > sizeof(buf))
 			goto next_note;
 
 		if (read(fd_memory, &buf, sizeof(buf)) != sizeof(buf)) {

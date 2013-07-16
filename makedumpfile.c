@@ -5047,7 +5047,6 @@ write_elf_header(struct cache_data *cd_header)
 	 * function.
 	 */
 	info->size_elf_eraseinfo = size_eraseinfo;
-	DEBUG_MSG("erase info size: %lu\n", info->size_elf_eraseinfo);
 
 	/*
 	 * Write a PT_NOTE header.
@@ -6327,6 +6326,8 @@ write_elf_eraseinfo(struct cache_data *cd_header)
 	char buf[ERASEINFO_NOTE_NAME_BYTES + 4];
 	off_t offset_eraseinfo;
 	unsigned long note_header_size, size_written, size_note;
+
+	DEBUG_MSG("erase info size: %lu\n", info->size_elf_eraseinfo);
 
 	if (!info->size_elf_eraseinfo)
 		return TRUE;

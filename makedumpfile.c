@@ -7326,8 +7326,6 @@ initial_xen(void)
 #endif
 	if (!init_xen_crash_info())
 		return FALSE;
-	if (!fallback_to_current_page_size())
-		return FALSE;
 	/*
 	 * Get the debug information for analysis from the vmcoreinfo file
 	 */
@@ -7372,6 +7370,16 @@ initial_xen(void)
 		if (!read_vmcoreinfo_from_vmcore(offset, size, TRUE))
 			return FALSE;
 	}
+
+	if (!info->page_size) {
+		/*
+		 * If we cannot get page_size from a vmcoreinfo file,
+		 * fall back to the current kernel page size.
+		 */
+		if (!fallback_to_current_page_size())
+			return FALSE;
+	}
+
 	if (!get_xen_info())
 		return FALSE;
 

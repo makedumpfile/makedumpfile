@@ -4091,6 +4091,7 @@ check_cyclic_buffer_overrun(void)
 
 		bufsize = info->bufsize_cyclic;
 		info->bufsize_cyclic = round(bufsize, max_block_size);
+		info->pfn_cyclic = info->bufsize_cyclic * BITPERBYTE;
 
 		MSG("cyclic buffer size has been changed: %lu => %lu\n",
 		    bufsize, info->bufsize_cyclic);

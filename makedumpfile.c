@@ -4078,10 +4078,9 @@ check_cyclic_buffer_overrun(void)
 {
 	int max_order = ARRAY_LENGTH(zone.free_area);
 	int max_order_nr_pages = 1 << (max_order - 1);
-	unsigned long max_block_size = roundup(max_order_nr_pages, BITPERBYTE);
+	unsigned long max_block_size = divideup(max_order_nr_pages, BITPERBYTE);
 
-	if (info->bufsize_cyclic %
-	    roundup(max_order_nr_pages, BITPERBYTE)) {
+	if (info->bufsize_cyclic % max_block_size) {
 		unsigned long bufsize;
 
 		if (max_block_size > info->bufsize_cyclic) {

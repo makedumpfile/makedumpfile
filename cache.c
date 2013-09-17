@@ -103,19 +103,20 @@ cache_alloc(unsigned long long paddr)
 {
 	struct cache_entry *entry = NULL;
 
-	if (avail)
+	if (avail) {
 		entry = &pool[--avail];
-
-	if (!entry) {
-		if (used.tail) {
-			entry = used.tail;
-			remove_entry(&used, entry);
-		} else
-			return NULL;
-	}
-
-	entry->paddr = paddr;
-	add_entry(&pending, entry);
+		entry->paddr = paddr;
+		add_entry(&pending, entry);
+	} else if (pending.tail) {
+		entry = pending.tail;
+		entry->paddr = paddr;
+	} else if (used.tail) {
+		entry = used.tail;
+		remove_entry(&used, entry);
+		entry->paddr = paddr;
+		add_entry(&pending, entry);
+	} else
+		return NULL;
 
 	return entry->bufptr;
 }

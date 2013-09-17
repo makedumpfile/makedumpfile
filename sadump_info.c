@@ -23,6 +23,8 @@
 #include "print_info.h"
 #include "sadump_mod.h"
 
+#include <arpa/inet.h> /* htonl, htons */
+
 #define SADUMP_EFI_GUID_TEXT_REPR_LEN 36
 
 #ifdef __x86__
@@ -334,7 +336,7 @@ guid_to_str(efi_guid_t *guid, char *buf, size_t buflen)
 {
 	snprintf(buf, buflen,
 		 "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-		 guid->data1, guid->data2, guid->data3,
+		 htonl(guid->data1), htons(guid->data2), htons(guid->data3),
 		 guid->data4[0], guid->data4[1], guid->data4[2],
 		 guid->data4[3], guid->data4[4], guid->data4[5],
 		 guid->data4[6], guid->data4[7]);

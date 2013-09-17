@@ -3017,6 +3017,9 @@ out:
 		DEBUG_MSG("Buffer size for the cyclic mode: %ld\n", info->bufsize_cyclic);
 	}
 
+	if (!cache_init())
+		return FALSE;
+
 	if (debug_info) {
 		if (info->flag_sadump)
 			(void) sadump_virt_phys_base();

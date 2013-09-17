@@ -19,6 +19,7 @@
 #ifndef _CACHE_H
 #define _CACHE_H
 
+int cache_init(void);
 void *cache_search(unsigned long long paddr);
 void *cache_alloc(unsigned long long paddr);
 void cache_add(unsigned long long paddr);

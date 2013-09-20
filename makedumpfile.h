@@ -893,6 +893,7 @@ struct DumpInfo {
 	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
 	int             flag_dmesg;          /* dump the dmesg log out of the vmcore file */
+	int		flag_use_printk_log; /* did we read printk_log symbol name? */
 	int		flag_nospace;	     /* the flag of "No space on device" error */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
@@ -1176,6 +1177,7 @@ struct size_table {
 	long	list_head;
 	long	node_memblk_s;
 	long	nodemask_t;
+	long	printk_log;
 
 	/*
 	 * for Xen extraction
@@ -1198,7 +1200,6 @@ struct size_table {
 	long	cpumask_t;
 	long	kexec_segment;
 	long	elf64_hdr;
-	long	log;
 
 	long	pageflags;
 };
@@ -1337,11 +1338,11 @@ struct offset_table {
 		long	p_memsz;
 	} elf64_phdr;
 
-	struct log_s {
+	struct printk_log_s {
 		long ts_nsec;
 		long len;
 		long text_len;
-	} log;
+	} printk_log;
 
 };
 

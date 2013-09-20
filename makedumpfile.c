@@ -1389,10 +1389,23 @@ get_structure_info(void)
 	OFFSET_INIT(elf64_phdr.p_paddr, "elf64_phdr", "p_paddr");
 	OFFSET_INIT(elf64_phdr.p_memsz, "elf64_phdr", "p_memsz");
 
-	SIZE_INIT(log, "log");
-	OFFSET_INIT(log.ts_nsec, "log", "ts_nsec");
-	OFFSET_INIT(log.len, "log", "len");
-	OFFSET_INIT(log.text_len, "log", "text_len");
+	SIZE_INIT(printk_log, "printk_log");
+	if (SIZE(printk_log) != NOT_FOUND_STRUCTURE) {
+		/*
+		 * In kernel 3.11-rc4 the log structure name was renamed
+		 * to "printk_log".
+		 */
+		info->flag_use_printk_log = TRUE;
+		OFFSET_INIT(printk_log.ts_nsec, "printk_log", "ts_nsec");
+		OFFSET_INIT(printk_log.len, "printk_log", "len");
+		OFFSET_INIT(printk_log.text_len, "printk_log", "text_len");
+	} else {
+		info->flag_use_printk_log = FALSE;
+		SIZE_INIT(printk_log, "log");
+		OFFSET_INIT(printk_log.ts_nsec, "log", "ts_nsec");
+		OFFSET_INIT(printk_log.len, "log", "len");
+		OFFSET_INIT(printk_log.text_len, "log", "text_len");
+	}
 
 	return TRUE;
 }
@@ -1593,7 +1606,10 @@ write_vmcoreinfo_data(void)
 	WRITE_STRUCTURE_SIZE("node_memblk_s", node_memblk_s);
 	WRITE_STRUCTURE_SIZE("nodemask_t", nodemask_t);
 	WRITE_STRUCTURE_SIZE("pageflags", pageflags);
-	WRITE_STRUCTURE_SIZE("log", log);
+	if (info->flag_use_printk_log)
+		WRITE_STRUCTURE_SIZE("printk_log", printk_log);
+	else
+		WRITE_STRUCTURE_SIZE("log", printk_log);
 
 	/*
 	 * write the member offset of 1st kernel
@@ -1628,9 +1644,16 @@ write_vmcoreinfo_data(void)
 	WRITE_MEMBER_OFFSET("vm_struct.addr", vm_struct.addr);
 	WRITE_MEMBER_OFFSET("vmap_area.va_start", vmap_area.va_start);
 	WRITE_MEMBER_OFFSET("vmap_area.list", vmap_area.list);
-	WRITE_MEMBER_OFFSET("log.ts_nsec", log.ts_nsec);
-	WRITE_MEMBER_OFFSET("log.len", log.len);
-	WRITE_MEMBER_OFFSET("log.text_len", log.text_len);
+	if (info->flag_use_printk_log) {
+		WRITE_MEMBER_OFFSET("printk_log.ts_nsec", printk_log.ts_nsec);
+		WRITE_MEMBER_OFFSET("printk_log.len", printk_log.len);
+		WRITE_MEMBER_OFFSET("printk_log.text_len", printk_log.text_len);
+	} else {
+		/* Compatibility with pre-3.11-rc4 */
+		WRITE_MEMBER_OFFSET("log.ts_nsec", printk_log.ts_nsec);
+		WRITE_MEMBER_OFFSET("log.len", printk_log.len);
+		WRITE_MEMBER_OFFSET("log.text_len", printk_log.text_len);
+	}
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("node_data", node_data);
@@ -1909,7 +1932,6 @@ read_vmcoreinfo(void)
 	READ_STRUCTURE_SIZE("node_memblk_s", node_memblk_s);
 	READ_STRUCTURE_SIZE("nodemask_t", nodemask_t);
 	READ_STRUCTURE_SIZE("pageflags", pageflags);
-	READ_STRUCTURE_SIZE("log", log);
 
 	READ_MEMBER_OFFSET("page.flags", page.flags);
 	READ_MEMBER_OFFSET("page._count", page._count);
@@ -1940,9 +1962,20 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("vm_struct.addr", vm_struct.addr);
 	READ_MEMBER_OFFSET("vmap_area.va_start", vmap_area.va_start);
 	READ_MEMBER_OFFSET("vmap_area.list", vmap_area.list);
-	READ_MEMBER_OFFSET("log.ts_nsec", log.ts_nsec);
-	READ_MEMBER_OFFSET("log.len", log.len);
-	READ_MEMBER_OFFSET("log.text_len", log.text_len);
+
+	READ_STRUCTURE_SIZE("printk_log", printk_log);
+	if (SIZE(printk_log) != NOT_FOUND_STRUCTURE) {
+		info->flag_use_printk_log = TRUE;
+		READ_MEMBER_OFFSET("printk_log.ts_nsec", printk_log.ts_nsec);
+		READ_MEMBER_OFFSET("printk_log.len", printk_log.len);
+		READ_MEMBER_OFFSET("printk_log.text_len", printk_log.text_len);
+	} else {
+		info->flag_use_printk_log = FALSE;
+		READ_STRUCTURE_SIZE("log", printk_log);
+		READ_MEMBER_OFFSET("log.ts_nsec", printk_log.ts_nsec);
+		READ_MEMBER_OFFSET("log.len", printk_log.len);
+		READ_MEMBER_OFFSET("log.text_len", printk_log.text_len);
+	}
 
 	READ_ARRAY_LENGTH("node_data", node_data);
 	READ_ARRAY_LENGTH("pgdat_list", pgdat_list);
@@ -3710,13 +3743,13 @@ dump_log_entry(char *logptr, int fp)
 	ulonglong nanos;
 	ulong rem;
 
-	text_len = USHORT(logptr + OFFSET(log.text_len));
-	ts_nsec = ULONGLONG(logptr + OFFSET(log.ts_nsec));
+	text_len = USHORT(logptr + OFFSET(printk_log.text_len));
+	ts_nsec = ULONGLONG(logptr + OFFSET(printk_log.ts_nsec));
 
 	nanos = (ulonglong)ts_nsec / (ulonglong)1000000000;
 	rem = (ulonglong)ts_nsec % (ulonglong)1000000000;
 
-	msg = logptr + SIZE(log);
+	msg = logptr + SIZE(printk_log);
 
 	sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
 
@@ -3754,7 +3787,7 @@ log_from_idx(unsigned int idx, char *logbuf)
 	 * the buffer.
 	 */
 
-	msglen = USHORT(logptr + OFFSET(log.len));
+	msglen = USHORT(logptr + OFFSET(printk_log.len));
 	if (!msglen)
 		logptr = logbuf;
 
@@ -3775,9 +3808,9 @@ log_next(unsigned int idx, char *logbuf)
 	 * return the one after that.
 	 */
 
-	msglen = USHORT(logptr + OFFSET(log.len));
+	msglen = USHORT(logptr + OFFSET(printk_log.len));
 	if (!msglen) {
-		msglen = USHORT(logbuf + OFFSET(log.len));
+		msglen = USHORT(logbuf + OFFSET(printk_log.len));
 		return msglen;
 	}
 

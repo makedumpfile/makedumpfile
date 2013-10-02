@@ -5199,6 +5199,16 @@ write_kdump_header(void)
 	dh->bitmap_blocks  = divideup(info->len_bitmap, dh->block_size);
 	memcpy(&dh->timestamp, &info->timestamp, sizeof(dh->timestamp));
 	memcpy(&dh->utsname, &info->system_utsname, sizeof(dh->utsname));
+	if (info->flag_compress & DUMP_DH_COMPRESSED_ZLIB)
+		dh->status |= DUMP_DH_COMPRESSED_ZLIB;
+#ifdef USELZO
+	else if (info->flag_compress & DUMP_DH_COMPRESSED_LZO)
+		dh->status |= DUMP_DH_COMPRESSED_LZO;
+#endif
+#ifdef USESNAPPY
+	else if (info->flag_compress & DUMP_DH_COMPRESSED_SNAPPY)
+		dh->status |= DUMP_DH_COMPRESSED_SNAPPY;
+#endif
 
 	size = sizeof(struct disk_dump_header);
 	if (!write_buffer(info->fd_dumpfile, 0, dh, size, info->name_dumpfile))

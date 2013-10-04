@@ -24,6 +24,10 @@
 #define SIG_LEN (sizeof(DUMP_PARTITION_SIGNATURE) - 1)
 #define DISKDUMP_HEADER_BLOCKS		(1)
 
+/*
+ * These are all remnants of the old "diskdump" facility,
+ * none of them are ever used by makedumpfile.
+ */
 #define DUMP_HEADER_COMPLETED	0
 #define DUMP_HEADER_INCOMPLETED 1
 #define DUMP_HEADER_COMPRESSED  8

@@ -491,13 +491,13 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 #ifdef USESNAPPY
 	} else if ((pd.flags & DUMP_DH_COMPRESSED_SNAPPY)) {
 
-		ret = snappy_uncompressed_length(buf, pd.size, &retlen);
+		ret = snappy_uncompressed_length(buf, pd.size, (size_t *)&retlen);
 		if (ret != SNAPPY_OK) {
 			ERRMSG("Uncompress failed: %d\n", ret);
 			return FALSE;
 		}
 
-		ret = snappy_uncompress(buf, pd.size, bufptr, &retlen);
+		ret = snappy_uncompress(buf, pd.size, bufptr, (size_t *)&retlen);
 		if ((ret != SNAPPY_OK) || (retlen != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
 			return FALSE;

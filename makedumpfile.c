@@ -8011,6 +8011,7 @@ reassemble_kdump_header(void)
 	struct disk_dump_header dh;
 	struct kdump_sub_header kh;
 	char *buf_bitmap = NULL;
+	ssize_t status, read_size, written_size;
 
 	/*
 	 * Write common header.
@@ -8087,10 +8088,16 @@ reassemble_kdump_header(void)
 		    SPLITTING_DUMPFILE(0), strerror(errno));
 		goto out;
 	}
-	if (read(fd, buf_bitmap, info->len_bitmap) != info->len_bitmap) {
-		ERRMSG("Can't read a file(%s). %s\n",
-		    SPLITTING_DUMPFILE(0), strerror(errno));
-		goto out;
+	read_size = 0;
+	while (read_size < info->len_bitmap) {
+		status = read(fd, buf_bitmap + read_size, info->len_bitmap
+			- read_size);
+		if (status < 0) {
+			ERRMSG("Can't read a file(%s). %s\n",
+				SPLITTING_DUMPFILE(0), strerror(errno));
+			goto out;
+		}
+		read_size += status;
 	}
 
 	if (lseek(info->fd_dumpfile, offset, SEEK_SET) < 0) {
@@ -8098,11 +8105,16 @@ reassemble_kdump_header(void)
 		    info->name_dumpfile, strerror(errno));
 		goto out;
 	}
-	if (write(info->fd_dumpfile, buf_bitmap, info->len_bitmap)
-	    != info->len_bitmap) {
-		ERRMSG("Can't write a file(%s). %s\n",
-		    info->name_dumpfile, strerror(errno));
-		goto out;
+	written_size = 0;
+	while (written_size < info->len_bitmap) {
+		status = write(info->fd_dumpfile, buf_bitmap + written_size,
+			info->len_bitmap - written_size);
+		if (status < 0) {
+			ERRMSG("Can't write a file(%s). %s\n",
+			    info->name_dumpfile, strerror(errno));
+			goto out;
+		}
+		written_size += status;
 	}
 
 	if (lseek(info->fd_bitmap, 0x0, SEEK_SET) < 0) {
@@ -8110,11 +8122,16 @@ reassemble_kdump_header(void)
 		    info->name_bitmap, strerror(errno));
 		goto out;
 	}
-	if (write(info->fd_bitmap, buf_bitmap, info->len_bitmap)
-	    != info->len_bitmap) {
-		ERRMSG("Can't write a file(%s). %s\n",
-		    info->name_bitmap, strerror(errno));
-		goto out;
+	written_size = 0;
+	while (written_size < info->len_bitmap) {
+		status = write(info->fd_bitmap, buf_bitmap + written_size,
+			info->len_bitmap - written_size);
+		if (status < 0) {
+			ERRMSG("Can't write a file(%s). %s\n",
+			    info->name_bitmap, strerror(errno));
+			goto out;
+		}
+		written_size += status;
 	}
 
 	ret = TRUE;

@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <ctype.h>
 #include <sys/time.h>
+#include <limits.h>
 
 struct symbol_table	symbol_table;
 struct size_table	size_table;
@@ -125,7 +126,10 @@ get_max_mapnr(void)
 	unsigned long long max_paddr;
 
 	if (info->flag_refiltering) {
-		info->max_mapnr = info->dh_memory->max_mapnr;
+		if (info->dh_memory->header_version >= 6)
+			info->max_mapnr = info->kh_memory->max_mapnr_64;
+		else
+			info->max_mapnr = info->dh_memory->max_mapnr;
 		return TRUE;
 	}
 
@@ -802,6 +806,12 @@ get_kdump_compressed_header_info(char *filename)
 	DEBUG_MSG("  split            : %d\n", kh.split);
 	DEBUG_MSG("  start_pfn        : 0x%lx\n", kh.start_pfn);
 	DEBUG_MSG("  end_pfn          : 0x%lx\n", kh.end_pfn);
+	if (dh.header_version >= 6) {
+		/* A dumpfile contains full 64bit values. */
+		DEBUG_MSG("  start_pfn_64     : 0x%llx\n", kh.start_pfn_64);
+		DEBUG_MSG("  end_pfn_64       : 0x%llx\n", kh.end_pfn_64);
+		DEBUG_MSG("  max_mapnr_64     : 0x%llx\n", kh.max_mapnr_64);
+	}
 
 	info->dh_memory = malloc(sizeof(dh));
 	if (info->dh_memory == NULL) {
@@ -2799,14 +2809,16 @@ int
 initialize_bitmap_memory(void)
 {
 	struct disk_dump_header	*dh;
+	struct kdump_sub_header *kh;
 	struct dump_bitmap *bmp;
 	off_t bitmap_offset;
-	int bitmap_len, max_sect_len;
+	off_t bitmap_len, max_sect_len;
 	unsigned long pfn;
 	int i, j;
 	long block_size;
 
 	dh = info->dh_memory;
+	kh = info->kh_memory;
 	block_size = dh->block_size;
 
 	bitmap_offset
@@ -2826,7 +2838,10 @@ initialize_bitmap_memory(void)
 	bmp->offset = bitmap_offset + bitmap_len / 2;
 	info->bitmap_memory = bmp;
 
-	max_sect_len = divideup(dh->max_mapnr, BITMAP_SECT_LEN);
+	if (dh->header_version >= 6)
+		max_sect_len = divideup(kh->max_mapnr_64, BITMAP_SECT_LEN);
+	else
+		max_sect_len = divideup(dh->max_mapnr, BITMAP_SECT_LEN);
 	info->valid_pages = calloc(sizeof(ulong), max_sect_len);
 	if (info->valid_pages == NULL) {
 		ERRMSG("Can't allocate memory for the valid_pages. %s\n",
@@ -4743,7 +4758,7 @@ create_2nd_bitmap(void)
 int
 prepare_bitmap_buffer(void)
 {
-	unsigned long tmp;
+	unsigned long long tmp;
 
 	/*
 	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
@@ -4775,7 +4790,7 @@ prepare_bitmap_buffer(void)
 int
 prepare_bitmap_buffer_cyclic(void)
 {
-	unsigned long tmp;
+	unsigned long long tmp;
 
 	/*
 	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
@@ -5190,11 +5205,12 @@ write_kdump_header(void)
 	 * Write common header
 	 */
 	strncpy(dh->signature, KDUMP_SIGNATURE, strlen(KDUMP_SIGNATURE));
-	dh->header_version = 5;
+	dh->header_version = 6;
 	dh->block_size     = info->page_size;
 	dh->sub_hdr_size   = sizeof(kh) + size_note;
 	dh->sub_hdr_size   = divideup(dh->sub_hdr_size, dh->block_size);
-	dh->max_mapnr      = info->max_mapnr;
+	/* dh->max_mapnr may be truncated, full 64bit in kh.max_mapnr_64 */
+	dh->max_mapnr      = MIN(info->max_mapnr, UINT_MAX);
 	dh->nr_cpus        = get_nr_cpus();
 	dh->bitmap_blocks  = divideup(info->len_bitmap, dh->block_size);
 	memcpy(&dh->timestamp, &info->timestamp, sizeof(dh->timestamp));
@@ -5219,12 +5235,22 @@ write_kdump_header(void)
 	 */
 	size = sizeof(struct kdump_sub_header);
 	memset(&kh, 0, size);
+	/* 64bit max_mapnr_64 */
+	kh.max_mapnr_64 = info->max_mapnr;
 	kh.phys_base  = info->phys_base;
 	kh.dump_level = info->dump_level;
 	if (info->flag_split) {
 		kh.split = 1;
-		kh.start_pfn = info->split_start_pfn;
-		kh.end_pfn   = info->split_end_pfn;
+		/*
+		 * start_pfn and end_pfn may be truncated,
+		 * only for compatibility purpose
+		 */
+		kh.start_pfn = MIN(info->split_start_pfn, UINT_MAX);
+		kh.end_pfn   = MIN(info->split_end_pfn, UINT_MAX);
+
+		/* 64bit start_pfn_64 and end_pfn_64 */
+		kh.start_pfn_64 = info->split_start_pfn;
+		kh.end_pfn_64   = info->split_end_pfn;
 	}
 	if (has_pt_note()) {
 		/*
@@ -6470,7 +6496,7 @@ int
 write_kdump_bitmap(void)
 {
 	struct cache_data bm;
-	long buf_size;
+	long long buf_size;
 	off_t offset;
 
 	int ret = FALSE;
@@ -7853,10 +7879,8 @@ store_splitting_info(void)
 
 		if (i == 0) {
 			memcpy(&dh, &tmp_dh, sizeof(tmp_dh));
-			info->max_mapnr = dh.max_mapnr;
 			if (!set_page_size(dh.block_size))
 				return FALSE;
-			DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
 			DEBUG_MSG("page_size    : %ld\n", info->page_size);
 		}
 
@@ -7873,11 +7897,24 @@ store_splitting_info(void)
 			return FALSE;
 
 		if (i == 0) {
+			if (dh.header_version >= 6)
+				info->max_mapnr = kh.max_mapnr_64;
+			else
+				info->max_mapnr = dh.max_mapnr;
+
+			DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
+
 			info->dump_level = kh.dump_level;
 			DEBUG_MSG("dump_level   : %d\n", info->dump_level);
 		}
-		SPLITTING_START_PFN(i) = kh.start_pfn;
-		SPLITTING_END_PFN(i)   = kh.end_pfn;
+
+		if (dh.header_version >= 6) {
+			SPLITTING_START_PFN(i) = kh.start_pfn_64;
+			SPLITTING_END_PFN(i)   = kh.end_pfn_64;
+		} else {
+			SPLITTING_START_PFN(i) = kh.start_pfn;
+			SPLITTING_END_PFN(i)   = kh.end_pfn;
+		}
 		SPLITTING_OFFSET_EI(i) = kh.offset_eraseinfo;
 		SPLITTING_SIZE_EI(i)   = kh.size_eraseinfo;
 	}
@@ -8039,6 +8076,8 @@ reassemble_kdump_header(void)
 	kh.split = 0;
 	kh.start_pfn = 0;
 	kh.end_pfn   = 0;
+	kh.start_pfn_64 = 0;
+	kh.end_pfn_64 = 0;
 
 	if (lseek(info->fd_dumpfile, info->page_size, SEEK_SET) < 0) {
 		ERRMSG("Can't seek a file(%s). %s\n",

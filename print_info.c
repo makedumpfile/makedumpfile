@@ -283,27 +283,30 @@ print_usage(void)
 void
 print_progress(const char *msg, unsigned long current, unsigned long end)
 {
-	int progress;
+	float progress;
 	time_t tm;
 	static time_t last_time = 0;
+	static unsigned int lapse = 0;
+	static const char *spinner = "/|\\-";
 
 	if (current < end) {
 		tm = time(NULL);
 		if (tm - last_time < 1)
 			return;
 		last_time = tm;
-		progress = current * 100 / end;
+		progress = (float)current * 100 / end;
 	} else
 		progress = 100;
 
 	if (flag_ignore_r_char) {
-		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3d %%]\n",
-			     msg, progress);
+		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%5.1f %%] %c\n",
+			     msg, progress, spinner[lapse % 4]);
 	} else {
 		PROGRESS_MSG("\r");
-		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3d %%] ",
-			     msg, progress);
+		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%5.1f %%] %c",
+			     msg, progress, spinner[lapse % 4]);
 	}
+	lapse++;
 }
 
 void

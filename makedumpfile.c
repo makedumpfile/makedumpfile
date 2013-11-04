@@ -5573,7 +5573,7 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	initialize_2nd_bitmap(&bitmap2);
 
 	num_dumpable = get_num_dumpable();
-	per = num_dumpable / 100;
+	per = num_dumpable / 10000;
 
 	off_seg_load    = info->offset_load_dumpfile;
 	cd_page->offset = info->offset_load_dumpfile;
@@ -5858,7 +5858,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 		return FALSE;
 
 	num_dumpable = info->num_dumpable;
-	per = num_dumpable / 100;
+	per = num_dumpable / 10000;
 
 	off_seg_load   = info->offset_load_dumpfile;
 	cd_page->offset = info->offset_load_dumpfile;
@@ -6116,7 +6116,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 	}
 
 	num_dumpable = get_num_dumpable();
-	per = num_dumpable / 100;
+	per = num_dumpable / 10000;
 
 	/*
 	 * Calculate the offset of the page data.
@@ -6317,7 +6317,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		goto out;
 	}
 
-	per = info->num_dumpable / 100;
+	per = info->num_dumpable / 10000;
 
 	/*
 	 * Set a fileoffset of Physical Address 0x0.

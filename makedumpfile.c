@@ -4317,6 +4317,8 @@ create_1st_bitmap_cyclic()
 	unsigned long long pfn, pfn_bitmap1;
 	unsigned long long phys_start, phys_end;
 	unsigned long long pfn_start, pfn_end;
+	unsigned long long pfn_start_roundup, pfn_end_round;
+	unsigned long pfn_start_byte, pfn_end_byte;
 
 	/*
 	 * At first, clear all the bits on the 1st-bitmap.
@@ -4329,10 +4331,30 @@ create_1st_bitmap_cyclic()
 	 */
 	pfn_bitmap1 = 0;
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
-		pfn_start = paddr_to_pfn(phys_start);
-		pfn_end   = paddr_to_pfn(phys_end);
+		pfn_start = MAX(paddr_to_pfn(phys_start), info->cyclic_start_pfn);
+		pfn_end   = MIN(paddr_to_pfn(phys_end), info->cyclic_end_pfn);
 
-		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
+		if (pfn_start >= pfn_end)
+			continue;
+
+		pfn_start_roundup = roundup(pfn_start, BITPERBYTE);
+		pfn_end_round = round(pfn_end, BITPERBYTE);
+
+		for (pfn = pfn_start; pfn < pfn_start_roundup; pfn++) {
+			if (set_bit_on_1st_bitmap(pfn))
+				pfn_bitmap1++;
+		}
+
+		pfn_start_byte = (pfn_start_roundup - info->cyclic_start_pfn) >> 3;
+		pfn_end_byte = (pfn_end_round - info->cyclic_start_pfn) >> 3;
+
+		memset(info->partial_bitmap1 + pfn_start_byte,
+		       0xff,
+		       pfn_end_byte - pfn_start_byte);
+
+		pfn_bitmap1 += (pfn_end_byte - pfn_start_byte) * BITPERBYTE;
+
+		for (pfn = pfn_end_round; pfn < pfn_end; pfn++) {
 			if (set_bit_on_1st_bitmap(pfn))
 				pfn_bitmap1++;
 		}

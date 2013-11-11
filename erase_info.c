@@ -27,13 +27,13 @@ struct erase_info	*erase_info = NULL;
 unsigned long		num_erase_info = 1; /* Node 0 is unused. */
 
 struct call_back eppic_cb = {
-	&get_domain,
+	&get_domain_all,
 	&readmem,
 	&get_die_attr_type,
 	&get_die_name,
 	&get_die_offset,
 	&get_die_length,
-	&get_die_member,
+	&get_die_member_all,
 	&get_die_nfields,
 	&get_symbol_addr_all,
 	&update_filter_info_raw
@@ -1949,6 +1949,165 @@ get_symbol_addr_all(char *name) {
 		return NOT_FOUND_SYMBOL;
 }
 
+
+/*
+ * Search for domain in modules as well as vmlinux
+ */
+long
+get_domain_all(char *symname, int cmd, unsigned long long *die) {
+
+	short vmlinux_searched = 0;
+	long size = 0;
+	unsigned int i, current_mod;
+	struct module_info *modules;
+
+	/* Search in vmlinux if debuginfo is set to vmlinux */
+	if (!strcmp(get_dwarf_module_name(), "vmlinux")) {
+		size = get_domain(symname, cmd, die);
+		if (size > 0 && die)
+			return size;
+
+		vmlinux_searched = 1;
+	}
+
+	/*
+	 * Proceed the search in modules. Try in the module
+	 * which resulted in a hit in the previous search
+	 */
+
+	modules = mod_st.modules;
+	current_mod = mod_st.current_mod;
+
+	if (strcmp(get_dwarf_module_name(), modules[current_mod].name)) {
+		if (!set_dwarf_debuginfo(modules[current_mod].name,
+				info->system_utsname.release, NULL, -1)) {
+			ERRMSG("Cannot set to current module %s\n",
+					modules[current_mod].name);
+			return NOT_FOUND_STRUCTURE;
+		}
+	}
+
+	size = get_domain(symname, cmd, die);
+	if (size > 0 && die)
+		return size;
+
+	/* Search in all modules */
+	for (i = 0; i < mod_st.num_modules; i++) {
+
+		/* Already searched. Skip */
+		if (i == current_mod)
+			continue;
+
+		if (!set_dwarf_debuginfo(modules[i].name,
+				info->system_utsname.release, NULL, -1)) {
+			ERRMSG("Skipping Module section %s\n", modules[i].name);
+			continue;
+		}
+
+		size = get_domain(symname, cmd, die);
+
+		if (size <= 0 || !die)
+			continue;
+
+		/*
+		 * Domain found. Set the current_mod to this module index, a
+		 * minor optimization for fast lookup next time
+		 */
+		mod_st.current_mod = i;
+		return size;
+	}
+
+	/* Domain not found in any module. Set debuginfo back to vmlinux */
+	set_dwarf_debuginfo("vmlinux", NULL, info->name_vmlinux,
+			info->fd_vmlinux);
+
+	if (!vmlinux_searched)
+		return get_domain(symname, cmd, die);
+	else
+		return NOT_FOUND_STRUCTURE;
+}
+
+/*
+ * Search for die member in modules as well as vmlinux
+ */
+int
+get_die_member_all(unsigned long long die_off, int index, long *offset,
+		char **name, int *nbits, int *fbits, unsigned long long *m_die)
+{
+	short vmlinux_searched = 0;
+	long size = -1;
+	unsigned int i, current_mod;
+	struct module_info *modules;
+
+	/* Search in vmlinux if debuginfo is set to vmlinux */
+	if (!strcmp(get_dwarf_module_name(), "vmlinux")) {
+		size = get_die_member(die_off, index, offset, name,
+				nbits, fbits, m_die);
+		if (size >= 0)
+			return size;
+
+		vmlinux_searched = 1;
+	}
+
+	/*
+	 * Proceed the search in modules. Try in the module
+	 * which resulted in a hit in the previous search
+	 */
+
+	modules = mod_st.modules;
+	current_mod = mod_st.current_mod;
+
+	if (strcmp(get_dwarf_module_name(), modules[current_mod].name)) {
+		if (!set_dwarf_debuginfo(modules[current_mod].name,
+				info->system_utsname.release, NULL, -1)) {
+			ERRMSG("Cannot set to current module %s\n",
+					modules[current_mod].name);
+			return -1;
+		}
+	}
+
+	size = get_die_member(die_off, index, offset, name,
+				nbits, fbits, m_die);
+	if (size >= 0)
+		return size;
+
+	/* Search in all modules */
+	for (i = 0; i < mod_st.num_modules; i++) {
+
+		/* Already searched. Skip */
+		if (i == current_mod)
+			continue;
+
+		if (!set_dwarf_debuginfo(modules[i].name,
+				info->system_utsname.release, NULL, -1)) {
+			ERRMSG("Skipping Module section %s\n", modules[i].name);
+			continue;
+		}
+
+		size = get_die_member(die_off, index, offset, name,
+				nbits, fbits, m_die);
+
+		if (size < 0)
+			continue;
+
+		/*
+		 * Die member found. Set the current_mod to this module index,
+		 * a minor optimization for fast lookup next time
+		 */
+		mod_st.current_mod = i;
+		return size;
+	}
+
+	/* Die member not found in any module. Set debuginfo back to vmlinux */
+	set_dwarf_debuginfo("vmlinux", NULL, info->name_vmlinux,
+			info->fd_vmlinux);
+
+	if (!vmlinux_searched)
+		return get_die_member(die_off, index, offset, name,
+				nbits, fbits, m_die);
+	else
+		return -1;
+}
 
 /* Process the eppic macro using eppic library */
 static int

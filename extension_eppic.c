@@ -236,8 +236,8 @@ apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
 		index = 0;
 
 	while (index < nfields) {
-		size = GET_DIE_MEMBER(die_off, index, &offset, &name, &nbits,
-				&fbits, &m_die);
+		size = GET_DIE_MEMBER_ALL(die_off, index, &offset, &name,
+					&nbits, &fbits, &m_die);
 
 		if (size < 0)
 			return NULL;
@@ -272,13 +272,14 @@ apigetctype(int ctype, char *name, type_t *tout)
 
 	switch (ctype) {
 	case V_TYPEDEF:
-		size = GET_DOMAIN(name, DWARF_INFO_GET_DOMAIN_TYPEDEF, &die);
+		size = GET_DOMAIN_ALL(name, DWARF_INFO_GET_DOMAIN_TYPEDEF,
+									&die);
 		break;
 	case V_STRUCT:
-		size = GET_DOMAIN(name, DWARF_INFO_GET_DOMAIN_STRUCT, &die);
+		size = GET_DOMAIN_ALL(name, DWARF_INFO_GET_DOMAIN_STRUCT, &die);
 		break;
 	case V_UNION:
-		size = GET_DOMAIN(name, DWARF_INFO_GET_DOMAIN_UNION, &die);
+		size = GET_DOMAIN_ALL(name, DWARF_INFO_GET_DOMAIN_UNION, &die);
 		break;
 	/* TODO
 	 * Implement for all the domains

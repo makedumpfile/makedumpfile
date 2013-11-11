@@ -81,13 +81,13 @@ do { \
 
 struct call_back *cb;
 
-#define GET_DOMAIN cb->get_domain
+#define GET_DOMAIN_ALL cb->get_domain_all
 #define READMEM cb->readmem
 #define GET_DIE_ATTR_TYPE cb->get_die_attr_type
 #define GET_DIE_NAME cb->get_die_name
 #define GET_DIE_OFFSET cb->get_die_offset
 #define GET_DIE_LENGTH cb->get_die_length
-#define GET_DIE_MEMBER cb->get_die_member
+#define GET_DIE_MEMBER_ALL cb->get_die_member_all
 #define GET_DIE_NFIELDS cb->get_die_nfields
 #define GET_SYMBOL_ADDR_ALL cb->get_symbol_addr_all
 #define UPDATE_FILTER_INFO_RAW cb->update_filter_info_raw

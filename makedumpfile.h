@@ -576,6 +576,8 @@ do { \
 #define _SECTION_SIZE_BITS	(24)
 #define _MAX_PHYSMEM_BITS_ORIG  (44)
 #define _MAX_PHYSMEM_BITS_3_7   (46)
+#define REGION_SHIFT            (60UL)
+#define VMEMMAP_REGION_ID       (0xfUL)
 #endif
 
 #ifdef __powerpc32__
@@ -862,6 +864,11 @@ struct splitting_info {
 	unsigned long		size_eraseinfo;
 } splitting_info_t;
 
+struct ppc64_vmemmap {
+	unsigned long		phys;
+	unsigned long		virt;
+};
+
 struct DumpInfo {
 	int32_t		kernel_version;      /* version of first kernel*/
 	struct timeval	timestamp;
@@ -895,6 +902,7 @@ struct DumpInfo {
 	int             flag_dmesg;          /* dump the dmesg log out of the vmcore file */
 	int		flag_use_printk_log; /* did we read printk_log symbol name? */
 	int		flag_nospace;	     /* the flag of "No space on device" error */
+	int		flag_vmemmap;        /* kernel supports vmemmap address space */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
@@ -909,6 +917,9 @@ struct DumpInfo {
 	unsigned long   vmalloc_end;
 	unsigned long	vmemmap_start;
 	unsigned long	vmemmap_end;
+	int		vmemmap_psize;
+	int		vmemmap_cnt;
+	struct ppc64_vmemmap	*vmemmap_list;
 
 	/*
 	 * Filter config file containing filter commands to filter out kernel
@@ -1166,6 +1177,13 @@ struct symbol_table {
 	unsigned long long	__per_cpu_load;
 	unsigned long long	cpu_online_mask;
 	unsigned long long	kexec_crash_image;
+
+	/*
+	 * vmemmap symbols on ppc64 arch
+	 */
+	unsigned long long		vmemmap_list;
+	unsigned long long		mmu_vmemmap_psize;
+	unsigned long long		mmu_psize_defs;
 };
 
 struct size_table {
@@ -1200,6 +1218,12 @@ struct size_table {
 	long	cpumask_t;
 	long	kexec_segment;
 	long	elf64_hdr;
+
+	/*
+	 * vmemmap symbols on ppc64 arch
+	 */
+	long	vmemmap_backing;
+	long	mmu_psize_def;
 
 	long	pageflags;
 };
@@ -1343,6 +1367,19 @@ struct offset_table {
 		long len;
 		long text_len;
 	} printk_log;
+
+	/*
+	 * vmemmap symbols on ppc64 arch
+	 */
+	struct mmu_psize_def {
+		long	shift;
+	} mmu_psize_def;
+
+	struct vmemmap_backing {
+		long	phys;
+		long	virt_addr;
+		long	list;
+	} vmemmap_backing;
 
 };
 

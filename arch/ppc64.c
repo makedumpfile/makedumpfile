@@ -24,6 +24,154 @@
 #include "../elf_info.h"
 #include "../makedumpfile.h"
 
+/*
+ * This function traverses vmemmap list to get the count of vmemmap regions
+ * and populates the regions' info in info->vmemmap_list[]
+ */
+static int
+get_vmemmap_list_info(ulong head)
+{
+	int   i, cnt;
+	long  backing_size, virt_addr_offset, phys_offset, list_offset;
+	ulong curr, next;
+	char  *vmemmap_buf = NULL;
+
+	backing_size		= SIZE(vmemmap_backing);
+	virt_addr_offset	= OFFSET(vmemmap_backing.virt_addr);
+	phys_offset		= OFFSET(vmemmap_backing.phys);
+	list_offset		= OFFSET(vmemmap_backing.list);
+	info->vmemmap_list = NULL;
+
+	/*
+	 * Get list count by traversing the vmemmap list
+	 */
+	cnt = 0;
+	curr = head;
+	next = 0;
+	do {
+		if (!readmem(VADDR, (curr + list_offset), &next,
+			     sizeof(next))) {
+			ERRMSG("Can't get vmemmap region addresses\n");
+			goto err;
+		}
+		curr = next;
+		cnt++;
+	} while ((next != 0) && (next != head));
+
+	/*
+	 * Using temporary buffer to save vmemmap region information
+	 */
+	vmemmap_buf = calloc(1, backing_size);
+	if (vmemmap_buf == NULL) {
+		ERRMSG("Can't allocate memory for vmemmap_buf. %s\n",
+		       strerror(errno));
+		goto err;
+	}
+
+	info->vmemmap_list = calloc(1, cnt * sizeof(struct ppc64_vmemmap));
+	if (info->vmemmap_list == NULL) {
+		ERRMSG("Can't allocate memory for vmemmap_list. %s\n",
+		       strerror(errno));
+		goto err;
+	}
+
+	curr = head;
+	for (i = 0; i < cnt; i++) {
+		if (!readmem(VADDR, curr, vmemmap_buf, backing_size)) {
+			ERRMSG("Can't get vmemmap region info\n");
+			goto err;
+		}
+
+		info->vmemmap_list[i].phys = ULONG(vmemmap_buf + phys_offset);
+		info->vmemmap_list[i].virt = ULONG(vmemmap_buf +
+						   virt_addr_offset);
+		curr = ULONG(vmemmap_buf + list_offset);
+
+		if (info->vmemmap_list[i].virt < info->vmemmap_start)
+			info->vmemmap_start = info->vmemmap_list[i].virt;
+
+		if ((info->vmemmap_list[i].virt + info->vmemmap_psize) >
+		    info->vmemmap_end)
+			info->vmemmap_end = (info->vmemmap_list[i].virt +
+					     info->vmemmap_psize);
+	}
+
+	free(vmemmap_buf);
+	return cnt;
+err:
+	free(vmemmap_buf);
+	free(info->vmemmap_list);
+	return 0;
+}
+
+/*
+ *  Verify that the kernel has made the vmemmap list available,
+ *  and if so, stash the relevant data required to make vtop
+ *  translations.
+ */
+static int
+ppc64_vmemmap_init(void)
+{
+	int psize, shift;
+	ulong head;
+
+	if ((SYMBOL(vmemmap_list) == NOT_FOUND_SYMBOL)
+	    || (SYMBOL(mmu_psize_defs) == NOT_FOUND_SYMBOL)
+	    || (SYMBOL(mmu_vmemmap_psize) == NOT_FOUND_SYMBOL)
+	    || (SIZE(vmemmap_backing) == NOT_FOUND_STRUCTURE)
+	    || (SIZE(mmu_psize_def) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(mmu_psize_def.shift) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(vmemmap_backing.phys) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(vmemmap_backing.virt_addr) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(vmemmap_backing.list) == NOT_FOUND_STRUCTURE))
+		return FALSE;
+
+	if (!readmem(VADDR, SYMBOL(mmu_vmemmap_psize), &psize, sizeof(int)))
+		return FALSE;
+
+	if (!readmem(VADDR, SYMBOL(mmu_psize_defs) +
+		     (SIZE(mmu_psize_def) * psize) +
+		     OFFSET(mmu_psize_def.shift), &shift, sizeof(int)))
+		return FALSE;
+	info->vmemmap_psize = 1 << shift;
+
+	if (!readmem(VADDR, SYMBOL(vmemmap_list), &head, sizeof(unsigned long)))
+		return FALSE;
+
+	/*
+	 * Get vmemmap list count and populate vmemmap regions info
+	 */
+	info->vmemmap_cnt = get_vmemmap_list_info(head);
+	if (info->vmemmap_cnt == 0)
+		return FALSE;
+
+	info->flag_vmemmap = TRUE;
+	return TRUE;
+}
+
+/*
+ *  If the vmemmap address translation information is stored in the kernel,
+ *  make the translation.
+ */
+static unsigned long long
+ppc64_vmemmap_to_phys(unsigned long vaddr)
+{
+	int	i;
+	ulong	offset;
+	unsigned long long paddr = NOT_PADDR;
+
+	for (i = 0; i < info->vmemmap_cnt; i++) {
+		if ((vaddr >= info->vmemmap_list[i].virt) && (vaddr <
+		    (info->vmemmap_list[i].virt + info->vmemmap_psize))) {
+			offset = vaddr - info->vmemmap_list[i].virt;
+			paddr = info->vmemmap_list[i].phys + offset;
+			break;
+		}
+	}
+
+	return paddr;
+}
+
 int
 set_ppc64_max_physmem_bits(void)
 {
@@ -103,6 +251,16 @@ get_machdep_info_ppc64(void)
 	info->vmalloc_start = vmalloc_start;
 	DEBUG_MSG("vmalloc_start: %lx\n", vmalloc_start);
 
+	if (SYMBOL(vmemmap_list) != NOT_FOUND_SYMBOL) {
+		info->vmemmap_start = VMEMMAP_REGION_ID << REGION_SHIFT;
+		info->vmemmap_end = info->vmemmap_start;
+		if (ppc64_vmemmap_init() == FALSE) {
+			ERRMSG("Can't get vmemmap list info.\n");
+			return FALSE;
+		}
+		DEBUG_MSG("vmemmap_start: %lx\n", info->vmemmap_start);
+	}
+
 	return TRUE;
 }
 
@@ -121,13 +279,22 @@ vaddr_to_paddr_ppc64(unsigned long vaddr)
 	if (paddr != NOT_PADDR)
 		return paddr;
 
-	if ((SYMBOL(vmlist) == NOT_FOUND_SYMBOL)
-	    || (OFFSET(vm_struct.addr) == NOT_FOUND_STRUCTURE)) {
-		ERRMSG("Can't get necessary information for vmalloc translation.\n");
-		return NOT_PADDR;
+	if ((SYMBOL(vmap_area_list) == NOT_FOUND_SYMBOL)
+	    || (OFFSET(vmap_area.va_start) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(vmap_area.list) == NOT_FOUND_STRUCTURE)) {
+		if ((SYMBOL(vmlist) == NOT_FOUND_SYMBOL)
+		    || (OFFSET(vm_struct.addr) == NOT_FOUND_STRUCTURE)) {
+			ERRMSG("Can't get info for vmalloc translation.\n");
+			return NOT_PADDR;
+		}
 	}
 	if (!is_vmalloc_addr_ppc64(vaddr))
 		return (vaddr - info->kernel_start);
+
+	if ((info->flag_vmemmap)
+	    && (vaddr >= info->vmemmap_start)) {
+		return ppc64_vmemmap_to_phys(vaddr);
+	}
 
 	/*
 	 * TODO: Support vmalloc translation.

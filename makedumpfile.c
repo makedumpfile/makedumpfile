@@ -1107,6 +1107,10 @@ get_symbol_info(void)
 		SYMBOL_ARRAY_LENGTH_INIT(node_remap_start_pfn,
 					"node_remap_start_pfn");
 
+	SYMBOL_INIT(vmemmap_list, "vmemmap_list");
+	SYMBOL_INIT(mmu_psize_defs, "mmu_psize_defs");
+	SYMBOL_INIT(mmu_vmemmap_psize, "mmu_vmemmap_psize");
+
 	return TRUE;
 }
 
@@ -1417,6 +1421,20 @@ get_structure_info(void)
 		OFFSET_INIT(printk_log.text_len, "log", "text_len");
 	}
 
+	/*
+	 * Get offsets of the vmemmap_backing's members.
+	 */
+	SIZE_INIT(vmemmap_backing, "vmemmap_backing");
+	OFFSET_INIT(vmemmap_backing.phys, "vmemmap_backing", "phys");
+	OFFSET_INIT(vmemmap_backing.virt_addr, "vmemmap_backing", "virt_addr");
+	OFFSET_INIT(vmemmap_backing.list, "vmemmap_backing", "list");
+
+	/*
+	 * Get offsets of the mmu_psize_def's members.
+	 */
+	SIZE_INIT(mmu_psize_def, "mmu_psize_def");
+	OFFSET_INIT(mmu_psize_def.shift, "mmu_psize_def", "shift");
+
 	return TRUE;
 }
 
@@ -1603,6 +1621,9 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("node_remap_start_vaddr", node_remap_start_vaddr);
 	WRITE_SYMBOL("node_remap_end_vaddr", node_remap_end_vaddr);
 	WRITE_SYMBOL("node_remap_start_pfn", node_remap_start_pfn);
+	WRITE_SYMBOL("vmemmap_list", vmemmap_list);
+	WRITE_SYMBOL("mmu_psize_defs", mmu_psize_defs);
+	WRITE_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
 
 	/*
 	 * write the structure size of 1st kernel
@@ -1620,6 +1641,8 @@ write_vmcoreinfo_data(void)
 		WRITE_STRUCTURE_SIZE("printk_log", printk_log);
 	else
 		WRITE_STRUCTURE_SIZE("log", printk_log);
+	WRITE_STRUCTURE_SIZE("vmemmap_backing", vmemmap_backing);
+	WRITE_STRUCTURE_SIZE("mmu_psize_def", mmu_psize_def);
 
 	/*
 	 * write the member offset of 1st kernel
@@ -1664,6 +1687,11 @@ write_vmcoreinfo_data(void)
 		WRITE_MEMBER_OFFSET("log.len", printk_log.len);
 		WRITE_MEMBER_OFFSET("log.text_len", printk_log.text_len);
 	}
+	WRITE_MEMBER_OFFSET("vmemmap_backing.phys", vmemmap_backing.phys);
+	WRITE_MEMBER_OFFSET("vmemmap_backing.virt_addr",
+	    vmemmap_backing.virt_addr);
+	WRITE_MEMBER_OFFSET("vmemmap_backing.list", vmemmap_backing.list);
+	WRITE_MEMBER_OFFSET("mmu_psize_def.shift", mmu_psize_def.shift);
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("node_data", node_data);
@@ -1932,6 +1960,9 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("node_remap_start_vaddr", node_remap_start_vaddr);
 	READ_SYMBOL("node_remap_end_vaddr", node_remap_end_vaddr);
 	READ_SYMBOL("node_remap_start_pfn", node_remap_start_pfn);
+	READ_SYMBOL("vmemmap_list", vmemmap_list);
+	READ_SYMBOL("mmu_psize_defs", mmu_psize_defs);
+	READ_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
 
 	READ_STRUCTURE_SIZE("page", page);
 	READ_STRUCTURE_SIZE("mem_section", mem_section);
@@ -1942,6 +1973,9 @@ read_vmcoreinfo(void)
 	READ_STRUCTURE_SIZE("node_memblk_s", node_memblk_s);
 	READ_STRUCTURE_SIZE("nodemask_t", nodemask_t);
 	READ_STRUCTURE_SIZE("pageflags", pageflags);
+	READ_STRUCTURE_SIZE("vmemmap_backing", vmemmap_backing);
+	READ_STRUCTURE_SIZE("mmu_psize_def", mmu_psize_def);
+
 
 	READ_MEMBER_OFFSET("page.flags", page.flags);
 	READ_MEMBER_OFFSET("page._count", page._count);
@@ -1972,6 +2006,11 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("vm_struct.addr", vm_struct.addr);
 	READ_MEMBER_OFFSET("vmap_area.va_start", vmap_area.va_start);
 	READ_MEMBER_OFFSET("vmap_area.list", vmap_area.list);
+	READ_MEMBER_OFFSET("vmemmap_backing.phys", vmemmap_backing.phys);
+	READ_MEMBER_OFFSET("vmemmap_backing.virt_addr",
+	    vmemmap_backing.virt_addr);
+	READ_MEMBER_OFFSET("vmemmap_backing.list", vmemmap_backing.list);
+	READ_MEMBER_OFFSET("mmu_psize_def.shift", mmu_psize_def.shift);
 
 	READ_STRUCTURE_SIZE("printk_log", printk_log);
 	if (SIZE(printk_log) != NOT_FOUND_STRUCTURE) {

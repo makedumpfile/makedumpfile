@@ -2928,14 +2928,6 @@ initial(void)
 	}
 #endif
 
-	if (is_xen_memory()) {
-		if(info->flag_cyclic) {
-			info->flag_cyclic = FALSE;
-			MSG("Switched running mode from cyclic to non-cyclic,\n");
-			MSG("because the cyclic mode doesn't support Xen.\n");
-		}
-	}
-
 	if (info->flag_exclude_xen_dom && !is_xen_memory()) {
 		MSG("'-X' option is disable,");
 		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
@@ -7645,6 +7637,14 @@ initial_xen(void)
 		return FALSE;
 	}
 #endif
+	if (is_xen_memory()) {
+		if(info->flag_cyclic) {
+			info->flag_cyclic = FALSE;
+			MSG("Switched running mode from cyclic to non-cyclic,\n");
+			MSG("because the cyclic mode doesn't support Xen.\n");
+		}
+	}
+
 	if (!init_xen_crash_info())
 		return FALSE;
 	/*

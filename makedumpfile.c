@@ -3117,7 +3117,7 @@ out:
 		DEBUG_MSG("Buffer size for the cyclic mode: %ld\n", info->bufsize_cyclic);
 	}
 
-	if (!cache_init())
+	if (!is_xen_memory() && !cache_init())
 		return FALSE;
 
 	if (debug_info) {
@@ -7622,6 +7622,7 @@ exclude_xen_user_domain(void)
 int
 initial_xen(void)
 {
+	int xen_info_required = TRUE;
 	off_t offset;
 	unsigned long size;
 
@@ -7673,8 +7674,10 @@ initial_xen(void)
 		 * and get both the offset and the size.
 		 */
 		if (!has_vmcoreinfo_xen()){
-			if (!info->flag_exclude_xen_dom)
+			if (!info->flag_exclude_xen_dom) {
+				xen_info_required = FALSE;
 				goto out;
+			}
 
 			MSG("%s doesn't contain a vmcoreinfo for Xen.\n",
 			    info->name_memory);
@@ -7691,6 +7694,7 @@ initial_xen(void)
 			return FALSE;
 	}
 
+out:
 	if (!info->page_size) {
 		/*
 		 * If we cannot get page_size from a vmcoreinfo file,
@@ -7700,12 +7704,17 @@ initial_xen(void)
 			return FALSE;
 	}
 
-	if (!get_xen_info())
+	if (!cache_init())
 		return FALSE;
 
-	if (message_level & ML_PRINT_DEBUG_MSG)
-		show_data_xen();
-out:
+	if (xen_info_required == TRUE) {
+		if (!get_xen_info())
+			return FALSE;
+
+		if (message_level & ML_PRINT_DEBUG_MSG)
+			show_data_xen();
+	}
+
 	if (!get_max_mapnr())
 		return FALSE;
 

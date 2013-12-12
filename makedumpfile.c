@@ -272,7 +272,7 @@ update_mmap_range(off_t offset, int initial) {
 static int
 is_mapped_with_mmap(off_t offset) {
 
-	if (info->flag_usemmap
+	if (info->flag_usemmap == MMAP_ENABLE
 	    && offset >= info->mmap_start_offset
 	    && offset < info->mmap_end_offset)
 		return TRUE;
@@ -320,7 +320,7 @@ read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 {
 	const off_t failed = (off_t)-1;
 
-	if (info->flag_usemmap) {
+	if (info->flag_usemmap == MMAP_ENABLE) {
 		if (!read_with_mmap(offset, bufptr, size)) {
 			ERRMSG("Can't read the dump memory(%s) with mmap().\n",
 			       info->name_memory);
@@ -3175,14 +3175,14 @@ out:
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		setup_page_is_buddy();
 
-	if (!initialize_mmap()) {
-		/* this kernel does not support mmap of vmcore */
-		DEBUG_MSG("Kernel can't mmap vmcore, using reads.\n");
-		info->flag_usemmap = FALSE;
+	if (info->flag_usemmap == MMAP_TRY && initialize_mmap()) {
+		DEBUG_MSG("mmap() is available on the kernel.\n");
+		info->flag_usemmap = MMAP_ENABLE;
 	} else {
-		DEBUG_MSG("read %s with mmap()\n", info->name_memory);
-		info->flag_usemmap = TRUE;
-	}
+		DEBUG_MSG("The kernel doesn't support mmap(),");
+		DEBUG_MSG("read() will be used instead.\n");
+		info->flag_usemmap = MMAP_DISABLE;
+        }
 
 	return TRUE;
 }
@@ -8947,6 +8947,7 @@ static struct option longopts[] = {
 	{"non-cyclic", no_argument, NULL, OPT_NON_CYCLIC},
 	{"cyclic-buffer", required_argument, NULL, OPT_CYCLIC_BUFFER},
 	{"eppic", required_argument, NULL, OPT_EPPIC},
+	{"non-mmap", no_argument, NULL, OPT_NON_MMAP},
 	{0, 0, 0, 0}
 };
 
@@ -8972,7 +8973,12 @@ main(int argc, char *argv[])
 	 * By default, makedumpfile works in constant memory space.
 	 */
 	info->flag_cyclic = TRUE;
-	
+
+	/*
+	 * By default, makedumpfile try to use mmap(2) to read /proc/vmcore.
+	 */
+	info->flag_usemmap = MMAP_TRY;
+
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
 	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:lpRvXx:", longopts,
@@ -9068,6 +9074,9 @@ main(int argc, char *argv[])
 			break;
 		case OPT_NON_CYCLIC:
 			info->flag_cyclic = FALSE;
+			break;
+		case OPT_NON_MMAP:
+			info->flag_usemmap = MMAP_DISABLE;
 			break;
 		case OPT_XEN_VMCOREINFO:
 			info->flag_read_vmcoreinfo = 1;

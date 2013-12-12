@@ -395,6 +395,17 @@ If you feel the cyclic mode is too slow, please try this mode.
 # makedumpfile \-\-non\-cyclic \-d 31 \-x vmlinux /proc/vmcore dumpfile
 
 .TP
+\fB\-\-non\-mmap\fR
+Never use \fBmmap(2)\fR to read \fIVMCORE\fR even if it supports \fBmmap(2)\fR.
+Generally, reading \fIVMCORE\fR with \fBmmap(2)\fR is faster than without it,
+so ordinary users don't need to specify this option.
+This option is mainly for debugging.
+.br
+.B Example:
+.br
+# makedumpfile \-\-non\-mmap \-d 31 \-x vmlinux /proc/vmcore dumpfile
+
+.TP
 \fB\-\-xen-syms\fR \fIXEN-SYMS\fR
 Specify the \fIXEN-SYMS\fR with debug information to analyze the xen's memory usage.
 This option extracts the part of xen and domain-0.

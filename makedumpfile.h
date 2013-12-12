@@ -128,6 +128,14 @@ enum {
 	MADDR_XEN
 };
 
+/*
+ * State of mmap(2)
+ */
+enum {
+	MMAP_DISABLE,
+	MMAP_TRY,
+	MMAP_ENABLE,
+};
 
 static inline int
 test_bit(int nr, unsigned long addr)
@@ -1741,6 +1749,7 @@ struct elf_prstatus {
 #define OPT_NON_CYCLIC          OPT_START+10
 #define OPT_CYCLIC_BUFFER       OPT_START+11
 #define OPT_EPPIC               OPT_START+12
+#define OPT_NON_MMAP            OPT_START+13
 
 /*
  * Function Prototype.

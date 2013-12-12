@@ -196,6 +196,12 @@ print_usage(void)
 	MSG("      same as v1.4.4 or before.\n");
 	MSG("      If you feel the cyclic mode is too slow, please try this mode.\n");
 	MSG("\n");
+	MSG("  [--non-mmap]:\n");
+	MSG("      Never use mmap(2) to read VMCORE even if it supports mmap(2).\n");
+	MSG("      Generally, reading VMCORE with mmap(2) is faster than without it,\n");
+	MSG("      so ordinary users don't need to specify this option.\n");
+	MSG("      This option is mainly for debugging.\n");
+	MSG("\n");
 	MSG("  [--xen-syms XEN-SYMS]:\n");
 	MSG("      Specify the XEN-SYMS to analyze Xen's memory usage.\n");
 	MSG("\n");

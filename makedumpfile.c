@@ -324,7 +324,15 @@ read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 		if (!read_with_mmap(offset, bufptr, size)) {
 			ERRMSG("Can't read the dump memory(%s) with mmap().\n",
 			       info->name_memory);
-			return FALSE;
+
+			ERRMSG("This kernel might have some problems about mmap().\n");
+			ERRMSG("read() will be used instead of mmap() from now.\n");
+
+			/*
+			 * Fall back to read().
+			 */
+			info->flag_usemmap = MMAP_DISABLE;
+			read_from_vmcore(offset, bufptr, size);
 		}
 	} else {
 		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {

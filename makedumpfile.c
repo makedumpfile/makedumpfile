@@ -4036,6 +4036,14 @@ dump_dmesg()
 		if (!close_files_for_creating_dumpfile())
 			goto out;
 	} else {
+		if (SIZE(printk_log) == NOT_FOUND_STRUCTURE ||
+		    OFFSET(printk_log.len) == NOT_FOUND_STRUCTURE ||
+		    OFFSET(printk_log.text_len) == NOT_FOUND_STRUCTURE ||
+		    OFFSET(printk_log.ts_nsec) == NOT_FOUND_STRUCTURE) {
+			ERRMSG("Can't get necessary structures for extracting dmesg log.\n");
+			goto out;
+		}
+
 		if (!readmem(VADDR, log_buf, log_buffer, log_buf_len)) {
 			ERRMSG("Can't read indexed dmesg log.\n");
 			goto out;

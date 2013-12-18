@@ -4435,11 +4435,13 @@ create_1st_bitmap_cyclic()
 		pfn_start_byte = (pfn_start_roundup - info->cyclic_start_pfn) >> 3;
 		pfn_end_byte = (pfn_end_round - info->cyclic_start_pfn) >> 3;
 
-		memset(info->partial_bitmap1 + pfn_start_byte,
-		       0xff,
-		       pfn_end_byte - pfn_start_byte);
+		if (pfn_start_byte < pfn_end_byte) {
+			memset(info->partial_bitmap1 + pfn_start_byte,
+			       0xff,
+			       pfn_end_byte - pfn_start_byte);
 
-		pfn_bitmap1 += (pfn_end_byte - pfn_start_byte) * BITPERBYTE;
+			pfn_bitmap1 += (pfn_end_byte - pfn_start_byte) * BITPERBYTE;
+		}
 
 		for (pfn = pfn_end_round; pfn < pfn_end; pfn++) {
 			if (set_bit_on_1st_bitmap(pfn))
@@ -4540,9 +4542,11 @@ initialize_2nd_bitmap_cyclic(void)
 		pfn_start_byte = (pfn_start_roundup - info->cyclic_start_pfn) >> 3;
 		pfn_end_byte = (pfn_end_round - info->cyclic_start_pfn) >> 3;
 
-		memset(info->partial_bitmap2 + pfn_start_byte,
-		       0xff,
-		       pfn_end_byte - pfn_start_byte);
+		if (pfn_start_byte < pfn_end_byte) {
+			memset(info->partial_bitmap2 + pfn_start_byte,
+			       0xff,
+			       pfn_end_byte - pfn_start_byte);
+		}
 
 		for (pfn = pfn_end_round; pfn < pfn_end; ++pfn)
 			if (!set_bit_on_2nd_bitmap_for_kernel(pfn))

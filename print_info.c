@@ -26,6 +26,16 @@ void
 show_version(void)
 {
 	MSG("makedumpfile: version " VERSION " (released on " RELEASE_DATE ")\n");
+#ifdef USELZO
+	MSG("lzo\tenabled\n");
+#else
+	MSG("lzo\tdisabled\n");
+#endif
+#ifdef USESNAPPY
+	MSG("snappy\tenabled\n");
+#else
+	MSG("snappy\tdisabled\n");
+#endif
 	MSG("\n");
 }
 

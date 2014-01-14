@@ -3848,12 +3848,10 @@ dump_log_entry(char *logptr, int fp)
 	sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
 
 	for (i = 0, p = msg; i < text_len; i++, p++) {
-		if (*p == '\n')
-			sprintf(buf, "%s.", buf);
-		else if (isprint(*p) || isspace(*p))
+		if (isprint(*p) || isspace(*p))
 			sprintf(buf, "%s%c", buf, *p);
 		else
-			sprintf(buf, "%s.", buf);
+			sprintf(buf, "%s\\x%02x", buf, *p);
 	}
 
 	sprintf(buf, "%s\n", buf);

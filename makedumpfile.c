@@ -6329,6 +6329,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	struct page_desc pd;
 	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
+	struct timeval tv_start;
 	const off_t failed = (off_t)-1;
 	unsigned long len_buf_out_zlib, len_buf_out_lzo, len_buf_out_snappy;
 
@@ -6387,6 +6388,8 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		if (end_pfn > info->split_end_pfn)
 			end_pfn = info->split_end_pfn;
 	}
+
+	gettimeofday(&tv_start, NULL);
 
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 
@@ -6479,6 +6482,9 @@ out:
 	if (wrkmem != NULL)
 		free(wrkmem);
 #endif
+
+	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable);
+	print_execution_time(PROGRESS_COPY, &tv_start);
 
 	return ret;
 }
@@ -6814,8 +6820,6 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	unsigned long long pfn;
 	struct timeval tv_start;
 
-	gettimeofday(&tv_start, NULL);
-
 	/*
 	 * Reset counter for debug message.
 	 */
@@ -6885,6 +6889,8 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 		if (!write_kdump_bitmap2_cyclic())
 			return FALSE;
         }
+
+	gettimeofday(&tv_start, NULL);
 
 	/*
 	 * Write the remainder.

@@ -1056,8 +1056,6 @@ struct DumpInfo {
 	 */
 	char               *partial_bitmap1;
 	char               *partial_bitmap2;
-	unsigned long long cyclic_start_pfn;
-	unsigned long long cyclic_end_pfn;  
 	unsigned long long num_dumpable;
 	unsigned long      bufsize_cyclic;
 	unsigned long      pfn_cyclic;

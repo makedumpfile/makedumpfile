@@ -37,6 +37,33 @@ struct DumpInfo		*info = NULL;
 
 char filename_stdout[] = FILENAME_STDOUT;
 
+static void first_cycle(unsigned long long start, unsigned long long max, struct cycle *cycle)
+{
+	cycle->start_pfn = round(start, info->pfn_cyclic);
+	cycle->end_pfn = cycle->start_pfn + info->pfn_cyclic;
+
+	if (cycle->end_pfn > max)
+		cycle->end_pfn = max;
+}
+
+static void update_cycle(unsigned long long max, struct cycle *cycle)
+{
+	cycle->start_pfn= cycle->end_pfn;
+	cycle->end_pfn=  cycle->start_pfn + info->pfn_cyclic;
+
+	if (cycle->end_pfn > max)
+		cycle->end_pfn = max;
+}
+
+static int end_cycle(unsigned long long max, struct cycle *cycle)
+{
+	return (cycle->start_pfn >=  max)?TRUE:FALSE;
+}
+
+#define for_each_cycle(start, max, C) \
+	for (first_cycle(start, max, C); !end_cycle(max, C); \
+	     update_cycle(max, C))
+
 /*
  * The numbers of the excluded pages
  */

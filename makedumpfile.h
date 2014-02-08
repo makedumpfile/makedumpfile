@@ -1590,6 +1590,11 @@ int get_xen_info_ia64(void);
 #define get_xen_info_arch(X) FALSE
 #endif	/* s390x */
 
+struct cycle {
+	unsigned long long start_pfn;
+	unsigned long long end_pfn;
+};
+
 static inline int
 is_on(char *bitmap, int i)
 {

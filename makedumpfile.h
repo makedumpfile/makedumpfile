@@ -1618,18 +1618,18 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 }
 
 static inline int
-is_dumpable_cyclic(char *bitmap, unsigned long long pfn)
+is_dumpable_cyclic(char *bitmap, unsigned long long pfn, struct cycle *cycle)
 {
-	if (pfn < info->cyclic_start_pfn || info->cyclic_end_pfn <= pfn)
+	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
 		return FALSE;
 	else
-		return is_on(bitmap, pfn - info->cyclic_start_pfn);
+		return is_on(bitmap, pfn - cycle->start_pfn);
 }
 
 static inline int
-is_cyclic_region(unsigned long long pfn)
+is_cyclic_region(unsigned long long pfn, struct cycle *cycle)
 {
-	if (pfn < info->cyclic_start_pfn || info->cyclic_end_pfn <= pfn)
+	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
 		return FALSE;
 	else
 		return TRUE;
@@ -1647,8 +1647,8 @@ is_zero_page(unsigned char *buf, long page_size)
 }
 
 void write_vmcoreinfo_data(void);
-int set_bit_on_1st_bitmap(unsigned long long pfn);
-int clear_bit_on_1st_bitmap(unsigned long long pfn);
+int set_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle);
+int clear_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle);
 
 #ifdef __x86__
 

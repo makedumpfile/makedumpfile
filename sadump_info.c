@@ -214,9 +214,9 @@ sadump_copy_1st_bitmap_from_memory(void)
 						      si->backup_src_start);
 
 			if (is_dumpable(info->bitmap_memory, backup_src_pfn))
-				set_bit_on_1st_bitmap(pfn);
+				set_bit_on_1st_bitmap(pfn, NULL);
 			else
-				clear_bit_on_1st_bitmap(pfn);
+				clear_bit_on_1st_bitmap(pfn, NULL);
 		}
 	}
 

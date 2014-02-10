@@ -264,9 +264,10 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 
 static int
 update_mmap_range(off_t offset, int initial) {
-	off_t start_offset;
+	off_t start_offset, end_offset;
 	off_t map_size;
 	off_t max_offset = get_max_file_offset();
+	off_t pt_load_end = offset_to_pt_load_end(offset);
 
 	munmap(info->mmap_buf,
 	       info->mmap_end_offset - info->mmap_start_offset);
@@ -274,9 +275,13 @@ update_mmap_range(off_t offset, int initial) {
 	/*
 	 * offset for mmap() must be page aligned.
 	 */
-	start_offset = round(offset, info->page_size);
+	start_offset = roundup(offset, info->page_size);
+	end_offset = MIN(max_offset, round(pt_load_end, info->page_size));
 
-	map_size = MIN(max_offset - start_offset, info->mmap_region_size);
+	if (!pt_load_end || (end_offset - start_offset) <= 0)
+		return FALSE;
+
+	map_size = MIN(end_offset - start_offset, info->mmap_region_size);
 
 	info->mmap_buf = mmap(NULL, map_size, PROT_READ, MAP_PRIVATE,
 				     info->fd_memory, start_offset);
@@ -309,9 +314,12 @@ is_mapped_with_mmap(off_t offset) {
 
 int
 initialize_mmap(void) {
+	unsigned long long phys_start;
 	info->mmap_region_size = MAP_REGION;
 	info->mmap_buf = MAP_FAILED;
-	if (!update_mmap_range(0, 1))
+
+	get_pt_load(0, &phys_start, NULL, NULL, NULL);
+	if (!update_mmap_range(phys_start, 1))
 		return FALSE;
 
 	return TRUE;
@@ -347,7 +355,8 @@ read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 {
 	const off_t failed = (off_t)-1;
 
-	if (info->flag_usemmap == MMAP_ENABLE) {
+	if (info->flag_usemmap == MMAP_ENABLE &&
+	    page_is_fractional(offset) == FALSE) {
 		if (!read_with_mmap(offset, bufptr, size)) {
 			ERRMSG("Can't read the dump memory(%s) with mmap().\n",
 			       info->name_memory);

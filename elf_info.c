@@ -488,6 +488,71 @@ page_head_to_phys_end(unsigned long long head_paddr)
 	return 0;
 }
 
+/*
+ *  Calculate a start File Offset of PT_LOAD from a File Offset
+ *  of a page. If this function returns 0x0, the input page is
+ *  not in the memory image.
+ */
+off_t
+offset_to_pt_load_start(off_t offset)
+{
+	int i;
+	off_t pt_load_start;
+	struct pt_load_segment *pls;
+
+	for (i = pt_load_start = 0; i < num_pt_loads; i++) {
+		pls = &pt_loads[i];
+		if ((offset >= pls->file_offset)
+		    && (offset < pls->file_offset +
+			(pls->phys_end - pls->phys_start))) {
+			pt_load_start = pls->file_offset;
+			break;
+		}
+	}
+	return pt_load_start;
+}
+
+/*
+ *  Calculate a end File Offset of PT_LOAD from a File Offset
+ *  of a page. If this function returns 0x0, the input page is
+ *  not in the memory image.
+ */
+off_t
+offset_to_pt_load_end(off_t offset)
+{
+	int i;
+	off_t pt_load_end;
+	struct pt_load_segment *pls;
+
+	for (i = pt_load_end = 0; i < num_pt_loads; i++) {
+		pls = &pt_loads[i];
+		if ((offset >= pls->file_offset)
+		    && (offset < pls->file_offset +
+			(pls->phys_end - pls->phys_start))) {
+			pt_load_end = (off_t)(pls->file_offset +
+					      (pls->phys_end - pls->phys_start));
+			break;
+		}
+	}
+	return pt_load_end;
+}
+
+/*
+ * Judge whether the page is fractional or not.
+ */
+int
+page_is_fractional(off_t page_offset)
+{
+	if (page_offset % info->page_size != 0)
+		return TRUE;
+
+	if (offset_to_pt_load_end(page_offset) - page_offset
+	    < info->page_size)
+		return TRUE;
+
+	return FALSE;
+}
+
 unsigned long long
 vaddr_to_paddr_general(unsigned long long vaddr)
 {

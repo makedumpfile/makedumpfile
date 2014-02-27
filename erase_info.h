@@ -35,6 +35,7 @@ unsigned long long get_symbol_addr_all(char *);
 long get_domain_all(char *, int, unsigned long long *);
 int get_die_member_all(unsigned long long die_off, int index, long *offset,
 		char **name, int *nbits, int *fbits, unsigned long long *m_die);
+int get_die_nfields_all(unsigned long long die_off);
 
 struct call_back {
 	long (*get_domain_all)(char *, int, unsigned long long *);
@@ -48,7 +49,7 @@ struct call_back {
 	int (*get_die_member_all)(unsigned long long die_off, int index,
 		long *offset, char **name, int *nbits, int *fbits,
 		unsigned long long *m_die);
-	int (*get_die_nfields)(unsigned long long die_off);
+	int (*get_die_nfields_all)(unsigned long long die_off);
 	unsigned long long (*get_symbol_addr_all)(char *symname);
 	int (*update_filter_info_raw)(unsigned long long, int, int);
 };

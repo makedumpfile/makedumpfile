@@ -88,7 +88,7 @@ struct call_back *cb;
 #define GET_DIE_OFFSET cb->get_die_offset
 #define GET_DIE_LENGTH cb->get_die_length
 #define GET_DIE_MEMBER_ALL cb->get_die_member_all
-#define GET_DIE_NFIELDS cb->get_die_nfields
+#define GET_DIE_NFIELDS_ALL cb->get_die_nfields_all
 #define GET_SYMBOL_ADDR_ALL cb->get_symbol_addr_all
 #define UPDATE_FILTER_INFO_RAW cb->update_filter_info_raw
 

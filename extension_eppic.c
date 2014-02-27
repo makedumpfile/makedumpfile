@@ -224,7 +224,7 @@ apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
 	ull m_die, die_off = idx;
 	char *name = NULL;
 
-	nfields = GET_DIE_NFIELDS(die_off);
+	nfields = GET_DIE_NFIELDS_ALL(die_off);
 	/*
 	 * GET_DIE_NFIELDS() returns < 0 if the die is not structure type
 	 * or union type

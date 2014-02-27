@@ -1468,7 +1468,7 @@ get_die_attr_type(unsigned long long die_off, int *type_flag,
 {
 	Dwarf_Die result;
 
-	if (!die_attr_off)
+	if (!die_attr_off || !die_off)
 		return FALSE;
 
 	if (!get_die_from_offset((Dwarf_Off) die_off, &result)) {

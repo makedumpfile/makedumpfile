@@ -24,6 +24,8 @@
 #include "makedumpfile.h"
 #include "extension_eppic.h"
 
+static int apigetctype(int, char *, type_t *);
+
 /*
  * Most of the functions included in this file performs similar
  * functionality as in the applications/crash/eppic.c file part of
@@ -183,18 +185,21 @@ drilldown(ull offset, type_t *t)
 			goto label;
 		case DW_TAG_structure_type:
 			eppic_type_mkstruct(t);
-			goto label;
+label:
+			eppic_type_setsize(t, GET_DIE_LENGTH(t_die_off, TRUE));
+			eppic_type_setidx(t, (ull)t_die_off);
+			tstr = GET_DIE_NAME(t_die_off);
+			/* Drill down further */
+			if (tstr)
+				apigetctype(V_STRUCT, tstr, t);
+			die_off = 0;
+			break;
 		/* Unknown TAG ? */
 		default:
 			die_off = t_die_off;
 			break;
 		}
 	}
-
-label:
-	eppic_type_setsize(t, GET_DIE_LENGTH(t_die_off, TRUE));
-	eppic_type_setidx(t, (ull)t_die_off);
-	tstr = GET_DIE_NAME(t_die_off);
 
 out:
 	eppic_setupidx(t, ref, nidx, idxlst);

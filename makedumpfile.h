@@ -1637,9 +1637,11 @@ static inline int
 is_zero_page(unsigned char *buf, long page_size)
 {
 	size_t i;
+	unsigned long long *vect = (unsigned long long *) buf;
+	long page_len = page_size / sizeof(unsigned long long);
 
-	for (i = 0; i < page_size; i++)
-		if (buf[i])
+	for (i = 0; i < page_len; i++)
+		if (vect[i])
 			return FALSE;
 	return TRUE;
 }

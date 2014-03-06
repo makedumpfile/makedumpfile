@@ -91,3 +91,5 @@ install:
 	install -m 644 -t ${DESTDIR}/usr/share/man/man8 makedumpfile.8.gz
 	install -m 644 -t ${DESTDIR}/usr/share/man/man5 makedumpfile.conf.5.gz
 	install -m 644 -D makedumpfile.conf ${DESTDIR}/etc/makedumpfile.conf.sample
+	mkdir -p ${DESTDIR}/usr/share/makedumpfile-${VERSION}/eppic_scripts
+	install -m 644 -t ${DESTDIR}/usr/share/makedumpfile-${VERSION}/eppic_scripts/ eppic_scripts/*

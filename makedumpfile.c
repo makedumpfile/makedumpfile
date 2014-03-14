@@ -3892,12 +3892,12 @@ dump_log_entry(char *logptr, int fp)
 		}
 
 		if (isprint(*p) || isspace(*p))
-			bufp =+ sprintf(bufp, "%c", *p);
+			*bufp++ = *p;
 		else
 			bufp += sprintf(bufp, "\\x%02x", *p);
 	}
 
-	bufp += sprintf(bufp, "\n");
+	*bufp++ = '\n';
 
 	if (write(info->fd_dumpfile, buf, bufp - buf) < 0)
 		return FALSE;

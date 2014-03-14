@@ -3866,7 +3866,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones, struct cycle *cycle)
 static int
 dump_log_entry(char *logptr, int fp)
 {
-	char *msg, *p;
+	char *msg, *p, *bufp;
 	unsigned int i, text_len;
 	unsigned long long ts_nsec;
 	char buf[BUFSIZE];
@@ -3881,18 +3881,19 @@ dump_log_entry(char *logptr, int fp)
 
 	msg = logptr + SIZE(printk_log);
 
-	sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
+	bufp = buf;
+	bufp += sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
 
 	for (i = 0, p = msg; i < text_len; i++, p++) {
 		if (isprint(*p) || isspace(*p))
-			sprintf(buf, "%s%c", buf, *p);
+			bufp =+ sprintf(bufp, "%c", *p);
 		else
-			sprintf(buf, "%s\\x%02x", buf, *p);
+			bufp += sprintf(bufp, "\\x%02x", *p);
 	}
 
-	sprintf(buf, "%s\n", buf);
+	bufp += sprintf(bufp, "\n");
 
-	if (write(info->fd_dumpfile, buf, strlen(buf)) < 0)
+	if (write(info->fd_dumpfile, buf, bufp - buf) < 0)
 		return FALSE;
 	else
 		return TRUE;

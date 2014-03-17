@@ -3885,6 +3885,7 @@ dump_log_entry(char *logptr, int fp)
 	bufp += sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
 
 	for (i = 0, p = msg; i < text_len; i++, p++) {
+		/* 6bytes = "\\x%02x" + '\n' + '\0' */
 		if (bufp - buf >= sizeof(buf) - 6) {
 			if (write(info->fd_dumpfile, buf, bufp - buf) < 0)
 				return FALSE;

@@ -7660,7 +7660,7 @@ initial_xen(void)
 	MSG("Xen is not supported on powerpc.\n");
 	return FALSE;
 #else
-	if(!info->flag_elf_dumpfile) {
+	if(!info->flag_elf_dumpfile && !info->flag_dmesg) {
 		MSG("Specify '-E' option for Xen.\n");
 		MSG("Commandline parameter is invalid.\n");
 		MSG("Try `makedumpfile --help' for more information.\n");

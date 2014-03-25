@@ -2865,6 +2865,8 @@ get_mem_map_without_mm(void)
 int
 get_mem_map(void)
 {
+	unsigned long long max_pfn = 0;
+	unsigned int i;
 	int ret;
 
 	switch (get_mem_type()) {
@@ -2897,6 +2899,17 @@ get_mem_map(void)
 		ret = FALSE;
 		break;
 	}
+	/*
+	 * Adjust "max_mapnr" for the case that Linux uses less memory
+	 * than is dumped. For example when "mem=" has been used for the
+	 * dumped system.
+	 */
+	for (i = 0; i < info->num_mem_map; i++) {
+		if (info->mem_map_data[i].mem_map == NOT_MEMMAP_ADDR)
+			continue;
+		max_pfn = MAX(max_pfn, info->mem_map_data[i].pfn_end);
+	}
+	info->max_mapnr = MIN(info->max_mapnr, max_pfn);
 	return ret;
 }
 

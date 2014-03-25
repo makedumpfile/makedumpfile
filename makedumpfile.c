@@ -2726,11 +2726,14 @@ nr_to_section(unsigned long nr, unsigned long *mem_sec)
 {
 	unsigned long addr;
 
-	if (is_sparsemem_extreme())
+	if (is_sparsemem_extreme()) {
+		if (mem_sec[SECTION_NR_TO_ROOT(nr)] == 0)
+			return NOT_KV_ADDR;
 		addr = mem_sec[SECTION_NR_TO_ROOT(nr)] +
 		    (nr & SECTION_ROOT_MASK()) * SIZE(mem_section);
-	else
+	} else {
 		addr = SYMBOL(mem_section) + (nr * SIZE(mem_section));
+	}
 
 	if (!is_kvaddr(addr))
 		return NOT_KV_ADDR;
@@ -2814,10 +2817,19 @@ get_mm_sparsemem(void)
 	}
 	for (section_nr = 0; section_nr < num_section; section_nr++) {
 		section = nr_to_section(section_nr, mem_sec);
-		mem_map = section_mem_map_addr(section);
-		mem_map = sparse_decode_mem_map(mem_map, section_nr);
-		if (!is_kvaddr(mem_map))
+		if (section == NOT_KV_ADDR) {
 			mem_map = NOT_MEMMAP_ADDR;
+		} else {
+			mem_map = section_mem_map_addr(section);
+			if (mem_map == 0) {
+				mem_map = NOT_MEMMAP_ADDR;
+			} else {
+				mem_map = sparse_decode_mem_map(mem_map,
+								section_nr);
+				if (!is_kvaddr(mem_map))
+					mem_map = NOT_MEMMAP_ADDR;
+			}
+		}
 		pfn_start = section_nr * PAGES_PER_SECTION();
 		pfn_end   = pfn_start + PAGES_PER_SECTION();
 		if (info->max_mapnr < pfn_end)

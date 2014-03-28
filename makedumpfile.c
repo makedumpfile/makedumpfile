@@ -189,9 +189,30 @@ get_dom0_mapnr()
 		}
 
 		info->dom0_mapnr = max_pfn;
-		DEBUG_MSG("domain-0 pfn : %llx\n", info->dom0_mapnr);
+	} else if (info->p2m_frames) {
+		unsigned long mfns[MFNS_PER_FRAME];
+		unsigned long mfn_idx = info->p2m_frames - 1;
+		unsigned long long maddr;
+		unsigned i;
+
+		maddr = pfn_to_paddr(info->p2m_mfn_frame_list[mfn_idx]);
+		if (!readmem(MADDR_XEN, maddr, &mfns, sizeof(mfns))) {
+			ERRMSG("Can't read %ld domain-0 mfns at 0x%llu\n",
+				(long)MFNS_PER_FRAME, maddr);
+			return FALSE;
+		}
+
+		for (i = 0; i < MFNS_PER_FRAME; ++i)
+			if (!mfns[i])
+				break;
+
+		info->dom0_mapnr = mfn_idx * MFNS_PER_FRAME + i;
+	} else {
+		/* dom0_mapnr is unavailable, which may be non-critical */
+		return TRUE;
 	}
 
+	DEBUG_MSG("domain-0 pfn : %llx\n", info->dom0_mapnr);
 	return TRUE;
 }
 

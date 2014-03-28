@@ -3183,12 +3183,15 @@ out:
 	if (!is_xen_memory() && !cache_init())
 		return FALSE;
 
+	if (debug_info && !get_machdep_info())
+		return FALSE;
+
+	if (is_xen_memory() && !get_dom0_mapnr())
+		return FALSE;
+
 	if (debug_info) {
 		if (info->flag_sadump)
 			(void) sadump_virt_phys_base();
-
-		if (!get_machdep_info())
-			return FALSE;
 
 		if (info->flag_sadump) {
 			int online_cpus;
@@ -3234,9 +3237,6 @@ out:
 		if (!get_mem_map_without_mm())
 			return FALSE;
 	}
-
-	if (is_xen_memory() && !get_dom0_mapnr())
-		return FALSE;
 
 	if (!get_value_for_old_linux())
 		return FALSE;

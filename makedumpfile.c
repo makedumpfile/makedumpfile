@@ -4492,8 +4492,9 @@ create_1st_bitmap_cyclic(struct cycle *cycle)
 		if (pfn_start >= pfn_end)
 			continue;
 
-		pfn_start_roundup = roundup(pfn_start, BITPERBYTE);
-		pfn_end_round = round(pfn_end, BITPERBYTE);
+		pfn_start_roundup = MIN(roundup(pfn_start, BITPERBYTE),
+					pfn_end);
+		pfn_end_round = MAX(round(pfn_end, BITPERBYTE), pfn_start);
 
 		for (pfn = pfn_start; pfn < pfn_start_roundup; pfn++) {
 			if (set_bit_on_1st_bitmap(pfn, cycle))
@@ -4511,9 +4512,11 @@ create_1st_bitmap_cyclic(struct cycle *cycle)
 			pfn_bitmap1 += (pfn_end_byte - pfn_start_byte) * BITPERBYTE;
 		}
 
-		for (pfn = pfn_end_round; pfn < pfn_end; pfn++) {
-			if (set_bit_on_1st_bitmap(pfn, cycle))
-				pfn_bitmap1++;
+		if (pfn_end_round > pfn_start) {
+			for (pfn = pfn_end_round; pfn < pfn_end; pfn++) {
+				if (set_bit_on_1st_bitmap(pfn, cycle))
+					pfn_bitmap1++;
+			}
 		}
 	}
 	pfn_memhole -= pfn_bitmap1;
@@ -4600,8 +4603,9 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 		if (pfn_start >= pfn_end)
 			continue;
 
-		pfn_start_roundup = roundup(pfn_start, BITPERBYTE);
-		pfn_end_round = round(pfn_end, BITPERBYTE);
+		pfn_start_roundup = MIN(roundup(pfn_start, BITPERBYTE),
+					pfn_end);
+		pfn_end_round = MAX(round(pfn_end, BITPERBYTE), pfn_start);
 
 		for (pfn = pfn_start; pfn < pfn_start_roundup; ++pfn)
 			if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
@@ -4616,9 +4620,12 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 			       pfn_end_byte - pfn_start_byte);
 		}
 
-		for (pfn = pfn_end_round; pfn < pfn_end; ++pfn)
-			if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
-				return FALSE;
+		if (pfn_end_round > pfn_start) {
+			for (pfn = pfn_end_round; pfn < pfn_end; ++pfn) {
+				if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
+					return FALSE;
+			}
+		}
 	}
 
 	return TRUE;

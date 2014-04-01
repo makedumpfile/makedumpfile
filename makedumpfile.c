@@ -6321,7 +6321,6 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		    && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_ZLIB;
 			pd.size  = size_out;
-			memcpy(buf, buf_out, pd.size);
 #ifdef USELZO
 		} else if (info->flag_lzo_support
 			   && (info->flag_compress & DUMP_DH_COMPRESSED_LZO)
@@ -6331,7 +6330,6 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			   && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_LZO;
 			pd.size  = size_out;
-			memcpy(buf, buf_out, pd.size);
 #endif
 #ifdef USESNAPPY
 		} else if ((info->flag_compress & DUMP_DH_COMPRESSED_SNAPPY)
@@ -6343,7 +6341,6 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			   && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_SNAPPY;
 			pd.size  = size_out;
-			memcpy(buf, buf_out, pd.size);
 #endif
 		} else {
 			pd.flags = 0;
@@ -6362,7 +6359,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		/*
 		 * Write the page data.
 		 */
-		if (!write_cache(cd_page, buf, pd.size))
+		if (!write_cache(cd_page, pd.flags ? buf_out : buf, pd.size))
 			goto out;
 	}
 
@@ -6503,7 +6500,6 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		    && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_ZLIB;
 			pd.size  = size_out;
-			memcpy(buf, buf_out, pd.size);
 #ifdef USELZO
 		} else if (info->flag_lzo_support
 			   && (info->flag_compress & DUMP_DH_COMPRESSED_LZO)
@@ -6513,7 +6509,6 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 			   && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_LZO;
 			pd.size  = size_out;
-			memcpy(buf, buf_out, pd.size);
 #endif
 #ifdef USESNAPPY
 		} else if ((info->flag_compress & DUMP_DH_COMPRESSED_SNAPPY)
@@ -6525,7 +6520,6 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 			   && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_SNAPPY;
 			pd.size  = size_out;
-			memcpy(buf, buf_out, pd.size);
 #endif
 		} else {
 			pd.flags = 0;
@@ -6544,7 +6538,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
                 /*
                  * Write the page data.
                  */
-                if (!write_cache(cd_page, buf, pd.size))
+		if (!write_cache(cd_page, pd.flags ? buf_out : buf, pd.size))
                         goto out;
         }
 

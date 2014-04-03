@@ -2904,12 +2904,14 @@ get_mem_map(void)
 	 * than is dumped. For example when "mem=" has been used for the
 	 * dumped system.
 	 */
-	for (i = 0; i < info->num_mem_map; i++) {
-		if (info->mem_map_data[i].mem_map == NOT_MEMMAP_ADDR)
-			continue;
-		max_pfn = MAX(max_pfn, info->mem_map_data[i].pfn_end);
+	if (!is_xen_memory()) {
+		for (i = 0; i < info->num_mem_map; i++) {
+			if (info->mem_map_data[i].mem_map == NOT_MEMMAP_ADDR)
+				continue;
+			max_pfn = MAX(max_pfn, info->mem_map_data[i].pfn_end);
+		}
+		info->max_mapnr = MIN(info->max_mapnr, max_pfn);
 	}
-	info->max_mapnr = MIN(info->max_mapnr, max_pfn);
 	return ret;
 }
 
@@ -4444,6 +4446,9 @@ create_1st_bitmap(void)
 
 		pfn_start = paddr_to_pfn(phys_start);
 		pfn_end   = paddr_to_pfn(phys_end);
+		if (pfn_start > info->max_mapnr)
+			continue;
+		pfn_end = MIN(pfn_end, info->max_mapnr);
 
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
 			set_bit_on_1st_bitmap(pfn, NULL);

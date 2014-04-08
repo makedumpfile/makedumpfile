@@ -15,10 +15,11 @@ CFLAGS_ARCH	= -g -O2 -Wall -D_FILE_OFFSET_BITS=64 \
 		    -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 # LDFLAGS = -L/usr/local/lib -I/usr/local/include
 
+HOST_ARCH := $(shell uname -m)
 # Use TARGET as the target architecture if specified.
 # Defaults to uname -m
 ifeq ($(strip($TARGET)),)
-TARGET := $(shell uname -m)
+TARGET := $(HOST_ARCH)
 endif
 
 ARCH := $(shell echo ${TARGET}  | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
@@ -26,8 +27,13 @@ ARCH := $(shell echo ${TARGET}  | sed -e s/i.86/x86/ -e s/sun4u/sparc64/ \
 			       -e s/s390x/s390/ -e s/parisc64/parisc/ \
 			       -e s/ppc64/powerpc64/ -e s/ppc/powerpc32/)
 
-CFLAGS += -D__$(ARCH)__
-CFLAGS_ARCH += -D__$(ARCH)__
+CROSS :=
+ifneq ($(TARGET), $(HOST_ARCH))
+CROSS := -U__$(HOST_ARCH)__
+endif
+
+CFLAGS += -D__$(ARCH)__ $(CROSS)
+CFLAGS_ARCH += -D__$(ARCH)__ $(CROSS)
 
 ifeq ($(ARCH), powerpc64)
 CFLAGS += -m64

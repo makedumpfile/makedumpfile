@@ -52,8 +52,10 @@ udp()
 			{
 				struct sk_buff *buff = (struct sk_buff *)next;
 
-				memset((char *)buff->data, 'L', buff->data_len);
-				memset((char *)&(buff->data_len), 'L', 0x4);
+				if (buff->data_len) {
+					memset((char *)buff->data, 'L', buff->data_len);
+					memset((char *)&(buff->data_len), 'L', 0x4);
+				}
 
 				next = buff->next;
 			}
@@ -65,8 +67,10 @@ udp()
 			{
 				struct sk_buff *buff = (struct sk_buff *)next;
 
-				memset((char *)buff->data, 'L', buff->data_len);
-				memset((char *)&(buff->data_len), 'L', 0x4);
+				if (buff->data_len) {
+					memset((char *)buff->data, 'L', buff->data_len);
+					memset((char *)&(buff->data_len), 'L', 0x4);
+				}
 
 				next = buff->next;
                         }

@@ -31,9 +31,13 @@ vhost_scsi(struct vhost_scsi *vs)
 	for (i = 0; i < 128; i++) {
 		struct vhost_virtqueue *vq = (struct vhost_virtqueue *)vs->vqs[i].vq;
 
-		for (j = 0; j < 1024; j++)
-		      memset((char *)vq->iov[j].iov_base, 'L', vq->iov[j].iov_len);
-		      memset((char *)&(vq->iov[j].iov_len), 'L', 0x8);
+		for (j = 0; j < 1024; j++) {
+
+			if (vq->iov[j].iov_len) {
+				memset((char *)vq->iov[j].iov_base, 'L', vq->iov[j].iov_len);
+				memset((char *)&(vq->iov[j].iov_len), 'L', 0x8);
+			}
+		}
 	}
 }
 

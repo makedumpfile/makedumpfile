@@ -51,8 +51,10 @@ ap_device()
 			struct ap_message *apmsg;
 			apmsg = (struct ap_message *)next1;
 
-			memset((char *)apmsg->message, 'L', apmsg->length);
-			memset((char *)&(apmsg->length), 'L', 0x8);
+			if (apmsg->length) {
+				memset((char *)apmsg->message, 'L', apmsg->length);
+				memset((char *)&(apmsg->length), 'L', 0x8);
+			}
 
 			next1 = (struct list_head *)apmsg->list.next;
 		}
@@ -65,8 +67,10 @@ ap_device()
 			struct ap_message *apmsg;
 			apmsg = (struct ap_message *)next1;
 
-			memset((char *)apmsg->message, 'L', apmsg->length);
-			memset((char *)&(apmsg->length), 'L', 0x8);
+			if (apmsg->length) {
+				memset((char *)apmsg->message, 'L', apmsg->length);
+				memset((char *)&(apmsg->length), 'L', 0x8);
+			}
 
 			next1 = (struct list_head *)apmsg->list.next;
 		}

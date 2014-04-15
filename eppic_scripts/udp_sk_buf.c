@@ -30,7 +30,7 @@ udp()
 	struct udp_table *table;
 	struct sock_common *off = 0;
 
-	table = &udp_table;
+	table = (struct udp_table *)&udp_table;
 
 	for (i = 0; i < table->mask; i++) {
 		struct hlist_nulls_node *pos;

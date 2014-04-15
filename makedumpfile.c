@@ -3361,9 +3361,16 @@ int
 set_bitmap_cyclic(char *bitmap, unsigned long long pfn, int val, struct cycle *cycle)
 {
 	int byte, bit;
+	static int warning = 0;
 
-        if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
+        if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn) {
+		if (warning == 0) {
+			MSG("WARNING: PFN out of cycle range. (pfn:%llx, ", pfn);
+			MSG("cycle:[%llx-%llx])\n", cycle->start_pfn, cycle->end_pfn);
+			warning = 1;
+		}
                 return FALSE;
+	}
 
 	/*
 	 * If val is 0, clear bit on the bitmap.

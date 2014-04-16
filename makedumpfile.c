@@ -4545,7 +4545,7 @@ create_1st_bitmap_cyclic(struct cycle *cycle)
 			pfn_bitmap1 += (pfn_end_byte - pfn_start_byte) * BITPERBYTE;
 		}
 
-		if (pfn_end_round > pfn_start) {
+		if (pfn_end_round >= pfn_start) {
 			for (pfn = pfn_end_round; pfn < pfn_end; pfn++) {
 				if (set_bit_on_1st_bitmap(pfn, cycle))
 					pfn_bitmap1++;
@@ -4653,7 +4653,7 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 			       pfn_end_byte - pfn_start_byte);
 		}
 
-		if (pfn_end_round > pfn_start) {
+		if (pfn_end_round >= pfn_start) {
 			for (pfn = pfn_end_round; pfn < pfn_end; ++pfn) {
 				if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
 					return FALSE;

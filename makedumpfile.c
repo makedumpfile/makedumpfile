@@ -9003,7 +9003,7 @@ out:
  */
 int
 calculate_cyclic_buffer_size(void) {
-	unsigned long long free_size, needed_size;
+	unsigned long long limit_size, bitmap_size;
 
 	if (info->max_mapnr <= 0) {
 		ERRMSG("Invalid max_mapnr(%llu).\n", info->max_mapnr);
@@ -9016,18 +9016,17 @@ calculate_cyclic_buffer_size(void) {
 	 * within 80% of free memory.
 	 */
 	if (info->flag_elf_dumpfile) {
-		free_size = get_free_memory_size() * 0.4;
-		needed_size = (info->max_mapnr * 2) / BITPERBYTE;
+		limit_size = get_free_memory_size() * 0.4;
 	} else {
-		free_size = get_free_memory_size() * 0.8;
-		needed_size = info->max_mapnr / BITPERBYTE;
+		limit_size = get_free_memory_size() * 0.8;
 	}
+	bitmap_size = info->max_mapnr / BITPERBYTE;
 
 	/* if --split was specified cyclic buffer allocated per dump file */
 	if (info->num_dumpfile > 1)
-		needed_size /= info->num_dumpfile;
+		bitmap_size /= info->num_dumpfile;
 
-	info->bufsize_cyclic = (free_size <= needed_size) ? free_size : needed_size;
+	info->bufsize_cyclic = MIN(limit_size, bitmap_size);
 
 	return TRUE;
 }

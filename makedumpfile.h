@@ -1594,7 +1594,7 @@ struct cycle {
 };
 
 static inline int
-is_on(char *bitmap, int i)
+is_on(char *bitmap, unsigned long long i)
 {
 	return bitmap[i>>3] & (1 << (i & 7));
 }

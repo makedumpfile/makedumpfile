@@ -767,13 +767,15 @@ unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #endif          /* ia64 */
 
+typedef unsigned long long mdf_pfn_t;
+
 #ifndef ARCH_PFN_OFFSET
 #define ARCH_PFN_OFFSET		0
 #endif
 #define paddr_to_pfn(X) \
 	(((unsigned long long)(X) >> PAGESHIFT()) - ARCH_PFN_OFFSET)
 #define pfn_to_paddr(X) \
-	(((unsigned long long)(X) + ARCH_PFN_OFFSET) << PAGESHIFT())
+	(((mdf_pfn_t)(X) + ARCH_PFN_OFFSET) << PAGESHIFT())
 
 /* Format of Xen crash info ELF note */
 typedef struct {
@@ -813,8 +815,8 @@ typedef struct {
 } xen_crash_info_v2_t;
 
 struct mem_map_data {
-	unsigned long long	pfn_start;
-	unsigned long long	pfn_end;
+	mdf_pfn_t	pfn_start;
+	mdf_pfn_t	pfn_end;
 	unsigned long	mem_map;
 };
 
@@ -866,8 +868,8 @@ struct makedumpfile_data_header {
 struct splitting_info {
 	char			*name_dumpfile;
 	int 			fd_bitmap;
-	unsigned long long	start_pfn;
-	unsigned long long	end_pfn;
+	mdf_pfn_t		start_pfn;
+	mdf_pfn_t		end_pfn;
 	off_t			offset_eraseinfo;
 	unsigned long		size_eraseinfo;
 } splitting_info_t;
@@ -914,7 +916,7 @@ struct DumpInfo {
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
-	unsigned long long	max_mapnr;   /* number of page descriptor */
+	mdf_pfn_t	max_mapnr;   /* number of page descriptor */
 	unsigned long   page_offset;
 	unsigned long   section_size_bits;
 	unsigned long   max_physmem_bits;
@@ -1025,10 +1027,10 @@ struct DumpInfo {
 					 *   1 .. xen_crash_info_t
 					 *   2 .. xen_crash_info_v2_t */
 
-	unsigned long long	dom0_mapnr;  /* The number of page in domain-0.
-					      * Different from max_mapnr.
-					      * max_mapnr is the number of page
-					      * in system. */
+	mdf_pfn_t	dom0_mapnr;	/* The number of page in domain-0.
+					 * Different from max_mapnr.
+					 * max_mapnr is the number of page
+					 * in system. */
 	unsigned long xen_phys_start;
 	unsigned long xen_heap_start;	/* start mfn of xen heap area */
 	unsigned long xen_heap_end;	/* end mfn(+1) of xen heap area */
@@ -1048,15 +1050,15 @@ struct DumpInfo {
 	/*
 	 * for splitting
 	 */
-	unsigned long long split_start_pfn;  
-	unsigned long long split_end_pfn;  
+	mdf_pfn_t split_start_pfn;
+	mdf_pfn_t split_end_pfn;
 
 	/*
 	 * for cyclic processing
 	 */
 	char               *partial_bitmap1;
 	char               *partial_bitmap2;
-	unsigned long long num_dumpable;
+	mdf_pfn_t          num_dumpable;
 	unsigned long      bufsize_cyclic;
 	unsigned long      pfn_cyclic;
 
@@ -1453,7 +1455,7 @@ int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 int get_str_osrelease_from_vmlinux(void);
 int read_vmcoreinfo_xen(void);
 int exclude_xen_user_domain(void);
-unsigned long long get_num_dumpable(void);
+mdf_pfn_t get_num_dumpable(void);
 int __read_disk_dump_header(struct disk_dump_header *dh, char *filename);
 int read_disk_dump_header(struct disk_dump_header *dh, char *filename);
 int read_kdump_sub_header(struct kdump_sub_header *kh, char *filename);
@@ -1589,18 +1591,18 @@ int get_xen_info_ia64(void);
 #endif	/* s390x */
 
 struct cycle {
-	unsigned long long start_pfn;
-	unsigned long long end_pfn;
+	mdf_pfn_t start_pfn;
+	mdf_pfn_t end_pfn;
 };
 
 static inline int
-is_on(char *bitmap, unsigned long long i)
+is_on(char *bitmap, mdf_pfn_t i)
 {
 	return bitmap[i>>3] & (1 << (i & 7));
 }
 
 static inline int
-is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
+is_dumpable(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 {
 	off_t offset;
 	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
@@ -1616,7 +1618,7 @@ is_dumpable(struct dump_bitmap *bitmap, unsigned long long pfn)
 }
 
 static inline int
-is_dumpable_cyclic(char *bitmap, unsigned long long pfn, struct cycle *cycle)
+is_dumpable_cyclic(char *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
 		return FALSE;
@@ -1625,7 +1627,7 @@ is_dumpable_cyclic(char *bitmap, unsigned long long pfn, struct cycle *cycle)
 }
 
 static inline int
-is_cyclic_region(unsigned long long pfn, struct cycle *cycle)
+is_cyclic_region(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
 		return FALSE;
@@ -1647,8 +1649,8 @@ is_zero_page(unsigned char *buf, long page_size)
 }
 
 void write_vmcoreinfo_data(void);
-int set_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle);
-int clear_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle);
+int set_bit_on_1st_bitmap(mdf_pfn_t pfn, struct cycle *cycle);
+int clear_bit_on_1st_bitmap(mdf_pfn_t pfn, struct cycle *cycle);
 
 #ifdef __x86__
 
@@ -1759,7 +1761,7 @@ struct elf_prstatus {
 /*
  * Function Prototype.
  */
-unsigned long long get_num_dumpable_cyclic(void);
+mdf_pfn_t get_num_dumpable_cyclic(void);
 int get_loads_dumpfile_cyclic(void);
 int initial_xen(void);
 unsigned long long get_free_memory_size(void);

@@ -42,7 +42,7 @@ int sadump_copy_1st_bitmap_from_memory(void);
 int sadump_initialize_bitmap_memory(void);
 int sadump_num_online_cpus(void);
 int sadump_set_timestamp(struct timeval *ts);
-unsigned long long sadump_get_max_mapnr(void);
+mdf_pfn_t sadump_get_max_mapnr(void);
 int readpage_sadump(unsigned long long paddr, void *bufptr);
 int sadump_check_debug_info(void);
 int sadump_generate_vmcoreinfo_from_vmlinux(size_t *vmcoreinfo_size);
@@ -92,7 +92,7 @@ static inline int sadump_set_timestamp(struct timeval *ts)
 	return FALSE;
 }
 
-static inline unsigned long long sadump_get_max_mapnr(void)
+static inline mdf_pfn_t sadump_get_max_mapnr(void)
 {
 	return 0;
 }

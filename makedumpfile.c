@@ -37,7 +37,7 @@ struct DumpInfo		*info = NULL;
 
 char filename_stdout[] = FILENAME_STDOUT;
 
-static void first_cycle(unsigned long long start, unsigned long long max, struct cycle *cycle)
+static void first_cycle(mdf_pfn_t start, mdf_pfn_t max, struct cycle *cycle)
 {
 	cycle->start_pfn = round(start, info->pfn_cyclic);
 	cycle->end_pfn = cycle->start_pfn + info->pfn_cyclic;
@@ -46,7 +46,7 @@ static void first_cycle(unsigned long long start, unsigned long long max, struct
 		cycle->end_pfn = max;
 }
 
-static void update_cycle(unsigned long long max, struct cycle *cycle)
+static void update_cycle(mdf_pfn_t max, struct cycle *cycle)
 {
 	cycle->start_pfn= cycle->end_pfn;
 	cycle->end_pfn=  cycle->start_pfn + info->pfn_cyclic;
@@ -55,7 +55,7 @@ static void update_cycle(unsigned long long max, struct cycle *cycle)
 		cycle->end_pfn = max;
 }
 
-static int end_cycle(unsigned long long max, struct cycle *cycle)
+static int end_cycle(mdf_pfn_t max, struct cycle *cycle)
 {
 	return (cycle->start_pfn >=  max)?TRUE:FALSE;
 }
@@ -67,15 +67,15 @@ static int end_cycle(unsigned long long max, struct cycle *cycle)
 /*
  * The numbers of the excluded pages
  */
-unsigned long long pfn_zero;
-unsigned long long pfn_memhole;
-unsigned long long pfn_cache;
-unsigned long long pfn_cache_private;
-unsigned long long pfn_user;
-unsigned long long pfn_free;
-unsigned long long pfn_hwpoison;
+mdf_pfn_t pfn_zero;
+mdf_pfn_t pfn_memhole;
+mdf_pfn_t pfn_cache;
+mdf_pfn_t pfn_cache_private;
+mdf_pfn_t pfn_user;
+mdf_pfn_t pfn_free;
+mdf_pfn_t pfn_hwpoison;
 
-unsigned long long num_dumped;
+mdf_pfn_t num_dumped;
 
 int retcd = FAILED;	/* return code */
 
@@ -122,7 +122,9 @@ unsigned long long
 ptom_xen(unsigned long long paddr)
 {
 	unsigned long mfn;
-	unsigned long long maddr, pfn, mfn_idx, frame_idx;
+	unsigned long long maddr;
+	mdf_pfn_t pfn;
+	unsigned long long mfn_idx, frame_idx;
 
 	pfn = paddr_to_pfn(paddr);
 	mfn_idx   = pfn / MFNS_PER_FRAME;
@@ -226,12 +228,13 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 }
 
 #define BITMAP_SECT_LEN 4096
-static inline int is_dumpable(struct dump_bitmap *, unsigned long long);
-static inline int is_dumpable_cyclic(char *bitmap, unsigned long long, struct cycle *cycle);
+static inline int is_dumpable(struct dump_bitmap *, mdf_pfn_t);
+static inline int is_dumpable_cyclic(char *bitmap, mdf_pfn_t, struct cycle *cycle);
 unsigned long
-pfn_to_pos(unsigned long long pfn)
+pfn_to_pos(mdf_pfn_t pfn)
 {
-	unsigned long desc_pos, i;
+	unsigned long desc_pos;
+	mdf_pfn_t i;
 
 	desc_pos = info->valid_pages[pfn / BITMAP_SECT_LEN];
 	for (i = round(pfn, BITMAP_SECT_LEN); i < pfn; i++)
@@ -246,7 +249,7 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 {
 	struct disk_dump_header *dh;
 	unsigned long desc_pos;
-	unsigned long long pfn;
+	mdf_pfn_t pfn;
 	off_t offset;
 
 	/*
@@ -2375,8 +2378,8 @@ pgdat4:
 }
 
 void
-dump_mem_map(unsigned long long pfn_start,
-    unsigned long long pfn_end, unsigned long mem_map, int num_mm)
+dump_mem_map(mdf_pfn_t pfn_start, mdf_pfn_t pfn_end,
+    unsigned long mem_map, int num_mm)
 {
 	struct mem_map_data *mmd;
 
@@ -2802,7 +2805,7 @@ int
 get_mm_sparsemem(void)
 {
 	unsigned int section_nr, mem_section_size, num_section;
-	unsigned long long pfn_start, pfn_end;
+	mdf_pfn_t pfn_start, pfn_end;
 	unsigned long section, mem_map;
 	unsigned long *mem_sec = NULL;
 
@@ -2886,7 +2889,7 @@ get_mem_map_without_mm(void)
 int
 get_mem_map(void)
 {
-	unsigned long long max_pfn = 0;
+	mdf_pfn_t max_pfn = 0;
 	unsigned int i;
 	int ret;
 
@@ -2944,7 +2947,7 @@ initialize_bitmap_memory(void)
 	struct dump_bitmap *bmp;
 	off_t bitmap_offset;
 	off_t bitmap_len, max_sect_len;
-	unsigned long pfn;
+	mdf_pfn_t pfn;
 	int i, j;
 	long block_size;
 
@@ -3309,8 +3312,7 @@ initialize_2nd_bitmap(struct dump_bitmap *bitmap)
 }
 
 int
-set_bitmap(struct dump_bitmap *bitmap, unsigned long long pfn,
-    int val)
+set_bitmap(struct dump_bitmap *bitmap, mdf_pfn_t pfn, int val)
 {
 	int byte, bit;
 	off_t old_offset, new_offset;
@@ -3358,7 +3360,7 @@ set_bitmap(struct dump_bitmap *bitmap, unsigned long long pfn,
 }
 
 int
-set_bitmap_cyclic(char *bitmap, unsigned long long pfn, int val, struct cycle *cycle)
+set_bitmap_cyclic(char *bitmap, mdf_pfn_t pfn, int val, struct cycle *cycle)
 {
 	int byte, bit;
 	static int warning = 0;
@@ -3425,7 +3427,7 @@ sync_2nd_bitmap(void)
 }
 
 int
-set_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle)
+set_bit_on_1st_bitmap(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (info->flag_cyclic) {
 		return set_bitmap_cyclic(info->partial_bitmap1, pfn, 1, cycle);
@@ -3435,7 +3437,7 @@ set_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle)
 }
 
 int
-clear_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle)
+clear_bit_on_1st_bitmap(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (info->flag_cyclic) {
 		return set_bitmap_cyclic(info->partial_bitmap1, pfn, 0, cycle);
@@ -3445,7 +3447,7 @@ clear_bit_on_1st_bitmap(unsigned long long pfn, struct cycle *cycle)
 }
 
 int
-clear_bit_on_2nd_bitmap(unsigned long long pfn, struct cycle *cycle)
+clear_bit_on_2nd_bitmap(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (info->flag_cyclic) {
 		return set_bitmap_cyclic(info->partial_bitmap2, pfn, 0, cycle);
@@ -3455,7 +3457,7 @@ clear_bit_on_2nd_bitmap(unsigned long long pfn, struct cycle *cycle)
 }
 
 int
-clear_bit_on_2nd_bitmap_for_kernel(unsigned long long pfn, struct cycle *cycle)
+clear_bit_on_2nd_bitmap_for_kernel(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	unsigned long long maddr;
 
@@ -3472,7 +3474,7 @@ clear_bit_on_2nd_bitmap_for_kernel(unsigned long long pfn, struct cycle *cycle)
 }
 
 int
-set_bit_on_2nd_bitmap(unsigned long long pfn, struct cycle *cycle)
+set_bit_on_2nd_bitmap(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (info->flag_cyclic) {
 		return set_bitmap_cyclic(info->partial_bitmap2, pfn, 1, cycle);
@@ -3482,7 +3484,7 @@ set_bit_on_2nd_bitmap(unsigned long long pfn, struct cycle *cycle)
 }
 
 int
-set_bit_on_2nd_bitmap_for_kernel(unsigned long long pfn, struct cycle *cycle)
+set_bit_on_2nd_bitmap_for_kernel(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	unsigned long long maddr;
 
@@ -3793,11 +3795,11 @@ rearrange_dumpdata(void)
 	return TRUE;
 }
 
-unsigned long long
+mdf_pfn_t
 page_to_pfn(unsigned long page)
 {
 	unsigned int num;
-	unsigned long long pfn = ULONGLONG_MAX;
+	mdf_pfn_t pfn = ULONGLONG_MAX;
 	unsigned long long index = 0;
 	struct mem_map_data *mmd;
 
@@ -3827,7 +3829,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones, struct cycle *cycle)
 	int order, i, migrate_type, migrate_types;
 	unsigned long curr, previous, head, curr_page, curr_prev;
 	unsigned long addr_free_pages, free_pages = 0, found_free_pages = 0;
-	unsigned long long pfn, start_pfn;
+	mdf_pfn_t pfn, start_pfn;
 
 	/*
 	 * On linux-2.6.24 or later, free_list is divided into the array.
@@ -4430,7 +4432,7 @@ create_1st_bitmap(void)
 	int i;
 	unsigned int num_pt_loads = get_num_pt_loads();
  	char buf[info->page_size];
-	unsigned long long pfn, pfn_start, pfn_end, pfn_bitmap1;
+	mdf_pfn_t pfn, pfn_start, pfn_end, pfn_bitmap1;
 	unsigned long long phys_start, phys_end;
 	struct timeval tv_start;
 	off_t offset_page;
@@ -4502,10 +4504,10 @@ int
 create_1st_bitmap_cyclic(struct cycle *cycle)
 {
 	int i;
-	unsigned long long pfn, pfn_bitmap1;
+	mdf_pfn_t pfn, pfn_bitmap1;
 	unsigned long long phys_start, phys_end;
-	unsigned long long pfn_start, pfn_end;
-	unsigned long long pfn_start_roundup, pfn_end_round;
+	mdf_pfn_t pfn_start, pfn_end;
+	mdf_pfn_t pfn_start_roundup, pfn_end_round;
 	unsigned long pfn_start_byte, pfn_end_byte;
 
 	/*
@@ -4563,7 +4565,8 @@ create_1st_bitmap_cyclic(struct cycle *cycle)
 int
 exclude_zero_pages(void)
 {
-	unsigned long long pfn, paddr;
+	mdf_pfn_t pfn;
+	unsigned long long paddr;
 	struct dump_bitmap bitmap2;
 	struct timeval tv_start;
 	unsigned char buf[info->page_size];
@@ -4615,10 +4618,10 @@ static int
 initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 {
 	int i;
-	unsigned long long pfn;
+	mdf_pfn_t pfn;
 	unsigned long long phys_start, phys_end;
-	unsigned long long pfn_start, pfn_end;
-	unsigned long long pfn_start_roundup, pfn_end_round;
+	mdf_pfn_t pfn_start, pfn_end;
+	mdf_pfn_t pfn_start_roundup, pfn_end_round;
 	unsigned long pfn_start_byte, pfn_end_byte;
 
 	/*
@@ -4666,10 +4669,12 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 
 int
 __exclude_unnecessary_pages(unsigned long mem_map,
-    unsigned long long pfn_start, unsigned long long pfn_end, struct cycle *cycle)
+    mdf_pfn_t pfn_start, mdf_pfn_t pfn_end, struct cycle *cycle)
 {
-	unsigned long long pfn, pfn_mm, maddr;
-	unsigned long long pfn_read_start, pfn_read_end, index_pg;
+	mdf_pfn_t pfn;
+	unsigned long index_pg, pfn_mm;
+	unsigned long long maddr;
+	mdf_pfn_t pfn_read_start, pfn_read_end;
 	unsigned char page_cache[SIZE(page) * PGMM_CACHED];
 	unsigned char *pcache;
 	unsigned int _count, _mapcount = 0;
@@ -5169,7 +5174,7 @@ get_loads_dumpfile(void)
 {
 	int i, phnum, num_new_load = 0;
 	long page_size = info->page_size;
-	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
+	mdf_pfn_t pfn, pfn_start, pfn_end, num_excluded;
 	unsigned long frac_head, frac_tail;
 	Elf64_Phdr load;
 	struct dump_bitmap bitmap2;
@@ -5619,10 +5624,10 @@ out:
 	return ret;
 }
 
-unsigned long long
+mdf_pfn_t
 get_num_dumpable(void)
 {
-	unsigned long long pfn, num_dumpable;
+	mdf_pfn_t pfn, num_dumpable;
 	struct dump_bitmap bitmap2;
 
 	initialize_2nd_bitmap(&bitmap2);
@@ -5634,10 +5639,10 @@ get_num_dumpable(void)
 	return num_dumpable;
 }
 
-unsigned long long
+mdf_pfn_t
 get_num_dumpable_cyclic(void)
 {
-	unsigned long long pfn, num_dumpable=0;
+	mdf_pfn_t pfn, num_dumpable=0;
 	struct cycle cycle = {0};
 
 	for_each_cycle(0, info->max_mapnr, &cycle)
@@ -5699,8 +5704,9 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 {
 	int i, phnum;
 	long page_size = info->page_size;
-	unsigned long long pfn, pfn_start, pfn_end, paddr, num_excluded;
-	unsigned long long num_dumpable, per;
+	mdf_pfn_t pfn, pfn_start, pfn_end, num_excluded;
+	unsigned long long paddr;
+	mdf_pfn_t num_dumpable, per;
 	unsigned long long memsz, filesz;
 	unsigned long frac_head, frac_tail;
 	off_t off_seg_load, off_memory;
@@ -5885,7 +5891,7 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 }
 
 int
-read_pfn(unsigned long long pfn, unsigned char *buf)
+read_pfn(mdf_pfn_t pfn, unsigned char *buf)
 {
 	unsigned long long paddr;
 
@@ -5904,7 +5910,7 @@ get_loads_dumpfile_cyclic(void)
 	int i, phnum, num_new_load = 0;
 	long page_size = info->page_size;
 	unsigned char buf[info->page_size];
-	unsigned long long pfn, pfn_start, pfn_end, num_excluded;
+	mdf_pfn_t pfn, pfn_start, pfn_end, num_excluded;
 	unsigned long frac_head, frac_tail;
 	Elf64_Phdr load;
 	struct cycle cycle = {0};
@@ -5976,8 +5982,8 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	int i, phnum;
 	long page_size = info->page_size;
 	unsigned char buf[info->page_size];
-	unsigned long long pfn, pfn_start, pfn_end, paddr, num_excluded;
-	unsigned long long num_dumpable, per;
+	mdf_pfn_t pfn, pfn_start, pfn_end, num_excluded, num_dumpable, per;
+	unsigned long long paddr;
 	unsigned long long memsz, filesz;
 	unsigned long frac_head, frac_tail;
 	off_t off_seg_load, off_memory;
@@ -6197,8 +6203,8 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 int
 write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 {
- 	unsigned long long pfn, per, num_dumpable;
-	unsigned long long start_pfn, end_pfn;
+	mdf_pfn_t pfn, per, num_dumpable;
+	mdf_pfn_t start_pfn, end_pfn;
 	unsigned long size_out;
 	struct page_desc pd, pd_zero;
 	off_t offset_data = 0;
@@ -6404,8 +6410,8 @@ int
 write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page,
 			 struct page_desc *pd_zero, off_t *offset_data, struct cycle *cycle)
 {
-	unsigned long long pfn, per;
-	unsigned long long start_pfn, end_pfn;
+	mdf_pfn_t pfn, per;
+	mdf_pfn_t start_pfn, end_pfn;
 	unsigned long size_out;
 	struct page_desc pd;
 	unsigned char buf[info->page_size], *buf_out = NULL;
@@ -7511,7 +7517,7 @@ read_vmcoreinfo_xen(void)
 }
 
 int
-allocated_in_map(unsigned long long pfn)
+allocated_in_map(mdf_pfn_t pfn)
 {
 	static unsigned long long cur_idx = -1;
 	static unsigned long cur_word;
@@ -7557,8 +7563,8 @@ exclude_xen3_user_domain(void)
 	unsigned int num_pt_loads = get_num_pt_loads();
 	unsigned long page_info_addr;
 	unsigned long long phys_start, phys_end;
-	unsigned long long pfn, pfn_end;
-	unsigned long long j, size;
+	mdf_pfn_t pfn, pfn_end;
+	mdf_pfn_t j, size;
 
 	/*
 	 * NOTE: the first half of bitmap is not used for Xen extraction
@@ -7621,8 +7627,8 @@ exclude_xen4_user_domain(void)
 	unsigned int num_pt_loads = get_num_pt_loads();
 	unsigned long page_info_addr;
 	unsigned long long phys_start, phys_end;
-	unsigned long long pfn, pfn_end;
-	unsigned long long j, size;
+	mdf_pfn_t pfn, pfn_end;
+	mdf_pfn_t j, size;
 
 	/*
 	 * NOTE: the first half of bitmap is not used for Xen extraction
@@ -7847,7 +7853,7 @@ print_vtop(void)
 void
 print_report(void)
 {
-	unsigned long long pfn_original, pfn_excluded, shrinking;
+	mdf_pfn_t pfn_original, pfn_excluded, shrinking;
 
 	/*
 	 * /proc/vmcore doesn't contain the memory hole area.
@@ -7952,9 +7958,9 @@ int
 setup_splitting(void)
 {
 	int i;
-	unsigned long long j, pfn_per_dumpfile;
-	unsigned long long start_pfn, end_pfn;
-	unsigned long long num_dumpable = get_num_dumpable();
+	mdf_pfn_t j, pfn_per_dumpfile;
+	mdf_pfn_t start_pfn, end_pfn;
+	mdf_pfn_t num_dumpable = get_num_dumpable();
 	struct dump_bitmap bitmap2;
 
 	if (info->num_dumpfile <= 1)
@@ -8281,7 +8287,7 @@ void
 sort_splitting_info(void)
 {
 	int i, j;
-	unsigned long long start_pfn, end_pfn;
+	mdf_pfn_t start_pfn, end_pfn;
 	char *name_dumpfile;
 
 	/*
@@ -8317,7 +8323,7 @@ int
 check_splitting_info(void)
 {
 	int i;
-	unsigned long long end_pfn;
+	mdf_pfn_t end_pfn;
 
 	/*
 	 * Check whether there are not lack of /proc/vmcore.
@@ -8544,8 +8550,8 @@ reassemble_kdump_pages(void)
 	int i, fd = 0, ret = FALSE;
 	off_t offset_first_ph, offset_ph_org, offset_eraseinfo;
 	off_t offset_data_new, offset_zero_page = 0;
-	unsigned long long pfn, start_pfn, end_pfn;
-	unsigned long long num_dumpable;
+	mdf_pfn_t pfn, start_pfn, end_pfn;
+	mdf_pfn_t num_dumpable;
 	unsigned long size_eraseinfo;
 	struct dump_bitmap bitmap2;
 	struct disk_dump_header dh;

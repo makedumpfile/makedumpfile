@@ -94,7 +94,7 @@ static int read_device_diskset(struct sadump_diskset_info *sdi, void *buf,
 			       size_t bytes, ulong *offset);
 static int read_sadump_header(char *filename);
 static int read_sadump_header_diskset(int diskid, struct sadump_diskset_info *sdi);
-static unsigned long long pfn_to_block(unsigned long long pfn);
+static unsigned long long pfn_to_block(mdf_pfn_t pfn);
 static int lookup_diskset(unsigned long long whole_offset, int *diskid,
 			  unsigned long long *disk_offset);
 static int max_mask_cpu(void);
@@ -202,7 +202,8 @@ sadump_copy_1st_bitmap_from_memory(void)
 	 * modify bitmap accordingly.
 	 */
 	if (si->kdump_backed_up) {
-		unsigned long long paddr, pfn, backup_src_pfn;
+		unsigned long long paddr;
+		mdf_pfn_t pfn, backup_src_pfn;
 
 		for (paddr = si->backup_src_start;
 		     paddr < si->backup_src_start + si->backup_src_size;
@@ -754,7 +755,8 @@ sadump_initialize_bitmap_memory(void)
 	struct sadump_header *sh = si->sh_memory;
 	struct dump_bitmap *bmp;
 	unsigned long dumpable_bitmap_offset;
-	unsigned long long section, max_section, pfn;
+	unsigned long long section, max_section;
+	mdf_pfn_t pfn;
 	unsigned long long *block_table;
 
 	dumpable_bitmap_offset =
@@ -901,7 +903,7 @@ sadump_set_timestamp(struct timeval *ts)
 	return TRUE;
 }
 
-unsigned long long
+mdf_pfn_t
 sadump_get_max_mapnr(void)
 {
 	return si->sh_memory->max_mapnr;
@@ -951,7 +953,8 @@ failed:
 int
 readpage_sadump(unsigned long long paddr, void *bufptr)
 {
-	unsigned long long pfn, block, whole_offset, perdisk_offset;
+	mdf_pfn_t pfn;
+	unsigned long long block, whole_offset, perdisk_offset;
 	int fd_memory;
 
 	if (si->kdump_backed_up &&
@@ -1117,7 +1120,7 @@ sadump_check_debug_info(void)
 }
 
 static unsigned long long
-pfn_to_block(unsigned long long pfn)
+pfn_to_block(mdf_pfn_t pfn)
 {
 	unsigned long long block, section, p;
 

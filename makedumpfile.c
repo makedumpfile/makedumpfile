@@ -2794,13 +2794,15 @@ section_mem_map_addr(unsigned long addr)
 unsigned long
 sparse_decode_mem_map(unsigned long coded_mem_map, unsigned long section_nr)
 {
-	if (!is_kvaddr(coded_mem_map))
-		return NOT_KV_ADDR;
+	unsigned long mem_map;
 
-	return coded_mem_map +
+	mem_map =  coded_mem_map +
 	    (SECTION_NR_TO_PFN(section_nr) * SIZE(page));
-}
 
+	if (!is_kvaddr(mem_map))
+		return NOT_KV_ADDR;
+	return mem_map;
+}
 int
 get_mm_sparsemem(void)
 {

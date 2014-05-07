@@ -1599,7 +1599,7 @@ int
 is_sparsemem_extreme(void)
 {
 	if (ARRAY_LENGTH(mem_section)
-	     == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
+	     == divideup(NR_MEM_SECTIONS(), _SECTIONS_PER_ROOT_EXTREME()))
 		return TRUE;
 	else
 		return FALSE;

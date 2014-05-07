@@ -5130,6 +5130,31 @@ free_bitmap_buffer(void)
 	free_bitmap2_buffer();
 }
 
+void
+free_bitmap1_buffer_cyclic()
+{
+	if (info->partial_bitmap1 != NULL){
+		free(info->partial_bitmap1);
+		info->partial_bitmap1 = NULL;
+	}
+}
+
+void
+free_bitmap2_buffer_cyclic()
+{
+	if (info->partial_bitmap2 != NULL){
+		free(info->partial_bitmap2);
+		info->partial_bitmap2 = NULL;
+	}
+}
+
+void
+free_bitmap_buffer_cyclic()
+{
+	free_bitmap1_buffer_cyclic();
+	free_bitmap2_buffer_cyclic();
+}
+
 int
 create_dump_bitmap(void)
 {
@@ -5147,8 +5172,7 @@ create_dump_bitmap(void)
 				goto out;
 
 			info->num_dumpable = get_num_dumpable_cyclic();
-
-			free_bitmap2_buffer();
+			free_bitmap2_buffer_cyclic();
 		}
 
 	} else {
@@ -6190,6 +6214,8 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	if (!write_cache_bufsz(cd_page))
 		return FALSE;
 
+	free_bitmap_buffer_cyclic();
+
 	/*
 	 * print [100 %]
 	 */
@@ -6947,7 +6973,7 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	}
 
 
-	free_bitmap1_buffer();
+	free_bitmap1_buffer_cyclic();
 
 	if (!prepare_bitmap2_buffer_cyclic())
 		return FALSE;
@@ -6970,7 +6996,7 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 			return FALSE;
 	}
 
-
+	free_bitmap2_buffer_cyclic();
 
 	gettimeofday(&tv_start, NULL);
 
@@ -9349,10 +9375,6 @@ out:
 			free(info->splitting_info);
 		if (info->p2m_mfn_frame_list != NULL)
 			free(info->p2m_mfn_frame_list);
-		if (info->partial_bitmap1 != NULL)
-			free(info->partial_bitmap1);
-		if (info->partial_bitmap2 != NULL)
-			free(info->partial_bitmap2);
 		free(info);
 	}
 	free_elf_info();

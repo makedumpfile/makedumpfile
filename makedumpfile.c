@@ -2111,6 +2111,8 @@ read_vmcoreinfo(void)
 	READ_NUMBER("PG_slab", PG_slab);
 	READ_NUMBER("PG_buddy", PG_buddy);
 	READ_NUMBER("PG_hwpoison", PG_hwpoison);
+	READ_NUMBER("SECTION_SIZE_BITS", SECTION_SIZE_BITS);
+	READ_NUMBER("MAX_PHYSMEM_BITS", MAX_PHYSMEM_BITS);
 
 	READ_SRCFILE("pud_t", pud_t);
 
@@ -2996,6 +2998,18 @@ initialize_bitmap_memory(void)
 }
 
 int
+calibrate_machdep_info(void)
+{
+	if (NUMBER(MAX_PHYSMEM_BITS) > 0)
+		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
+
+	if (NUMBER(SECTION_SIZE_BITS) > 0)
+		info->section_size_bits = NUMBER(SECTION_SIZE_BITS);
+
+	return TRUE;
+}
+
+int
 initial(void)
 {
 	off_t offset;
@@ -3210,6 +3224,9 @@ out:
 		return FALSE;
 
 	if (debug_info && !get_machdep_info())
+		return FALSE;
+
+	if (debug_info && !calibrate_machdep_info())
 		return FALSE;
 
 	if (is_xen_memory() && !get_dom0_mapnr())

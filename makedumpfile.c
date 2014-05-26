@@ -44,6 +44,9 @@ static void first_cycle(mdf_pfn_t start, mdf_pfn_t max, struct cycle *cycle)
 
 	if (cycle->end_pfn > max)
 		cycle->end_pfn = max;
+
+	cycle->exclude_pfn_start = 0;
+	cycle->exclude_pfn_end = 0;
 }
 
 static void update_cycle(mdf_pfn_t max, struct cycle *cycle)
@@ -4686,6 +4689,26 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 	return TRUE;
 }
 
+static void
+exclude_range(mdf_pfn_t *counter, mdf_pfn_t pfn, mdf_pfn_t endpfn,
+	      struct cycle *cycle)
+{
+	if (cycle) {
+		cycle->exclude_pfn_start = cycle->end_pfn;
+		cycle->exclude_pfn_end = endpfn;
+		cycle->exclude_pfn_counter = counter;
+
+		if (cycle->end_pfn < endpfn)
+			endpfn = cycle->end_pfn;
+	}
+
+	while (pfn < endpfn) {
+		if (clear_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
+			(*counter)++;
+		++pfn;
+	}
+}
+
 int
 __exclude_unnecessary_pages(unsigned long mem_map,
     mdf_pfn_t pfn_start, mdf_pfn_t pfn_end, struct cycle *cycle)
@@ -4698,6 +4721,18 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 	unsigned char *pcache;
 	unsigned int _count, _mapcount = 0;
 	unsigned long flags, mapping, private = 0;
+
+	/*
+	 * If a multi-page exclusion is pending, do it first
+	 */
+	if (cycle && cycle->exclude_pfn_start < cycle->exclude_pfn_end) {
+		exclude_range(cycle->exclude_pfn_counter,
+			cycle->exclude_pfn_start, cycle->exclude_pfn_end,
+			cycle);
+
+		mem_map += (cycle->exclude_pfn_end - pfn_start) * SIZE(page);
+		pfn_start = cycle->exclude_pfn_end;
+	}
 
 	/*
 	 * Refresh the buffer of struct page, when changing mem_map.
@@ -4763,21 +4798,10 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		if ((info->dump_level & DL_EXCLUDE_FREE)
 		    && info->page_is_buddy
 		    && info->page_is_buddy(flags, _mapcount, private, _count)) {
-			int i, nr_pages = 1 << private;
+			int nr_pages = 1 << private;
 
-			for (i = 0; i < nr_pages; ++i) {
-				/*
-				 * According to combination of
-				 * MAX_ORDER and size of cyclic
-				 * buffer, this clearing bit operation
-				 * can overrun the cyclic buffer.
-				 *
-				 * See check_cyclic_buffer_overrun()
-				 * for the detail.
-				 */
-				if (clear_bit_on_2nd_bitmap_for_kernel((pfn + i), cycle))
-					pfn_free++;
-			}
+			exclude_range(&pfn_free, pfn, pfn + nr_pages, cycle);
+
 			pfn += nr_pages - 1;
 			mem_map += (nr_pages - 1) * SIZE(page);
 		}

@@ -1595,6 +1595,11 @@ int get_xen_info_ia64(void);
 struct cycle {
 	mdf_pfn_t start_pfn;
 	mdf_pfn_t end_pfn;
+
+	/* for excluding multi-page regions */
+	mdf_pfn_t exclude_pfn_start;
+	mdf_pfn_t exclude_pfn_end;
+	mdf_pfn_t *exclude_pfn_counter;
 };
 
 static inline int

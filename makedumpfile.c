@@ -4450,7 +4450,7 @@ int
 create_1st_bitmap_cyclic(struct cycle *cycle)
 {
 	int i;
-	mdf_pfn_t pfn, pfn_bitmap1;
+	mdf_pfn_t pfn;
 	unsigned long long phys_start, phys_end;
 	mdf_pfn_t pfn_start, pfn_end;
 	mdf_pfn_t pfn_start_roundup, pfn_end_round;
@@ -4465,7 +4465,6 @@ create_1st_bitmap_cyclic(struct cycle *cycle)
 	 * If page is on memory hole, set bit on the 1st-bitmap.
 	 * (note that this is not done in cyclic mode)
 	 */
-	pfn_bitmap1 = 0;
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
 		pfn_start = MAX(paddr_to_pfn(phys_start), cycle->start_pfn);
 		pfn_end   = MIN(paddr_to_pfn(phys_end), cycle->end_pfn);
@@ -4478,8 +4477,7 @@ create_1st_bitmap_cyclic(struct cycle *cycle)
 		pfn_end_round = MAX(round(pfn_end, BITPERBYTE), pfn_start);
 
 		for (pfn = pfn_start; pfn < pfn_start_roundup; pfn++) {
-			if (set_bit_on_1st_bitmap(pfn, cycle))
-				pfn_bitmap1++;
+			set_bit_on_1st_bitmap(pfn, cycle);
 		}
 
 		pfn_start_byte = (pfn_start_roundup - cycle->start_pfn) >> 3;
@@ -4489,18 +4487,14 @@ create_1st_bitmap_cyclic(struct cycle *cycle)
 			memset(info->partial_bitmap1 + pfn_start_byte,
 			       0xff,
 			       pfn_end_byte - pfn_start_byte);
-
-			pfn_bitmap1 += (pfn_end_byte - pfn_start_byte) * BITPERBYTE;
 		}
 
 		if (pfn_end_round >= pfn_start) {
 			for (pfn = pfn_end_round; pfn < pfn_end; pfn++) {
-				if (set_bit_on_1st_bitmap(pfn, cycle))
-					pfn_bitmap1++;
+				set_bit_on_1st_bitmap(pfn, cycle);
 			}
 		}
 	}
-	pfn_memhole -= pfn_bitmap1;
 
 	return TRUE;
 }
@@ -4589,9 +4583,11 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 					pfn_end);
 		pfn_end_round = MAX(round(pfn_end, BITPERBYTE), pfn_start);
 
-		for (pfn = pfn_start; pfn < pfn_start_roundup; ++pfn)
+		for (pfn = pfn_start; pfn < pfn_start_roundup; ++pfn) {
 			if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
 				return FALSE;
+			pfn_memhole--;
+		}
 
 		pfn_start_byte = (pfn_start_roundup - cycle->start_pfn) >> 3;
 		pfn_end_byte = (pfn_end_round - cycle->start_pfn) >> 3;
@@ -4600,12 +4596,14 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 			memset(info->partial_bitmap2 + pfn_start_byte,
 			       0xff,
 			       pfn_end_byte - pfn_start_byte);
+			pfn_memhole -= (pfn_end_byte - pfn_start_byte) << 3;
 		}
 
 		if (pfn_end_round >= pfn_start) {
 			for (pfn = pfn_end_round; pfn < pfn_end; ++pfn) {
 				if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
 					return FALSE;
+				pfn_memhole--;
 			}
 		}
 	}

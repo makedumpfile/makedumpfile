@@ -191,7 +191,6 @@ print_usage(void)
 	MSG("\n");
 	MSG("  [--cyclic-buffer BUFFER_SIZE]:\n");
 	MSG("      Specify the buffer size in kilo bytes for analysis in the cyclic mode.\n");
-	MSG("      Actually, the double of BUFFER_SIZE kilo bytes will be allocated in memory.\n");
 	MSG("      In the cyclic mode, the number of cycles is represented as:\n");
 	MSG("\n");
 	MSG("          num_of_cycles = system_memory / \n");

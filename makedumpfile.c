@@ -3195,24 +3195,7 @@ out:
 				MSG("Specified buffer size is larger than free memory.\n");
 				MSG("The buffer size for the cyclic mode will ");
 				MSG("be truncated to %lld byte.\n", free_memory);
-				/*
-				 * On conversion from ELF to ELF,
-				 * bufsize_cyclic is used to allocate
-				 * 1st and 2nd bitmap, so it should be
-				 * truncated to the half of
-				 * free_memory.
-				 *
-				 * On conversion from ELF to
-				 * kdump-compressed format, a whole
-				 * part of the 1st bitmap is created
-				 * first, so a whole part of
-				 * free_memory is used for the 2nd
-				 * bitmap.
-				 */
-				if (info->flag_elf_dumpfile)
-					info->bufsize_cyclic = free_memory / 2;
-				else
-					info->bufsize_cyclic = free_memory;
+				info->bufsize_cyclic = free_memory;
 			}
 		}
 
@@ -5016,38 +4999,6 @@ prepare_bitmap_buffer(void)
 }
 
 int
-prepare_bitmap_buffer_cyclic(void)
-{
-	unsigned long long tmp;
-
-	/*
-	 * Create 2 bitmaps (1st-bitmap & 2nd-bitmap) on block_size boundary.
-	 * The crash utility requires both of them to be aligned to block_size
-	 * boundary.
-	 */
-	tmp = divideup(divideup(info->max_mapnr, BITPERBYTE), info->page_size);
-	info->len_bitmap = tmp*info->page_size*2;
-
-	/*
-	 * Prepare partial bitmap buffers for cyclic processing.
-	 */
-	if ((info->partial_bitmap1 = (char *)malloc(info->bufsize_cyclic)) == NULL) {
-		ERRMSG("Can't allocate memory for the 1st-bitmap. %s\n",
-		       strerror(errno));
-		return FALSE;
-	}
-	if ((info->partial_bitmap2 = (char *)malloc(info->bufsize_cyclic)) == NULL) {
-		ERRMSG("Can't allocate memory for the 2nd-bitmap. %s\n",
-		       strerror(errno));
-		return FALSE;
-	}
-	initialize_bitmap_cyclic(info->partial_bitmap1);
-	initialize_bitmap_cyclic(info->partial_bitmap2);
-
-	return TRUE;
-}
-
-int
 prepare_bitmap1_buffer_cyclic(void)
 {
 	/*
@@ -5132,32 +5083,18 @@ free_bitmap2_buffer_cyclic()
 	}
 }
 
-void
-free_bitmap_buffer_cyclic()
-{
-	free_bitmap1_buffer_cyclic();
-	free_bitmap2_buffer_cyclic();
-}
-
 int
 create_dump_bitmap(void)
 {
 	int ret = FALSE;
 
 	if (info->flag_cyclic) {
+		if (!prepare_bitmap2_buffer_cyclic())
+			goto out;
+		info->num_dumpable = get_num_dumpable_cyclic();
 
-		if (info->flag_elf_dumpfile) {
-			if (!prepare_bitmap_buffer_cyclic())
-				goto out;
-
-			info->num_dumpable = get_num_dumpable_cyclic();
-		} else {
-			if (!prepare_bitmap2_buffer_cyclic())
-				goto out;
-
-			info->num_dumpable = get_num_dumpable_cyclic();
+		if (!info->flag_elf_dumpfile)
 			free_bitmap2_buffer_cyclic();
-		}
 
 	} else {
 		if (!prepare_bitmap_buffer())
@@ -6051,8 +5988,6 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 			/*
 			 * Update target region and partial bitmap if necessary.
 			 */
-			if (!create_1st_bitmap_cyclic(&cycle))
-				return FALSE;
 			if (!exclude_unnecessary_pages_cyclic(&cycle))
 				return FALSE;
 
@@ -6198,7 +6133,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	if (!write_cache_bufsz(cd_page))
 		return FALSE;
 
-	free_bitmap_buffer_cyclic();
+	free_bitmap2_buffer_cyclic();
 
 	/*
 	 * print [100 %]
@@ -9027,15 +8962,10 @@ calculate_cyclic_buffer_size(void) {
 	}
 
 	/*
-	 * free_size will be used to allocate 1st and 2nd bitmap, so it
-	 * should be 40% of free memory to keep the size of cyclic buffer
-	 * within 80% of free memory.
+	 *  We should keep the size of cyclic buffer within 80% of free memory
+	 *  for safety.
 	 */
-	if (info->flag_elf_dumpfile) {
-		limit_size = get_free_memory_size() * 0.4;
-	} else {
-		limit_size = get_free_memory_size() * 0.8;
-	}
+	limit_size = get_free_memory_size() * 0.8;
 	bitmap_size = info->max_mapnr / BITPERBYTE;
 
 	/* if --split was specified cyclic buffer allocated per dump file */

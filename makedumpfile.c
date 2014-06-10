@@ -8946,13 +8946,15 @@ out:
 
 
 /*
- * Choose the lesser value of the two below as the size of cyclic buffer.
- *  - the size enough for storing the 1st/2nd bitmap for the whole of vmcore
- *  - 80% of free memory (as safety limit)
+ * Choose the less value of the three below as the size of cyclic buffer.
+ *  - the size enough for storing the 1st or 2nd bitmap for the whole of vmcore
+ *  - 4MB as sufficient value
+ *  - 60% of free memory as safety limit
  */
 int
 calculate_cyclic_buffer_size(void) {
 	unsigned long long limit_size, bitmap_size;
+	const unsigned long long maximum_size = 4 * 1024 * 1024;
 
 	if (info->max_mapnr <= 0) {
 		ERRMSG("Invalid max_mapnr(%llu).\n", info->max_mapnr);
@@ -8960,17 +8962,18 @@ calculate_cyclic_buffer_size(void) {
 	}
 
 	/*
-	 *  We should keep the size of cyclic buffer within 80% of free memory
-	 *  for safety.
+	 *  At least, we should keep the size of cyclic buffer within 60% of
+	 *  free memory for safety.
 	 */
-	limit_size = get_free_memory_size() * 0.8;
+	limit_size = get_free_memory_size() * 0.6;
 	bitmap_size = info->max_mapnr / BITPERBYTE;
 
 	/* if --split was specified cyclic buffer allocated per dump file */
 	if (info->num_dumpfile > 1)
 		bitmap_size /= info->num_dumpfile;
 
-	info->bufsize_cyclic = MIN(limit_size, bitmap_size);
+	/* 4MB will be enough for performance according to benchmarks. */
+	info->bufsize_cyclic = MIN(MIN(limit_size, maximum_size), bitmap_size);
 
 	return TRUE;
 }

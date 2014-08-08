@@ -158,6 +158,9 @@ isAnon(unsigned long mapping)
 	return ((unsigned long)mapping & PAGE_MAPPING_ANON) != 0;
 }
 
+#define PTOB(X)			(((unsigned long long)(X)) << PAGESHIFT())
+#define BTOP(X)			(((unsigned long long)(X)) >> PAGESHIFT())
+
 #define PAGESIZE()		(info->page_size)
 #define PAGESHIFT()		(info->page_shift)
 #define PAGEOFFSET(X)		(((unsigned long long)(X)) & (PAGESIZE() - 1))

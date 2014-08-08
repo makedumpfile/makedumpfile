@@ -586,6 +586,58 @@ do { \
 #define _MAX_PHYSMEM_BITS_3_7   (46)
 #define REGION_SHIFT            (60UL)
 #define VMEMMAP_REGION_ID       (0xfUL)
+
+#define PGDIR_SHIFT	\
+	(PAGESHIFT() + (PAGESHIFT() - 3) + (PAGESHIFT() - 2))
+#define PMD_SHIFT       (PAGESHIFT() + (PAGESHIFT() - 3))
+
+/* shift to put page number into pte */
+#define PTE_SHIFT 16
+
+#define PTE_INDEX_SIZE  9
+#define PMD_INDEX_SIZE  10
+#define PGD_INDEX_SIZE  10
+
+#define PTRS_PER_PTE    (1 << PTE_INDEX_SIZE)
+#define PTRS_PER_PMD    (1 << PMD_INDEX_SIZE)
+#define PTRS_PER_PGD    (1 << PGD_INDEX_SIZE)
+
+#define PGD_OFFSET(vaddr)       ((vaddr >> PGDIR_SHIFT) & 0x7ff)
+#define PMD_OFFSET(vaddr)       ((vaddr >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+
+/* 4-level page table support */
+
+/* 4K pagesize */
+#define PTE_INDEX_SIZE_L4_4K  9
+#define PMD_INDEX_SIZE_L4_4K  7
+#define PUD_INDEX_SIZE_L4_4K  7
+#define PGD_INDEX_SIZE_L4_4K  9
+#define PTE_SHIFT_L4_4K  17
+#define PMD_MASKED_BITS_4K  0
+
+/* 64K pagesize */
+#define PTE_INDEX_SIZE_L4_64K   12
+#define PMD_INDEX_SIZE_L4_64K   12
+#define PUD_INDEX_SIZE_L4_64K   0
+#define PGD_INDEX_SIZE_L4_64K   4
+#define PTE_INDEX_SIZE_L4_64K_3_10  8
+#define PMD_INDEX_SIZE_L4_64K_3_10  10
+#define PGD_INDEX_SIZE_L4_64K_3_10  12
+#define PTE_SHIFT_L4_64K_V1  32
+#define PTE_SHIFT_L4_64K_V2  30
+#define PMD_MASKED_BITS_64K  0x1ff
+
+#define L4_MASK		\
+	(info->kernel_version >= KERNEL_VERSION(3, 10, 0) ? 0xfff : 0x1ff)
+#define L4_OFFSET(vaddr)	((vaddr >> (info->l4_shift)) & L4_MASK)
+
+#define PGD_OFFSET_L4(vaddr)	\
+	((vaddr >> (info->l3_shift)) & (info->ptrs_per_l3 - 1))
+
+#define PMD_OFFSET_L4(vaddr)	\
+	((vaddr >> (info->l2_shift)) & (info->ptrs_per_l2 - 1))
+
+#define _PAGE_PRESENT		0x1UL
 #endif
 
 #ifdef __powerpc32__
@@ -731,10 +783,11 @@ unsigned long long vaddr_to_paddr_x86_64(unsigned long vaddr);
 
 #ifdef __powerpc64__ /* powerpc64 */
 int get_machdep_info_ppc64(void);
+int get_versiondep_info_ppc64(void);
 unsigned long long vaddr_to_paddr_ppc64(unsigned long vaddr);
 #define get_phys_base()		TRUE
 #define get_machdep_info()	get_machdep_info_ppc64()
-#define get_versiondep_info()	TRUE
+#define get_versiondep_info()	get_versiondep_info_ppc64()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc64(X)
 #endif          /* powerpc64 */
 
@@ -930,6 +983,25 @@ struct DumpInfo {
 	int		vmemmap_psize;
 	int		vmemmap_cnt;
 	struct ppc64_vmemmap	*vmemmap_list;
+
+	/*
+	 * page table info for ppc64
+	 */
+	int		ptrs_per_pgd;
+	uint		l3_index_size;
+	uint		l2_index_size;
+	uint		l1_index_size;
+	uint		ptrs_per_l3;
+	uint		ptrs_per_l2;
+	uint		ptrs_per_l1;
+	uint		l4_shift;
+	uint		l3_shift;
+	uint		l2_shift;
+	uint		l1_shift;
+	uint		pte_shift;
+	uint		l2_masked_bits;
+	ulong		kernel_pgd;
+	char		*page_buf; /* Page buffer to read page tables */
 
 	/*
 	 * Filter config file containing filter commands to filter out kernel
@@ -1192,6 +1264,12 @@ struct symbol_table {
 	unsigned long long		vmemmap_list;
 	unsigned long long		mmu_vmemmap_psize;
 	unsigned long long		mmu_psize_defs;
+
+	/*
+	 * vm related symbols for ppc64 arch
+	 */
+	unsigned long long		cpu_pgd;
+	unsigned long long		demote_segment_4k;
 };
 
 struct size_table {

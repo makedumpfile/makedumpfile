@@ -149,6 +149,58 @@ ppc64_vmemmap_init(void)
 	return TRUE;
 }
 
+static int
+ppc64_vmalloc_init(void)
+{
+	if (info->page_size == 65536) {
+		/*
+		 * 64K pagesize
+		 */
+		if (info->kernel_version >= KERNEL_VERSION(3, 10, 0)) {
+			info->l1_index_size = PTE_INDEX_SIZE_L4_64K_3_10;
+			info->l2_index_size = PMD_INDEX_SIZE_L4_64K_3_10;
+			info->l3_index_size = PUD_INDEX_SIZE_L4_64K;
+		} else {
+			info->l1_index_size = PTE_INDEX_SIZE_L4_64K;
+			info->l2_index_size = PMD_INDEX_SIZE_L4_64K;
+			info->l3_index_size = PUD_INDEX_SIZE_L4_64K;
+		}
+
+		info->pte_shift = SYMBOL(demote_segment_4k) ?
+			PTE_SHIFT_L4_64K_V2 : PTE_SHIFT_L4_64K_V1;
+		info->l2_masked_bits = PMD_MASKED_BITS_64K;
+	} else {
+		/*
+		 * 4K pagesize
+		 */
+		info->l1_index_size = PTE_INDEX_SIZE_L4_4K;
+		info->l2_index_size = PMD_INDEX_SIZE_L4_4K;
+		info->l3_index_size = PUD_INDEX_SIZE_L4_4K;
+
+		info->pte_shift = PTE_SHIFT_L4_4K;
+		info->l2_masked_bits = PMD_MASKED_BITS_4K;
+	}
+
+	/*
+	 * Compute ptrs per each level
+	 */
+	info->l1_shift = info->page_shift;
+	info->ptrs_per_l1 = (1 << info->l1_index_size);
+	info->ptrs_per_l2 = (1 << info->l2_index_size);
+	info->ptrs_per_l3 = (1 << info->l3_index_size);
+
+	info->ptrs_per_pgd = info->ptrs_per_l3;
+
+	/*
+	 * Compute shifts
+	 */
+	info->l2_shift = info->l1_shift + info->l1_index_size;
+	info->l3_shift = info->l2_shift + info->l2_index_size;
+	info->l4_shift = info->l3_shift + info->l3_index_size;
+
+	return TRUE;
+}
+
 /*
  *  If the vmemmap address translation information is stored in the kernel,
  *  make the translation.
@@ -251,6 +303,15 @@ get_machdep_info_ppc64(void)
 	info->vmalloc_start = vmalloc_start;
 	DEBUG_MSG("vmalloc_start: %lx\n", vmalloc_start);
 
+	if (SYMBOL(swapper_pg_dir) != NOT_FOUND_SYMBOL) {
+		info->kernel_pgd = SYMBOL(swapper_pg_dir);
+	} else if (SYMBOL(cpu_pgd) != NOT_FOUND_SYMBOL) {
+		info->kernel_pgd = SYMBOL(cpu_pgd);
+	} else {
+		ERRMSG("No swapper_pg_dir or cpu_pgd symbols exist\n");
+		return FALSE;
+	}
+
 	if (SYMBOL(vmemmap_list) != NOT_FOUND_SYMBOL) {
 		info->vmemmap_start = VMEMMAP_REGION_ID << REGION_SHIFT;
 		info->vmemmap_end = info->vmemmap_start;
@@ -259,6 +320,17 @@ get_machdep_info_ppc64(void)
 			return FALSE;
 		}
 		DEBUG_MSG("vmemmap_start: %lx\n", info->vmemmap_start);
+	}
+
+	return TRUE;
+}
+
+int
+get_versiondep_info_ppc64()
+{
+	if (ppc64_vmalloc_init() == FALSE) {
+		ERRMSG("Can't initialize for vmalloc translation\n");
+		return FALSE;
 	}
 
 	return TRUE;

@@ -1181,6 +1181,9 @@ get_symbol_info(void)
 	SYMBOL_INIT(mmu_psize_defs, "mmu_psize_defs");
 	SYMBOL_INIT(mmu_vmemmap_psize, "mmu_vmemmap_psize");
 
+	SYMBOL_INIT(cpu_pgd, "cpu_pgd");
+	SYMBOL_INIT(demote_segment_4k, "demote_segment_4k");
+
 	return TRUE;
 }
 
@@ -1694,6 +1697,8 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("vmemmap_list", vmemmap_list);
 	WRITE_SYMBOL("mmu_psize_defs", mmu_psize_defs);
 	WRITE_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
+	WRITE_SYMBOL("cpu_pgd", cpu_pgd);
+	WRITE_SYMBOL("demote_segment_4k", demote_segment_4k);
 
 	/*
 	 * write the structure size of 1st kernel
@@ -2033,6 +2038,8 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("vmemmap_list", vmemmap_list);
 	READ_SYMBOL("mmu_psize_defs", mmu_psize_defs);
 	READ_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
+	READ_SYMBOL("cpu_pgd", cpu_pgd);
+	READ_SYMBOL("demote_segment_4k", demote_segment_4k);
 
 	READ_STRUCTURE_SIZE("page", page);
 	READ_STRUCTURE_SIZE("mem_section", mem_section);

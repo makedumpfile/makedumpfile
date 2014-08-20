@@ -1180,6 +1180,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(vmemmap_list, "vmemmap_list");
 	SYMBOL_INIT(mmu_psize_defs, "mmu_psize_defs");
 	SYMBOL_INIT(mmu_vmemmap_psize, "mmu_vmemmap_psize");
+	SYMBOL_INIT(free_huge_page, "free_huge_page");
 
 	SYMBOL_INIT(cpu_pgd, "cpu_pgd");
 	SYMBOL_INIT(demote_segment_4k, "demote_segment_4k");
@@ -1295,6 +1296,15 @@ get_structure_info(void)
 	ENUM_NUMBER_INIT(PG_buddy, "PG_buddy");
 	ENUM_NUMBER_INIT(PG_slab, "PG_slab");
 	ENUM_NUMBER_INIT(PG_hwpoison, "PG_hwpoison");
+
+	ENUM_NUMBER_INIT(PG_head_mask, "PG_head_mask");
+	if (NUMBER(PG_head_mask) == NOT_FOUND_NUMBER) {
+		ENUM_NUMBER_INIT(PG_head, "PG_head");
+		if (NUMBER(PG_head) == NOT_FOUND_NUMBER)
+			ENUM_NUMBER_INIT(PG_head, "PG_compound");
+		if (NUMBER(PG_head) != NOT_FOUND_NUMBER)
+			NUMBER(PG_head_mask) = 1UL << NUMBER(PG_head);
+	}
 
 	ENUM_TYPE_SIZE_INIT(pageflags, "pageflags");
 
@@ -1530,6 +1540,9 @@ get_value_for_old_linux(void)
 		NUMBER(PG_swapcache) = PG_swapcache_ORIGINAL;
 	if (NUMBER(PG_slab) == NOT_FOUND_NUMBER)
 		NUMBER(PG_slab) = PG_slab_ORIGINAL;
+	if (NUMBER(PG_head_mask) == NOT_FOUND_NUMBER)
+		NUMBER(PG_head_mask) = 1L << PG_compound_ORIGINAL;
+
 	/*
 	 * The values from here are for free page filtering based on
 	 * mem_map array. These are minimum effort to cover old
@@ -1699,6 +1712,7 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
 	WRITE_SYMBOL("cpu_pgd", cpu_pgd);
 	WRITE_SYMBOL("demote_segment_4k", demote_segment_4k);
+	WRITE_SYMBOL("free_huge_page", free_huge_page);
 
 	/*
 	 * write the structure size of 1st kernel
@@ -1788,6 +1802,7 @@ write_vmcoreinfo_data(void)
 
 	WRITE_NUMBER("PG_lru", PG_lru);
 	WRITE_NUMBER("PG_private", PG_private);
+	WRITE_NUMBER("PG_head_mask", PG_head_mask);
 	WRITE_NUMBER("PG_swapcache", PG_swapcache);
 	WRITE_NUMBER("PG_buddy", PG_buddy);
 	WRITE_NUMBER("PG_slab", PG_slab);
@@ -2040,6 +2055,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
 	READ_SYMBOL("cpu_pgd", cpu_pgd);
 	READ_SYMBOL("demote_segment_4k", demote_segment_4k);
+	READ_SYMBOL("free_huge_page", free_huge_page);
 
 	READ_STRUCTURE_SIZE("page", page);
 	READ_STRUCTURE_SIZE("mem_section", mem_section);
@@ -2116,6 +2132,7 @@ read_vmcoreinfo(void)
 
 	READ_NUMBER("PG_lru", PG_lru);
 	READ_NUMBER("PG_private", PG_private);
+	READ_NUMBER("PG_head_mask", PG_head_mask);
 	READ_NUMBER("PG_swapcache", PG_swapcache);
 	READ_NUMBER("PG_slab", PG_slab);
 	READ_NUMBER("PG_buddy", PG_buddy);
@@ -4643,13 +4660,16 @@ __exclude_unnecessary_pages(unsigned long mem_map,
     mdf_pfn_t pfn_start, mdf_pfn_t pfn_end, struct cycle *cycle)
 {
 	mdf_pfn_t pfn;
+	mdf_pfn_t *pfn_counter;
+	mdf_pfn_t nr_pages;
 	unsigned long index_pg, pfn_mm;
 	unsigned long long maddr;
 	mdf_pfn_t pfn_read_start, pfn_read_end;
 	unsigned char page_cache[SIZE(page) * PGMM_CACHED];
 	unsigned char *pcache;
-	unsigned int _count, _mapcount = 0;
+	unsigned int _count, _mapcount = 0, compound_order = 0;
 	unsigned long flags, mapping, private = 0;
+	unsigned long compound_dtor;
 
 	/*
 	 * If a multi-page exclusion is pending, do it first
@@ -4715,11 +4735,36 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		flags   = ULONG(pcache + OFFSET(page.flags));
 		_count  = UINT(pcache + OFFSET(page._count));
 		mapping = ULONG(pcache + OFFSET(page.mapping));
+
+		if ((index_pg < PGMM_CACHED - 1) &&
+		    isCompoundHead(flags)) {
+			compound_order = ULONG(pcache + SIZE(page) + OFFSET(page.lru)
+					       + OFFSET(list_head.prev));
+			compound_dtor = ULONG(pcache + SIZE(page) + OFFSET(page.lru)
+					     + OFFSET(list_head.next));
+
+			if ((compound_order >= sizeof(unsigned long) * 8)
+			    || ((pfn & ((1UL << compound_order) - 1)) != 0)) {
+				/* Invalid order */
+				compound_order = 0;
+			}
+		} else {
+			/*
+			 * The last pfn of the mem_map cache must not be compound page
+			 * since all compound pages are aligned to its page order and
+			 * PGMM_CACHED is a power of 2.
+			 */
+			compound_order = 0;
+			compound_dtor = 0;
+		}
+
 		if (OFFSET(page._mapcount) != NOT_FOUND_STRUCTURE)
 			_mapcount = UINT(pcache + OFFSET(page._mapcount));
 		if (OFFSET(page.private) != NOT_FOUND_STRUCTURE)
 			private = ULONG(pcache + OFFSET(page.private));
 
+		nr_pages = 1 << compound_order;
+		pfn_counter = NULL;
 		/*
 		 * Exclude the free page managed by a buddy
 		 * Use buddy identification of free pages whether cyclic or not.
@@ -4727,12 +4772,8 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		if ((info->dump_level & DL_EXCLUDE_FREE)
 		    && info->page_is_buddy
 		    && info->page_is_buddy(flags, _mapcount, private, _count)) {
-			int nr_pages = 1 << private;
-
-			exclude_range(&pfn_free, pfn, pfn + nr_pages, cycle);
-
-			pfn += nr_pages - 1;
-			mem_map += (nr_pages - 1) * SIZE(page);
+			nr_pages = 1 << private;
+			pfn_counter = &pfn_free;
 		}
 		/*
 		 * Exclude the cache page without the private page.
@@ -4740,8 +4781,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		else if ((info->dump_level & DL_EXCLUDE_CACHE)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isPrivate(flags) && !isAnon(mapping)) {
-			if (clear_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
-				pfn_cache++;
+			pfn_counter = &pfn_cache;
 		}
 		/*
 		 * Exclude the cache page with the private page.
@@ -4749,23 +4789,39 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isAnon(mapping)) {
-			if (clear_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
-				pfn_cache_private++;
+			pfn_counter = &pfn_cache_private;
 		}
 		/*
 		 * Exclude the data page of the user process.
+		 *  - anonymous pages
+		 *  - hugetlbfs pages
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
-		    && isAnon(mapping)) {
-			if (clear_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
-				pfn_user++;
+			 && (isAnon(mapping) || isHugetlb(compound_dtor))) {
+			pfn_counter = &pfn_user;
 		}
 		/*
 		 * Exclude the hwpoison page.
 		 */
 		else if (isHWPOISON(flags)) {
+			pfn_counter = &pfn_hwpoison;
+		}
+		/*
+		 * Unexcludable page
+		 */
+		else
+			continue;
+
+		/*
+		 * Execute exclusion
+		 */
+		if (nr_pages == 1) {
 			if (clear_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
-				pfn_hwpoison++;
+				(*pfn_counter)++;
+		} else {
+			exclude_range(pfn_counter, pfn, pfn + nr_pages, cycle);
+			pfn += nr_pages - 1;
+			mem_map += (nr_pages - 1) * SIZE(page);
 		}
 	}
 	return TRUE;

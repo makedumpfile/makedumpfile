@@ -74,6 +74,7 @@ int get_mem_type(void);
 #define PG_lru_ORIGINAL	 	(5)
 #define PG_slab_ORIGINAL	(7)
 #define PG_private_ORIGINAL	(11)	/* Has something at ->private */
+#define PG_compound_ORIGINAL	(14)	/* Is part of a compound page */
 #define PG_swapcache_ORIGINAL	(15)	/* Swap page: swp_entry_t in private */
 
 #define PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_38	(-2)
@@ -148,6 +149,9 @@ test_bit(int nr, unsigned long addr)
 
 #define isLRU(flags)		test_bit(NUMBER(PG_lru), flags)
 #define isPrivate(flags)	test_bit(NUMBER(PG_private), flags)
+#define isCompoundHead(flags)   (!!((flags) & NUMBER(PG_head_mask)))
+#define isHugetlb(dtor)         ((SYMBOL(free_huge_page) != NOT_FOUND_SYMBOL) \
+				 && (SYMBOL(free_huge_page) == dtor))
 #define isSwapCache(flags)	test_bit(NUMBER(PG_swapcache), flags)
 #define isHWPOISON(flags)	(test_bit(NUMBER(PG_hwpoison), flags) \
 				&& (NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER))
@@ -1218,6 +1222,7 @@ struct symbol_table {
 	unsigned long long	node_remap_start_vaddr;
 	unsigned long long	node_remap_end_vaddr;
 	unsigned long long	node_remap_start_pfn;
+	unsigned long long      free_huge_page;
 
 	/*
 	 * for Xen extraction
@@ -1509,6 +1514,8 @@ struct number_table {
 	 */
 	long	PG_lru;
 	long	PG_private;
+	long	PG_head;
+	long	PG_head_mask;
 	long	PG_swapcache;
 	long	PG_buddy;
 	long	PG_slab;

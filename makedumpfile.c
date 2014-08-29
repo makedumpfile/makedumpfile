@@ -3949,7 +3949,7 @@ static int
 dump_log_entry(char *logptr, int fp)
 {
 	char *msg, *p, *bufp;
-	unsigned int i, text_len;
+	unsigned int i, text_len, buf_need;
 	unsigned long long ts_nsec;
 	char buf[BUFSIZE];
 	ulonglong nanos;
@@ -3966,9 +3966,11 @@ dump_log_entry(char *logptr, int fp)
 	bufp = buf;
 	bufp += sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
 
+	/* How much buffer space is needed in the worst case */
+	buf_need = sizeof("\\xXX\n");
+
 	for (i = 0, p = msg; i < text_len; i++, p++) {
-		/* 6bytes = "\\x%02x" + '\n' + '\0' */
-		if (bufp - buf >= sizeof(buf) - 6) {
+		if (bufp - buf >= sizeof(buf) - buf_need) {
 			if (write(info->fd_dumpfile, buf, bufp - buf) < 0)
 				return FALSE;
 			bufp = buf;

@@ -5656,6 +5656,8 @@ get_num_dumpable_cyclic(void)
 	mdf_pfn_t pfn, num_dumpable=0;
 	struct cycle cycle = {0};
 
+	pfn_memhole = info->max_mapnr;
+
 	for_each_cycle(0, info->max_mapnr, &cycle)
 	{
 		if (!exclude_unnecessary_pages_cyclic(&cycle))

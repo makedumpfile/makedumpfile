@@ -682,6 +682,9 @@ get_kernel_version(char *release)
 	long maj, min, rel;
 	char *start, *end;
 
+	if (info->kernel_version)
+		return info->kernel_version;
+
 	/*
 	 * This method checks that vmlinux and vmcore are same kernel version.
 	 */
@@ -706,6 +709,7 @@ get_kernel_version(char *release)
 		MSG("The kernel version is not supported.\n");
 		MSG("The created dumpfile may be incomplete.\n");
 	}
+
 	return version;
 }
 
@@ -9128,6 +9132,21 @@ int is_crashkernel_mem_reserved(void)
 	crash_reserved_mem_nr = ret;
 
 	return !!crash_reserved_mem_nr;
+}
+
+static int get_page_offset(void)
+{
+	struct utsname utsname;
+	if (uname(&utsname)) {
+		ERRMSG("Cannot get name and information about current kernel : %s",
+		       strerror(errno));
+		return FALSE;
+	}
+
+	info->kernel_version = get_kernel_version(utsname.release);
+	get_versiondep_info();
+
+	return TRUE;
 }
 
 static struct option longopts[] = {

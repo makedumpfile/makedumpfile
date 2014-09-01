@@ -3949,7 +3949,7 @@ static int
 dump_log_entry(char *logptr, int fp)
 {
 	char *msg, *p, *bufp;
-	unsigned int i, text_len, buf_need;
+	unsigned int i, text_len, indent_len, buf_need;
 	unsigned long long ts_nsec;
 	char buf[BUFSIZE];
 	ulonglong nanos;
@@ -3965,9 +3965,10 @@ dump_log_entry(char *logptr, int fp)
 
 	bufp = buf;
 	bufp += sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
+	indent_len = strlen(buf);
 
 	/* How much buffer space is needed in the worst case */
-	buf_need = sizeof("\\xXX\n");
+	buf_need = MAX(sizeof("\\xXX\n"), sizeof("\n") + indent_len);
 
 	for (i = 0, p = msg; i < text_len; i++, p++) {
 		if (bufp - buf >= sizeof(buf) - buf_need) {
@@ -3976,7 +3977,9 @@ dump_log_entry(char *logptr, int fp)
 			bufp = buf;
 		}
 
-		if (isprint(*p) || isspace(*p))
+		if (*p == '\n')
+			bufp += sprintf(bufp, "\n%-*s", indent_len, "");
+		else if (isprint(*p) || isspace(*p))
 			*bufp++ = *p;
 		else
 			bufp += sprintf(bufp, "\\x%02x", *p);

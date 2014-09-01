@@ -7944,6 +7944,40 @@ print_report(void)
 	REPORT_MSG("\n");
 }
 
+static void
+print_mem_usage(void)
+{
+	mdf_pfn_t pfn_original, pfn_excluded, shrinking;
+
+	/*
+	* /proc/vmcore doesn't contain the memory hole area.
+	*/
+	pfn_original = info->max_mapnr - pfn_memhole;
+
+	pfn_excluded = pfn_zero + pfn_cache + pfn_cache_private
+	    + pfn_user + pfn_free + pfn_hwpoison;
+	shrinking = (pfn_original - pfn_excluded) * 100;
+	shrinking = shrinking / pfn_original;
+
+	MSG("\n");
+	MSG("\n");
+	MSG("----------------------------------------------------------------------\n");
+	MSG("TYPE		PAGES			EXCLUDABLE	DESCRIPTION\n");
+
+	MSG("ZERO		%-16llu	yes		Pages filled with zero\n", pfn_zero);
+	MSG("CACHE		%-16llu	yes		Cache pages\n", pfn_cache);
+	MSG("CACHE_PRIVATE	%-16llu	yes		Cache pages + private\n",
+	    pfn_cache_private);
+	MSG("USER		%-16llu	yes		User process pages\n", pfn_user);
+	MSG("FREE		%-16llu	yes		Free pages\n", pfn_free);
+	MSG("KERN_DATA	%-16llu	no		Dumpable kernel data \n",
+	    pfn_original - pfn_excluded);
+
+	MSG("\n");
+
+	MSG("Total pages on system:	%-16llu\n", pfn_original);
+}
+
 int
 writeout_dumpfile(void)
 {

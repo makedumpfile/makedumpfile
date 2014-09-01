@@ -4587,6 +4587,45 @@ exclude_zero_pages(void)
 	return TRUE;
 }
 
+int
+exclude_zero_pages_cyclic(struct cycle *cycle)
+{
+	mdf_pfn_t pfn;
+	unsigned long long paddr;
+	unsigned char buf[info->page_size];
+
+	for (pfn = cycle->start_pfn, paddr = pfn_to_paddr(pfn); pfn < cycle->end_pfn;
+	    pfn++, paddr += info->page_size) {
+
+		if (!is_in_segs(paddr))
+			continue;
+
+		if (!is_dumpable_cyclic(info->partial_bitmap2, pfn, cycle))
+			continue;
+
+		if (is_xen_memory()) {
+			if (!readmem(MADDR_XEN, paddr, buf, info->page_size)) {
+				ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
+				    pfn, info->max_mapnr);
+				return FALSE;
+			}
+		} else {
+			if (!readmem(PADDR, paddr, buf, info->page_size)) {
+				ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
+				    pfn, info->max_mapnr);
+				return FALSE;
+			}
+		}
+		if (is_zero_page(buf, info->page_size)) {
+			if (clear_bit_on_2nd_bitmap(pfn, cycle))
+				pfn_zero++;
+		}
+	}
+
+	return TRUE;
+}
+
+
 static int
 initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 {
@@ -5666,6 +5705,9 @@ get_num_dumpable_cyclic(void)
 	{
 		if (!exclude_unnecessary_pages_cyclic(&cycle))
 			return FALSE;
+
+		if (info->flag_mem_usage)
+			exclude_zero_pages_cyclic(&cycle);
 
 		for(pfn=cycle.start_pfn; pfn<cycle.end_pfn; pfn++)
 			if (is_dumpable_cyclic(info->partial_bitmap2, pfn, &cycle))

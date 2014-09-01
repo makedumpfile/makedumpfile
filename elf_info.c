@@ -395,6 +395,53 @@ get_pt_note_info(void)
 	return TRUE;
 }
 
+#define UNINITIALIZED  ((ulong)(-1))
+int set_kcore_vmcoreinfo(uint64_t vmcoreinfo_addr, uint64_t vmcoreinfo_len)
+{
+	int i;
+	ulong kvaddr;
+	off_t offset;
+	char note[MAX_SIZE_NHDR];
+	int size_desc;
+	off_t offset_desc;
+
+	offset = UNINITIALIZED;
+	kvaddr = (ulong)vmcoreinfo_addr | PAGE_OFFSET;
+
+	for (i = 0; i < num_pt_loads; ++i) {
+		struct pt_load_segment *p = &pt_loads[i];
+		if ((kvaddr >= p->virt_start) && (kvaddr < p->virt_end)) {
+			offset = (off_t)(kvaddr - p->virt_start) +
+			(off_t)p->file_offset;
+			break;
+		}
+	}
+
+	if (offset == UNINITIALIZED) {
+		ERRMSG("Can't get the offset of VMCOREINFO(%s). %s\n",
+		    name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	if (lseek(fd_memory, offset, SEEK_SET) != offset) {
+		ERRMSG("Can't seek the dump memory(%s). %s\n",
+		    name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	if (read(fd_memory, note, MAX_SIZE_NHDR) != MAX_SIZE_NHDR) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		    name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	size_desc   = note_descsz(note);
+	offset_desc = offset + offset_note_desc(note);
+
+	set_vmcoreinfo(offset_desc, size_desc);
+
+	return TRUE;
+}
 
 /*
  * External functions.

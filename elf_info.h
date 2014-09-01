@@ -45,6 +45,7 @@ int get_elf32_ehdr(int fd, char *filename, Elf32_Ehdr *ehdr);
 int get_elf_info(int fd, char *filename);
 void free_elf_info(void);
 int get_elf_loads(int fd, char *filename);
+int set_kcore_vmcoreinfo(uint64_t vmcoreinfo_addr, uint64_t vmcoreinfo_len);
 
 int is_elf64_memory(void);
 int is_xen_memory(void);

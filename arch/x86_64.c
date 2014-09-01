@@ -20,7 +20,7 @@
 #include "../makedumpfile.h"
 
 int
-is_vmalloc_addr(ulong vaddr)
+is_vmalloc_addr_x86_64(ulong vaddr)
 {
 	/*
 	 *  vmalloc, virtual memmap, and module space as VMALLOC space.
@@ -56,7 +56,7 @@ get_phys_base_x86_64(void)
 
 	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
 		if ((virt_start >= __START_KERNEL_map) &&
-		    !(is_vmalloc_addr(virt_start))) {
+		    !(is_vmalloc_addr_x86_64(virt_start))) {
 
 			info->phys_base = phys_start -
 			    (virt_start & ~(__START_KERNEL_map));
@@ -281,7 +281,7 @@ vaddr_to_paddr_x86_64(unsigned long vaddr)
 	else
 		phys_base = 0;
 
-	if (is_vmalloc_addr(vaddr)) {
+	if (is_vmalloc_addr_x86_64(vaddr)) {
 		if ((paddr = vtop4_x86_64(vaddr)) == NOT_PADDR) {
 			ERRMSG("Can't convert a virtual address(%lx) to " \
 			    "physical address.\n", vaddr);

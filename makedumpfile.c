@@ -9048,6 +9048,88 @@ calculate_cyclic_buffer_size(void) {
 	return TRUE;
 }
 
+
+
+/* #define CRASH_RESERVED_MEM_NR   8 */
+struct memory_range crash_reserved_mem[CRASH_RESERVED_MEM_NR];
+int crash_reserved_mem_nr;
+
+/*
+ * iomem_for_each_line()
+ *
+ * Iterate over each line in the file returned by proc_iomem(). If match is
+ * NULL or if the line matches with our match-pattern then call the
+ * callback if non-NULL.
+ *
+ * Return the number of lines matched.
+ */
+int iomem_for_each_line(char *match,
+			      int (*callback)(void *data,
+					      int nr,
+					      char *str,
+					      unsigned long base,
+					      unsigned long length),
+			      void *data)
+{
+	const char iomem[] = "/proc/iomem";
+	char line[BUFSIZE_FGETS];
+	FILE *fp;
+	unsigned long long start, end, size;
+	char *str;
+	int consumed;
+	int count;
+	int nr = 0;
+
+	fp = fopen(iomem, "r");
+	if (!fp) {
+		ERRMSG("Cannot open %s\n", iomem);
+		return nr;
+	}
+
+	while (fgets(line, sizeof(line), fp) != 0) {
+		count = sscanf(line, "%Lx-%Lx : %n", &start, &end, &consumed);
+		if (count != 2)
+			continue;
+		str = line + consumed;
+		size = end - start + 1;
+		if (!match || memcmp(str, match, strlen(match)) == 0) {
+			if (callback
+			    && callback(data, nr, str, start, size) < 0) {
+				break;
+			}
+			nr++;
+		}
+	}
+
+	fclose(fp);
+
+	return nr;
+}
+
+static int crashkernel_mem_callback(void *data, int nr,
+					  char *str,
+					  unsigned long base,
+					  unsigned long length)
+{
+	if (nr >= CRASH_RESERVED_MEM_NR)
+		return 1;
+
+	crash_reserved_mem[nr].start = base;
+	crash_reserved_mem[nr].end   = base + length - 1;
+	return 0;
+}
+
+int is_crashkernel_mem_reserved(void)
+{
+	int ret;
+
+	ret = iomem_for_each_line("Crash kernel\n",
+					crashkernel_mem_callback, NULL);
+	crash_reserved_mem_nr = ret;
+
+	return !!crash_reserved_mem_nr;
+}
+
 static struct option longopts[] = {
 	{"split", no_argument, NULL, OPT_SPLIT},
 	{"reassemble", no_argument, NULL, OPT_REASSEMBLE},

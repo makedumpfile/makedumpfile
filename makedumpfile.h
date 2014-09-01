@@ -1540,6 +1540,13 @@ extern struct array_table	array_table;
 extern struct number_table	number_table;
 extern struct srcfile_table	srcfile_table;
 
+struct memory_range {
+	unsigned long long start, end;
+};
+
+#define CRASH_RESERVED_MEM_NR   8
+struct memory_range crash_reserved_mem[CRASH_RESERVED_MEM_NR];
+int crash_reserved_mem_nr;
 
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 int get_str_osrelease_from_vmlinux(void);

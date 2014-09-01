@@ -707,7 +707,7 @@ get_kernel_version(char *release)
 
 	if ((version < OLDEST_VERSION) || (LATEST_VERSION < version)) {
 		MSG("The kernel version is not supported.\n");
-		MSG("The created dumpfile may be incomplete.\n");
+		MSG("The makedumpfile operation may be incomplete.\n");
 	}
 
 	return version;
@@ -9012,6 +9012,13 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 		 */
 		info->name_memory   = argv[optind];
 
+	} else if ((argc == optind + 1) && info->flag_mem_usage) {
+		/*
+		* Parameter for showing the page number of memory
+		* in different use from.
+		*/
+		info->name_memory   = argv[optind];
+
 	} else
 		return FALSE;
 
@@ -9259,6 +9266,58 @@ static int get_sys_kernel_vmcoreinfo(uint64_t *addr, uint64_t *len)
 	return TRUE;
 }
 
+int show_mem_usage(void)
+{
+	uint64_t vmcoreinfo_addr, vmcoreinfo_len;
+
+	if (!is_crashkernel_mem_reserved()) {
+		ERRMSG("No memory is reserved for crashkenrel!\n");
+		return FALSE;
+	}
+
+
+	if (!info->flag_cyclic)
+		info->flag_cyclic = TRUE;
+
+	info->dump_level = MAX_DUMP_LEVEL;
+
+	if (!get_page_offset())
+		return FALSE;
+
+	if (!open_dump_memory())
+		return FALSE;
+
+	if (!get_elf_loads(info->fd_memory, info->name_memory))
+		return FALSE;
+
+	if (!get_sys_kernel_vmcoreinfo(&vmcoreinfo_addr, &vmcoreinfo_len))
+		return FALSE;
+
+	if (!set_kcore_vmcoreinfo(vmcoreinfo_addr, vmcoreinfo_len))
+		return FALSE;
+
+	if (!get_kcore_dump_loads())
+		return FALSE;
+
+	if (!initial())
+		return FALSE;
+
+
+	if (!prepare_bitmap2_buffer_cyclic())
+		return FALSE;
+
+	info->num_dumpable = get_num_dumpable_cyclic();
+
+	free_bitmap2_buffer_cyclic();
+
+	print_mem_usage();
+
+	if (!close_files_for_creating_dumpfile())
+		return FALSE;
+
+	return TRUE;
+}
+
 
 static struct option longopts[] = {
 	{"split", no_argument, NULL, OPT_SPLIT},
@@ -9276,6 +9335,7 @@ static struct option longopts[] = {
 	{"cyclic-buffer", required_argument, NULL, OPT_CYCLIC_BUFFER},
 	{"eppic", required_argument, NULL, OPT_EPPIC},
 	{"non-mmap", no_argument, NULL, OPT_NON_MMAP},
+	{"mem-usage", no_argument, NULL, OPT_MEM_USAGE},
 	{0, 0, 0, 0}
 };
 
@@ -9367,6 +9427,9 @@ main(int argc, char *argv[])
 		case OPT_DUMP_DMESG:
 			info->flag_dmesg = 1;
 			break;
+		case OPT_MEM_USAGE:
+		       info->flag_mem_usage = 1;
+		       break;
 		case OPT_COMPRESS_SNAPPY:
 			info->flag_compress = DUMP_DH_COMPRESSED_SNAPPY;
 			break;
@@ -9507,6 +9570,15 @@ main(int argc, char *argv[])
 
 		MSG("\n");
 		MSG("The dmesg log is saved to %s.\n", info->name_dumpfile);
+	} else if (info->flag_mem_usage) {
+		if (!check_param_for_creating_dumpfile(argc, argv)) {
+			MSG("Commandline parameter is invalid.\n");
+			MSG("Try `makedumpfile --help' for more information.\n");
+			goto out;
+		}
+
+		if (!show_mem_usage())
+			goto out;
 	} else {
 		if (!check_param_for_creating_dumpfile(argc, argv)) {
 			MSG("Commandline parameter is invalid.\n");

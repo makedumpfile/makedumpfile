@@ -533,6 +533,23 @@ it is necessary to specfiy [\-x \fIVMLINUX\fR] or [\-i \fIVMCOREINFO\fR].
 # makedumpfile \-\-dump-dmesg -x vmlinux /proc/vmcore dmesgfile
 .br
 
+
+.TP
+\fB\-\-mem-usage\fR
+This option is used to show the page numbers of current system in different
+use. It should be executed in 1st kernel. By the help of this, user can know
+how many pages is dumpable when different dump_level is specified. It analyzes
+the 'System Ram' and 'kernel text' program segment of /proc/kcore excluding
+the crashkernel range, then calculates the page number of different kind per
+vmcoreinfo. So currently /proc/kcore need be specified explicitly.
+
+.br
+.B Example:
+.br
+# makedumpfile \-\-mem-usage /proc/kcore
+.br
+
+
 .TP
 \fB\-\-diskset=VMCORE\fR
 Specify multiple \fIVMCORE\fRs created on sadump diskset configuration

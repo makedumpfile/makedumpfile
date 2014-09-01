@@ -267,6 +267,14 @@ print_usage(void)
 	MSG("      LOGFILE. If a VMCORE does not contain VMCOREINFO for dmesg, it is\n");
 	MSG("      necessary to specfiy [-x VMLINUX] or [-i VMCOREINFO].\n");
 	MSG("\n");
+	MSG("  [--mem-usage]:\n");
+	MSG("      This option is used to show the page numbers of current system in different\n");
+	MSG("      use. It should be executed in 1st kernel. By the help of this, user can know\n");
+	MSG("      how many pages is dumpable when different dump_level is specified. It analyzes\n");
+	MSG("      the 'System Ram' and 'kernel text' program segment of /proc/kcore excluding\n");
+	MSG("      the crashkernel range, then calculates the page number of different kind per\n");
+	MSG("      vmcoreinfo. So currently /proc/kcore need be specified explicitly.\n");
+	MSG("\n");
 	MSG("  [-D]:\n");
 	MSG("      Print debugging message.\n");
 	MSG("\n");

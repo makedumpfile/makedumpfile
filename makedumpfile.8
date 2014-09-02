@@ -150,8 +150,9 @@ Pages of the specified type are not copied to \fIDUMPFILE\fR. The page type
 marked in the following table is excluded. A user can specify multiple page
 types by setting the sum of each page type for dump_level. The maximum of
 dump_level is 31. Note that a dump_level for Xen dump filtering is 0 or 1 on
-a machine other than x86_64 (On an x86_64 machine, it is possible to specify
-2 or bigger as a dump_level).
+a machine other than x86_64. On a x86_64 machine, even 2 or bigger dump level
+will be effective if you specify domain-0's \fIvmlinux\fR with \-x option.
+Then the pages are excluded only from domain-0.
 .br
 If specifying multiple dump_levels with the delimiter ',', makedumpfile retries
 to create a \fIDUMPFILE\fR by other dump_level when "No space on device" error

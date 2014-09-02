@@ -89,6 +89,9 @@ print_usage(void)
 	MSG("  Creating DUMPFILE of Xen:\n");
 	MSG("  # makedumpfile -E [--xen-syms XEN-SYMS|--xen-vmcoreinfo VMCOREINFO] VMCORE DUMPFILE\n");
 	MSG("\n");
+	MSG("  Filtering domain-0 of Xen:\n");
+	MSG("  # makedumpfile -E -d DL -x vmlinux VMCORE DUMPFILE\n");
+	MSG("\n");
 	MSG("  Generating VMCOREINFO of Xen:\n");
 	MSG("  # makedumpfile -g VMCOREINFO --xen-syms XEN-SYMS\n");
 	MSG("\n");
@@ -111,7 +114,7 @@ print_usage(void)
 	MSG("      marked in the following table is excluded. A user can specify multiple\n");
 	MSG("      page types by setting the sum of each page type for Dump_Level (DL).\n");
 	MSG("      The maximum of Dump_Level is 31.\n");
-	MSG("      Note that Dump_Level for Xen dump filtering is 0 or 1.\n");
+	MSG("      Note that Dump_Level for Xen dump filtering is 0 or 1 except on x86_64\n");
 	MSG("\n");
 	MSG("            |         cache    cache\n");
 	MSG("      Dump  |  zero   without  with     user    free\n");

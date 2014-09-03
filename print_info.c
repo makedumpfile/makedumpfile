@@ -268,6 +268,7 @@ print_usage(void)
 	MSG("      necessary to specfiy [-x VMLINUX] or [-i VMCOREINFO].\n");
 	MSG("\n");
 	MSG("  [--mem-usage]:\n");
+	MSG("      This option is only for x86_64.\n");
 	MSG("      This option is used to show the page numbers of current system in different\n");
 	MSG("      use. It should be executed in 1st kernel. By the help of this, user can know\n");
 	MSG("      how many pages is dumpable when different dump_level is specified. It analyzes\n");

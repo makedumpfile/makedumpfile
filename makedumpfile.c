@@ -2963,12 +2963,16 @@ get_mem_map(void)
 	 * dumped system.
 	 */
 	if (!is_xen_memory()) {
+		unsigned int valid_memmap = 0;
 		for (i = 0; i < info->num_mem_map; i++) {
 			if (info->mem_map_data[i].mem_map == NOT_MEMMAP_ADDR)
 				continue;
 			max_pfn = MAX(max_pfn, info->mem_map_data[i].pfn_end);
+			valid_memmap++;
 		}
-		info->max_mapnr = MIN(info->max_mapnr, max_pfn);
+		if (valid_memmap) {
+			info->max_mapnr = MIN(info->max_mapnr, max_pfn);
+		}
 	}
 	return ret;
 }

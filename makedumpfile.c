@@ -4943,7 +4943,8 @@ exclude_unnecessary_pages_cyclic(struct cycle *cycle)
 
 		for (mm = 0; mm < info->num_mem_map; mm++) {
 
-			print_progress(PROGRESS_UNN_PAGES, mm, info->num_mem_map);
+			if (!info->flag_mem_usage)
+				print_progress(PROGRESS_UNN_PAGES, mm, info->num_mem_map);
 
 			mmd = &info->mem_map_data[mm];
 
@@ -4961,8 +4962,10 @@ exclude_unnecessary_pages_cyclic(struct cycle *cycle)
 		/*
 		 * print [100 %]
 		 */
-		print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
-		print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
+		if (!info->flag_mem_usage) {
+			print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
+			print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
+		}
 	}
 
 	return TRUE;
@@ -7952,6 +7955,7 @@ static void
 print_mem_usage(void)
 {
 	mdf_pfn_t pfn_original, pfn_excluded, shrinking;
+	unsigned long long total_size;
 
 	/*
 	* /proc/vmcore doesn't contain the memory hole area.
@@ -7962,11 +7966,11 @@ print_mem_usage(void)
 	    + pfn_user + pfn_free + pfn_hwpoison;
 	shrinking = (pfn_original - pfn_excluded) * 100;
 	shrinking = shrinking / pfn_original;
+	total_size = info->page_size * pfn_original;
 
 	MSG("\n");
-	MSG("\n");
-	MSG("----------------------------------------------------------------------\n");
 	MSG("TYPE		PAGES			EXCLUDABLE	DESCRIPTION\n");
+	MSG("----------------------------------------------------------------------\n");
 
 	MSG("ZERO		%-16llu	yes		Pages filled with zero\n", pfn_zero);
 	MSG("CACHE		%-16llu	yes		Cache pages\n", pfn_cache);
@@ -7979,7 +7983,9 @@ print_mem_usage(void)
 
 	MSG("\n");
 
+	MSG("page size:		%-16ld\n", info->page_size);
 	MSG("Total pages on system:	%-16llu\n", pfn_original);
+	MSG("Total size on system:	%-16llu Byte\n", total_size);
 }
 
 int
@@ -9618,10 +9624,10 @@ main(int argc, char *argv[])
 	retcd = COMPLETED;
 out:
 	MSG("\n");
-	if (retcd == COMPLETED)
-		MSG("makedumpfile Completed.\n");
-	else
+	if (retcd != COMPLETED)
 		MSG("makedumpfile Failed.\n");
+	else if (!info->flag_mem_usage)
+		MSG("makedumpfile Completed.\n");
 
 	if (info) {
 		if (info->dh_memory)

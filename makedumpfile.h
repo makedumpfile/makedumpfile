@@ -549,7 +549,9 @@ do { \
 #define VMEMMAP_END_2_6_31	(0xffffeaffffffffff) /* 2.6.31, or later  */
 
 #define __START_KERNEL_map	(0xffffffff80000000)
-#define MODULES_VADDR		(0xffffffff88000000)
+#define KERNEL_IMAGE_SIZE_ORIG		(0x0000000008000000) /* 2.6.25, or former */
+#define KERNEL_IMAGE_SIZE_2_6_26	(0x0000000020000000) /* 2.6.26, or later  */
+#define MODULES_VADDR          (__START_KERNEL_map + NUMBER(KERNEL_IMAGE_SIZE))
 #define MODULES_END		(0xfffffffffff00000)
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
@@ -1531,6 +1533,7 @@ struct number_table {
 	long    PG_hwpoison;
 
 	long	PAGE_BUDDY_MAPCOUNT_VALUE;
+	long	KERNEL_IMAGE_SIZE;
 	long	SECTION_SIZE_BITS;
 	long	MAX_PHYSMEM_BITS;
 };

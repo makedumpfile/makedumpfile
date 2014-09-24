@@ -1564,6 +1564,14 @@ get_value_for_old_linux(void)
 			NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) =
 			PAGE_BUDDY_MAPCOUNT_VALUE_v2_6_39_to_latest_version;
 	}
+#ifdef __x86_64__
+	if (NUMBER(KERNEL_IMAGE_SIZE) == NOT_FOUND_NUMBER) {
+		if (info->kernel_version < KERNEL_VERSION(2, 6, 26))
+			NUMBER(KERNEL_IMAGE_SIZE) = KERNEL_IMAGE_SIZE_ORIG;
+		else
+			NUMBER(KERNEL_IMAGE_SIZE) = KERNEL_IMAGE_SIZE_2_6_26;
+	}
+#endif
 	if (SIZE(pageflags) == NOT_FOUND_STRUCTURE) {
 		if (info->kernel_version >= KERNEL_VERSION(2, 6, 27))
 			SIZE(pageflags) =
@@ -1813,6 +1821,7 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER("PG_hwpoison", PG_hwpoison);
 
 	WRITE_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
+	WRITE_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
 
 	/*
 	 * write the source file of 1st kernel
@@ -2147,6 +2156,7 @@ read_vmcoreinfo(void)
 	READ_SRCFILE("pud_t", pud_t);
 
 	READ_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
+	READ_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
 
 	return TRUE;
 }

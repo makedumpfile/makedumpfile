@@ -27,6 +27,8 @@
 
 #define MAX_SIZE_NHDR	MAX(sizeof(Elf64_Nhdr), sizeof(Elf32_Nhdr))
 
+int get_elf64_phdr(int fd, char *filename, int index, Elf64_Phdr *phdr);
+int get_elf32_phdr(int fd, char *filename, int index, Elf32_Phdr *phdr);
 
 off_t paddr_to_offset(unsigned long long paddr);
 off_t paddr_to_offset2(unsigned long long paddr, off_t hint);

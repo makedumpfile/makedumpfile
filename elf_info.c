@@ -95,42 +95,6 @@ static unsigned long		size_xen_crash_info;
  * Internal functions.
  */
 static int
-get_elf64_phdr(int fd, char *filename, int index, Elf64_Phdr *phdr)
-{
-	off_t offset;
-
-	offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) * index;
-
-	if (lseek(fd, offset, SEEK_SET) < 0) {
-		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
-		return FALSE;
-	}
-	if (read(fd, phdr, sizeof(Elf64_Phdr)) != sizeof(Elf64_Phdr)) {
-		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static int
-get_elf32_phdr(int fd, char *filename, int index, Elf32_Phdr *phdr)
-{
-	off_t offset;
-
-	offset = sizeof(Elf32_Ehdr) + sizeof(Elf32_Phdr) * index;
-
-	if (lseek(fd, offset, SEEK_SET) < 0) {
-		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
-		return FALSE;
-	}
-	if (read(fd, phdr, sizeof(Elf32_Phdr)) != sizeof(Elf32_Phdr)) {
-		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static int
 check_elf_format(int fd, char *filename, int *phnum, unsigned int *num_load)
 {
 	int i;
@@ -446,6 +410,41 @@ int set_kcore_vmcoreinfo(uint64_t vmcoreinfo_addr, uint64_t vmcoreinfo_len)
 /*
  * External functions.
  */
+int
+get_elf64_phdr(int fd, char *filename, int index, Elf64_Phdr *phdr)
+{
+	off_t offset;
+
+	offset = sizeof(Elf64_Ehdr) + sizeof(Elf64_Phdr) * index;
+
+	if (lseek(fd, offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	if (read(fd, phdr, sizeof(Elf64_Phdr)) != sizeof(Elf64_Phdr)) {
+		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+get_elf32_phdr(int fd, char *filename, int index, Elf32_Phdr *phdr)
+{
+	off_t offset;
+
+	offset = sizeof(Elf32_Ehdr) + sizeof(Elf32_Phdr) * index;
+
+	if (lseek(fd, offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	if (read(fd, phdr, sizeof(Elf32_Phdr)) != sizeof(Elf32_Phdr)) {
+		ERRMSG("Can't read %s. %s\n", filename, strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
 
 /*
  * Convert Physical Address to File Offset.

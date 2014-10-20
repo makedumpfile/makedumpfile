@@ -3203,6 +3203,9 @@ initial(void)
 		debug_info = TRUE;
 	}
 
+	if (!get_value_for_old_linux())
+		return FALSE;
+
 out:
 	if (!info->page_size) {
 		/*
@@ -3305,9 +3308,6 @@ out:
 		if (!get_mem_map_without_mm())
 			return FALSE;
 	}
-
-	if (!get_value_for_old_linux())
-		return FALSE;
 
 	/* use buddy identification of free pages whether cyclic or not */
 	/* (this can reduce pages scan of 1TB memory from 60sec to 30sec) */

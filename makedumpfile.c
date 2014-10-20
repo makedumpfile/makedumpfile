@@ -3857,10 +3857,80 @@ out_close_file:
 }
 
 int
+check_and_modify_kdump_headers(char *filename) {
+	int fd, ret = FALSE;
+	struct disk_dump_header dh;
+
+	if (!read_disk_dump_header(&dh, filename))
+		return FALSE;
+
+	if ((fd = open(filename, O_RDWR)) < 0) {
+		ERRMSG("Can't open the dump file(%s). %s\n",
+		       filename, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Set the incomplete flag to the status of disk_dump_header.
+	 */
+	dh.status |= DUMP_DH_COMPRESSED_INCOMPLETE;
+
+	/*
+	 * It's safe to overwrite the disk_dump_header.
+	 */
+	if (!write_buffer(fd, 0, &dh, sizeof(struct disk_dump_header), filename))
+		goto out_close_file;
+
+	ret = TRUE;
+out_close_file:
+	if (close(fd) < 0) {
+		ERRMSG("Can't close the dump file(%s). %s\n",
+		       filename, strerror(errno));
+	}
+
+	return ret;
+}
+
+int
+check_and_modify_multiple_kdump_headers() {
+	int i, status, ret = TRUE;
+	pid_t pid;
+	pid_t array_pid[info->num_dumpfile];
+
+	for (i = 0; i < info->num_dumpfile; i++) {
+		if ((pid = fork()) < 0) {
+			return FALSE;
+
+		} else if (pid == 0) { /* Child */
+			if (!check_and_modify_kdump_headers(SPLITTING_DUMPFILE(i)))
+				exit(1);
+			exit(0);
+		}
+		array_pid[i] = pid;
+	}
+
+	for (i = 0; i < info->num_dumpfile; i++) {
+		waitpid(array_pid[i], &status, WUNTRACED);
+		if (!WIFEXITED(status) || WEXITSTATUS(status) == 1) {
+			ERRMSG("Check and modify the incomplete dumpfile(%s) failed.\n",
+			       SPLITTING_DUMPFILE(i));
+			ret = FALSE;
+		}
+	}
+
+	return ret;
+}
+
+int
 check_and_modify_headers()
 {
 	if (info->flag_elf_dumpfile)
 		return check_and_modify_elf_headers(info->name_dumpfile);
+	else
+		if(info->flag_split)
+			return check_and_modify_multiple_kdump_headers();
+		else
+			return check_and_modify_kdump_headers(info->name_dumpfile);
 	return FALSE;
 }
 
@@ -7133,11 +7203,11 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 		if (!exclude_unnecessary_pages_cyclic(&cycle))
 			return FALSE;
 
-		if (!write_kdump_pages_cyclic(cd_header, cd_page, &pd_zero,
-					&offset_data, &cycle))
+		if (!write_kdump_bitmap2_cyclic(&cycle))
 			return FALSE;
 
-		if (!write_kdump_bitmap2_cyclic(&cycle))
+		if (!write_kdump_pages_cyclic(cd_header, cd_page, &pd_zero,
+					&offset_data, &cycle))
 			return FALSE;
 	}
 
@@ -8137,11 +8207,11 @@ writeout_dumpfile(void)
 	} else {
 		if (!write_kdump_header())
 			goto out;
+		if (!write_kdump_bitmap())
+			goto out;
 		if (!write_kdump_pages(&cd_header, &cd_page))
 			goto out;
 		if (!write_kdump_eraseinfo(&cd_page))
-			goto out;
-		if (!write_kdump_bitmap())
 			goto out;
 	}
 	if (info->flag_flatten) {

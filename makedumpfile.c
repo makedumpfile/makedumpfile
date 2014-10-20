@@ -8705,8 +8705,14 @@ reassemble_kdump_header(void)
 	/*
 	 * Write common header.
 	 */
-	if (!read_disk_dump_header(&dh, SPLITTING_DUMPFILE(0)))
-		return FALSE;
+	int i;
+	for ( i = 0; i < info->num_dumpfile; i++){
+		if (!read_disk_dump_header(&dh, SPLITTING_DUMPFILE(i)))
+			return FALSE;
+		int status = dh.status & DUMP_DH_COMPRESSED_INCOMPLETE;
+		if (status)
+			break;
+	}
 
 	if (lseek(info->fd_dumpfile, 0x0, SEEK_SET) < 0) {
 		ERRMSG("Can't seek a file(%s). %s\n",

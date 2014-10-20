@@ -24,6 +24,7 @@
 #include <ctype.h>
 #include <sys/time.h>
 #include <limits.h>
+#include <assert.h>
 
 struct symbol_table	symbol_table;
 struct size_table	size_table;
@@ -3778,6 +3779,93 @@ read_flat_data_header(struct makedumpfile_data_header *fdh)
 }
 
 int
+reserve_diskspace(int fd, off_t start_offset, off_t end_offset, char *file_name)
+{
+	size_t buf_size;
+	char *buf = NULL;
+
+	int ret = FALSE;
+
+	assert(start_offset < end_offset);
+	buf_size = end_offset - start_offset;
+
+	if ((buf = malloc(buf_size)) == NULL) {
+		ERRMSG("Can't allocate memory for the size of reserved diskspace. %s\n",
+		       strerror(errno));
+		return FALSE;
+	}
+
+	memset(buf, 0, buf_size);
+	if (!write_buffer(fd, start_offset, buf, buf_size, file_name))
+		goto out;
+
+	ret = TRUE;
+out:
+	if (buf != NULL) {
+		free(buf);
+	}
+
+	return ret;
+}
+
+#define DUMP_ELF_INCOMPLETE 0x1
+int
+check_and_modify_elf_headers(char *filename)
+{
+	int fd, ret = FALSE;
+	Elf64_Ehdr ehdr64;
+	Elf32_Ehdr ehdr32;
+
+	if ((fd = open(filename, O_RDWR)) < 0) {
+		ERRMSG("Can't open the dump file(%s). %s\n",
+		       filename, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * the is_elf64_memory() function still can be used.
+	 */
+	/*
+	 * Set the incomplete flag to the e_flags of elf header.
+	 */
+	if (is_elf64_memory()) { /* ELF64 */
+		if (!get_elf64_ehdr(fd, filename, &ehdr64)) {
+			ERRMSG("Can't get ehdr64.\n");
+			goto out_close_file;
+		}
+		ehdr64.e_flags |= DUMP_ELF_INCOMPLETE;
+		if (!write_buffer(fd, 0, &ehdr64, sizeof(Elf64_Ehdr), filename))
+			goto out_close_file;
+
+	} else { /* ELF32 */
+		if (!get_elf32_ehdr(fd, filename, &ehdr32)) {
+			ERRMSG("Can't get ehdr32.\n");
+			goto out_close_file;
+		}
+		ehdr32.e_flags |= DUMP_ELF_INCOMPLETE;
+		if (!write_buffer(fd, 0, &ehdr32, sizeof(Elf32_Ehdr), filename))
+			goto out_close_file;
+
+	}
+	ret = TRUE;
+out_close_file:
+	if (close(fd) < 0) {
+		ERRMSG("Can't close the dump file(%s). %s\n",
+		       filename, strerror(errno));
+	}
+	return ret;
+}
+
+int
+check_and_modify_headers()
+{
+	if (info->flag_elf_dumpfile)
+		return check_and_modify_elf_headers(info->name_dumpfile);
+	return FALSE;
+}
+
+
+int
 rearrange_dumpdata(void)
 {
 	int read_size, tmp_read_size;
@@ -5506,6 +5594,13 @@ write_elf_header(struct cache_data *cd_header)
 	offset_note_memory = note.p_offset;
 	note.p_offset      = offset_note_dumpfile;
 	size_note          = note.p_filesz;
+
+	/*
+	 * Reserve a space to store the whole program headers.
+	 */
+	if (!reserve_diskspace(cd_header->fd, cd_header->offset,
+				offset_note_dumpfile, cd_header->file_name))
+		goto out;
 
 	/*
 	 * Modify the note size in PT_NOTE header to accomodate eraseinfo data.
@@ -8025,10 +8120,10 @@ writeout_dumpfile(void)
 			goto out;
 		if (info->flag_cyclic) {
 			if (!write_elf_pages_cyclic(&cd_header, &cd_page))
-				goto out;
+				goto write_cache_enospc;
 		} else {
 			if (!write_elf_pages(&cd_header, &cd_page))
-				goto out;
+				goto write_cache_enospc;
 		}
 		if (!write_elf_eraseinfo(&cd_header))
 			goto out;
@@ -8055,6 +8150,11 @@ writeout_dumpfile(void)
 	}
 
 	ret = TRUE;
+write_cache_enospc:
+	if ((ret == FALSE) && info->flag_nospace && !info->flag_flatten) {
+		if (!write_cache_bufsz(&cd_header))
+			ERRMSG("This dumpfile may lost some important data.\n");
+	}
 out:
 	free_cache_data(&cd_header);
 	free_cache_data(&cd_page);
@@ -8247,8 +8347,15 @@ retry:
 		 * to create a dumpfile with it again.
 		 */
 		num_retry++;
-		if ((info->dump_level = get_next_dump_level(num_retry)) < 0)
- 			return FALSE;
+		if ((info->dump_level = get_next_dump_level(num_retry)) < 0) {
+			if (!info->flag_flatten) {
+				if (check_and_modify_headers())
+					MSG("This is an incomplete dumpfile,"
+						" but might analyzable.\n");
+			}
+
+			return FALSE;
+		}
 		MSG("Retry to create a dumpfile by dump_level(%d).\n",
 		    info->dump_level);
 		if (!delete_dumpfile())

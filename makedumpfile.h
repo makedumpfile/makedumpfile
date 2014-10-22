@@ -759,26 +759,28 @@ do { \
 /*
  * The function of dependence on machine
  */
+static inline int stub_true() { return TRUE; }
+static inline int stub_true_ul(unsigned long x) { return TRUE; }
 #ifdef __arm__
 int get_phys_base_arm(void);
 int get_machdep_info_arm(void);
 unsigned long long vaddr_to_paddr_arm(unsigned long vaddr);
 #define get_phys_base()		get_phys_base_arm()
 #define get_machdep_info()	get_machdep_info_arm()
-#define get_versiondep_info()	TRUE
+#define get_versiondep_info()	stub_true()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_arm(X)
-#define is_vmalloc_addr(X)	TRUE
+#define is_vmalloc_addr(X)	stub_true_ul(X)
 #endif /* arm */
 
 #ifdef __x86__
 int get_machdep_info_x86(void);
 int get_versiondep_info_x86(void);
 unsigned long long vaddr_to_paddr_x86(unsigned long vaddr);
-#define get_phys_base()		TRUE
+#define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_x86()
 #define get_versiondep_info()	get_versiondep_info_x86()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_x86(X)
-#define is_vmalloc_addr(X)	TRUE
+#define is_vmalloc_addr(X)	stub_true_ul(X)
 #endif /* x86 */
 
 #ifdef __x86_64__
@@ -798,31 +800,31 @@ unsigned long long vaddr_to_paddr_x86_64(unsigned long vaddr);
 int get_machdep_info_ppc64(void);
 int get_versiondep_info_ppc64(void);
 unsigned long long vaddr_to_paddr_ppc64(unsigned long vaddr);
-#define get_phys_base()		TRUE
+#define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_ppc64()
 #define get_versiondep_info()	get_versiondep_info_ppc64()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc64(X)
-#define is_vmalloc_addr(X)	TRUE
+#define is_vmalloc_addr(X)	stub_true_ul(X)
 #endif          /* powerpc64 */
 
 #ifdef __powerpc32__ /* powerpc32 */
 int get_machdep_info_ppc(void);
 unsigned long long vaddr_to_paddr_ppc(unsigned long vaddr);
-#define get_phys_base()		TRUE
+#define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_ppc()
-#define get_versiondep_info()	TRUE
+#define get_versiondep_info()	stub_true()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc(X)
-#define is_vmalloc_addr(X)	TRUE
+#define is_vmalloc_addr(X)	stub_true_ul(X)
 #endif          /* powerpc32 */
 
 #ifdef __s390x__ /* s390x */
 int get_machdep_info_s390x(void);
 unsigned long long vaddr_to_paddr_s390x(unsigned long vaddr);
-#define get_phys_base()		TRUE
+#define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_s390x()
-#define get_versiondep_info()	TRUE
+#define get_versiondep_info()	stub_true()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_s390x(X)
-#define is_vmalloc_addr(X)	TRUE
+#define is_vmalloc_addr(X)	stub_true_ul(X)
 #endif          /* s390x */
 
 #ifdef __ia64__ /* ia64 */
@@ -831,10 +833,10 @@ int get_machdep_info_ia64(void);
 unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define get_machdep_info()	get_machdep_info_ia64()
 #define get_phys_base()		get_phys_base_ia64()
-#define get_versiondep_info()	TRUE
+#define get_versiondep_info()	stub_true()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ia64(X)
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
-#define is_vmalloc_addr(X)	TRUE
+#define is_vmalloc_addr(X)	stub_true_ul(X)
 #endif          /* ia64 */
 
 typedef unsigned long long mdf_pfn_t;

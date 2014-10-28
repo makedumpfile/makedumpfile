@@ -3091,61 +3091,6 @@ initial(void)
 		MSG("Try `makedumpfile --help' for more information.\n");
 		return FALSE;
 	}
-
-	if (info->flag_refiltering) {
-		if (info->flag_elf_dumpfile) {
-			MSG("'-E' option is disable, ");
-			MSG("because %s is kdump compressed format.\n",
-							info->name_memory);
-			return FALSE;
-		}
-
-		if(info->flag_cyclic) {
-			info->flag_cyclic = FALSE;
-			MSG("Switched running mode from cyclic to non-cyclic,\n");
-			MSG("because the cyclic mode doesn't support refiltering\n");
-			MSG("kdump compressed format.\n");
-		}
-
-		info->phys_base = info->kh_memory->phys_base;
-		info->max_dump_level |= info->kh_memory->dump_level;
-
-		if (!initialize_bitmap_memory())
-			return FALSE;
-
-	} else if (info->flag_sadump) {
-		if (info->flag_elf_dumpfile) {
-			MSG("'-E' option is disable, ");
-			MSG("because %s is sadump %s format.\n",
-			    info->name_memory, sadump_format_type_name());
-			return FALSE;
-		}
-
-		if(info->flag_cyclic) {
-			info->flag_cyclic = FALSE;
-			MSG("Switched running mode from cyclic to non-cyclic,\n");
-			MSG("because the cyclic mode doesn't support sadump format.\n");
-		}
-
-		set_page_size(sadump_page_size());
-
-		if (!sadump_initialize_bitmap_memory())
-			return FALSE;
-
-		(void) sadump_set_timestamp(&info->timestamp);
-
-		/*
-		 * NOTE: phys_base is never saved by sadump and so
-		 * must be computed in some way. We here choose the
-		 * way of looking at linux_banner. See
-		 * sadump_virt_phys_base(). The processing is
-		 * postponed until debug information becomes
-		 * available.
-		 */
-
-	} else if (!get_phys_base())
-		return FALSE;
-
 	/*
 	 * Get the debug information for analysis from the vmcoreinfo file
 	 */
@@ -3204,6 +3149,60 @@ initial(void)
 	}
 
 	if (!get_value_for_old_linux())
+		return FALSE;
+
+	if (info->flag_refiltering) {
+		if (info->flag_elf_dumpfile) {
+			MSG("'-E' option is disable, ");
+			MSG("because %s is kdump compressed format.\n",
+							info->name_memory);
+			return FALSE;
+		}
+
+		if(info->flag_cyclic) {
+			info->flag_cyclic = FALSE;
+			MSG("Switched running mode from cyclic to non-cyclic,\n");
+			MSG("because the cyclic mode doesn't support refiltering\n");
+			MSG("kdump compressed format.\n");
+		}
+
+		info->phys_base = info->kh_memory->phys_base;
+		info->max_dump_level |= info->kh_memory->dump_level;
+
+		if (!initialize_bitmap_memory())
+			return FALSE;
+
+	} else if (info->flag_sadump) {
+		if (info->flag_elf_dumpfile) {
+			MSG("'-E' option is disable, ");
+			MSG("because %s is sadump %s format.\n",
+			    info->name_memory, sadump_format_type_name());
+			return FALSE;
+		}
+
+		if(info->flag_cyclic) {
+			info->flag_cyclic = FALSE;
+			MSG("Switched running mode from cyclic to non-cyclic,\n");
+			MSG("because the cyclic mode doesn't support sadump format.\n");
+		}
+
+		set_page_size(sadump_page_size());
+
+		if (!sadump_initialize_bitmap_memory())
+			return FALSE;
+
+		(void) sadump_set_timestamp(&info->timestamp);
+
+		/*
+		 * NOTE: phys_base is never saved by sadump and so
+		 * must be computed in some way. We here choose the
+		 * way of looking at linux_banner. See
+		 * sadump_virt_phys_base(). The processing is
+		 * postponed until debug information becomes
+		 * available.
+		 */
+
+	} else if (!get_phys_base())
 		return FALSE;
 
 out:

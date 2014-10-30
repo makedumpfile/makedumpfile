@@ -3151,6 +3151,9 @@ initial(void)
 	if (!get_value_for_old_linux())
 		return FALSE;
 
+	if (info->flag_mem_usage && !get_kcore_dump_loads())
+		return FALSE;
+
 	if (info->flag_refiltering) {
 		if (info->flag_elf_dumpfile) {
 			MSG("'-E' option is disable, ");
@@ -9496,9 +9499,6 @@ int show_mem_usage(void)
 		return FALSE;
 
 	if (!set_kcore_vmcoreinfo(vmcoreinfo_addr, vmcoreinfo_len))
-		return FALSE;
-
-	if (!get_kcore_dump_loads())
 		return FALSE;
 
 	if (!initial())

@@ -853,7 +853,7 @@ int get_kcore_dump_loads(void)
 
 	for (i = 0; i < num_pt_loads; ++i) {
 		struct pt_load_segment *p = &pt_loads[i];
-		if (is_vmalloc_addr(p->virt_start))
+		if (!is_phys_addr(p->virt_start))
 			continue;
 		loads++;
 	}
@@ -873,7 +873,7 @@ int get_kcore_dump_loads(void)
 
 	for (i = 0, j = 0; i < num_pt_loads; ++i) {
 		struct pt_load_segment *p = &pt_loads[i];
-		if (is_vmalloc_addr(p->virt_start))
+		if (!is_phys_addr(p->virt_start))
 			continue;
 		if (j >= loads)
 			return FALSE;

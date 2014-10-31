@@ -308,4 +308,31 @@ vaddr_to_paddr_s390x(unsigned long vaddr)
 	return paddr;
 }
 
+struct addr_check {
+	unsigned long addr;
+	int found;
+};
+
+static int phys_addr_callback(void *data, int nr, char *str,
+			      unsigned long base, unsigned long length)
+{
+	struct addr_check *addr_check = data;
+	unsigned long addr = addr_check->addr;
+
+	if (addr >= base && addr < base + length) {
+		addr_check->found = 1;
+		return -1;
+	}
+	return 0;
+}
+
+int is_iomem_phys_addr_s390x(unsigned long addr)
+{
+	/* Implicit VtoP conversion will be performed for addr here. */
+	struct addr_check addr_check = {addr, 0};
+
+	iomem_for_each_line("System RAM\n", phys_addr_callback, &addr_check);
+	return addr_check.found;
+}
+
 #endif /* __s390x__ */

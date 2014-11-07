@@ -35,6 +35,7 @@ struct srcfile_table	srcfile_table;
 
 struct vm_table		vt = { 0 };
 struct DumpInfo		*info = NULL;
+struct SplitBlock		*splitblock = NULL;
 
 char filename_stdout[] = FILENAME_STDOUT;
 
@@ -5860,6 +5861,36 @@ out:
 		free(buf);
 
 	return ret;
+}
+
+/*
+ * cyclic_split mode:
+ *	manage memory by splitblocks,
+ *	divide memory into splitblocks
+ *	use splitblock_table to record numbers of dumpable pages in each
+ *	splitblock
+ */
+
+/*
+ * calculate entry size based on the amount of pages in one splitblock
+ */
+int
+calculate_entry_size(void)
+{
+	int entry_num = 1;
+	int count = 1;
+	int entry_size;
+
+	while (entry_num < splitblock->page_per_splitblock) {
+		entry_num = entry_num << 1;
+		count++;
+	}
+
+	entry_size = count / BITPERBYTE;
+	if (count % BITPERBYTE)
+		entry_size++;
+
+	return entry_size;
 }
 
 mdf_pfn_t

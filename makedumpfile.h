@@ -1173,8 +1173,22 @@ struct DumpInfo {
 	 */
 	int (*page_is_buddy)(unsigned long flags, unsigned int _mapcount,
 			     unsigned long private, unsigned int _count);
+	/*
+	 * for cyclic_splitting mode, setup splitblock_size
+	 */
+	long long splitblock_size;
 };
 extern struct DumpInfo		*info;
+
+/*
+ * for cyclic_splitting mode,Manage memory by splitblock
+ */
+struct SplitBlock {
+	char *table;
+	long long num;
+	long long page_per_splitblock;
+	int entry_size;                 /* counted by byte */
+};
 
 /*
  * kernel VM-related data

@@ -1183,6 +1183,8 @@ extern struct DumpInfo		*info;
 /*
  * for cyclic_splitting mode,Manage memory by splitblock
  */
+#define DEFAULT_SPLITBLOCK_SIZE (1LL << 30)
+
 struct SplitBlock {
 	char *table;
 	long long num;
@@ -1899,9 +1901,11 @@ struct elf_prstatus {
  * Function Prototype.
  */
 mdf_pfn_t get_num_dumpable_cyclic(void);
+mdf_pfn_t get_num_dumpable_cyclic_withsplit(void);
 int get_loads_dumpfile_cyclic(void);
 int initial_xen(void);
 unsigned long long get_free_memory_size(void);
 int calculate_cyclic_buffer_size(void);
+int prepare_splitblock_table(void);
 
 #endif /* MAKEDUMPFILE_H */

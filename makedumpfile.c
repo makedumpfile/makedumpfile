@@ -5378,7 +5378,14 @@ create_dump_bitmap(void)
 	if (info->flag_cyclic) {
 		if (!prepare_bitmap2_buffer_cyclic())
 			goto out;
-		info->num_dumpable = get_num_dumpable_cyclic();
+		if (info->flag_split) {
+			if (!prepare_splitblock_table())
+				goto out;
+
+			info->num_dumpable = get_num_dumpable_cyclic_withsplit();
+		} else {
+			info->num_dumpable = get_num_dumpable_cyclic();
+		}
 
 		if (!info->flag_elf_dumpfile)
 			free_bitmap2_buffer_cyclic();
@@ -5922,6 +5929,61 @@ read_from_splitblock_table(char *entry)
 	return value;
 }
 
+/*
+ * The splitblock size is specified as Kbyte with --splitblock-size <size> option.
+ * If not specified, set default value.
+ */
+int
+check_splitblock_size(void)
+{
+	if (info->splitblock_size) {
+		info->splitblock_size <<= 10;
+		if (info->splitblock_size == 0) {
+			ERRMSG("The splitblock size could not be 0. %s.\n",
+				strerror(errno));
+			return FALSE;
+		}
+		if (info->splitblock_size % info->page_size != 0) {
+			ERRMSG("The splitblock size must be align to page_size. %s.\n",
+				strerror(errno));
+			return FALSE;
+		}
+	} else {
+		info->splitblock_size = DEFAULT_SPLITBLOCK_SIZE;
+	}
+
+	return TRUE;
+}
+
+int
+prepare_splitblock_table(void)
+{
+	size_t table_size;
+
+	if (!check_splitblock_size())
+		return FALSE;
+
+	if ((splitblock = calloc(1, sizeof(struct SplitBlock))) == NULL) {
+		ERRMSG("Can't allocate memory for the splitblock. %s.\n",
+			strerror(errno));
+		return FALSE;
+	}
+
+	splitblock->page_per_splitblock = info->splitblock_size / info->page_size;
+	splitblock->num = divideup(info->max_mapnr, splitblock->page_per_splitblock);
+	splitblock->entry_size = calculate_entry_size();
+	table_size = splitblock->entry_size * splitblock->num;
+
+	splitblock->table = (char *)calloc(sizeof(char), table_size);
+	if (!splitblock->table) {
+		ERRMSG("Can't allocate memory for the splitblock_table. %s.\n",
+			 strerror(errno));
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 mdf_pfn_t
 get_num_dumpable(void)
 {
@@ -5934,6 +5996,45 @@ get_num_dumpable(void)
 		if (is_dumpable(&bitmap2, pfn))
 			num_dumpable++;
 	}
+	return num_dumpable;
+}
+
+/*
+ * generate splitblock_table
+ * modified from function get_num_dumpable_cyclic
+ */
+mdf_pfn_t
+get_num_dumpable_cyclic_withsplit(void)
+{
+	mdf_pfn_t pfn, num_dumpable = 0;
+	mdf_pfn_t dumpable_pfn_num = 0, pfn_num = 0;
+	struct cycle cycle = {0};
+	int pos = 0;
+
+	pfn_memhole = info->max_mapnr;
+
+	for_each_cycle(0, info->max_mapnr, &cycle) {
+		if (!exclude_unnecessary_pages_cyclic(&cycle))
+			return FALSE;
+
+		if (info->flag_mem_usage)
+			exclude_zero_pages_cyclic(&cycle);
+
+		for (pfn = cycle.start_pfn; pfn < cycle.end_pfn; pfn++) {
+			if (is_dumpable_cyclic(info->partial_bitmap2, pfn, &cycle)) {
+				num_dumpable++;
+				dumpable_pfn_num++;
+			}
+			if (++pfn_num >= splitblock->page_per_splitblock) {
+				write_into_splitblock_table(splitblock->table + pos,
+							    dumpable_pfn_num);
+				pos += splitblock->entry_size;
+				pfn_num = 0;
+				dumpable_pfn_num = 0;
+			}
+		}
+	}
+
 	return num_dumpable;
 }
 
@@ -9909,6 +10010,12 @@ out:
 		if (info->page_buf != NULL)
 			free(info->page_buf);
 		free(info);
+
+		if (splitblock) {
+			if (splitblock->table)
+				free(splitblock->table);
+			free(splitblock);
+		}
 	}
 	free_elf_info();
 

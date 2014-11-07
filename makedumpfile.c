@@ -5893,6 +5893,35 @@ calculate_entry_size(void)
 	return entry_size;
 }
 
+void
+write_into_splitblock_table(char *entry,
+				unsigned long long value)
+{
+	char temp;
+	int i = 0;
+
+	while (i++ < splitblock->entry_size) {
+		temp = value & 0xff;
+		value = value >> BITPERBYTE;
+		*entry = temp;
+		entry++;
+	}
+}
+
+unsigned long long
+read_from_splitblock_table(char *entry)
+{
+	unsigned long long value = 0;
+	int i;
+
+	for (i = splitblock->entry_size; i > 0; i--) {
+		value = value << BITPERBYTE;
+		value += *(entry + i - 1) & 0xff;
+	}
+
+	return value;
+}
+
 mdf_pfn_t
 get_num_dumpable(void)
 {

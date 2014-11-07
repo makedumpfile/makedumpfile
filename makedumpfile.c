@@ -8400,6 +8400,65 @@ out:
 		return ret;
 }
 
+/*
+ * calculate end_pfn of one dumpfile.
+ * try to make every output file have the same size.
+ * splitblock_table is used to reduce calculate time.
+ */
+
+#define CURRENT_SPLITBLOCK_PFN_NUM (*cur_splitblock_num * splitblock->page_per_splitblock)
+mdf_pfn_t
+calculate_end_pfn_by_splitblock(mdf_pfn_t start_pfn,
+				 int *cur_splitblock_num)
+{
+	if (start_pfn >= info->max_mapnr)
+		return info->max_mapnr;
+
+	mdf_pfn_t end_pfn;
+	long long pfn_needed, offset;
+	char *splitblock_value_offset;
+
+	pfn_needed = info->num_dumpable / info->num_dumpfile;
+	offset = *cur_splitblock_num * splitblock->entry_size;
+	splitblock_value_offset = splitblock->table + offset;
+	end_pfn = start_pfn;
+
+	while (*cur_splitblock_num < splitblock->num && pfn_needed > 0) {
+		pfn_needed -= read_from_splitblock_table(splitblock_value_offset);
+		splitblock_value_offset += splitblock->entry_size;
+		++*cur_splitblock_num;
+	}
+
+	end_pfn = CURRENT_SPLITBLOCK_PFN_NUM;
+	if (end_pfn > info->max_mapnr)
+		end_pfn = info->max_mapnr;
+
+	return end_pfn;
+}
+
+/*
+ * calculate start_pfn and end_pfn in each output file.
+ */
+static int setup_splitting_cyclic(void)
+{
+	int i;
+	mdf_pfn_t start_pfn, end_pfn;
+	int cur_splitblock_num = 0;
+	start_pfn = end_pfn = 0;
+
+	for (i = 0; i < info->num_dumpfile - 1; i++) {
+		start_pfn = end_pfn;
+		end_pfn = calculate_end_pfn_by_splitblock(start_pfn,
+							  &cur_splitblock_num);
+		SPLITTING_START_PFN(i) = start_pfn;
+		SPLITTING_END_PFN(i) = end_pfn;
+	}
+	SPLITTING_START_PFN(info->num_dumpfile - 1) = end_pfn;
+	SPLITTING_END_PFN(info->num_dumpfile - 1) = info->max_mapnr;
+
+	return TRUE;
+}
+
 int
 setup_splitting(void)
 {
@@ -8413,12 +8472,16 @@ setup_splitting(void)
 		return FALSE;
 
 	if (info->flag_cyclic) {
-		for (i = 0; i < info->num_dumpfile; i++) {
-			SPLITTING_START_PFN(i) = divideup(info->max_mapnr, info->num_dumpfile) * i;
-			SPLITTING_END_PFN(i)   = divideup(info->max_mapnr, info->num_dumpfile) * (i + 1);
+		int ret = FALSE;
+
+		if (!prepare_bitmap2_buffer_cyclic()) {
+			free_bitmap_buffer();
+			return ret;
 		}
-		if (SPLITTING_END_PFN(i-1) > info->max_mapnr)
-			SPLITTING_END_PFN(i-1) = info->max_mapnr;
+		ret = setup_splitting_cyclic();
+		free_bitmap2_buffer_cyclic();
+
+		return ret;
         } else {
 		initialize_2nd_bitmap(&bitmap2);
 

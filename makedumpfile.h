@@ -1896,6 +1896,7 @@ struct elf_prstatus {
 #define OPT_EPPIC               OPT_START+12
 #define OPT_NON_MMAP            OPT_START+13
 #define OPT_MEM_USAGE            OPT_START+14
+#define OPT_SPLITBLOCK_SIZE	OPT_START+15
 
 /*
  * Function Prototype.

@@ -203,6 +203,11 @@ print_usage(void)
 	MSG("      By default, BUFFER_SIZE will be calculated automatically depending on\n");
 	MSG("      system memory size, so ordinary users don't need to specify this option.\n");
 	MSG("\n");
+	MSG("  [--splitblock-size SPLITBLOCK_SIZE]:\n");
+	MSG("      Specify the splitblock size in kilo bytes for analysis in the cyclic mode\n");
+	MSG("      with --split. If --splitblock N is specified, difference of each splitted\n");
+	MSG("      dumpfile size is at most N kilo bytes.\n");
+	MSG("\n");
 	MSG("  [--non-cyclic]:\n");
 	MSG("      Running in the non-cyclic mode, this mode uses the old filtering logic\n");
 	MSG("      same as v1.4.4 or before.\n");

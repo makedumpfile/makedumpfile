@@ -9762,6 +9762,7 @@ static struct option longopts[] = {
 	{"eppic", required_argument, NULL, OPT_EPPIC},
 	{"non-mmap", no_argument, NULL, OPT_NON_MMAP},
 	{"mem-usage", no_argument, NULL, OPT_MEM_USAGE},
+	{"splitblock-size", required_argument, NULL, OPT_SPLITBLOCK_SIZE},
 	{0, 0, 0, 0}
 };
 
@@ -9901,6 +9902,9 @@ main(int argc, char *argv[])
 			break;
 		case OPT_CYCLIC_BUFFER:
 			info->bufsize_cyclic = atoi(optarg);
+			break;
+		case OPT_SPLITBLOCK_SIZE:
+			info->splitblock_size = atoi(optarg);
 			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");

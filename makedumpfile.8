@@ -386,6 +386,16 @@ size, so ordinary users don't need to specify this option.
 # makedumpfile \-\-cyclic\-buffer 1024 \-d 31 \-x vmlinux /proc/vmcore dumpfile
 
 .TP
+\fB\-\-splitblock\-size\fR \fIsplitblock_size\fR
+Specify the splitblock size in kilo bytes for analysis in the cyclic mode with --split.
+If --splitblock N is specified, difference of each splitted dumpfile size is at most N
+kilo bytes.
+.br
+.B Example:
+.br
+# makedumpfile \-\-splitblock\-size 1024 \-d 31 \-x vmlinux \-\-split /proc/vmcore dumpfile1 dumpfile2
+
+.TP
 \fB\-\-non\-cyclic\fR
 Running in the non-cyclic mode, this mode uses the old filtering logic same as v1.4.4 or before.
 If you feel the cyclic mode is too slow, please try this mode.

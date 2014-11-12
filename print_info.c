@@ -116,9 +116,9 @@ print_usage(void)
 	MSG("      The maximum of Dump_Level is 31.\n");
 	MSG("      Note that Dump_Level for Xen dump filtering is 0 or 1 except on x86_64\n");
 	MSG("\n");
-	MSG("            |         cache    cache\n");
-	MSG("      Dump  |  zero   without  with     user    free\n");
-	MSG("      Level |  page   private  private  data    page\n");
+	MSG("            |         non-\n");
+	MSG("      Dump  |  zero   private  private  user    free\n");
+	MSG("      Level |  page   cache    cache    data    page\n");
 	MSG("     -------+---------------------------------------\n");
 	MSG("         0  |\n");
 	MSG("         1  |   X\n");

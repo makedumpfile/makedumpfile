@@ -45,9 +45,9 @@ be excluded.
 .br
 .B \- Pages filled with zero
 .br
-.B \- Cache pages without private pages
+.B \- Cache pages without private flag (non-private cache)
 .br
-.B \- All cache pages with private pages
+.B \- Cache pages with private flag (private cache)
 .br
 .B \- User process data pages
 .br
@@ -164,10 +164,26 @@ by dump_level 11, makedumpfile retries it by dump_level 31.
 # makedumpfile \-d 11 \-x vmlinux /proc/vmcore dumpfile
 .br
 # makedumpfile \-d 11,31 \-x vmlinux /proc/vmcore dumpfile
+.br
+.B Base level:
+.br
+dump_level consists of five bits, so there are five base levels to specify the type of unnecessary page.
+.br
+	\fB 1\fR :	Exclude the pages filled with zero.
+.br
+	\fB 2\fR :	Exclude the non-private cache pages.
+.br
+	\fB 4\fR :	Exclude all cache pages.
+.br
+	\fB 8\fR :	Exclude the user process data pages.
+.br
+	\fB16\fR :	Exclude the free pages.
 
-       |      |cache  |cache  |      |
-  dump | zero |without|with   | user | free
- level | page |private|private| data | page
+Here is the all combinations of the bits.
+
+       |      |non-   |       |      |
+  dump | zero |private|private| user | free
+ level | page |cache  |cache  | data | page
 .br
 \-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-\-+\-\-\-\-\-\-\-+\-\-\-\-\-\-+\-\-\-\-\-\-
      0 |      |       |       |      |

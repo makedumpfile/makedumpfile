@@ -200,3 +200,79 @@
 
   - segments
     The data dumped are all stored in segments and notes.
+
+
+* The incomplete DUMPFILE
+  When generating DUMPFILE, if ENOSPACE error happens, the DUMPFILE will be
+  incomplete.
+
+  - The incomplete kdump-compressed DUMPFILE
+
+	   the complete                  the incomplete
+    +-----------------------+    +-----------------------+
+    |      main header      |    |      main header      |  have incomplete flag
+    |-----------------------+    |-----------------------+
+    |      sub header       |    |      sub header       |
+    |-----------------------+    |-----------------------+
+    |      1st-bitmap       |    |      1st-bitmap       |
+    |-----------------------+    |-----------------------+
+    |      2nd-bitmap       |    |      2nd-bitmap       |
+    |-----------------------+    |-----------------------+
+    | page header for pfn 0 |    | page header for pfn 0 |
+    | page header for pfn 1 |    | page header for pfn 1 |
+    |                  :    |    |                  :    |
+    | page header for pfn N |    | page header for pfn N |  The page headers after
+    |                  :    |    |                       |  N don't exist. The
+    | page header for pfn Z |    |                       |  value of it is zero,
+    |-----------------------|    |-----------------------|  when try to read it.
+    |   page data (pfn 0)   |    |   page data (pfn 0)   |
+    |   page data (pfn 1)   |    |   page data (pfn 1)   |
+    |                  :    |    |                  :    |
+    |   page data (pfn N)   |    |   page data (pfn N)   |
+    |                  :    |    +-----------------------+
+    |   page data (pfn Z)   |
+    +-----------------------+
+
+    The incomplete flag is set into status of disk_dump_header by
+			  status |= DUMP_DH_COMPRESSED_INCOMPLETE
+    DUMP_DH_COMPRESSED_INCOMPLETE : 0x8
+
+    The page header and page data are written in pairs. When writing page data
+    (pfn N+1), if ENOSPACE error happens, the page headers after N won't be
+    written either.
+
+    If there is no page data dumped into the DUMPFILE, the DUMPFILE can't be
+    analysed by crash.
+
+  - The incomplete elf DUMPFILE
+
+       the complete          the incomplete
+    +-------------+         +-------------+
+    |  elf header |         |  elf header |  have incomplete flag
+    |-------------+         |-------------+
+    |  PT_NOTE    |         |  PT_NOTE    |
+    |  PT_LOAD(1) |         |  PT_LOAD(1) |
+    |         :   |         |         :   |
+    |  PT_LOAD(N) |         |  PT_LOAD(N) |  The PT_LOAD after N don't exist.
+    |         :   |         |             |  The value of it is zero, when try
+    |  PT_LOAD(Z) |         |             |  to read it.
+    |-------------+         |-------------+
+    |    NOTE     |         |     NOTE    |
+    |-------------+         |-------------+
+    |  segment(1) |         |  segment(1) |
+    |          :  |         |          :  |
+    |  segment(N) |         |  segment(N) |  The segment(N) is incomplete.
+    |          :  |         +-------------+  The segments after N don't exist.
+    |  segment(Z) |
+    +-------------+
+
+    The incomplete flag is set into e_flags of elf_header by
+			      e_flags |= DUMP_ELF_INCOMPLETE
+    DUMP_ELF_INCOMPLETE : 0x1
+
+    The PT_LOAD and segment are written in pairs. When writing segment(N)
+    , if ENOSPACE error happens, the PT_LOAD after N won't be written
+    either.
+
+    If there is no segment dumped into the DUMPFILE, the DUMPFILE can't be
+    analysed by crash.

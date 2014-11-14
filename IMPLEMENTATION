@@ -145,17 +145,17 @@
     0x1 : incomplete
 
 	typedef struct elf32_hdr{
-		unsigned char e_ident[EI_NIDENT];
-		Elf32_Half    e_type;
+		unsigned char e_ident[EI_NIDENT];	/* ELF "magic number" */
+		Elf32_Half    e_type;		/* Object file type (CORE) */
 		Elf32_Half    e_machine;
 		Elf32_Word    e_version;
 		Elf32_Addr    e_entry;
-		Elf32_Off     e_phoff;
+		Elf32_Off     e_phoff;		/* Program header table file offset */
 		Elf32_Off     e_shoff;
 		Elf32_Word    e_flags;
-		Elf32_Half    e_ehsize;
-		Elf32_Half    e_phentsize;
-		Elf32_Half    e_phnum;
+		Elf32_Half    e_ehsize;		/* Size of this header */
+		Elf32_Half    e_phentsize;	/* Size of program headers */
+		Elf32_Half    e_phnum;		/* Number of program headers */
 		Elf32_Half    e_shentsize;
 		Elf32_Half    e_shnum;
 		Elf32_Half    e_shstrndx;
@@ -168,13 +168,13 @@
 
 	typedef struct elf32_phdr{
 		Elf32_Word    p_type;
-		Elf32_Off     p_offset;
-		Elf32_Addr    p_vaddr;
-		Elf32_Addr    p_paddr;
-		Elf32_Word    p_filesz;
-		Elf32_Word    p_memsz;
+		Elf32_Off     p_offset;		/* Segment file offset */
+		Elf32_Addr    p_vaddr;		/* Segment virtual address */
+		Elf32_Addr    p_paddr;		/* Segment physical address */
+		Elf32_Word    p_filesz;		/* Segment size in file */
+		Elf32_Word    p_memsz;		/* Segment size in memory */
 		Elf32_Word    p_flags;
-		Elf32_Word    p_align;
+		Elf32_Word    p_align;		/* Segment alignment, file & memory */
 	} Elf32_Phdr;
 
   - note

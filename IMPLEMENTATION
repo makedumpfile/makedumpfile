@@ -112,3 +112,91 @@
         unsigned long long      page_flags;     /* page flags */
     } page_desc_t;
 
+
+* The ELF format
+  There are two different ELF format(ELF32, ELF64) for K-bit architectures (K=32,64).
+  Since they almost have the same behaviour in this situation, the following will use
+  ELF32 as a example.
+
+  - The file structure
+
+    +---------------------------------+
+    |  elf_header (struct elf32_hdr)  |
+    |---------------------------------+
+    |  PT_NOTE    (struct elf32_phdr) |
+    |---------------------------------+
+    |  PT_LOAD(1) (struct elf32_phdr) |
+    |  PT_LOAD(2) (struct elf32_phdr) |
+    |             :                   |
+    |  PT_LOAD(Z) (struct elf32_phdr) |
+    |---------------------------------+
+    |  NOTE                           |
+    |---------------------------------+
+    |  segment(1)                     |
+    |  segment(2)                     |
+    |          :                      |
+    |  segment(Z)                     |
+    +---------------------------------+
+
+  - elf_header
+    This header is almost the same as a normal elf_header. The difference is that the
+    e_flags is used for indicating whether the dump file is complete or not.
+    0x0 : complete,
+    0x1 : incomplete
+
+	typedef struct elf32_hdr{
+		unsigned char e_ident[EI_NIDENT];
+		Elf32_Half    e_type;
+		Elf32_Half    e_machine;
+		Elf32_Word    e_version;
+		Elf32_Addr    e_entry;
+		Elf32_Off     e_phoff;
+		Elf32_Off     e_shoff;
+		Elf32_Word    e_flags;
+		Elf32_Half    e_ehsize;
+		Elf32_Half    e_phentsize;
+		Elf32_Half    e_phnum;
+		Elf32_Half    e_shentsize;
+		Elf32_Half    e_shnum;
+		Elf32_Half    e_shstrndx;
+	} Elf32_Ehdr;
+
+  - PT_NOTE and PT_LOAD
+    PT_NOTE corresponds to NOTE and PT_LOAD to segment.
+    They present the corresponding NOTE and segments information.
+
+
+	typedef struct elf32_phdr{
+		Elf32_Word    p_type;
+		Elf32_Off     p_offset;
+		Elf32_Addr    p_vaddr;
+		Elf32_Addr    p_paddr;
+		Elf32_Word    p_filesz;
+		Elf32_Word    p_memsz;
+		Elf32_Word    p_flags;
+		Elf32_Word    p_align;
+	} Elf32_Phdr;
+
+  - note
+    The note structure
+
+    +------------------------------------+
+    |  note header 1 (struct elf32_note) |
+    |  note header 2 (struct elf32_note) |
+    |               :                    |
+    |  note header N (struct elf32_note) |
+    |------------------------------------+
+    |  note data 1                       |
+    |  note data 2                       |
+    |          :                         |
+    |  note data N                       |
+    +------------------------------------+
+
+	typedef struct elf32_note {
+		Elf32_Word    n_namesz;       /* Name size */
+		Elf32_Word    n_descsz;       /* Content size */
+		Elf32_Word    n_type;         /* Content type */
+	} Elf32_Nhdr;
+
+  - segments
+    The data dumped are all stored in segments and notes.

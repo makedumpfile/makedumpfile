@@ -4999,7 +4999,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 			pfn_counter = &pfn_free;
 		}
 		/*
-		 * Exclude the cache page without the private page.
+		 * Exclude the non-private cache page.
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_CACHE)
 		    && (isLRU(flags) || isSwapCache(flags))
@@ -5007,12 +5007,15 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 			pfn_counter = &pfn_cache;
 		}
 		/*
-		 * Exclude the cache page with the private page.
+		 * Exclude the cache page whether private or non-private.
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
 		    && (isLRU(flags) || isSwapCache(flags))
 		    && !isAnon(mapping)) {
-			pfn_counter = &pfn_cache_private;
+			if (isPrivate(flags))
+				pfn_counter = &pfn_cache_private;
+			else
+				pfn_counter = &pfn_cache;
 		}
 		/*
 		 * Exclude the data page of the user process.
@@ -8273,8 +8276,8 @@ print_report(void)
 	REPORT_MSG("Original pages  : 0x%016llx\n", pfn_original);
 	REPORT_MSG("  Excluded pages   : 0x%016llx\n", pfn_excluded);
 	REPORT_MSG("    Pages filled with zero  : 0x%016llx\n", pfn_zero);
-	REPORT_MSG("    Cache pages             : 0x%016llx\n", pfn_cache);
-	REPORT_MSG("    Cache pages + private   : 0x%016llx\n",
+	REPORT_MSG("    Non-private cache pages : 0x%016llx\n", pfn_cache);
+	REPORT_MSG("    Private cache pages     : 0x%016llx\n",
 	    pfn_cache_private);
 	REPORT_MSG("    User process data pages : 0x%016llx\n", pfn_user);
 	REPORT_MSG("    Free pages              : 0x%016llx\n", pfn_free);
@@ -8311,8 +8314,9 @@ print_mem_usage(void)
 	MSG("----------------------------------------------------------------------\n");
 
 	MSG("ZERO		%-16llu	yes		Pages filled with zero\n", pfn_zero);
-	MSG("CACHE		%-16llu	yes		Cache pages\n", pfn_cache);
-	MSG("CACHE_PRIVATE	%-16llu	yes		Cache pages + private\n",
+	MSG("NON_PRI_CACHE	%-16llu	yes		Cache pages without private flag\n",
+	    pfn_cache);
+	MSG("PRI_CACHE	%-16llu	yes		Cache pages with private flag\n",
 	    pfn_cache_private);
 	MSG("USER		%-16llu	yes		User process pages\n", pfn_user);
 	MSG("FREE		%-16llu	yes		Free pages\n", pfn_free);

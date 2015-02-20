@@ -84,6 +84,7 @@ struct sadump_info {
 	unsigned long backup_src_size;
 	unsigned long long backup_offset;
 	int kdump_backed_up;
+	mdf_pfn_t max_mapnr;
 };
 
 static char *guid_to_str(efi_guid_t *guid, char *buf, size_t buflen);
@@ -625,6 +626,19 @@ restart:
 		offset += sh->sub_hdr_size * block_size;
 	}
 
+	switch (sh->header_version) {
+	case 0:
+		si->max_mapnr = (mdf_pfn_t)(uint64_t)sh->max_mapnr;
+		break;
+	default:
+		ERRMSG("sadump: unsupported header version: %u\n"
+		       "sadump: assuming header version: 1\n",
+		       sh->header_version);
+	case 1:
+		si->max_mapnr = (mdf_pfn_t)sh->max_mapnr_64;
+		break;
+	}
+
 	if (!sh->bitmap_blocks) {
 		DEBUG_MSG("sadump: bitmap_blocks is zero\n");
 		return FALSE;
@@ -775,7 +789,7 @@ sadump_initialize_bitmap_memory(void)
 	memset(bmp->buf, 0, BUFSIZE_BITMAP);
 	bmp->offset = dumpable_bitmap_offset;
 
-	max_section = divideup(sh->max_mapnr, SADUMP_PF_SECTION_NUM);
+	max_section = divideup(si->max_mapnr, SADUMP_PF_SECTION_NUM);
 
 	block_table = calloc(sizeof(unsigned long long), max_section);
 	if (block_table == NULL) {
@@ -906,7 +920,7 @@ sadump_set_timestamp(struct timeval *ts)
 mdf_pfn_t
 sadump_get_max_mapnr(void)
 {
-	return si->sh_memory->max_mapnr;
+	return si->max_mapnr;
 }
 
 #ifdef __x86_64__
@@ -964,7 +978,7 @@ readpage_sadump(unsigned long long paddr, void *bufptr)
 
 	pfn = paddr_to_pfn(paddr);
 
-	if (pfn >= si->sh_memory->max_mapnr)
+	if (pfn >= si->max_mapnr)
 		return FALSE;
 
 	if (!is_dumpable(info->bitmap_memory, pfn)) {

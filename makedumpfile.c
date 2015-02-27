@@ -347,7 +347,7 @@ initialize_mmap(void) {
 	info->mmap_buf = MAP_FAILED;
 
 	get_pt_load(0, &phys_start, NULL, NULL, NULL);
-	if (!update_mmap_range(phys_start, 1))
+	if (!update_mmap_range(paddr_to_offset(phys_start), 1))
 		return FALSE;
 
 	return TRUE;

@@ -39,6 +39,10 @@ struct SplitBlock		*splitblock = NULL;
 
 char filename_stdout[] = FILENAME_STDOUT;
 
+/* Cache statistics */
+static unsigned long long	cache_hit;
+static unsigned long long	cache_miss;
+
 static void first_cycle(mdf_pfn_t start, mdf_pfn_t max, struct cycle *cycle)
 {
 	cycle->start_pfn = round(start, info->pfn_cyclic);
@@ -645,6 +649,7 @@ next_page:
 	pgaddr = PAGEBASE(paddr);
 	pgbuf = cache_search(pgaddr);
 	if (!pgbuf) {
+		++cache_miss;
 		cached = cache_alloc(pgaddr);
 		if (!cached)
 			goto error;
@@ -661,7 +666,8 @@ next_page:
 				goto error_cached;
 		}
 		cache_add(cached);
-	}
+	} else
+		++cache_hit;
 
 	memcpy(bufptr, pgbuf + PAGEOFFSET(paddr), read_size);
 
@@ -8294,6 +8300,11 @@ print_report(void)
 	REPORT_MSG("--------------------------------------------------\n");
 	REPORT_MSG("Total pages     : 0x%016llx\n", info->max_mapnr);
 	REPORT_MSG("\n");
+	REPORT_MSG("Cache hit: %lld, miss: %lld", cache_hit, cache_miss);
+	if (cache_hit + cache_miss)
+		REPORT_MSG(", hit rate: %.1f%%",
+		    100.0 * cache_hit / (cache_hit + cache_miss));
+	REPORT_MSG("\n\n");
 }
 
 static void

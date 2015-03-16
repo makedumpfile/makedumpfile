@@ -32,22 +32,22 @@ static int avail = CACHE_SIZE;
 
 static struct cache used, pending;
 
+static void *cachebuf;
+
 int
 cache_init(void)
 {
-	void *bufptr;
 	int i;
 
-	for (i = 0; i < CACHE_SIZE; ++i) {
-		bufptr = malloc(info->page_size);
-		if (bufptr == NULL) {
-			ERRMSG("Can't allocate memory for cache. %s\n",
-			       strerror(errno));
-			return FALSE;
-		}
-		entries[i].bufptr = bufptr;
-		pool[i] = &entries[i];
+	cachebuf = malloc(info->page_size * CACHE_SIZE);
+	if (cachebuf == NULL) {
+		ERRMSG("Can't allocate memory for cache. %s\n",
+		       strerror(errno));
+		return FALSE;
 	}
+
+	for (i = 0; i < CACHE_SIZE; ++i)
+		pool[i] = &entries[i];
 
 	return TRUE;
 }
@@ -98,6 +98,7 @@ struct cache_entry *
 cache_alloc(unsigned long long paddr)
 {
 	struct cache_entry *entry = NULL;
+	int idx;
 
 	if (avail) {
 		entry = pool[--avail];
@@ -107,8 +108,11 @@ cache_alloc(unsigned long long paddr)
 	} else
 		return NULL;
 
-	add_entry(&pending, entry);
+	idx = entry - entries;
 	entry->paddr = paddr;
+	entry->bufptr = cachebuf + idx * info->page_size;
+	add_entry(&pending, entry);
+
 	return entry;
 }
 

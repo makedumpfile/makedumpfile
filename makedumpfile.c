@@ -652,13 +652,13 @@ next_page:
 
 		if (info->flag_refiltering) {
 			if (!readpage_kdump_compressed(pgaddr, pgbuf))
-				goto error;
+				goto error_cached;
 		} else if (info->flag_sadump) {
 			if (!readpage_sadump(pgaddr, pgbuf))
-				goto error;
+				goto error_cached;
 		} else {
 			if (!readpage_elf(pgaddr, pgbuf))
-				goto error;
+				goto error_cached;
 		}
 		cache_add(cached);
 	}
@@ -674,6 +674,8 @@ next_page:
 
 	return size_orig;
 
+error_cached:
+	cache_free(cached);
 error:
 	ERRMSG("type_addr: %d, addr:%llx, size:%zd\n", type_addr, addr, size_orig);
 	return FALSE;

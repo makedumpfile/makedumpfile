@@ -29,5 +29,6 @@ int cache_init(void);
 void *cache_search(unsigned long long paddr);
 struct cache_entry *cache_alloc(unsigned long long paddr);
 void cache_add(struct cache_entry *entry);
+void cache_free(struct cache_entry *entry);
 
 #endif	/* _CACHE_H */

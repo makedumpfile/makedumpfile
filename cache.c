@@ -26,7 +26,8 @@ struct cache {
 
 /* 8 pages covers 4-level paging plus 4 data pages */
 #define CACHE_SIZE	8
-static struct cache_entry pool[CACHE_SIZE];
+static struct cache_entry entries[CACHE_SIZE];
+static struct cache_entry *pool[CACHE_SIZE];
 static int avail = CACHE_SIZE;
 
 static struct cache used, pending;
@@ -44,7 +45,8 @@ cache_init(void)
 			       strerror(errno));
 			return FALSE;
 		}
-		pool[i].bufptr = bufptr;
+		entries[i].bufptr = bufptr;
+		pool[i] = &entries[i];
 	}
 
 	return TRUE;
@@ -98,7 +100,7 @@ cache_alloc(unsigned long long paddr)
 	struct cache_entry *entry = NULL;
 
 	if (avail) {
-		entry = &pool[--avail];
+		entry = pool[--avail];
 		add_entry(&pending, entry);
 	} else if (pending.tail) {
 		entry = pending.tail;
@@ -118,4 +120,11 @@ cache_add(struct cache_entry *entry)
 {
 	remove_entry(&pending, entry);
 	add_entry(&used, entry);
+}
+
+void
+cache_free(struct cache_entry *entry)
+{
+	remove_entry(&pending, entry);
+	pool[avail++] = entry;
 }

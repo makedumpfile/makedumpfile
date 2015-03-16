@@ -294,15 +294,18 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 	return TRUE;
 }
 
+static void
+unmap_cache(struct cache_entry *entry)
+{
+	munmap(entry->bufptr, entry->buflen);
+}
+
 static int
 update_mmap_range(off_t offset, int initial) {
 	off_t start_offset, end_offset;
 	off_t map_size;
 	off_t max_offset = get_max_file_offset();
 	off_t pt_load_end = offset_to_pt_load_end(offset);
-
-	munmap(info->mmap_buf,
-	       info->mmap_end_offset - info->mmap_start_offset);
 
 	/*
 	 * offset for mmap() must be page aligned.
@@ -357,29 +360,45 @@ initialize_mmap(void) {
 	return TRUE;
 }
 
-static int
-read_with_mmap(off_t offset, void *bufptr, unsigned long size) {
-	size_t read_size;
+static char *
+mappage_elf(unsigned long long paddr)
+{
+	off_t offset, offset2;
 
-next_region:
+	if (info->flag_usemmap != MMAP_ENABLE)
+		return NULL;
 
-	if (!is_mapped_with_mmap(offset))
-		if (!update_mmap_range(offset, 0))
-			return FALSE;
+	offset = paddr_to_offset(paddr);
+	if (!offset || page_is_fractional(offset))
+		return NULL;
 
-	read_size = MIN(info->mmap_end_offset - offset, size);
+	offset2 = paddr_to_offset(paddr + info->page_size);
+	if (!offset2)
+		return NULL;
 
-	memcpy(bufptr, info->mmap_buf +
-	       (offset - info->mmap_start_offset), read_size);
+	if (offset2 - offset != info->page_size)
+		return NULL;
 
-	offset += read_size;
-	bufptr += read_size;
-	size -= read_size;
+	if (!is_mapped_with_mmap(offset) &&
+	    !update_mmap_range(offset, 0)) {
+		ERRMSG("Can't read the dump memory(%s) with mmap().\n",
+		       info->name_memory);
 
-	if (size > 0)
-		goto next_region;
+		ERRMSG("This kernel might have some problems about mmap().\n");
+		ERRMSG("read() will be used instead of mmap() from now.\n");
 
-	return TRUE;
+		/*
+		 * Fall back to read().
+		 */
+		info->flag_usemmap = MMAP_DISABLE;
+		return NULL;
+	}
+
+	if (offset < info->mmap_start_offset ||
+	    offset + info->page_size > info->mmap_end_offset)
+		return NULL;
+
+	return info->mmap_buf + (offset - info->mmap_start_offset);
 }
 
 static int
@@ -387,33 +406,16 @@ read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 {
 	const off_t failed = (off_t)-1;
 
-	if (info->flag_usemmap == MMAP_ENABLE &&
-	    page_is_fractional(offset) == FALSE) {
-		if (!read_with_mmap(offset, bufptr, size)) {
-			ERRMSG("Can't read the dump memory(%s) with mmap().\n",
-			       info->name_memory);
+	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
+		       info->name_memory, (unsigned long long)offset, strerror(errno));
+		return FALSE;
+	}
 
-			ERRMSG("This kernel might have some problems about mmap().\n");
-			ERRMSG("read() will be used instead of mmap() from now.\n");
-
-			/*
-			 * Fall back to read().
-			 */
-			info->flag_usemmap = MMAP_DISABLE;
-			read_from_vmcore(offset, bufptr, size);
-		}
-	} else {
-		if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
-			ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
-			       info->name_memory, (unsigned long long)offset, strerror(errno));
-			return FALSE;
-		}
-
-		if (read(info->fd_memory, bufptr, size) != size) {
-			ERRMSG("Can't read the dump memory(%s). %s\n",
-			       info->name_memory, strerror(errno));
-			return FALSE;
-		}
+	if (read(info->fd_memory, bufptr, size) != size) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		       info->name_memory, strerror(errno));
+		return FALSE;
 	}
 
 	return TRUE;
@@ -662,7 +664,18 @@ next_page:
 			if (!readpage_sadump(pgaddr, pgbuf))
 				goto error_cached;
 		} else {
-			if (!readpage_elf(pgaddr, pgbuf))
+			char *mapbuf = mappage_elf(pgaddr);
+			size_t mapoff;
+
+			if (mapbuf) {
+				pgbuf = mapbuf;
+				mapoff = mapbuf - info->mmap_buf;
+				cached->paddr = pgaddr - mapoff;
+				cached->bufptr = info->mmap_buf;
+				cached->buflen = info->mmap_end_offset -
+					info->mmap_start_offset;
+				cached->discard = unmap_cache;
+			} else if (!readpage_elf(pgaddr, pgbuf))
 				goto error_cached;
 		}
 		cache_add(cached);

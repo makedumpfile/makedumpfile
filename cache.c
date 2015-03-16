@@ -108,6 +108,8 @@ cache_alloc(unsigned long long paddr)
 	} else if (used.tail) {
 		entry = used.tail;
 		remove_entry(&used, entry);
+		if (entry->discard)
+			entry->discard(entry);
 	} else
 		return NULL;
 
@@ -115,6 +117,7 @@ cache_alloc(unsigned long long paddr)
 	entry->paddr = paddr;
 	entry->bufptr = cachebuf + idx * info->page_size;
 	entry->buflen = info->page_size;
+	entry->discard = NULL;
 	add_entry(&pending, entry);
 
 	return entry;

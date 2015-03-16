@@ -24,6 +24,8 @@ struct cache_entry {
 	void *bufptr;
 	unsigned long buflen;
 	struct cache_entry *next, *prev;
+
+	void (*discard)(struct cache_entry *);
 };
 
 int cache_init(void);

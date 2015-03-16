@@ -591,6 +591,7 @@ readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 	unsigned long long paddr, maddr = NOT_PADDR;
 	unsigned long long pgaddr;
 	void *pgbuf;
+	struct cache_entry *cached;
 
 next_page:
 	switch (type_addr) {
@@ -644,9 +645,10 @@ next_page:
 	pgaddr = PAGEBASE(paddr);
 	pgbuf = cache_search(pgaddr);
 	if (!pgbuf) {
-		pgbuf = cache_alloc(pgaddr);
-		if (!pgbuf)
+		cached = cache_alloc(pgaddr);
+		if (!cached)
 			goto error;
+		pgbuf = cached->bufptr;
 
 		if (info->flag_refiltering) {
 			if (!readpage_kdump_compressed(pgaddr, pgbuf))
@@ -658,7 +660,7 @@ next_page:
 			if (!readpage_elf(pgaddr, pgbuf))
 				goto error;
 		}
-		cache_add(pgaddr);
+		cache_add(cached);
 	}
 
 	memcpy(bufptr, pgbuf + PAGEOFFSET(paddr), read_size);

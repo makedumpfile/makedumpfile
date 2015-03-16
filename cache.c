@@ -20,12 +20,6 @@
 #include "cache.h"
 #include "print_info.h"
 
-struct cache_entry {
-	unsigned long long paddr;
-	void *bufptr;
-	struct cache_entry *next, *prev;
-};
-
 struct cache {
 	struct cache_entry *head, *tail;
 };
@@ -98,38 +92,30 @@ cache_search(unsigned long long paddr)
 	return NULL;		/* cache miss */
 }
 
-void *
+struct cache_entry *
 cache_alloc(unsigned long long paddr)
 {
 	struct cache_entry *entry = NULL;
 
 	if (avail) {
 		entry = &pool[--avail];
-		entry->paddr = paddr;
 		add_entry(&pending, entry);
 	} else if (pending.tail) {
 		entry = pending.tail;
-		entry->paddr = paddr;
 	} else if (used.tail) {
 		entry = used.tail;
 		remove_entry(&used, entry);
-		entry->paddr = paddr;
 		add_entry(&pending, entry);
 	} else
 		return NULL;
 
-	return entry->bufptr;
+	entry->paddr = paddr;
+	return entry;
 }
 
 void
-cache_add(unsigned long long paddr)
+cache_add(struct cache_entry *entry)
 {
-	struct cache_entry *entry;
-	for (entry = pending.head; entry; entry = entry->next) {
-		if (entry->paddr == paddr) {
-			remove_entry(&pending, entry);
-			add_entry(&used, entry);
-			break;
-		}
-	}
+	remove_entry(&pending, entry);
+	add_entry(&used, entry);
 }

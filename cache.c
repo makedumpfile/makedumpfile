@@ -79,17 +79,20 @@ remove_entry(struct cache *cache, struct cache_entry *entry)
 }
 
 void *
-cache_search(unsigned long long paddr)
+cache_search(unsigned long long paddr, unsigned long length)
 {
 	struct cache_entry *entry;
-	for (entry = used.head; entry; entry = entry->next)
-		if (entry->paddr == paddr) {
+	for (entry = used.head; entry; entry = entry->next) {
+		size_t off = paddr - entry->paddr;
+		if (off < entry->buflen &&
+		    length <= entry->buflen - off) {
 			if (entry != used.head) {
 				remove_entry(&used, entry);
 				add_entry(&used, entry);
 			}
-			return entry->bufptr;
+			return entry->bufptr + off;
 		}
+	}
 
 	return NULL;		/* cache miss */
 }
@@ -111,6 +114,7 @@ cache_alloc(unsigned long long paddr)
 	idx = entry - entries;
 	entry->paddr = paddr;
 	entry->bufptr = cachebuf + idx * info->page_size;
+	entry->buflen = info->page_size;
 	add_entry(&pending, entry);
 
 	return entry;

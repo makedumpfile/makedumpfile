@@ -22,11 +22,12 @@
 struct cache_entry {
 	unsigned long long paddr;
 	void *bufptr;
+	unsigned long buflen;
 	struct cache_entry *next, *prev;
 };
 
 int cache_init(void);
-void *cache_search(unsigned long long paddr);
+void *cache_search(unsigned long long paddr, unsigned long length);
 struct cache_entry *cache_alloc(unsigned long long paddr);
 void cache_add(struct cache_entry *entry);
 void cache_free(struct cache_entry *entry);

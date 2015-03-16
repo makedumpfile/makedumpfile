@@ -647,7 +647,7 @@ next_page:
 	read_size = MIN(info->page_size - PAGEOFFSET(paddr), size);
 
 	pgaddr = PAGEBASE(paddr);
-	pgbuf = cache_search(pgaddr);
+	pgbuf = cache_search(pgaddr, read_size);
 	if (!pgbuf) {
 		++cache_miss;
 		cached = cache_alloc(pgaddr);

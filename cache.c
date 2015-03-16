@@ -101,16 +101,13 @@ cache_alloc(unsigned long long paddr)
 
 	if (avail) {
 		entry = pool[--avail];
-		add_entry(&pending, entry);
-	} else if (pending.tail) {
-		entry = pending.tail;
 	} else if (used.tail) {
 		entry = used.tail;
 		remove_entry(&used, entry);
-		add_entry(&pending, entry);
 	} else
 		return NULL;
 
+	add_entry(&pending, entry);
 	entry->paddr = paddr;
 	return entry;
 }

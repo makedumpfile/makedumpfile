@@ -239,8 +239,11 @@ vaddr_to_paddr_x86(unsigned long vaddr)
 	if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
 		return paddr;
 
-	if ((SYMBOL(vmlist) == NOT_FOUND_SYMBOL)
-	    || (OFFSET(vm_struct.addr) == NOT_FOUND_STRUCTURE)) {
+	if (((SYMBOL(vmap_area_list) == NOT_FOUND_SYMBOL)
+	     || (OFFSET(vmap_area.va_start) == NOT_FOUND_STRUCTURE)
+	     || (OFFSET(vmap_area.list) == NOT_FOUND_STRUCTURE))
+	    && ((SYMBOL(vmlist) == NOT_FOUND_SYMBOL)
+		|| (OFFSET(vm_struct.addr) == NOT_FOUND_STRUCTURE))) {
 		ERRMSG("Can't get necessary information for vmalloc translation.\n");
 		return NOT_PADDR;
 	}

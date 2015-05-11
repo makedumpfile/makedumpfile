@@ -4788,6 +4788,9 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 		if (!is_in_segs(paddr))
 			continue;
 
+		if (!sync_2nd_bitmap())
+			return FALSE;
+
 		if (!is_dumpable(info->bitmap2, pfn, cycle))
 			continue;
 
@@ -5244,7 +5247,8 @@ create_2nd_bitmap(struct cycle *cycle)
 	 *	 should be fixed for creating an ELF header. That is slow
 	 *	 due to reading each page two times, but it is necessary.
 	 */
-	if ((info->dump_level & DL_EXCLUDE_ZERO) && info->flag_elf_dumpfile) {
+	if ((info->dump_level & DL_EXCLUDE_ZERO) &&
+	    (info->flag_elf_dumpfile || info->flag_mem_usage)) {
 		/*
 		 * 2nd-bitmap should be flushed at this time, because
 		 * exclude_zero_pages() checks 2nd-bitmap.
@@ -5252,7 +5256,7 @@ create_2nd_bitmap(struct cycle *cycle)
 		if (!sync_2nd_bitmap())
 			return FALSE;
 
-		if (!exclude_zero_pages()) {
+		if (!exclude_zero_pages_cyclic(cycle)) {
 			ERRMSG("Can't exclude pages filled with zero for creating an ELF dumpfile.\n");
 			return FALSE;
 		}
@@ -5599,16 +5603,9 @@ write_elf_header(struct cache_data *cd_header)
 	/*
 	 * Get the PT_LOAD number of the dumpfile.
 	 */
-	if (info->flag_cyclic) {
-		if (!(num_loads_dumpfile = get_loads_dumpfile_cyclic())) {
-			ERRMSG("Can't get a number of PT_LOAD.\n");
-			goto out;
-		}
-	} else {
-		if (!(num_loads_dumpfile = get_loads_dumpfile())) {
-			ERRMSG("Can't get a number of PT_LOAD.\n");
-			goto out;
-		}
+	if (!(num_loads_dumpfile = get_loads_dumpfile_cyclic())) {
+		ERRMSG("Can't get a number of PT_LOAD.\n");
+		goto out;
 	}
 
 	if (is_elf64_memory()) { /* ELF64 */
@@ -6328,7 +6325,6 @@ get_loads_dumpfile_cyclic(void)
 {
 	int i, phnum, num_new_load = 0;
 	long page_size = info->page_size;
-	unsigned char buf[info->page_size];
 	mdf_pfn_t pfn, pfn_start, pfn_end, num_excluded;
 	unsigned long frac_head, frac_tail;
 	Elf64_Phdr load;
@@ -6357,27 +6353,15 @@ get_loads_dumpfile_cyclic(void)
 			pfn_end++;
 
 		for_each_cycle(pfn_start, pfn_end, &cycle) {
-			if (!create_2nd_bitmap(&cycle))
-				return FALSE;
+			if (info->flag_cyclic) {
+				if (!create_2nd_bitmap(&cycle))
+					return FALSE;
+			}
 			for (pfn = MAX(pfn_start, cycle.start_pfn); pfn < cycle.end_pfn; pfn++) {
 				if (!is_dumpable(info->bitmap2, pfn, &cycle)) {
 					num_excluded++;
 					continue;
 				}
-
-				/*
-				 * Exclude zero pages.
-				 */
-				if (info->dump_level & DL_EXCLUDE_ZERO) {
-					if (!read_pfn(pfn, buf))
-						return FALSE;
-					if (is_zero_page(buf, page_size)) {
-						num_excluded++;
-						continue;
-					}
-				}
-
-				info->num_dumpable++;
 
 				/*
 				 * If the number of the contiguous pages to be excluded
@@ -6400,7 +6384,6 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 {
 	int i, phnum;
 	long page_size = info->page_size;
-	unsigned char buf[info->page_size];
 	mdf_pfn_t pfn, pfn_start, pfn_end, num_excluded, num_dumpable, per;
 	unsigned long long paddr;
 	unsigned long long memsz, filesz;
@@ -6423,9 +6406,11 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	/*
 	 * Reset counter for debug message.
 	 */
-	pfn_zero = pfn_cache = pfn_cache_private = 0;
-	pfn_user = pfn_free = pfn_hwpoison = 0;
-	pfn_memhole = info->max_mapnr;
+	if (info->flag_cyclic) {
+		pfn_zero = pfn_cache = pfn_cache_private = 0;
+		pfn_user = pfn_free = pfn_hwpoison = 0;
+		pfn_memhole = info->max_mapnr;
+	}
 
 	if (!(phnum = get_phnum_memory()))
 		return FALSE;
@@ -6462,8 +6447,10 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 			/*
 			 * Update target region and partial bitmap if necessary.
 			 */
-			if (!create_2nd_bitmap(&cycle))
-				return FALSE;
+			if (info->flag_cyclic) {
+				if (!create_2nd_bitmap(&cycle))
+					return FALSE;
+			}
 
 			for (pfn = MAX(pfn_start, cycle.start_pfn); pfn < cycle.end_pfn; pfn++) {
 				if (!is_dumpable(info->bitmap2, pfn, &cycle)) {
@@ -6473,23 +6460,6 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 					else
 						memsz += page_size;
 					continue;
-				}
-
-				/*
-				 * Exclude zero pages.
-				 */
-				if (info->dump_level & DL_EXCLUDE_ZERO) {
-					if (!read_pfn(pfn, buf))
-						return FALSE;
-					if (is_zero_page(buf, page_size)) {
-						pfn_zero++;
-						num_excluded++;
-						if ((pfn == pfn_end - 1) && frac_tail)
-							memsz += frac_tail;
-						else
-							memsz += page_size;
-						continue;
-					}
 				}
 
 				if ((num_dumped % per) == 0)
@@ -8202,13 +8172,8 @@ writeout_dumpfile(void)
 	if (info->flag_elf_dumpfile) {
 		if (!write_elf_header(&cd_header))
 			goto out;
-		if (info->flag_cyclic) {
-			if (!write_elf_pages_cyclic(&cd_header, &cd_page))
+		if (!write_elf_pages_cyclic(&cd_header, &cd_page))
 				goto write_cache_enospc;
-		} else {
-			if (!write_elf_pages(&cd_header, &cd_page))
-				goto write_cache_enospc;
-		}
 		if (!write_elf_eraseinfo(&cd_header))
 			goto out;
 	} else {

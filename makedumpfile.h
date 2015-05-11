@@ -940,7 +940,7 @@ struct dump_bitmap {
 	int		fd;
 	int		no_block;
 	char		*file_name;
-	char		buf[BUFSIZE_BITMAP];
+	char		*buf;
 	off_t		offset;
 };
 
@@ -1192,8 +1192,8 @@ struct DumpInfo {
 	/*
 	 * for cyclic processing
 	 */
-	char               *partial_bitmap1;
-	char               *partial_bitmap2;
+	struct dump_bitmap *partial_bitmap1;
+	struct dump_bitmap *partial_bitmap2;
 	mdf_pfn_t          num_dumpable;
 	unsigned long      bufsize_cyclic;
 	unsigned long      pfn_cyclic;
@@ -1804,12 +1804,12 @@ is_dumpable(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 }
 
 static inline int
-is_dumpable_cyclic(char *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
+is_dumpable_cyclic(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
 		return FALSE;
 	else
-		return is_on(bitmap, pfn - cycle->start_pfn);
+		return is_on(bitmap->buf, pfn - cycle->start_pfn);
 }
 
 static inline int

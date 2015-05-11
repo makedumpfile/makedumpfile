@@ -236,8 +236,7 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 }
 
 #define BITMAP_SECT_LEN 4096
-static inline int is_dumpable(struct dump_bitmap *, mdf_pfn_t);
-static inline int is_dumpable_cyclic(struct dump_bitmap *, mdf_pfn_t, struct cycle *cycle);
+static inline int is_dumpable(struct dump_bitmap *, mdf_pfn_t, struct cycle *cycle);
 unsigned long
 pfn_to_pos(mdf_pfn_t pfn)
 {
@@ -246,7 +245,7 @@ pfn_to_pos(mdf_pfn_t pfn)
 
 	desc_pos = info->valid_pages[pfn / BITMAP_SECT_LEN];
 	for (i = round(pfn, BITMAP_SECT_LEN); i < pfn; i++)
-		if (is_dumpable(info->bitmap_memory, i))
+		if (is_dumpable(info->bitmap_memory, i, NULL))
 			desc_pos++;
 
 	return desc_pos;
@@ -522,7 +521,7 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 	int ret;
 	unsigned long retlen;
 
-	if (!is_dumpable(info->bitmap_memory, paddr_to_pfn(paddr))) {
+	if (!is_dumpable(info->bitmap_memory, paddr_to_pfn(paddr), NULL)) {
 		ERRMSG("pfn(%llx) is excluded from %s.\n",
 				paddr_to_pfn(paddr), info->name_memory);
 		return FALSE;
@@ -3072,7 +3071,7 @@ initialize_bitmap_memory(void)
 	for (i = 1, pfn = 0; i < max_sect_len; i++) {
 		info->valid_pages[i] = info->valid_pages[i - 1];
 		for (j = 0; j < BITMAP_SECT_LEN; j++, pfn++)
-			if (is_dumpable(info->bitmap_memory, pfn))
+			if (is_dumpable(info->bitmap_memory, pfn, NULL))
 				info->valid_pages[i]++;
 	}
 
@@ -3599,7 +3598,7 @@ is_in_segs(unsigned long long paddr)
 		if (bitmap1.fd == 0)
 			initialize_1st_bitmap(&bitmap1);
 
-		return is_dumpable(&bitmap1, paddr_to_pfn(paddr));
+		return is_dumpable(&bitmap1, paddr_to_pfn(paddr), NULL);
 	}
 
 	if (paddr_to_offset(paddr))
@@ -4774,7 +4773,7 @@ exclude_zero_pages(void)
 		if (!is_in_segs(paddr))
 			continue;
 
-		if (!is_dumpable(&bitmap2, pfn))
+		if (!is_dumpable(&bitmap2, pfn, NULL))
 			continue;
 
 		if (is_xen_memory()) {
@@ -4818,7 +4817,7 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 		if (!is_in_segs(paddr))
 			continue;
 
-		if (!is_dumpable_cyclic(info->partial_bitmap2, pfn, cycle))
+		if (!is_dumpable(info->partial_bitmap2, pfn, cycle))
 			continue;
 
 		if (is_xen_memory()) {
@@ -5516,7 +5515,7 @@ get_loads_dumpfile(void)
 			pfn_end++;
 
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
-			if (!is_dumpable(&bitmap2, pfn)) {
+			if (!is_dumpable(&bitmap2, pfn, NULL)) {
 				num_excluded++;
 				continue;
 			}
@@ -6066,7 +6065,7 @@ get_num_dumpable(void)
 	initialize_2nd_bitmap(&bitmap2);
 
 	for (pfn = 0, num_dumpable = 0; pfn < info->max_mapnr; pfn++) {
-		if (is_dumpable(&bitmap2, pfn))
+		if (is_dumpable(&bitmap2, pfn, NULL))
 			num_dumpable++;
 	}
 	return num_dumpable;
@@ -6094,7 +6093,7 @@ get_num_dumpable_cyclic_withsplit(void)
 			exclude_zero_pages_cyclic(&cycle);
 
 		for (pfn = cycle.start_pfn; pfn < cycle.end_pfn; pfn++) {
-			if (is_dumpable_cyclic(info->partial_bitmap2, pfn, &cycle)) {
+			if (is_dumpable(info->partial_bitmap2, pfn, &cycle)) {
 				num_dumpable++;
 				dumpable_pfn_num++;
 			}
@@ -6128,7 +6127,7 @@ get_num_dumpable_cyclic(void)
 			exclude_zero_pages_cyclic(&cycle);
 
 		for(pfn=cycle.start_pfn; pfn<cycle.end_pfn; pfn++)
-			if (is_dumpable_cyclic(info->partial_bitmap2, pfn, &cycle))
+			if (is_dumpable(info->partial_bitmap2, pfn, &cycle))
 				num_dumpable++;
 	}
 
@@ -6235,7 +6234,7 @@ write_elf_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 			pfn_end++;
 
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
-			if (!is_dumpable(&bitmap2, pfn)) {
+			if (!is_dumpable(&bitmap2, pfn, NULL)) {
 				num_excluded++;
 				if ((pfn == pfn_end - 1) && frac_tail)
 					memsz += frac_tail;
@@ -6418,7 +6417,7 @@ get_loads_dumpfile_cyclic(void)
 			if (!exclude_unnecessary_pages_cyclic(&cycle))
 				return FALSE;
 			for (pfn = MAX(pfn_start, cycle.start_pfn); pfn < cycle.end_pfn; pfn++) {
-				if (!is_dumpable_cyclic(info->partial_bitmap2, pfn, &cycle)) {
+				if (!is_dumpable(info->partial_bitmap2, pfn, &cycle)) {
 					num_excluded++;
 					continue;
 				}
@@ -6524,7 +6523,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 				return FALSE;
 
 			for (pfn = MAX(pfn_start, cycle.start_pfn); pfn < cycle.end_pfn; pfn++) {
-				if (!is_dumpable_cyclic(info->partial_bitmap2, pfn, &cycle)) {
+				if (!is_dumpable(info->partial_bitmap2, pfn, &cycle)) {
 					num_excluded++;
 					if ((pfn == pfn_end - 1) && frac_tail)
 						memsz += frac_tail;
@@ -6784,7 +6783,7 @@ write_kdump_pages(struct cache_data *cd_header, struct cache_data *cd_page)
 		/*
 		 * Check the excluded page.
 		 */
-		if (!is_dumpable(&bitmap2, pfn))
+		if (!is_dumpable(&bitmap2, pfn, NULL))
 			continue;
 
 		num_dumped++;
@@ -8575,7 +8574,7 @@ setup_splitting(void)
 				end_pfn  = info->max_mapnr;
 			} else {
 				for (j = 0; j < pfn_per_dumpfile; end_pfn++) {
-					if (is_dumpable(&bitmap2, end_pfn))
+					if (is_dumpable(&bitmap2, end_pfn, NULL))
 						j++;
 				}
 			}
@@ -9226,7 +9225,7 @@ reassemble_kdump_pages(void)
 
 		offset_ph_org = offset_first_ph;
 		for (pfn = start_pfn; pfn < end_pfn; pfn++) {
-			if (!is_dumpable(&bitmap2, pfn))
+			if (!is_dumpable(&bitmap2, pfn, NULL))
 				continue;
 
 			num_dumped++;

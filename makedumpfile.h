@@ -1789,7 +1789,16 @@ is_on(char *bitmap, mdf_pfn_t i)
 }
 
 static inline int
-is_dumpable(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
+is_dumpable_buffer(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
+{
+	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
+		return FALSE;
+	else
+		return is_on(bitmap->buf, pfn - cycle->start_pfn);
+}
+
+static inline int
+is_dumpable_file(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 {
 	off_t offset;
 	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
@@ -1805,12 +1814,13 @@ is_dumpable(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 }
 
 static inline int
-is_dumpable_cyclic(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
+is_dumpable(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
 {
-	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
-		return FALSE;
-	else
-		return is_on(bitmap->buf, pfn - cycle->start_pfn);
+	if (bitmap->fd == 0) {
+		return is_dumpable_buffer(bitmap, pfn, cycle);
+	} else {
+		return is_dumpable_file(bitmap, pfn);
+	}
 }
 
 static inline int

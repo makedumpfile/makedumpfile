@@ -215,7 +215,7 @@ sadump_copy_1st_bitmap_from_memory(void)
 						      si->backup_offset -
 						      si->backup_src_start);
 
-			if (is_dumpable(info->bitmap_memory, backup_src_pfn))
+			if (is_dumpable(info->bitmap_memory, backup_src_pfn, NULL))
 				set_bit_on_1st_bitmap(pfn, NULL);
 			else
 				clear_bit_on_1st_bitmap(pfn, NULL);
@@ -805,7 +805,7 @@ sadump_initialize_bitmap_memory(void)
 		for (pfn = section * SADUMP_PF_SECTION_NUM;
 		     pfn < (section + 1) * SADUMP_PF_SECTION_NUM;
 		     ++pfn)
-			if (is_dumpable(bmp, pfn))
+			if (is_dumpable(bmp, pfn, NULL))
 				block_table[section]++;
 	}
 
@@ -981,7 +981,7 @@ readpage_sadump(unsigned long long paddr, void *bufptr)
 	if (pfn >= si->max_mapnr)
 		return FALSE;
 
-	if (!is_dumpable(info->bitmap_memory, pfn)) {
+	if (!is_dumpable(info->bitmap_memory, pfn, NULL)) {
 		ERRMSG("pfn(%llx) is excluded from %s.\n", pfn,
 		       info->name_memory);
 		return FALSE;
@@ -1146,7 +1146,7 @@ pfn_to_block(mdf_pfn_t pfn)
 		block = 0;
 
 	for (p = section * SADUMP_PF_SECTION_NUM; p < pfn; ++p)
-		if (is_dumpable(info->bitmap_memory, p))
+		if (is_dumpable(info->bitmap_memory, p, NULL))
 			block++;
 
 	return block;

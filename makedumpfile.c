@@ -1033,7 +1033,7 @@ open_dump_bitmap(void)
 	char *tmpname;
 
 	/* Unnecessary to open */
-	if (!info->working_dir && !info->flag_mem_usage)
+	if (!info->working_dir && !info->flag_reassemble && !info->flag_mem_usage)
 		return TRUE;
 
 	tmpname = getenv("TMPDIR");
@@ -3256,7 +3256,7 @@ out:
 	if (!get_max_mapnr())
 		return FALSE;
 
-	if (info->working_dir || info->flag_mem_usage) {
+	if (info->working_dir || info->flag_reassemble || info->flag_mem_usage) {
 		/* Implemented as non-cyclic mode based on the file */
 		info->flag_cyclic = FALSE;
 		info->pfn_cyclic = info->max_mapnr;
@@ -5334,51 +5334,6 @@ free_bitmap_buffer(void)
 }
 
 int
-create_dump_bitmap(void)
-{
-	int ret = FALSE;
-
-	if (info->flag_cyclic) {
-		if (!prepare_bitmap2_buffer())
-			goto out;
-		if (info->flag_split) {
-			if (!prepare_splitblock_table())
-				goto out;
-
-			info->num_dumpable = get_num_dumpable_cyclic_withsplit();
-		} else {
-			info->num_dumpable = get_num_dumpable_cyclic();
-		}
-
-		if (!info->flag_elf_dumpfile)
-			free_bitmap2_buffer();
-
-	} else {
-		struct cycle cycle = {0};
-		first_cycle(0, info->max_mapnr, &cycle);
-		if (!prepare_bitmap_buffer())
-			goto out;
-
-		pfn_memhole = info->max_mapnr;
-		if (!create_1st_bitmap(&cycle))
-			goto out;
-
-		if (!create_2nd_bitmap(&cycle))
-			goto out;
-
-		info->num_dumpable = get_num_dumpable_cyclic();
-	}
-
-	ret = TRUE;
-out:
-	/* Should keep the buffer in the 1-cycle case. */
-	if (info->flag_cyclic)
-		free_bitmap_buffer();
-
-	return ret;
-}
-
-int
 prepare_cache_data(struct cache_data *cd)
 {
 	cd->fd         = info->fd_dumpfile;
@@ -5897,12 +5852,11 @@ mdf_pfn_t
 get_num_dumpable(void)
 {
 	mdf_pfn_t pfn, num_dumpable;
-	struct dump_bitmap bitmap2;
 
-	initialize_2nd_bitmap(&bitmap2);
+	initialize_2nd_bitmap(info->bitmap2);
 
 	for (pfn = 0, num_dumpable = 0; pfn < info->max_mapnr; pfn++) {
-		if (is_dumpable(&bitmap2, pfn, NULL))
+		if (is_dumpable(info->bitmap2, pfn, NULL))
 			num_dumpable++;
 	}
 	return num_dumpable;
@@ -5920,11 +5874,11 @@ get_num_dumpable_cyclic_withsplit(void)
 	struct cycle cycle = {0};
 	int pos = 0;
 
-	pfn_memhole = info->max_mapnr;
-
 	for_each_cycle(0, info->max_mapnr, &cycle) {
-		if (!create_2nd_bitmap(&cycle))
-			return FALSE;
+		if (info->flag_cyclic) {
+			if (!create_2nd_bitmap(&cycle))
+				return FALSE;
+		}
 
 		for (pfn = cycle.start_pfn; pfn < cycle.end_pfn; pfn++) {
 			if (is_dumpable(info->bitmap2, pfn, &cycle)) {
@@ -5945,7 +5899,7 @@ get_num_dumpable_cyclic_withsplit(void)
 }
 
 mdf_pfn_t
-get_num_dumpable_cyclic(void)
+get_num_dumpable_cyclic_single(void)
 {
 	mdf_pfn_t pfn, num_dumpable=0;
 	struct cycle cycle = {0};
@@ -5963,6 +5917,59 @@ get_num_dumpable_cyclic(void)
 	}
 
 	return num_dumpable;
+}
+
+mdf_pfn_t
+get_num_dumpable_cyclic(void)
+{
+	if (info->flag_split)
+		return get_num_dumpable_cyclic_withsplit();
+	else
+		return get_num_dumpable_cyclic_single();
+}
+
+int
+create_dump_bitmap(void)
+{
+	int ret = FALSE;
+
+	if (info->flag_split) {
+		if (!prepare_splitblock_table())
+			goto out;
+	}
+
+	if (info->flag_cyclic) {
+		if (!prepare_bitmap2_buffer())
+			goto out;
+
+		info->num_dumpable = get_num_dumpable_cyclic();
+
+		if (!info->flag_elf_dumpfile)
+			free_bitmap2_buffer();
+
+	} else {
+		struct cycle cycle = {0};
+		first_cycle(0, info->max_mapnr, &cycle);
+		if (!prepare_bitmap_buffer())
+			goto out;
+
+		pfn_memhole = info->max_mapnr;
+		if (!create_1st_bitmap(&cycle))
+			goto out;
+
+		if (!create_2nd_bitmap(&cycle))
+			goto out;
+
+		info->num_dumpable = get_num_dumpable_cyclic();
+	}
+
+	ret = TRUE;
+out:
+	/* Should keep the buffer in the 1-cycle case. */
+	if (info->flag_cyclic)
+		free_bitmap_buffer();
+
+	return ret;
 }
 
 int
@@ -6938,7 +6945,7 @@ close_dump_file(void)
 void
 close_dump_bitmap(void)
 {
-	if (!info->working_dir && !info->flag_mem_usage)
+	if (!info->working_dir && !info->flag_reassemble && !info->flag_mem_usage)
 		return;
 
 	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)
@@ -7946,12 +7953,15 @@ calculate_end_pfn_by_splitblock(mdf_pfn_t start_pfn,
 /*
  * calculate start_pfn and end_pfn in each output file.
  */
-static int setup_splitting_cyclic(void)
+static int setup_splitting(void)
 {
 	int i;
 	mdf_pfn_t start_pfn, end_pfn;
 	int cur_splitblock_num = 0;
 	start_pfn = end_pfn = 0;
+
+	if (info->num_dumpfile <= 1)
+		return FALSE;
 
 	for (i = 0; i < info->num_dumpfile - 1; i++) {
 		start_pfn = end_pfn;
@@ -7962,52 +7972,6 @@ static int setup_splitting_cyclic(void)
 	}
 	SPLITTING_START_PFN(info->num_dumpfile - 1) = end_pfn;
 	SPLITTING_END_PFN(info->num_dumpfile - 1) = info->max_mapnr;
-
-	return TRUE;
-}
-
-int
-setup_splitting(void)
-{
-	int i;
-	mdf_pfn_t j, pfn_per_dumpfile;
-	mdf_pfn_t start_pfn, end_pfn;
-	mdf_pfn_t num_dumpable = get_num_dumpable();
-	struct dump_bitmap bitmap2;
-
-	if (info->num_dumpfile <= 1)
-		return FALSE;
-
-	if (info->flag_cyclic) {
-		int ret = FALSE;
-
-		if (!prepare_bitmap2_buffer()) {
-			free_bitmap_buffer();
-			return ret;
-		}
-		ret = setup_splitting_cyclic();
-		free_bitmap2_buffer();
-
-		return ret;
-        } else {
-		initialize_2nd_bitmap(&bitmap2);
-
-		pfn_per_dumpfile = num_dumpable / info->num_dumpfile;
-		start_pfn = end_pfn = 0;
-		for (i = 0; i < info->num_dumpfile; i++) {
-			start_pfn = end_pfn;
-			if (i == (info->num_dumpfile - 1)) {
-				end_pfn  = info->max_mapnr;
-			} else {
-				for (j = 0; j < pfn_per_dumpfile; end_pfn++) {
-					if (is_dumpable(&bitmap2, end_pfn, NULL))
-						j++;
-				}
-			}
-			SPLITTING_START_PFN(i) = start_pfn;
-			SPLITTING_END_PFN(i)   = end_pfn;
-		}
-	}
 
 	return TRUE;
 }
@@ -8582,7 +8546,6 @@ reassemble_kdump_pages(void)
 	mdf_pfn_t pfn, start_pfn, end_pfn;
 	mdf_pfn_t num_dumpable;
 	unsigned long size_eraseinfo;
-	struct dump_bitmap bitmap2;
 	struct disk_dump_header dh;
 	struct page_desc pd, pd_zero;
 	struct cache_data cd_pd, cd_data;
@@ -8590,7 +8553,8 @@ reassemble_kdump_pages(void)
 	char *data = NULL;
 	unsigned long data_buf_size = info->page_size;
 
-	initialize_2nd_bitmap(&bitmap2);
+	if (!prepare_bitmap2_buffer())
+		return FALSE;
 
 	if (!read_disk_dump_header(&dh, SPLITTING_DUMPFILE(0)))
 		return FALSE;
@@ -8651,7 +8615,7 @@ reassemble_kdump_pages(void)
 
 		offset_ph_org = offset_first_ph;
 		for (pfn = start_pfn; pfn < end_pfn; pfn++) {
-			if (!is_dumpable(&bitmap2, pfn, NULL))
+			if (!is_dumpable(info->bitmap2, pfn, NULL))
 				continue;
 
 			num_dumped++;
@@ -8760,6 +8724,7 @@ reassemble_kdump_pages(void)
 out:
 	free_cache_data(&cd_pd);
 	free_cache_data(&cd_data);
+	free_bitmap2_buffer();
 
 	if (data)
 		free(data);

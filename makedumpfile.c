@@ -1033,7 +1033,8 @@ open_dump_bitmap(void)
 	char *tmpname;
 
 	/* Unnecessary to open */
-	if (!info->working_dir && !info->flag_reassemble && !info->flag_mem_usage)
+	if (!info->working_dir && !info->flag_reassemble && !info->flag_refiltering
+	    && !info->flag_mem_usage)
 		return TRUE;
 
 	tmpname = getenv("TMPDIR");
@@ -3198,13 +3199,6 @@ initial(void)
 			return FALSE;
 		}
 
-		if(info->flag_cyclic) {
-			info->flag_cyclic = FALSE;
-			MSG("Switched running mode from cyclic to non-cyclic,\n");
-			MSG("because the cyclic mode doesn't support refiltering\n");
-			MSG("kdump compressed format.\n");
-		}
-
 		info->phys_base = info->kh_memory->phys_base;
 		info->max_dump_level |= info->kh_memory->dump_level;
 
@@ -3256,7 +3250,8 @@ out:
 	if (!get_max_mapnr())
 		return FALSE;
 
-	if (info->working_dir || info->flag_reassemble || info->flag_mem_usage) {
+	if (info->working_dir || info->flag_reassemble || info->flag_refiltering
+	    || info->flag_mem_usage) {
 		/* Implemented as non-cyclic mode based on the file */
 		info->flag_cyclic = FALSE;
 		info->pfn_cyclic = info->max_mapnr;
@@ -3591,24 +3586,6 @@ set_bit_on_2nd_bitmap_for_kernel(mdf_pfn_t pfn, struct cycle *cycle)
 		pfn = paddr_to_pfn(maddr);
 	}
 	return set_bit_on_2nd_bitmap(pfn, cycle);
-}
-
-static inline int
-is_in_segs(unsigned long long paddr)
-{
-	if (info->flag_refiltering || info->flag_sadump) {
-		static struct dump_bitmap bitmap1 = {0};
-
-		if (bitmap1.fd == 0)
-			initialize_1st_bitmap(&bitmap1);
-
-		return is_dumpable(&bitmap1, paddr_to_pfn(paddr), NULL);
-	}
-
-	if (paddr_to_offset(paddr))
-		return TRUE;
-	else
-		return FALSE;
 }
 
 int
@@ -4721,6 +4698,24 @@ create_1st_bitmap(struct cycle *cycle)
 	} else {
 		return create_1st_bitmap_buffer(cycle);
 	}
+}
+
+static inline int
+is_in_segs(unsigned long long paddr)
+{
+	if (info->flag_refiltering || info->flag_sadump) {
+		if (info->bitmap1->fd == 0) {
+			initialize_1st_bitmap(info->bitmap1);
+			create_1st_bitmap_file();
+		}
+
+		return is_dumpable(info->bitmap1, paddr_to_pfn(paddr), NULL);
+	}
+
+	if (paddr_to_offset(paddr))
+		return TRUE;
+	else
+		return FALSE;
 }
 
 /*
@@ -6945,7 +6940,8 @@ close_dump_file(void)
 void
 close_dump_bitmap(void)
 {
-	if (!info->working_dir && !info->flag_reassemble && !info->flag_mem_usage)
+	if (!info->working_dir && !info->flag_reassemble && !info->flag_refiltering
+	    && !info->flag_mem_usage)
 		return;
 
 	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)

@@ -1192,8 +1192,6 @@ struct DumpInfo {
 	/*
 	 * for cyclic processing
 	 */
-	struct dump_bitmap *partial_bitmap1;
-	struct dump_bitmap *partial_bitmap2;
 	char	           *working_dir;	     /* working directory for bitmap */
 	mdf_pfn_t          num_dumpable;
 	unsigned long      bufsize_cyclic;

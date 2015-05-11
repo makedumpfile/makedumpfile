@@ -1034,7 +1034,7 @@ open_dump_bitmap(void)
 
 	/* Unnecessary to open */
 	if (!info->working_dir && !info->flag_reassemble && !info->flag_refiltering
-	    && !info->flag_mem_usage)
+	    && !info->flag_sadump && !info->flag_mem_usage)
 		return TRUE;
 
 	tmpname = getenv("TMPDIR");
@@ -3213,12 +3213,6 @@ initial(void)
 			return FALSE;
 		}
 
-		if(info->flag_cyclic) {
-			info->flag_cyclic = FALSE;
-			MSG("Switched running mode from cyclic to non-cyclic,\n");
-			MSG("because the cyclic mode doesn't support sadump format.\n");
-		}
-
 		set_page_size(sadump_page_size());
 
 		if (!sadump_initialize_bitmap_memory())
@@ -3251,7 +3245,7 @@ out:
 		return FALSE;
 
 	if (info->working_dir || info->flag_reassemble || info->flag_refiltering
-	    || info->flag_mem_usage) {
+	    || info->flag_sadump || info->flag_mem_usage) {
 		/* Implemented as non-cyclic mode based on the file */
 		info->flag_cyclic = FALSE;
 		info->pfn_cyclic = info->max_mapnr;
@@ -6941,7 +6935,7 @@ void
 close_dump_bitmap(void)
 {
 	if (!info->working_dir && !info->flag_reassemble && !info->flag_refiltering
-	    && !info->flag_mem_usage)
+	    && !info->flag_sadump && !info->flag_mem_usage)
 		return;
 
 	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)

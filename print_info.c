@@ -213,6 +213,13 @@ print_usage(void)
 	MSG("      same as v1.4.4 or before.\n");
 	MSG("      If you feel the cyclic mode is too slow, please try this mode.\n");
 	MSG("\n");
+	MSG("  [--work-dir]:\n");
+	MSG("      Specify the working directory for the temporary bitmap file.\n");
+	MSG("      If this option isn't specified, the bitmap will be saved on memory.\n");
+	MSG("      Filtering processing has to do 2 pass scanning to fix the memory consumption,\n");
+	MSG("      but it can be avoided by using working directory on file system.\n");
+	MSG("      So if you specify this option, the filtering speed may be bit faster.\n");
+	MSG("\n");
 	MSG("  [--non-mmap]:\n");
 	MSG("      Never use mmap(2) to read VMCORE even if it supports mmap(2).\n");
 	MSG("      Generally, reading VMCORE with mmap(2) is faster than without it,\n");

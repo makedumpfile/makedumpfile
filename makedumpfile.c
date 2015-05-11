@@ -1033,8 +1033,14 @@ open_dump_bitmap(void)
 	int i, fd;
 	char *tmpname;
 
+	/* Unnecessary to open */
+	if (!info->working_dir)
+		return TRUE;
+
 	tmpname = getenv("TMPDIR");
-	if (!tmpname)
+	if (info->working_dir)
+		tmpname = info->working_dir;
+	else if (!tmpname)
 		tmpname = "/tmp";
 
 	if ((info->name_bitmap = (char *)malloc(sizeof(FILENAME_BITMAP) +
@@ -3251,7 +3257,11 @@ out:
 	if (!get_max_mapnr())
 		return FALSE;
 
-	if (info->flag_cyclic) {
+	if (info->working_dir) {
+		/* Implemented as non-cyclic mode based on the file */
+		info->flag_cyclic = FALSE;
+		info->pfn_cyclic = info->max_mapnr;
+	} else {
 		if (info->bufsize_cyclic == 0) {
 			if (!calculate_cyclic_buffer_size())
 				return FALSE;
@@ -7489,6 +7499,9 @@ close_dump_file(void)
 void
 close_dump_bitmap(void)
 {
+	if (!info->working_dir)
+		return;
+
 	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));
@@ -9832,6 +9845,7 @@ static struct option longopts[] = {
 	{"non-mmap", no_argument, NULL, OPT_NON_MMAP},
 	{"mem-usage", no_argument, NULL, OPT_MEM_USAGE},
 	{"splitblock-size", required_argument, NULL, OPT_SPLITBLOCK_SIZE},
+	{"work-dir", required_argument, NULL, OPT_WORKING_DIR},
 	{0, 0, 0, 0}
 };
 
@@ -9974,6 +9988,9 @@ main(int argc, char *argv[])
 			break;
 		case OPT_SPLITBLOCK_SIZE:
 			info->splitblock_size = atoi(optarg);
+			break;
+		case OPT_WORKING_DIR:
+			info->working_dir = optarg;
 			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");

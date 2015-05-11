@@ -421,6 +421,19 @@ If you feel the cyclic mode is too slow, please try this mode.
 # makedumpfile \-\-non\-cyclic \-d 31 \-x vmlinux /proc/vmcore dumpfile
 
 .TP
+\fB\-\-work\-dir\fR
+Specify the working directory for the temporary bitmap file.
+If this option isn't specified, the bitmap will be saved on memory.
+Filtering processing has to do 2 pass scanning to fix the memory consumption,
+but it can be avoided by using working directory on file system.
+So if you specify this option, the filtering speed may be bit faster.
+
+.br
+.B Example:
+.br
+# makedumpfile \-\-work\-dir /tmp \-d 31 \-x vmlinux /proc/vmcore dumpfile
+
+.TP
 \fB\-\-non\-mmap\fR
 Never use \fBmmap(2)\fR to read \fIVMCORE\fR even if it supports \fBmmap(2)\fR.
 Generally, reading \fIVMCORE\fR with \fBmmap(2)\fR is faster than without it,

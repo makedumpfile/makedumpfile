@@ -1194,6 +1194,7 @@ struct DumpInfo {
 	 */
 	struct dump_bitmap *partial_bitmap1;
 	struct dump_bitmap *partial_bitmap2;
+	char	           *working_dir;	     /* working directory for bitmap */
 	mdf_pfn_t          num_dumpable;
 	unsigned long      bufsize_cyclic;
 	unsigned long      pfn_cyclic;
@@ -1945,6 +1946,7 @@ struct elf_prstatus {
 #define OPT_NON_MMAP            OPT_START+13
 #define OPT_MEM_USAGE            OPT_START+14
 #define OPT_SPLITBLOCK_SIZE	OPT_START+15
+#define OPT_WORKING_DIR         OPT_START+16
 
 /*
  * Function Prototype.

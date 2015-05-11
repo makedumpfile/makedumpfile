@@ -4699,58 +4699,15 @@ create_1st_bitmap_file(void)
 	return TRUE;
 }
 
+int
+create_bitmap_from_memhole(struct cycle *cycle, struct dump_bitmap *bitmap, int count_memhole,
+			   int (*set_bit)(mdf_pfn_t pfn, struct cycle *cycle));
 
 int
 create_1st_bitmap_buffer(struct cycle *cycle)
 {
-	int i;
-	mdf_pfn_t pfn;
-	unsigned long long phys_start, phys_end;
-	mdf_pfn_t pfn_start, pfn_end;
-	mdf_pfn_t pfn_start_roundup, pfn_end_round;
-	unsigned long pfn_start_byte, pfn_end_byte;
-
-	/*
-	 * At first, clear all the bits on the 1st-bitmap.
-	 */
-	initialize_bitmap(info->bitmap1);
-
-	/*
-	 * If page is on memory hole, set bit on the 1st-bitmap.
-	 * (note that this is not done in cyclic mode)
-	 */
-	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
-		pfn_start = MAX(paddr_to_pfn(phys_start), cycle->start_pfn);
-		pfn_end   = MIN(paddr_to_pfn(phys_end), cycle->end_pfn);
-
-		if (pfn_start >= pfn_end)
-			continue;
-
-		pfn_start_roundup = MIN(roundup(pfn_start, BITPERBYTE),
-					pfn_end);
-		pfn_end_round = MAX(round(pfn_end, BITPERBYTE), pfn_start);
-
-		for (pfn = pfn_start; pfn < pfn_start_roundup; pfn++) {
-			set_bit_on_1st_bitmap(pfn, cycle);
-		}
-
-		pfn_start_byte = (pfn_start_roundup - cycle->start_pfn) >> 3;
-		pfn_end_byte = (pfn_end_round - cycle->start_pfn) >> 3;
-
-		if (pfn_start_byte < pfn_end_byte) {
-			memset(info->bitmap1->buf + pfn_start_byte,
-			       0xff,
-			       pfn_end_byte - pfn_start_byte);
-		}
-
-		if (pfn_end_round >= pfn_start) {
-			for (pfn = pfn_end_round; pfn < pfn_end; pfn++) {
-				set_bit_on_1st_bitmap(pfn, cycle);
-			}
-		}
-	}
-
-	return TRUE;
+	return create_bitmap_from_memhole(cycle, info->bitmap1, TRUE,
+					  set_bit_on_1st_bitmap);
 }
 
 int
@@ -4856,8 +4813,16 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 	return TRUE;
 }
 
-static int
+int
 initialize_2nd_bitmap_cyclic(struct cycle *cycle)
+{
+	return create_bitmap_from_memhole(cycle, info->bitmap2, FALSE,
+					  set_bit_on_2nd_bitmap_for_kernel);
+}
+
+int
+create_bitmap_from_memhole(struct cycle *cycle, struct dump_bitmap *bitmap, int count_memhole,
+			   int (*set_bit)(mdf_pfn_t pfn, struct cycle *cycle))
 {
 	int i;
 	mdf_pfn_t pfn;
@@ -4865,18 +4830,23 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 	mdf_pfn_t pfn_start, pfn_end;
 	mdf_pfn_t pfn_start_roundup, pfn_end_round;
 	unsigned long pfn_start_byte, pfn_end_byte;
+	unsigned int num_pt_loads = get_num_pt_loads();
+	struct timeval tv_start;
 
 	/*
-	 * At first, clear all the bits on the 2nd-bitmap.
+	 * At first, clear all the bits on the bitmap.
 	 */
-	initialize_bitmap(info->bitmap2);
+	initialize_bitmap(bitmap);
 
 	/*
-	 * If page is on memory hole, set bit on the 2nd-bitmap.
+	 * If page is on memory hole, set bit on the bitmap.
 	 */
+	gettimeofday(&tv_start, NULL);
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
 		pfn_start = MAX(paddr_to_pfn(phys_start), cycle->start_pfn);
 		pfn_end = MIN(paddr_to_pfn(phys_end), cycle->end_pfn);
+
+		print_progress(PROGRESS_HOLES, i, num_pt_loads);
 
 		if (pfn_start >= pfn_end)
 			continue;
@@ -4886,29 +4856,37 @@ initialize_2nd_bitmap_cyclic(struct cycle *cycle)
 		pfn_end_round = MAX(round(pfn_end, BITPERBYTE), pfn_start);
 
 		for (pfn = pfn_start; pfn < pfn_start_roundup; ++pfn) {
-			if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
+			if (!set_bit(pfn, cycle))
 				return FALSE;
-			pfn_memhole--;
+			if (count_memhole)
+				pfn_memhole--;
 		}
 
 		pfn_start_byte = (pfn_start_roundup - cycle->start_pfn) >> 3;
 		pfn_end_byte = (pfn_end_round - cycle->start_pfn) >> 3;
 
 		if (pfn_start_byte < pfn_end_byte) {
-			memset(info->bitmap2->buf + pfn_start_byte,
+			memset(bitmap->buf + pfn_start_byte,
 			       0xff,
 			       pfn_end_byte - pfn_start_byte);
-			pfn_memhole -= (pfn_end_byte - pfn_start_byte) << 3;
+			if (count_memhole)
+				pfn_memhole -= (pfn_end_byte - pfn_start_byte) << 3;
 		}
 
 		if (pfn_end_round >= pfn_start) {
 			for (pfn = pfn_end_round; pfn < pfn_end; ++pfn) {
-				if (!set_bit_on_2nd_bitmap_for_kernel(pfn, cycle))
+				if (!set_bit(pfn, cycle))
 					return FALSE;
-				pfn_memhole--;
+				if (count_memhole)
+					pfn_memhole--;
 			}
 		}
 	}
+	/*
+	 * print 100 %
+	 */
+	print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr);
+	print_execution_time(PROGRESS_HOLES, &tv_start);
 
 	return TRUE;
 }

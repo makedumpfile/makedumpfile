@@ -3246,7 +3246,7 @@ out:
 
 	if (info->working_dir || info->flag_reassemble || info->flag_refiltering
 	    || info->flag_sadump || info->flag_mem_usage) {
-		/* Implemented as non-cyclic mode based on the file */
+		/* Can be done in 1-cycle by using backing file. */
 		info->flag_cyclic = FALSE;
 		info->pfn_cyclic = info->max_mapnr;
 	} else {
@@ -7662,8 +7662,6 @@ initial_xen(void)
 	if (is_xen_memory()) {
 		if(info->flag_cyclic) {
 			info->flag_cyclic = FALSE;
-			MSG("Switched running mode from cyclic to non-cyclic,\n");
-			MSG("because the cyclic mode doesn't support Xen.\n");
 		}
 	}
 
@@ -9223,7 +9221,6 @@ static struct option longopts[] = {
 	{"config", required_argument, NULL, OPT_CONFIG},
 	{"help", no_argument, NULL, OPT_HELP},
 	{"diskset", required_argument, NULL, OPT_DISKSET},
-	{"non-cyclic", no_argument, NULL, OPT_NON_CYCLIC},
 	{"cyclic-buffer", required_argument, NULL, OPT_CYCLIC_BUFFER},
 	{"eppic", required_argument, NULL, OPT_EPPIC},
 	{"non-mmap", no_argument, NULL, OPT_NON_MMAP},
@@ -9252,7 +9249,8 @@ main(int argc, char *argv[])
 	initialize_tables();
 
 	/*
-	 * By default, makedumpfile works in constant memory space.
+	 * By default, makedumpfile assumes that multi-cycle processing is
+	 * necessary to work in constant memory space.
 	 */
 	info->flag_cyclic = TRUE;
 
@@ -9356,9 +9354,6 @@ main(int argc, char *argv[])
 			break;
 		case OPT_XEN_SYMS:
 			info->name_xen_syms = optarg;
-			break;
-		case OPT_NON_CYCLIC:
-			info->flag_cyclic = FALSE;
 			break;
 		case OPT_NON_MMAP:
 			info->flag_usemmap = MMAP_DISABLE;

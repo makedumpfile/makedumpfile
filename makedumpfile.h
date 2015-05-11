@@ -1019,7 +1019,7 @@ struct DumpInfo {
 	int		flag_rearrange;      /* flag of creating dumpfile from
 						flattened format */
 	int		flag_split;	     /* splitting vmcore */
-  	int		flag_cyclic;	     /* cyclic processing to keep memory consumption */
+	int		flag_cyclic;	     /* multi-cycle processing is necessary */
 	int		flag_usemmap;	     /* /proc/vmcore supports mmap(2) */
 	int		flag_reassemble;     /* reassemble multiple dumpfiles into one */
 	int		flag_refiltering;    /* refilter from kdump-compressed file */
@@ -1948,13 +1948,12 @@ struct elf_prstatus {
 #define OPT_DUMP_DMESG          OPT_START+7
 #define OPT_CONFIG              OPT_START+8
 #define OPT_DISKSET             OPT_START+9
-#define OPT_NON_CYCLIC          OPT_START+10
-#define OPT_CYCLIC_BUFFER       OPT_START+11
-#define OPT_EPPIC               OPT_START+12
-#define OPT_NON_MMAP            OPT_START+13
-#define OPT_MEM_USAGE            OPT_START+14
-#define OPT_SPLITBLOCK_SIZE	OPT_START+15
-#define OPT_WORKING_DIR         OPT_START+16
+#define OPT_CYCLIC_BUFFER       OPT_START+10
+#define OPT_EPPIC               OPT_START+11
+#define OPT_NON_MMAP            OPT_START+12
+#define OPT_MEM_USAGE           OPT_START+13
+#define OPT_SPLITBLOCK_SIZE	OPT_START+14
+#define OPT_WORKING_DIR         OPT_START+15
 
 /*
  * Function Prototype.

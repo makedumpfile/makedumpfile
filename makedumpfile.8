@@ -387,8 +387,9 @@ The default value is 4.
 
 .TP
 \fB\-\-cyclic\-buffer\fR \fIbuffer_size\fR
-Specify the buffer size in kilo bytes for analysis in the cyclic mode.
-In the cyclic mode, the number of cycles is represented as:
+Specify the buffer size in kilo bytes for bitmap data.
+Filtering processing will be divided into multi cycles to fix the memory consumption,
+the number of cycles is represented as:
 
     num_of_cycles = system_memory / (\fIbuffer_size\fR * 1024 * bit_per_bytes * page_size )
 
@@ -403,7 +404,7 @@ size, so ordinary users don't need to specify this option.
 
 .TP
 \fB\-\-splitblock\-size\fR \fIsplitblock_size\fR
-Specify the splitblock size in kilo bytes for analysis in the cyclic mode with --split.
+Specify the splitblock size in kilo bytes for analysis with --split.
 If --splitblock N is specified, difference of each splitted dumpfile size is at most N
 kilo bytes.
 .br
@@ -412,15 +413,7 @@ kilo bytes.
 # makedumpfile \-\-splitblock\-size 1024 \-d 31 \-x vmlinux \-\-split /proc/vmcore dumpfile1 dumpfile2
 
 .TP
-\fB\-\-non\-cyclic\fR
-Running in the non-cyclic mode, this mode uses the old filtering logic same as v1.4.4 or before.
-If you feel the cyclic mode is too slow, please try this mode.
-.br
-.B Example:
-.br
-# makedumpfile \-\-non\-cyclic \-d 31 \-x vmlinux /proc/vmcore dumpfile
 
-.TP
 \fB\-\-work\-dir\fR
 Specify the working directory for the temporary bitmap file.
 If this option isn't specified, the bitmap will be saved on memory.
@@ -618,13 +611,11 @@ Show the version of makedumpfile.
 
 .TP 8
 .B TMPDIR
-This environment variable is for a temporary memory bitmap file only in the non-cyclic mode.
-If your machine has a lots of memory and you use tmpfs on /tmp, makedumpfile
-can fail for a little memory in the 2nd kernel because makedumpfile makes a
-very large temporary memory bitmap file in this case. To avoid this failure,
-you can set a TMPDIR environment variable. If you do not set a TMPDIR
-environment variable, makedumpfile uses /tmp directory for a temporary
-bitmap file as a default.
+This environment variable is used in 1st kernel environment for a temporary memory bitmap file.
+If your machine has a lots of memory and you use small tmpfs on /tmp, makedumpfile
+can fail for a little memory because makedumpfile makes a very large temporary
+memory bitmap file in this case. To avoid this failure, you should specify
+--work-dir option to use file system on storage for the bitmap file.
 
 .SH DIAGNOSTICS
 makedumpfile exits with the following value.

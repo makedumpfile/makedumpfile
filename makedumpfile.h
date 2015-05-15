@@ -483,6 +483,33 @@ do { \
 #define VMEMMAP_START		(info->vmemmap_start)
 #define VMEMMAP_END		(info->vmemmap_end)
 
+#ifdef __aarch64__
+#define CONFIG_ARM64_PGTABLE_LEVELS	2
+#define CONFIG_ARM64_VA_BITS		42
+#define CONFIG_ARM64_64K_PAGES		1
+
+/* Currently we only suport following defines based on above
+ * config definitions.
+ * TODOs: We need to find a way to get above defines dynamically and
+ * then to support following definitions based on that
+ */
+
+#if CONFIG_ARM64_PGTABLE_LEVELS == 2
+#define ARM64_PGTABLE_LEVELS	2
+#endif
+
+#if CONFIG_ARM64_VA_BITS == 42
+#define VA_BITS			42
+#endif
+
+#ifdef CONFIG_ARM64_64K_PAGES
+#define PAGE_SHIFT		16
+#endif
+
+#define KVBASE_MASK		(0xffffffffffffffffUL << (VA_BITS - 1))
+#define KVBASE			(SYMBOL(_stext) & KVBASE_MASK)
+#endif /* aarch64 */
+
 #ifdef __arm__
 #define KVBASE_MASK		(0xffff)
 #define KVBASE			(SYMBOL(_stext) & ~KVBASE_MASK)
@@ -761,6 +788,22 @@ do { \
  */
 static inline int stub_true() { return TRUE; }
 static inline int stub_true_ul(unsigned long x) { return TRUE; }
+#ifdef __aarch64__
+int get_phys_base_arm64(void);
+int get_machdep_info_arm64(void);
+unsigned long long vaddr_to_paddr_arm64(unsigned long vaddr);
+int get_versiondep_info_arm64(void);
+int get_xen_basic_info_arm64(void);
+int get_xen_info_arm64(void);
+#define vaddr_to_paddr(X)	vaddr_to_paddr_arm64(X)
+#define get_phys_base()		get_phys_base_arm64()
+#define get_machdep_info()	get_machdep_info_arm64()
+#define get_versiondep_info()	get_versiondep_info_arm64()
+#define get_xen_basic_info_arch(X) get_xen_basic_info_arm64(X)
+#define get_xen_info_arch(X) get_xen_info_arm64(X)
+#define is_phys_addr(X)		stub_true_ul(X)
+#endif /* aarch64 */
+
 #ifdef __arm__
 int get_phys_base_arm(void);
 int get_machdep_info_arm(void);
@@ -1607,6 +1650,11 @@ struct domain_list {
 
 #define PAGES_PER_MAPWORD 	(sizeof(unsigned long) * 8)
 #define MFNS_PER_FRAME		(info->page_size / sizeof(unsigned long))
+
+#ifdef __aarch64__
+unsigned long long kvtop_xen_arm64(unsigned long kvaddr);
+#define kvtop_xen(X)	kvtop_xen_arm64(X)
+#endif /* aarch64 */
 
 #ifdef __arm__
 #define kvtop_xen(X)	FALSE

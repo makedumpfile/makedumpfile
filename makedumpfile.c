@@ -3801,7 +3801,8 @@ read_flat_data_header(struct makedumpfile_data_header *fdh)
 int
 reserve_diskspace(int fd, off_t start_offset, off_t end_offset, char *file_name)
 {
-	size_t buf_size;
+	off_t off;
+	size_t buf_size, write_size;
 	char *buf = NULL;
 
 	int ret = FALSE;
@@ -3809,6 +3810,7 @@ reserve_diskspace(int fd, off_t start_offset, off_t end_offset, char *file_name)
 	assert(start_offset < end_offset);
 	buf_size = end_offset - start_offset;
 
+	buf_size = MIN(info->page_size, buf_size);
 	if ((buf = malloc(buf_size)) == NULL) {
 		ERRMSG("Can't allocate memory for the size of reserved diskspace. %s\n",
 		       strerror(errno));
@@ -3816,8 +3818,15 @@ reserve_diskspace(int fd, off_t start_offset, off_t end_offset, char *file_name)
 	}
 
 	memset(buf, 0, buf_size);
-	if (!write_buffer(fd, start_offset, buf, buf_size, file_name))
-		goto out;
+	off = start_offset;
+
+	while (off < end_offset) {
+		write_size = MIN(buf_size, end_offset - off);
+		if (!write_buffer(fd, off, buf, write_size, file_name))
+			goto out;
+
+		off += write_size;
+	}
 
 	ret = TRUE;
 out:

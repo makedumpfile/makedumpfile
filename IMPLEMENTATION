@@ -240,6 +240,10 @@
     The page header and page data are written in pairs. When writing page data
     (pfn N+1), if ENOSPACE error happens, the page headers after N won't be
     written either.
+    Since the data lost is filled with zero when it is read, the page_desc->offset
+    will also be zero. And zero page has its own offset not equal 0. So when reading
+    page from incomplete core, only the page lost by ENOSPACE errors has 0 in its
+    corresponding page descriptor's member offset.
 
     If there is no page data dumped into the DUMPFILE, the DUMPFILE can't be
     analysed by crash.

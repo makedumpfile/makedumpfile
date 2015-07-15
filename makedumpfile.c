@@ -6295,6 +6295,92 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 }
 
 int
+write_cd_buf(struct cache_data *cd)
+{
+	if (cd->buf_size == 0)
+		return TRUE;
+
+	if (!write_buffer(cd->fd, cd->offset, cd->buf,
+			cd->buf_size, cd->file_name)) {
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+/*
+ * get_nr_pages is used for generating incomplete kdump core.
+ * When enospac occurs in writing the buf cd_page, it can be used to
+ * get how many pages have been written.
+ */
+int
+get_nr_pages(void *buf, struct cache_data *cd_page){
+	int size, file_end, nr_pages;
+	page_desc_t *pd = buf;
+
+	file_end = lseek(cd_page->fd, 0, SEEK_END);
+	if (file_end < 0) {
+		ERRMSG("Can't seek end of the dump file(%s).\n", cd_page->file_name);
+		return -1;
+	}
+
+	size = pd->size;
+	nr_pages = 0;
+	while (size <= file_end - cd_page->offset) {
+		nr_pages++;
+		pd++;
+		size += pd->size;
+	}
+
+	return nr_pages;
+}
+
+int
+write_kdump_page(struct cache_data *cd_header, struct cache_data *cd_page,
+		struct page_desc *pd, void *page_data)
+{
+	int written_headers_size;
+
+	/*
+	 * If either cd_header or cd_page is nearly full,
+	 * write the buffer cd_header into dumpfile and then write the cd_page.
+	 * With that, when enospc occurs, we can save more useful information.
+	 */
+	if (cd_header->buf_size + sizeof(*pd) > cd_header->cache_size
+		|| cd_page->buf_size + pd->size > cd_page->cache_size){
+		if( !write_cd_buf(cd_header) ) {
+			memset(cd_header->buf, 0, cd_header->cache_size);
+			write_cd_buf(cd_header);
+
+			return FALSE;
+		}
+
+		if( !write_cd_buf(cd_page) ) {
+			written_headers_size = sizeof(page_desc_t) *
+					get_nr_pages(cd_header->buf, cd_page);
+			if (written_headers_size < 0)
+				return FALSE;
+
+			memset(cd_header->buf, 0, cd_header->cache_size);
+			cd_header->offset += written_headers_size;
+			cd_header->buf_size -= written_headers_size;
+			write_cd_buf(cd_header);
+
+			return FALSE;
+		}
+		cd_header->offset += cd_header->buf_size;
+		cd_page->offset += cd_page->buf_size;
+		cd_header->buf_size = 0;
+		cd_page->buf_size = 0;
+	}
+
+	write_cache(cd_header, pd, sizeof(page_desc_t));
+	write_cache(cd_page, page_data, pd->size);
+
+	return TRUE;
+}
+
+int
 write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page,
 			 struct page_desc *pd_zero, off_t *offset_data, struct cycle *cycle)
 {
@@ -6433,17 +6519,11 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		pd.offset     = *offset_data;
 		*offset_data  += pd.size;
 
-                /*
-                 * Write the page header.
-                 */
-                if (!write_cache(cd_header, &pd, sizeof(page_desc_t)))
-                        goto out;
-
-                /*
-                 * Write the page data.
-                 */
-		if (!write_cache(cd_page, pd.flags ? buf_out : buf, pd.size))
-                        goto out;
+               /*
+                * Write the page header and the page data
+                */
+               if (!write_kdump_page(cd_header, cd_page, &pd, pd.flags ? buf_out : buf))
+                       goto out;
         }
 
 	ret = TRUE;

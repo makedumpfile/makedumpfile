@@ -6015,9 +6015,11 @@ int
 read_pfn(mdf_pfn_t pfn, unsigned char *buf)
 {
 	unsigned long long paddr;
+	int type_addr;
 
 	paddr = pfn_to_paddr(pfn);
-	if (!readmem(PADDR, paddr, buf, info->page_size)) {
+	type_addr = is_xen_memory() ? MADDR_XEN : PADDR;
+	if (!readmem(type_addr, paddr, buf, info->page_size)) {
 		ERRMSG("Can't get the page data.\n");
 		return FALSE;
 	}
@@ -7734,12 +7736,6 @@ initial_xen(void)
 	MSG("Xen is not supported on powerpc.\n");
 	return FALSE;
 #else
-	if(!info->flag_elf_dumpfile && !info->flag_dmesg) {
-		MSG("Specify '-E' option for Xen.\n");
-		MSG("Commandline parameter is invalid.\n");
-		MSG("Try `makedumpfile --help' for more information.\n");
-		return FALSE;
-	}
 #ifndef __x86_64__
 	if (DL_EXCLUDE_ZERO < info->max_dump_level) {
 		MSG("Dump_level is invalid. It should be 0 or 1.\n");

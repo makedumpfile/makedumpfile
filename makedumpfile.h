@@ -431,8 +431,15 @@ do { \
 /*
  * Macro for getting parallel info.
  */
+#define FD_MEMORY_PARALLEL(i)		info->parallel_info[i].fd_memory
 #define FD_BITMAP_MEMORY_PARALLEL(i)	info->parallel_info[i].fd_bitmap_memory
 #define FD_BITMAP_PARALLEL(i)		info->parallel_info[i].fd_bitmap
+#define BUF_PARALLEL(i)			info->parallel_info[i].buf
+#define BUF_OUT_PARALLEL(i)		info->parallel_info[i].buf_out
+#define MMAP_CACHE_PARALLEL(i)		info->parallel_info[i].mmap_cache
+#ifdef USELZO
+#define WRKMEM_PARALLEL(i)		info->parallel_info[i].wrkmem
+#endif
 /*
  * kernel version
  *
@@ -964,10 +971,39 @@ typedef unsigned long long int ulonglong;
 /*
  * for parallel process
  */
+
+#define WAIT_TIME	(60 * 10)
+#define PTHREAD_FAIL	((void *)-2)
+#define NUM_BUFFERS	(50)
+
 struct mmap_cache {
 	char	*mmap_buf;
 	off_t	mmap_start_offset;
 	off_t   mmap_end_offset;
+};
+
+struct page_data
+{
+	mdf_pfn_t pfn;
+	int dumpable;
+	int zero;
+	unsigned int flags;
+	long size;
+	unsigned char *buf;
+	pthread_mutex_t mutex;
+	/*
+	 * whether the page_data is ready to be consumed
+	 */
+	int ready;
+};
+
+struct thread_args {
+	int thread_num;
+	unsigned long len_buf_out;
+	mdf_pfn_t start_pfn, end_pfn;
+	int page_data_num;
+	struct cycle *cycle;
+	struct page_data *page_data_buf;
 };
 
 /*
@@ -1250,7 +1286,17 @@ struct DumpInfo {
 	/*
 	 * for parallel process
 	 */
+	int num_threads;
+	int num_buffers;
+	pthread_t **threads;
+	struct thread_args *kdump_thread_args;
+	struct page_data *page_data_buf;
 	pthread_rwlock_t usemmap_rwlock;
+	mdf_pfn_t current_pfn;
+	pthread_mutex_t current_pfn_mutex;
+	mdf_pfn_t consumed_pfn;
+	pthread_mutex_t consumed_pfn_mutex;
+	pthread_mutex_t filter_mutex;
 };
 extern struct DumpInfo		*info;
 

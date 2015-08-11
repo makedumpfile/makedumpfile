@@ -6360,6 +6360,40 @@ read_pfn(mdf_pfn_t pfn, unsigned char *buf)
 }
 
 int
+read_pfn_parallel(int fd_memory, mdf_pfn_t pfn, unsigned char *buf,
+		  struct dump_bitmap* bitmap_memory_parallel,
+		  struct mmap_cache *mmap_cache)
+{
+	unsigned long long paddr;
+	unsigned long long pgaddr;
+
+	paddr = pfn_to_paddr(pfn);
+
+	pgaddr = PAGEBASE(paddr);
+
+	if (info->flag_refiltering) {
+		if (!readpage_kdump_compressed_parallel(fd_memory, pgaddr, buf,
+						      bitmap_memory_parallel)) {
+			ERRMSG("Can't get the page data.\n");
+			return FALSE;
+		}
+	} else {
+		char *mapbuf = mappage_elf_parallel(fd_memory, pgaddr,
+						    mmap_cache);
+		if (mapbuf) {
+			memcpy(buf, mapbuf, info->page_size);
+		} else {
+			if (!readpage_elf_parallel(fd_memory, pgaddr, buf)) {
+				ERRMSG("Can't get the page data.\n");
+				return FALSE;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+int
 get_loads_dumpfile_cyclic(void)
 {
 	int i, phnum, num_new_load = 0;

@@ -67,6 +67,8 @@ LIBS := -lsnappy $(LIBS)
 CFLAGS += -DUSESNAPPY
 endif
 
+LIBS := -lpthread $(LIBS)
+
 all: makedumpfile
 
 $(OBJ_PART): $(SRC_PART)

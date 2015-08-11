@@ -76,6 +76,10 @@ print_usage(void)
 	MSG("  # makedumpfile --split [OPTION] [-x VMLINUX|-i VMCOREINFO] VMCORE DUMPFILE1\n");
 	MSG("    DUMPFILE2 [DUMPFILE3 ..]\n");
 	MSG("\n");
+	MSG("  Using multiple threads to create DUMPFILE in parallel:\n");
+	MSG("  # makedumpfile [OPTION] [-x VMLINUX|-i VMCOREINFO] --num-threads THREADNUM\n");
+	MSG("    VMCORE DUMPFILE1\n");
+	MSG("\n");
 	MSG("  Reassemble multiple DUMPFILEs:\n");
 	MSG("  # makedumpfile --reassemble DUMPFILE1 DUMPFILE2 [DUMPFILE3 ..] DUMPFILE\n");
 	MSG("\n");
@@ -184,6 +188,12 @@ print_usage(void)
 	MSG("      of each DUMPFILE is smaller than the system memory size which is divided\n");
 	MSG("      by the number of DUMPFILEs.\n");
 	MSG("      This feature supports only the kdump-compressed format.\n");
+	MSG("\n");
+	MSG("  [--num-threads THREADNUM]:\n");
+	MSG("      Using multiple threads to read and compress data of each page in parallel.\n");
+	MSG("      And it will reduces time for saving DUMPFILE.\n");
+	MSG("      This feature only supports creating DUMPFILE in kdump-comressed format from\n");
+	MSG("      VMCORE in kdump-compressed format or elf format.\n");
 	MSG("\n");
 	MSG("  [--reassemble]:\n");
 	MSG("      Reassemble multiple DUMPFILEs, which are created by --split option,\n");

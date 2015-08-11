@@ -394,11 +394,60 @@ update_mmap_range(off_t offset, int initial) {
 }
 
 static int
+update_mmap_range_parallel(int fd_memory, off_t offset,
+			   struct mmap_cache *mmap_cache)
+{
+	off_t start_offset, end_offset;
+	off_t map_size;
+	off_t max_offset = get_max_file_offset();
+	off_t pt_load_end = offset_to_pt_load_end(offset);
+
+	/*
+	 * mmap_buf must be cleaned
+	 */
+	if (mmap_cache->mmap_buf != MAP_FAILED)
+		munmap(mmap_cache->mmap_buf, mmap_cache->mmap_end_offset
+					     - mmap_cache->mmap_start_offset);
+
+	/*
+	 * offset for mmap() must be page aligned.
+	 */
+	start_offset = roundup(offset, info->page_size);
+	end_offset = MIN(max_offset, round(pt_load_end, info->page_size));
+
+	if (!pt_load_end || (end_offset - start_offset) <= 0)
+		return FALSE;
+
+	map_size = MIN(end_offset - start_offset, info->mmap_region_size);
+
+	mmap_cache->mmap_buf = mmap(NULL, map_size, PROT_READ, MAP_PRIVATE,
+					fd_memory, start_offset);
+
+	if (mmap_cache->mmap_buf == MAP_FAILED) {
+		return FALSE;
+	}
+
+	mmap_cache->mmap_start_offset = start_offset;
+	mmap_cache->mmap_end_offset = start_offset + map_size;
+
+	return TRUE;
+}
+
+static int
 is_mapped_with_mmap(off_t offset) {
 
 	if (info->flag_usemmap == MMAP_ENABLE
 	    && offset >= info->mmap_start_offset
 	    && offset < info->mmap_end_offset)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+static int
+is_mapped_with_mmap_parallel(off_t offset, struct mmap_cache *mmap_cache) {
+	if (offset >= mmap_cache->mmap_start_offset
+	    && offset < mmap_cache->mmap_end_offset)
 		return TRUE;
 	else
 		return FALSE;
@@ -456,6 +505,54 @@ mappage_elf(unsigned long long paddr)
 		return NULL;
 
 	return info->mmap_buf + (offset - info->mmap_start_offset);
+}
+
+static char *
+mappage_elf_parallel(int fd_memory, unsigned long long paddr,
+		     struct mmap_cache *mmap_cache)
+{
+	off_t offset, offset2;
+	int flag_usemmap;
+
+	pthread_rwlock_rdlock(&info->usemmap_rwlock);
+	flag_usemmap = info->flag_usemmap;
+	pthread_rwlock_unlock(&info->usemmap_rwlock);
+	if (flag_usemmap != MMAP_ENABLE)
+		return NULL;
+
+	offset = paddr_to_offset(paddr);
+	if (!offset || page_is_fractional(offset))
+		return NULL;
+
+	offset2 = paddr_to_offset(paddr + info->page_size - 1);
+	if (!offset2)
+		return NULL;
+
+	if (offset2 - offset != info->page_size - 1)
+		return NULL;
+
+	if (!is_mapped_with_mmap_parallel(offset, mmap_cache) &&
+	    !update_mmap_range_parallel(fd_memory, offset, mmap_cache)) {
+		ERRMSG("Can't read the dump memory(%s) with mmap().\n",
+		       info->name_memory);
+
+		ERRMSG("This kernel might have some problems about mmap().\n");
+		ERRMSG("read() will be used instead of mmap() from now.\n");
+
+		/*
+		 * Fall back to read().
+		 */
+		pthread_rwlock_wrlock(&info->usemmap_rwlock);
+		info->flag_usemmap = MMAP_DISABLE;
+		pthread_rwlock_unlock(&info->usemmap_rwlock);
+		return NULL;
+	}
+
+	if (offset < mmap_cache->mmap_start_offset ||
+	    offset + info->page_size > mmap_cache->mmap_end_offset)
+		return NULL;
+
+	return mmap_cache->mmap_buf + (offset - mmap_cache->mmap_start_offset);
 }
 
 static int

@@ -42,6 +42,7 @@
 #include "dwarf_info.h"
 #include "diskdump_mod.h"
 #include "sadump_mod.h"
+#include <pthread.h>
 
 /*
  * Result of command
@@ -956,6 +957,15 @@ typedef unsigned long int ulong;
 typedef unsigned long long int ulonglong;
 
 /*
+ * for parallel process
+ */
+struct mmap_cache {
+	char	*mmap_buf;
+	off_t	mmap_start_offset;
+	off_t   mmap_end_offset;
+};
+
+/*
  * makedumpfile header
  *   For re-arranging the dump data on different architecture, all the
  *   variables are defined by 64bits. The size of signature is aligned
@@ -1219,6 +1229,10 @@ struct DumpInfo {
 	 * for cyclic_splitting mode, setup splitblock_size
 	 */
 	long long splitblock_size;
+	/*
+	 * for parallel process
+	 */
+	pthread_rwlock_t usemmap_rwlock;
 };
 extern struct DumpInfo		*info;
 

@@ -2328,7 +2328,6 @@ extract_filter_info(unsigned long long start_paddr,
 	return TRUE;
 }
 
-
 /*
  * External functions.
  */
@@ -2410,6 +2409,34 @@ filter_data_buffer(unsigned char *buf, unsigned long long paddr,
 			memset(buf_ptr, 0, fl_info.size);
 		else
 			memset(buf_ptr, fl_info.erase_ch, fl_info.size);
+	}
+}
+
+/*
+ * Filter buffer if the physical address is in filter_info.
+ */
+void
+filter_data_buffer_parallel(unsigned char *buf, unsigned long long paddr,
+					size_t size, pthread_mutex_t *mutex)
+{
+	struct filter_info fl_info;
+	unsigned char *buf_ptr;
+	int found = FALSE;
+
+	while (TRUE) {
+		pthread_mutex_lock(mutex);
+		found = extract_filter_info(paddr, paddr + size, &fl_info);
+		pthread_mutex_unlock(mutex);
+
+		if (found) {
+			buf_ptr = buf + (fl_info.paddr - paddr);
+			if (fl_info.nullify)
+				memset(buf_ptr, 0, fl_info.size);
+			else
+				memset(buf_ptr, fl_info.erase_ch, fl_info.size);
+		} else {
+			break;
+		}
 	}
 }
 

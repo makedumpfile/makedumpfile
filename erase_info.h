@@ -60,6 +60,8 @@ extern unsigned long		num_erase_info;
 int gather_filter_info(void);
 void clear_filter_info(void);
 void filter_data_buffer(unsigned char *buf, unsigned long long paddr, size_t size);
+void filter_data_buffer_parallel(unsigned char *buf, unsigned long long paddr,
+					size_t size, pthread_mutex_t *mutex);
 unsigned long get_size_eraseinfo(void);
 int update_filter_info_raw(unsigned long long, int, int);
 

@@ -575,6 +575,27 @@ read_from_vmcore(off_t offset, void *bufptr, unsigned long size)
 	return TRUE;
 }
 
+static int
+read_from_vmcore_parallel(int fd_memory, off_t offset, void *bufptr,
+			  unsigned long size)
+{
+	const off_t failed = (off_t)-1;
+
+	if (lseek(fd_memory, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump memory(%s). (offset: %llx) %s\n",
+		       info->name_memory, (unsigned long long)offset, strerror(errno));
+		return FALSE;
+	}
+
+	if (read(fd_memory, bufptr, size) != size) {
+		ERRMSG("Can't read the dump memory(%s). %s\n",
+		       info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 /*
  * This function is specific for reading page from ELF.
  *
@@ -659,6 +680,83 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 		size2 = phys_end - (phys_start + size1);
 
 		if(!read_from_vmcore(offset2, bufptr + frac_head + size1, size2)) {
+			ERRMSG("Can't read the dump memory(%s).\n",
+			       info->name_memory);
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
+static int
+readpage_elf_parallel(int fd_memory, unsigned long long paddr, void *bufptr)
+{
+	off_t offset1, offset2;
+	size_t size1, size2;
+	unsigned long long phys_start, phys_end, frac_head = 0;
+
+	offset1 = paddr_to_offset(paddr);
+	offset2 = paddr_to_offset(paddr + info->page_size);
+	phys_start = paddr;
+	phys_end = paddr + info->page_size;
+
+	/*
+	 * Check the case phys_start isn't aligned by page size like below:
+	 *
+	 *                           phys_start
+	 *                           = 0x40ffda7000
+	 *         |<-- frac_head -->|------------- PT_LOAD -------------
+	 *     ----+-----------------------+---------------------+----
+	 *         |         pfn:N         |       pfn:N+1       | ...
+	 *     ----+-----------------------+---------------------+----
+	 *         |
+	 *     pfn_to_paddr(pfn:N)               # page size = 16k
+	 *     = 0x40ffda4000
+	 */
+	if (!offset1) {
+		phys_start = page_head_to_phys_start(paddr);
+		offset1 = paddr_to_offset(phys_start);
+		frac_head = phys_start - paddr;
+		memset(bufptr, 0, frac_head);
+	}
+
+	/*
+	 * Check the case phys_end isn't aligned by page size like the
+	 * phys_start's case.
+	 */
+	if (!offset2) {
+		phys_end = page_head_to_phys_end(paddr);
+		offset2 = paddr_to_offset(phys_end);
+		memset(bufptr + (phys_end - paddr), 0, info->page_size
+							- (phys_end - paddr));
+	}
+
+	/*
+	 * Check the separated page on different PT_LOAD segments.
+	 */
+	if (offset1 + (phys_end - phys_start) == offset2) {
+		size1 = phys_end - phys_start;
+	} else {
+		for (size1 = 1; size1 < info->page_size - frac_head; size1++) {
+			offset2 = paddr_to_offset(phys_start + size1);
+			if (offset1 + size1 != offset2)
+				break;
+		}
+	}
+
+	if(!read_from_vmcore_parallel(fd_memory, offset1, bufptr + frac_head,
+								size1)) {
+		ERRMSG("Can't read the dump memory(%s).\n",
+		       info->name_memory);
+		return FALSE;
+	}
+
+	if (size1 + frac_head != info->page_size) {
+		size2 = phys_end - (phys_start + size1);
+
+		if(!read_from_vmcore_parallel(fd_memory, offset2,
+					bufptr + frac_head + size1, size2)) {
 			ERRMSG("Can't read the dump memory(%s).\n",
 			       info->name_memory);
 			return FALSE;

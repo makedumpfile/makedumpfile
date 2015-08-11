@@ -251,6 +251,20 @@ pfn_to_pos(mdf_pfn_t pfn)
 	return desc_pos;
 }
 
+unsigned long
+pfn_to_pos_parallel(mdf_pfn_t pfn, struct dump_bitmap* bitmap_memory_parallel)
+{
+	unsigned long desc_pos;
+	mdf_pfn_t i;
+
+	desc_pos = info->valid_pages[pfn / BITMAP_SECT_LEN];
+	for (i = round(pfn, BITMAP_SECT_LEN); i < pfn; i++)
+		if (is_dumpable(bitmap_memory_parallel, i, NULL))
+			desc_pos++;
+
+	return desc_pos;
+}
+
 int
 read_page_desc(unsigned long long paddr, page_desc_t *pd)
 {
@@ -279,6 +293,50 @@ read_page_desc(unsigned long long paddr, page_desc_t *pd)
 	 * Read page descriptor
 	 */
 	if (read(info->fd_memory, pd, sizeof(*pd)) != sizeof(*pd)) {
+		ERRMSG("Can't read %s. %s\n",
+				info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Sanity check
+	 */
+	if (pd->size > dh->block_size)
+		return FALSE;
+
+	return TRUE;
+}
+
+int
+read_page_desc_parallel(int fd_memory, unsigned long long paddr,
+			page_desc_t *pd,
+			struct dump_bitmap* bitmap_memory_parallel)
+{
+	struct disk_dump_header *dh;
+	unsigned long desc_pos;
+	mdf_pfn_t pfn;
+	off_t offset;
+
+	/*
+	 * Find page descriptor
+	 */
+	dh = info->dh_memory;
+	offset
+	    = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size + dh->bitmap_blocks)
+		* dh->block_size;
+	pfn = paddr_to_pfn(paddr);
+	desc_pos = pfn_to_pos_parallel(pfn, bitmap_memory_parallel);
+	offset += (off_t)desc_pos * sizeof(page_desc_t);
+	if (lseek(fd_memory, offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n",
+				 info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Read page descriptor
+	 */
+	if (read(fd_memory, pd, sizeof(*pd)) != sizeof(*pd)) {
 		ERRMSG("Can't read %s. %s\n",
 				info->name_memory, strerror(errno));
 		return FALSE;
@@ -544,6 +602,85 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 	rdbuf = pd.flags & (DUMP_DH_COMPRESSED_ZLIB | DUMP_DH_COMPRESSED_LZO |
 		DUMP_DH_COMPRESSED_SNAPPY) ? buf : bufptr;
 	if (read(info->fd_memory, rdbuf, pd.size) != pd.size) {
+		ERRMSG("Can't read %s. %s\n",
+				info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	if (pd.flags & DUMP_DH_COMPRESSED_ZLIB) {
+		retlen = info->page_size;
+		ret = uncompress((unsigned char *)bufptr, &retlen,
+					(unsigned char *)buf, pd.size);
+		if ((ret != Z_OK) || (retlen != info->page_size)) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			return FALSE;
+		}
+#ifdef USELZO
+	} else if (info->flag_lzo_support
+		   && (pd.flags & DUMP_DH_COMPRESSED_LZO)) {
+		retlen = info->page_size;
+		ret = lzo1x_decompress_safe((unsigned char *)buf, pd.size,
+					    (unsigned char *)bufptr, &retlen,
+					    LZO1X_MEM_DECOMPRESS);
+		if ((ret != LZO_E_OK) || (retlen != info->page_size)) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			return FALSE;
+		}
+#endif
+#ifdef USESNAPPY
+	} else if ((pd.flags & DUMP_DH_COMPRESSED_SNAPPY)) {
+
+		ret = snappy_uncompressed_length(buf, pd.size, (size_t *)&retlen);
+		if (ret != SNAPPY_OK) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			return FALSE;
+		}
+
+		ret = snappy_uncompress(buf, pd.size, bufptr, (size_t *)&retlen);
+		if ((ret != SNAPPY_OK) || (retlen != info->page_size)) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			return FALSE;
+		}
+#endif
+	}
+
+	return TRUE;
+}
+
+static int
+readpage_kdump_compressed_parallel(int fd_memory, unsigned long long paddr,
+				   void *bufptr,
+				   struct dump_bitmap* bitmap_memory_parallel)
+{
+	page_desc_t pd;
+	char buf[info->page_size], *rdbuf;
+	int ret;
+	unsigned long retlen;
+
+	if (!is_dumpable(bitmap_memory_parallel, paddr_to_pfn(paddr), NULL)) {
+		ERRMSG("pfn(%llx) is excluded from %s.\n",
+				paddr_to_pfn(paddr), info->name_memory);
+		return FALSE;
+	}
+
+	if (!read_page_desc_parallel(fd_memory, paddr, &pd,
+						bitmap_memory_parallel)) {
+		ERRMSG("Can't read page_desc: %llx\n", paddr);
+		return FALSE;
+	}
+
+	if (lseek(fd_memory, pd.offset, SEEK_SET) < 0) {
+		ERRMSG("Can't seek %s. %s\n",
+				info->name_memory, strerror(errno));
+		return FALSE;
+	}
+
+	/*
+	 * Read page data
+	 */
+	rdbuf = pd.flags & (DUMP_DH_COMPRESSED_ZLIB | DUMP_DH_COMPRESSED_LZO |
+		DUMP_DH_COMPRESSED_SNAPPY) ? buf : bufptr;
+	if (read(fd_memory, rdbuf, pd.size) != pd.size) {
 		ERRMSG("Can't read %s. %s\n",
 				info->name_memory, strerror(errno));
 		return FALSE;

@@ -972,6 +972,7 @@ typedef unsigned long long int ulonglong;
  * for parallel process
  */
 
+#define PAGE_DATA_NUM	(50)
 #define WAIT_TIME	(60 * 10)
 #define PTHREAD_FAIL	((void *)-2)
 #define NUM_BUFFERS	(50)

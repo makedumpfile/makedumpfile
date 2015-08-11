@@ -2033,6 +2033,7 @@ struct elf_prstatus {
 #define OPT_MEM_USAGE           OPT_START+13
 #define OPT_SPLITBLOCK_SIZE	OPT_START+14
 #define OPT_WORKING_DIR         OPT_START+15
+#define OPT_NUM_THREADS	OPT_START+16
 
 /*
  * Function Prototype.

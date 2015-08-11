@@ -3857,6 +3857,27 @@ out:
 		DEBUG_MSG("Buffer size for the cyclic mode: %ld\n", info->bufsize_cyclic);
 	}
 
+	if (info->num_threads) {
+		if (is_xen_memory()) {
+			MSG("'--num-threads' option is disable,\n");
+			MSG("because %s is Xen's memory core image.\n",
+							info->name_memory);
+			return FALSE;
+		}
+
+		if (info->flag_sadump) {
+			MSG("'--num-threads' option is disable,\n");
+			MSG("because %s is sadump %s format.\n",
+			    info->name_memory, sadump_format_type_name());
+			return FALSE;
+		}
+
+		if (!initial_for_parallel()) {
+			MSG("Fail to initial for parallel process.\n");
+			return FALSE;
+		}
+	}
+
 	if (!is_xen_memory() && !cache_init())
 		return FALSE;
 
@@ -7987,9 +8008,16 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 		if (!write_kdump_bitmap2(&cycle))
 			return FALSE;
 
-		if (!write_kdump_pages_cyclic(cd_header, cd_page, &pd_zero,
+		if (info->num_threads) {
+			if (!write_kdump_pages_parallel_cyclic(cd_header,
+							cd_page, &pd_zero,
+							&offset_data, &cycle))
+				return FALSE;
+		} else {
+			if (!write_kdump_pages_cyclic(cd_header, cd_page, &pd_zero,
 					&offset_data, &cycle))
-			return FALSE;
+				return FALSE;
+		}
 	}
 	free_bitmap2_buffer();
 
@@ -9950,6 +9978,18 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	if (info->flag_sadump_diskset && !sadump_is_supported_arch())
 		return FALSE;
 
+	if (info->num_threads) {
+		if (info->flag_split) {
+			MSG("--num-threads cannot used with --split.\n");
+			return FALSE;
+		}
+
+		if (info->flag_elf_dumpfile) {
+			MSG("--num-threads cannot used with ELF format.\n");
+			return FALSE;
+		}
+	}
+
 	if ((argc == optind + 2) && !info->flag_flatten
 				 && !info->flag_split
 				 && !info->flag_sadump_diskset) {
@@ -10013,6 +10053,18 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 
 	} else
 		return FALSE;
+
+	if (info->num_threads) {
+		if ((info->parallel_info =
+		     malloc(sizeof(parallel_info_t) * info->num_threads))
+		    == NULL) {
+			MSG("Can't allocate memory for parallel_info.\n");
+			return FALSE;
+		}
+
+		memset(info->parallel_info, 0, sizeof(parallel_info_t)
+							* info->num_threads);
+	}
 
 	return TRUE;
 }
@@ -10330,6 +10382,7 @@ static struct option longopts[] = {
 	{"mem-usage", no_argument, NULL, OPT_MEM_USAGE},
 	{"splitblock-size", required_argument, NULL, OPT_SPLITBLOCK_SIZE},
 	{"work-dir", required_argument, NULL, OPT_WORKING_DIR},
+	{"num-threads", required_argument, NULL, OPT_NUM_THREADS},
 	{0, 0, 0, 0}
 };
 
@@ -10474,6 +10527,9 @@ main(int argc, char *argv[])
 		case OPT_WORKING_DIR:
 			info->working_dir = optarg;
 			break;
+		case OPT_NUM_THREADS:
+			info->num_threads = MAX(atoi(optarg), 0);
+			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");
 			MSG("Try `makedumpfile --help' for more information.\n");
@@ -10617,6 +10673,8 @@ out:
 	else if (!info->flag_mem_usage)
 		MSG("makedumpfile Completed.\n");
 
+	free_for_parallel();
+
 	if (info) {
 		if (info->dh_memory)
 			free(info->dh_memory);
@@ -10644,6 +10702,8 @@ out:
 			free(info->p2m_mfn_frame_list);
 		if (info->page_buf != NULL)
 			free(info->page_buf);
+		if (info->parallel_info != NULL)
+			free(info->parallel_info);
 		free(info);
 
 		if (splitblock) {

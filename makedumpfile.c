@@ -3411,6 +3411,16 @@ initialize_bitmap_memory(void)
 	return TRUE;
 }
 
+void
+initialize_bitmap_memory_parallel(struct dump_bitmap *bitmap, int thread_num)
+{
+	bitmap->fd = FD_BITMAP_MEMORY_PARALLEL(thread_num);
+	bitmap->file_name = info->name_memory;
+	bitmap->no_block = -1;
+	memset(bitmap->buf, 0, BUFSIZE_BITMAP);
+	bitmap->offset = info->bitmap_memory->offset;
+}
+
 int
 calibrate_machdep_info(void)
 {
@@ -3722,6 +3732,16 @@ void
 initialize_2nd_bitmap(struct dump_bitmap *bitmap)
 {
 	initialize_bitmap(bitmap);
+	bitmap->offset = info->len_bitmap / 2;
+}
+
+void
+initialize_2nd_bitmap_parallel(struct dump_bitmap *bitmap, int thread_num)
+{
+	bitmap->fd = FD_BITMAP_PARALLEL(thread_num);
+	bitmap->file_name = info->name_bitmap;
+	bitmap->no_block = -1;
+	memset(bitmap->buf, 0, BUFSIZE_BITMAP);
 	bitmap->offset = info->len_bitmap / 2;
 }
 

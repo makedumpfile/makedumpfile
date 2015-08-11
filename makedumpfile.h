@@ -429,6 +429,11 @@ do { \
 #define SPLITTING_SIZE_EI(i)	info->splitting_info[i].size_eraseinfo
 
 /*
+ * Macro for getting parallel info.
+ */
+#define FD_BITMAP_MEMORY_PARALLEL(i)	info->parallel_info[i].fd_bitmap_memory
+#define FD_BITMAP_PARALLEL(i)		info->parallel_info[i].fd_bitmap
+/*
  * kernel version
  *
  * NOTE: the format of kernel_version is as follows
@@ -1000,6 +1005,18 @@ struct splitting_info {
 	unsigned long		size_eraseinfo;
 } splitting_info_t;
 
+struct parallel_info {
+	int			fd_memory;
+	int 			fd_bitmap_memory;
+	int			fd_bitmap;
+	unsigned char		*buf;
+	unsigned char 		*buf_out;
+	struct mmap_cache	*mmap_cache;
+#ifdef USELZO
+	lzo_bytep		wrkmem;
+#endif
+} parallel_info_t;
+
 struct ppc64_vmemmap {
 	unsigned long		phys;
 	unsigned long		virt;
@@ -1136,6 +1153,7 @@ struct DumpInfo {
 	char			*name_dumpfile;
 	int			num_dumpfile;
 	struct splitting_info	*splitting_info;
+	struct parallel_info	*parallel_info;
 
 	/*
 	 * bitmap info:

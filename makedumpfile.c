@@ -3782,7 +3782,8 @@ initial(void)
 			return FALSE;
 		}
 
-		set_page_size(sadump_page_size());
+		if (!set_page_size(sadump_page_size()))
+			return FALSE;
 
 		if (!sadump_initialize_bitmap_memory())
 			return FALSE;

@@ -465,9 +465,6 @@ read_sadump_header(char *filename)
 	smh = si->smh_memory;
 
 restart:
-	if (block_size < 0)
-		return FALSE;
-
 	if (!read_device(sph, block_size, &offset))
 		return ERROR;
 

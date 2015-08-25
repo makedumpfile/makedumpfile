@@ -41,6 +41,7 @@
 #include "common.h"
 #include "dwarf_info.h"
 #include "diskdump_mod.h"
+#include "print_info.h"
 #include "sadump_mod.h"
 #include <pthread.h>
 
@@ -1880,7 +1881,12 @@ is_dumpable_file(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 	off_t offset;
 	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
 		offset = bitmap->offset + BUFSIZE_BITMAP*(pfn/PFN_BUFBITMAP);
-		lseek(bitmap->fd, offset, SEEK_SET);
+		if (lseek(bitmap->fd, offset, SEEK_SET) < 0 ) {
+			ERRMSG("Can't seek the bitmap(%s). %s\n",
+				bitmap->file_name, strerror(errno));
+			return FALSE;
+		}
+
 		read(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP);
 		if (pfn == 0)
 			bitmap->no_block = 0;

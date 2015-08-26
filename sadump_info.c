@@ -695,7 +695,6 @@ read_sadump_header_diskset(int diskid, struct sadump_diskset_info *sdi)
 	if (sph->signature1 != SADUMP_SIGNATURE1 ||
 	    sph->signature2 != SADUMP_SIGNATURE2) {
 		DEBUG_MSG("sadump: does not have partition header\n");
-		free(sph);
 		goto error;
 	}
 

@@ -25,6 +25,7 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <assert.h>
+#include <zlib.h>
 
 struct symbol_table	symbol_table;
 struct size_table	size_table;
@@ -3538,6 +3539,11 @@ initial_for_parallel()
 		MMAP_CACHE_PARALLEL(i)->mmap_start_offset = 0;
 		MMAP_CACHE_PARALLEL(i)->mmap_end_offset = 0;
 
+		if (initialize_zlib(&ZLIB_STREAM_PARALLEL(i), Z_BEST_SPEED) == FALSE) {
+			ERRMSG("zlib initialization failed.\n");
+			return FALSE;
+		}
+
 #ifdef USELZO
 		if ((WRKMEM_PARALLEL(i) = malloc(LZO1X_1_MEM_COMPRESS)) == NULL) {
 			MSG("Can't allocate memory for the working memory. %s\n",
@@ -3628,6 +3634,7 @@ free_for_parallel()
 
 				free(MMAP_CACHE_PARALLEL(i));
 			}
+			finalize_zlib(&ZLIB_STREAM_PARALLEL(i));
 #ifdef USELZO
 			if (WRKMEM_PARALLEL(i) != NULL)
 				free(WRKMEM_PARALLEL(i));
@@ -7017,6 +7024,53 @@ write_kdump_page(struct cache_data *cd_header, struct cache_data *cd_page,
 	return TRUE;
 }
 
+int initialize_zlib(z_stream *stream, int level)
+{
+	int err;
+
+	stream->zalloc = (alloc_func)Z_NULL;
+	stream->zfree = (free_func)Z_NULL;
+	stream->opaque = (voidpf)Z_NULL;
+
+	err = deflateInit(stream, level);
+	if (err != Z_OK) {
+		ERRMSG("deflateInit failed: %s\n", zError(err));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int compress_mdf (z_stream *stream, Bytef *dest, uLongf *destLen,
+		  const Bytef *source, uLong sourceLen, int level)
+{
+	int err;
+	stream->next_in = (Bytef*)source;
+	stream->avail_in = (uInt)sourceLen;
+	stream->next_out = dest;
+	stream->avail_out = (uInt)*destLen;
+	if ((uLong)stream->avail_out != *destLen)
+		return Z_BUF_ERROR;
+
+	err = deflate(stream, Z_FINISH);
+
+	if (err != Z_STREAM_END) {
+		deflateReset(stream);
+		return err == Z_OK ? Z_BUF_ERROR : err;
+	}
+	*destLen = stream->total_out;
+
+	err = deflateReset(stream);
+	return err;
+}
+
+int finalize_zlib(z_stream *stream)
+{
+	int err;
+	err = deflateEnd(stream);
+
+	return err;
+}
+
 void *
 kdump_thread_function_cyclic(void *arg) {
 	void *retval = PTHREAD_FAIL;
@@ -7035,6 +7089,7 @@ kdump_thread_function_cyclic(void *arg) {
 	struct mmap_cache *mmap_cache =
 			MMAP_CACHE_PARALLEL(kdump_thread_args->thread_num);
 	unsigned long size_out;
+	z_stream *stream = &ZLIB_STREAM_PARALLEL(kdump_thread_args->thread_num);
 #ifdef USELZO
 	lzo_bytep wrkmem = WRKMEM_PARALLEL(kdump_thread_args->thread_num);
 #endif
@@ -7135,7 +7190,7 @@ kdump_thread_function_cyclic(void *arg) {
 			size_out = kdump_thread_args->len_buf_out;
 			if ((info->flag_compress & DUMP_DH_COMPRESSED_ZLIB)
 			    && ((size_out = kdump_thread_args->len_buf_out),
-				compress2(buf_out, &size_out, buf,
+				compress_mdf(stream, buf_out, &size_out, buf,
 					  info->page_size,
 					  Z_BEST_SPEED) == Z_OK)
 			    && (size_out < info->page_size)) {

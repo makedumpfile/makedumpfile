@@ -438,6 +438,7 @@ do { \
 #define BUF_PARALLEL(i)			info->parallel_info[i].buf
 #define BUF_OUT_PARALLEL(i)		info->parallel_info[i].buf_out
 #define MMAP_CACHE_PARALLEL(i)		info->parallel_info[i].mmap_cache
+#define ZLIB_STREAM_PARALLEL(i)		info->parallel_info[i].zlib_stream
 #ifdef USELZO
 #define WRKMEM_PARALLEL(i)		info->parallel_info[i].wrkmem
 #endif
@@ -1050,6 +1051,7 @@ struct parallel_info {
 	unsigned char		*buf;
 	unsigned char 		*buf_out;
 	struct mmap_cache	*mmap_cache;
+	z_stream		zlib_stream;
 #ifdef USELZO
 	lzo_bytep		wrkmem;
 #endif
@@ -2051,5 +2053,7 @@ int initial_xen(void);
 unsigned long long get_free_memory_size(void);
 int calculate_cyclic_buffer_size(void);
 int prepare_splitblock_table(void);
+int initialize_zlib(z_stream *stream, int level);
+int finalize_zlib(z_stream *stream);
 
 #endif /* MAKEDUMPFILE_H */

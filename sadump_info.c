@@ -874,6 +874,21 @@ sadump_initialize_bitmap_memory(void)
 	bmp->offset = si->sub_hdr_offset + sh->block_size * sh->sub_hdr_size;
 	si->ram_bitmap = bmp;
 
+	/*
+	 * Perform explicitly zero filtering. Without this processing
+	 * crash utility faces different behaviors on reading zero
+	 * pages that are filtered out on the kdump-compressed format
+	 * originating from kdump ELF and from sadump formats: the
+	 * former succeeds in reading zero pages but the latter fails.
+	 */
+	for (pfn = 0; pfn < si->max_mapnr; pfn++) {
+		if (sadump_is_ram(pfn) &&
+		    !sadump_is_dumpable(info->bitmap_memory, pfn)) {
+			info->dump_level |= DL_EXCLUDE_ZERO;
+			break;
+		}
+	}
+
 	return TRUE;
 }
 
@@ -1049,9 +1064,8 @@ readpage_sadump(unsigned long long paddr, void *bufptr)
 	}
 
 	if (!sadump_is_dumpable(info->bitmap_memory, pfn)) {
-		ERRMSG("pfn(%llx) is excluded from %s.\n", pfn,
-		       info->name_memory);
-		return FALSE;
+		memset(bufptr, 0, info->page_size);
+		return TRUE;
 	}
 
 	block = pfn_to_block(pfn);

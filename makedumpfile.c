@@ -33,10 +33,14 @@ struct offset_table	offset_table;
 struct array_table	array_table;
 struct number_table	number_table;
 struct srcfile_table	srcfile_table;
+struct save_control	sc;
 
 struct vm_table		vt = { 0 };
 struct DumpInfo		*info = NULL;
 struct SplitBlock		*splitblock = NULL;
+struct vmap_pfns	*gvmem_pfns;
+int nr_gvmem_pfns;
+extern int find_vmemmap();
 
 char filename_stdout[] = FILENAME_STDOUT;
 
@@ -5743,6 +5747,329 @@ copy_bitmap(void)
 	}
 }
 
+/*
+ * Initialize the structure for saving pfn's to be deleted.
+ */
+int
+init_save_control()
+{
+	int flags;
+	char *filename;
+
+	filename = malloc(50);
+	*filename = '\0';
+	strcpy(filename, info->working_dir);
+	strcat(filename, "/");
+	strcat(filename, "makedumpfilepfns");
+	sc.sc_filename = filename;
+	flags = O_RDWR|O_CREAT|O_TRUNC;
+	if ((sc.sc_fd = open(sc.sc_filename, flags, S_IRUSR|S_IWUSR)) < 0) {
+		ERRMSG("Can't open the pfn file %s.\n", sc.sc_filename);
+		return FAILED;
+	}
+	unlink(sc.sc_filename);
+
+	sc.sc_buf = malloc(info->page_size);
+	if (!sc.sc_buf) {
+		ERRMSG("Can't allocate a page for pfn buf.\n");
+		return FAILED;
+	}
+	sc.sc_buflen = info->page_size;
+	sc.sc_bufposition = 0;
+	sc.sc_fileposition = 0;
+	sc.sc_filelen = 0;
+	return COMPLETED;
+}
+
+/*
+ * Save a starting pfn and number of pfns for later delete from bitmap.
+ */
+int
+save_deletes(unsigned long startpfn, unsigned long numpfns)
+{
+	int i;
+	struct sc_entry *scp;
+
+	if (sc.sc_bufposition == sc.sc_buflen) {
+		i = write(sc.sc_fd, sc.sc_buf, sc.sc_buflen);
+		if (i != sc.sc_buflen) {
+			ERRMSG("save: Can't write a page to %s\n",
+				sc.sc_filename);
+			return FAILED;
+		}
+		sc.sc_filelen += sc.sc_buflen;
+		sc.sc_bufposition = 0;
+	}
+	scp = (struct sc_entry *)(sc.sc_buf + sc.sc_bufposition);
+	scp->startpfn = startpfn;
+	scp->numpfns = numpfns;
+	sc.sc_bufposition += sizeof(struct sc_entry);
+	return COMPLETED;
+}
+
+/*
+ * Get a starting pfn and number of pfns for delete from bitmap.
+ * Return 0 for success, 1 for 'no more'
+ */
+int
+get_deletes(unsigned long *startpfn, unsigned long *numpfns)
+{
+	int i;
+	struct sc_entry *scp;
+
+	if (sc.sc_fileposition >= sc.sc_filelen) {
+		return FAILED;
+	}
+
+	if (sc.sc_bufposition == sc.sc_buflen) {
+		i = read(sc.sc_fd, sc.sc_buf, sc.sc_buflen);
+		if (i <= 0) {
+			ERRMSG("Can't read a page from %s.\n", sc.sc_filename);
+			return FAILED;
+		}
+		sc.sc_bufposition = 0;
+	}
+	scp = (struct sc_entry *)(sc.sc_buf + sc.sc_bufposition);
+	*startpfn = scp->startpfn;
+	*numpfns = scp->numpfns;
+	sc.sc_bufposition += sizeof(struct sc_entry);
+	sc.sc_fileposition += sizeof(struct sc_entry);
+	return COMPLETED;
+}
+
+/*
+ * Given a range of unused pfn's, check whether we can drop the vmemmap pages
+ * that represent them.
+ *  (pfn ranges are literally start and end, not start and end+1)
+ *   see the array of vmemmap pfns and the pfns they represent: gvmem_pfns
+ * Return COMPLETED for delete, FAILED for not to delete.
+ */
+int
+find_vmemmap_pages(unsigned long startpfn, unsigned long endpfn, unsigned long *vmappfn,
+									unsigned long *nmapnpfns)
+{
+	int i;
+	long npfns_offset, vmemmap_offset, vmemmap_pfns, start_vmemmap_pfn;
+	long npages, end_vmemmap_pfn;
+	struct vmap_pfns *vmapp;
+	int pagesize = info->page_size;
+
+	for (i = 0; i < nr_gvmem_pfns; i++) {
+		vmapp = gvmem_pfns + i;
+		if ((startpfn >= vmapp->rep_pfn_start) &&
+		    (endpfn <= vmapp->rep_pfn_end)) {
+			npfns_offset = startpfn - vmapp->rep_pfn_start;
+			vmemmap_offset = npfns_offset * size_table.page;
+			// round up to a page boundary
+			if (vmemmap_offset % pagesize)
+				vmemmap_offset += (pagesize - (vmemmap_offset % pagesize));
+			vmemmap_pfns = vmemmap_offset / pagesize;
+			start_vmemmap_pfn = vmapp->vmap_pfn_start + vmemmap_pfns;
+			*vmappfn = start_vmemmap_pfn;
+
+			npfns_offset = endpfn - vmapp->rep_pfn_start;
+			vmemmap_offset = npfns_offset * size_table.page;
+			// round down to page boundary
+			vmemmap_offset -= (vmemmap_offset % pagesize);
+			vmemmap_pfns = vmemmap_offset / pagesize;
+			end_vmemmap_pfn = vmapp->vmap_pfn_start + vmemmap_pfns;
+			npages = end_vmemmap_pfn - start_vmemmap_pfn;
+			if (npages == 0)
+				return FAILED;
+			*nmapnpfns = npages;
+			return COMPLETED;
+		}
+	}
+	return FAILED;
+}
+
+/*
+ * Find the big holes in bitmap2; they represent ranges for which
+ * we do not need page structures.
+ * Bitmap1 is a map of dumpable (i.e existing) pages.
+ * They must only be pages that exist, so they will be 0 bits
+ * in the 2nd bitmap but 1 bits in the 1st bitmap.
+ * For speed, only worry about whole words full of bits.
+ */
+int
+find_unused_vmemmap_pages(void)
+{
+	struct dump_bitmap *bitmap1 = info->bitmap1;
+	struct dump_bitmap *bitmap2 = info->bitmap2;
+	unsigned long long pfn;
+	unsigned long *lp1, *lp2, startpfn, endpfn;
+	unsigned long vmapstartpfn, vmapnumpfns;
+	int i, sz, numpages=0, did_deletes;
+	int startword, numwords, do_break=0;
+	long deleted_pages = 0;
+	off_t new_offset1, new_offset2;
+
+	/* read each block of both bitmaps */
+	for (pfn = 0; pfn < info->max_mapnr; pfn += PFN_BUFBITMAP) { /* size in bits */
+		numpages++;
+		did_deletes = 0;
+		new_offset1 = bitmap1->offset + BUFSIZE_BITMAP * (pfn / PFN_BUFBITMAP);
+		if (lseek(bitmap1->fd, new_offset1, SEEK_SET) < 0 ) {
+			ERRMSG("Can't seek the bitmap(%s). %s\n",
+				bitmap1->file_name, strerror(errno));
+			return FAILED;
+		}
+		if (read(bitmap1->fd, bitmap1->buf, BUFSIZE_BITMAP) != BUFSIZE_BITMAP) {
+			ERRMSG("Can't read the bitmap(%s). %s\n",
+				bitmap1->file_name, strerror(errno));
+			return FAILED;
+		}
+		bitmap1->no_block = pfn / PFN_BUFBITMAP;
+
+		new_offset2 = bitmap2->offset + BUFSIZE_BITMAP * (pfn / PFN_BUFBITMAP);
+		if (lseek(bitmap2->fd, new_offset2, SEEK_SET) < 0 ) {
+			ERRMSG("Can't seek the bitmap(%s). %s\n",
+				bitmap2->file_name, strerror(errno));
+			return FAILED;
+		}
+		if (read(bitmap2->fd, bitmap2->buf, BUFSIZE_BITMAP) != BUFSIZE_BITMAP) {
+			ERRMSG("Can't read the bitmap(%s). %s\n",
+				bitmap2->file_name, strerror(errno));
+			return FAILED;
+		}
+		bitmap2->no_block = pfn / PFN_BUFBITMAP;
+
+		/* process this one page of both bitmaps at a time */
+		lp1 = (unsigned long *)bitmap1->buf;
+		lp2 = (unsigned long *)bitmap2->buf;
+		/* sz is words in the block */
+		sz = BUFSIZE_BITMAP / sizeof(unsigned long);
+		startword = -1;
+		for (i = 0; i < sz; i++, lp1++, lp2++) {
+			/* for each whole word in the block */
+			/* deal in full 64-page chunks only */
+			if (*lp1 == 0xffffffffffffffffUL) {
+				if (*lp2 == 0) {
+					/* we are in a series we want */
+					if (startword == -1) {
+						/* starting a new group */
+						startword = i;
+					}
+				} else {
+					/* we hit a used page */
+					if (startword >= 0)
+						do_break = 1;
+				}
+			} else {
+				/* we hit a hole in real memory, or part of one */
+				if (startword >= 0)
+					do_break = 1;
+			}
+			if (do_break) {
+				do_break = 0;
+				if (startword >= 0) {
+					numwords = i - startword;
+					/* 64 bits represents 64 page structs, which
+					   are not even one page of them (takes
+					   at least 73) */
+					if (numwords > 1) {
+						startpfn = pfn +
+							(startword * BITS_PER_WORD);
+						/* pfn ranges are literally start and end,
+						   not start and end + 1 */
+						endpfn = startpfn +
+							(numwords * BITS_PER_WORD) - 1;
+						if (find_vmemmap_pages(startpfn, endpfn,
+							&vmapstartpfn, &vmapnumpfns) ==
+							COMPLETED) {
+							if (save_deletes(vmapstartpfn,
+								vmapnumpfns) == FAILED) {
+								ERRMSG("save_deletes failed\n");
+								return FAILED;
+							}
+							deleted_pages += vmapnumpfns;
+							did_deletes = 1;
+						}
+					}
+				}
+				startword = -1;
+			}
+		}
+		if (startword >= 0) {
+			numwords = i - startword;
+			if (numwords > 1) {
+				startpfn = pfn + (startword * BITS_PER_WORD);
+				/* pfn ranges are literally start and end,
+				   not start and end + 1 */
+				endpfn = startpfn + (numwords * BITS_PER_WORD) - 1;
+				if (find_vmemmap_pages(startpfn, endpfn,
+					&vmapstartpfn, &vmapnumpfns) == COMPLETED) {
+					if (save_deletes(vmapstartpfn, vmapnumpfns)
+						== FAILED) {
+						ERRMSG("save_deletes failed\n");
+						return FAILED;
+					}
+					deleted_pages += vmapnumpfns;
+					did_deletes = 1;
+				}
+			}
+		}
+	}
+	PROGRESS_MSG("\nExcluded %ld unused vmemmap pages\n", deleted_pages);
+
+	return COMPLETED;
+}
+
+/*
+ * Retrieve the list of pfn's and delete them from bitmap2;
+ */
+void
+delete_unused_vmemmap_pages(void)
+{
+	unsigned long startpfn, numpfns, pfn, i;
+
+	while (get_deletes(&startpfn, &numpfns) == COMPLETED) {
+		for (i = 0, pfn = startpfn; i < numpfns; i++, pfn++) {
+			clear_bit_on_2nd_bitmap_for_kernel(pfn, (struct cycle *)0);
+			// note that this is never to be used in cyclic mode!
+		}
+	}
+	return;
+}
+
+/*
+ * Finalize the structure for saving pfn's to be deleted.
+ */
+void
+finalize_save_control()
+{
+	free(sc.sc_buf);
+	close(sc.sc_fd);
+	return;
+}
+
+/*
+ * Reset the structure for saving pfn's to be deleted so that it can be read
+ */
+int
+reset_save_control()
+{
+	int i;
+	if (sc.sc_bufposition == 0)
+		return COMPLETED;
+
+	i = write(sc.sc_fd, sc.sc_buf, sc.sc_buflen);
+	if (i != sc.sc_buflen) {
+		ERRMSG("reset: Can't write a page to %s\n",
+			sc.sc_filename);
+		return FAILED;
+	}
+	sc.sc_filelen += sc.sc_bufposition;
+
+	if (lseek(sc.sc_fd, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the pfn file %s).", sc.sc_filename);
+		return FAILED;
+	}
+	sc.sc_fileposition = 0;
+	sc.sc_bufposition = sc.sc_buflen; /* trigger 1st read */
+	return COMPLETED;
+}
+
 int
 create_2nd_bitmap(struct cycle *cycle)
 {
@@ -5821,6 +6148,20 @@ create_2nd_bitmap(struct cycle *cycle)
 
 	if (!sync_2nd_bitmap())
 		return FALSE;
+
+	/* --exclude-unused-vm means exclude vmemmap page structures for unused pages */
+	if (info->flag_excludevm) {
+		if (init_save_control() == FAILED)
+			return FALSE;
+		if (find_unused_vmemmap_pages() == FAILED)
+			return FALSE;
+		if (reset_save_control() == FAILED)
+			return FALSE;
+		delete_unused_vmemmap_pages();
+		finalize_save_control();
+		if (!sync_2nd_bitmap())
+			return FALSE;
+	}
 
 	return TRUE;
 }
@@ -6238,6 +6579,10 @@ write_kdump_header(void)
 	dh->bitmap_blocks  = divideup(info->len_bitmap, dh->block_size);
 	memcpy(&dh->timestamp, &info->timestamp, sizeof(dh->timestamp));
 	memcpy(&dh->utsname, &info->system_utsname, sizeof(dh->utsname));
+
+	if (info->flag_excludevm)
+		dh->status |= DUMP_DH_EXCLUDED_VMEMMAP;
+
 	if (info->flag_compress & DUMP_DH_COMPRESSED_ZLIB)
 		dh->status |= DUMP_DH_COMPRESSED_ZLIB;
 #ifdef USELZO
@@ -9253,6 +9598,14 @@ create_dumpfile(void)
 	if (!initial())
 		return FALSE;
 
+	/* create an array of translations from pfn to vmemmap pages */
+	if (info->flag_excludevm) {
+		if (find_vmemmap() == FAILED) {
+			ERRMSG("Can't find vmemmap pages\n");
+			info->flag_excludevm = 0;
+		}
+	}
+
 	print_vtop();
 
 	num_retry = 0;
@@ -10473,7 +10826,7 @@ main(int argc, char *argv[])
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:EFfg:hi:lpRvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:eEFfg:hi:lpRvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
 		case OPT_BLOCK_ORDER:
@@ -10516,6 +10869,10 @@ main(int argc, char *argv[])
 		case OPT_READ_VMCOREINFO:
 			info->flag_read_vmcoreinfo = 1;
 			info->name_vmcoreinfo = optarg;
+			break;
+		case OPT_EXCLUDE_UNUSED_VM:
+			info->flag_excludevm = 1;	/* exclude unused vmemmap pages */
+			info->flag_cyclic = FALSE;	/* force create_2nd_bitmap */
 			break;
 		case OPT_DISKSET:
 			if (!sadump_add_diskset_info(optarg))
@@ -10594,6 +10951,12 @@ main(int argc, char *argv[])
 	}
 	if (flag_debug)
 		message_level |= ML_PRINT_DEBUG_MSG;
+
+	if (info->flag_excludevm && !info->working_dir) {
+		ERRMSG("Error: -%c requires --work-dir\n", OPT_EXCLUDE_UNUSED_VM);
+		ERRMSG("Try `makedumpfile --help' for more information\n");
+		return COMPLETED;
+	}
 
 	if (info->flag_show_usage) {
 		print_usage();

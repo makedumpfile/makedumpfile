@@ -97,6 +97,7 @@ struct kdump_sub_header {
 					/* paged is compressed with snappy */
 #define DUMP_DH_COMPRESSED_INCOMPLETE	0x8
 					/* indicate an incomplete dumpfile */
+#define DUMP_DH_EXCLUDED_VMEMMAP 0x10	/* unused vmemmap pages are excluded */
 
 /* descriptor of each page for vmcore */
 typedef struct page_desc {

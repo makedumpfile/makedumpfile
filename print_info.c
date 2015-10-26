@@ -58,7 +58,7 @@ print_usage(void)
 	MSG("\n");
 	MSG("Usage:\n");
 	MSG("  Creating DUMPFILE:\n");
-	MSG("  # makedumpfile    [-c|-l|-p|-E] [-d DL] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
+	MSG("  # makedumpfile    [-c|-l|-p|-E] [-d DL] [-e] [-x VMLINUX|-i VMCOREINFO] VMCORE\n");
 	MSG("    DUMPFILE\n");
 	MSG("\n");
 	MSG("  Creating DUMPFILE with filtered kernel data specified through filter config\n");
@@ -112,6 +112,14 @@ print_usage(void)
 	MSG("      or snappy for -p option. A user cannot specify either of these options with\n");
 	MSG("      -E option, because the ELF format does not support compressed data.\n");
 	MSG("      THIS IS ONLY FOR THE CRASH UTILITY.\n");
+	MSG("\n");
+	MSG("  [-e]:\n");
+	MSG("      Exclude the page structures (vmemmap) which represent excluded pages.\n");
+	MSG("      This greatly shortens the dump of a very large memory system.\n");
+	MSG("      The --work-dir option must also be specified, as it will be used\n");
+	MSG("      to hold bitmaps and a file of page numbers that are to be excluded.\n");
+	MSG("      The -e option will cause a noncyclic dump procedure.\n");
+	MSG("      This option is only for x86_64.\n");
 	MSG("\n");
 	MSG("  [-d DL]:\n");
 	MSG("      Specify the type of unnecessary page for analysis.\n");

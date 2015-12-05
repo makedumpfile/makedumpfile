@@ -503,28 +503,10 @@ do { \
 #define PMASK			(0x7ffffffffffff000UL)
 
 #ifdef __aarch64__
-#define CONFIG_ARM64_PGTABLE_LEVELS	2
-#define CONFIG_ARM64_VA_BITS		42
-#define CONFIG_ARM64_64K_PAGES		1
-
-/* Currently we only suport following defines based on above
- * config definitions.
- * TODOs: We need to find a way to get above defines dynamically and
- * then to support following definitions based on that
- */
-
-#if CONFIG_ARM64_PGTABLE_LEVELS == 2
-#define ARM64_PGTABLE_LEVELS	2
-#endif
-
-#if CONFIG_ARM64_VA_BITS == 42
-#define VA_BITS			42
-#endif
-
-#ifdef CONFIG_ARM64_64K_PAGES
-#define PAGE_SHIFT		16
-#endif
-
+int get_va_bits_arm64(void);
+#define ARM64_PGTABLE_LEVELS	get_pgtable_level_arm64()
+#define VA_BITS			get_va_bits_arm64()
+#define PAGE_SHIFT		get_page_shift_arm64()
 #define KVBASE_MASK		(0xffffffffffffffffUL << (VA_BITS - 1))
 #define KVBASE			(SYMBOL(_stext) & KVBASE_MASK)
 #endif /* aarch64 */

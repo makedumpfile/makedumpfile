@@ -23,7 +23,6 @@
 #include "../makedumpfile.h"
 #include "../print_info.h"
 
-#if CONFIG_ARM64_PGTABLE_LEVELS == 2
 typedef struct {
 	unsigned long pgd;
 } pgd_t;
@@ -44,8 +43,6 @@ typedef struct {
 
 #define PUD_SHIFT		PGDIR_SHIFT
 #define PUD_SIZE		(1UL << PUD_SHIFT)
-
-#endif
 
 typedef struct {
 	unsigned long pte;
@@ -96,6 +93,41 @@ typedef struct {
 #define MODULES_END			PAGE_OFFSET
 #define MODULES_VADDR			(MODULES_END - 0x4000000)
 
+static int pgtable_level;
+static int va_bits;
+static int page_shift;
+
+int
+get_pgtable_level_arm64(void)
+{
+	return pgtable_level;
+}
+
+int
+get_va_bits_arm64(void)
+{
+	return va_bits;
+}
+
+int
+get_page_shift_arm64(void)
+{
+	return page_shift;
+}
+
+static int calculate_plat_config(void)
+{
+	/*
+	 * TODO: Keep it fixed for page level 2, size 64K and VA bits as
+	 * 42, as of now. Will calculate them from symbol address values
+	 * latter.
+	 */
+	pgtable_level = 2;
+	va_bits = 42;
+	page_shift = 16;
+
+	return TRUE;
+}
 
 static int
 is_vtop_from_page_table_arm64(unsigned long vaddr)
@@ -114,6 +146,12 @@ get_phys_base_arm64(void)
 	unsigned long phys_base = ULONG_MAX;
 	unsigned long long phys_start;
 	int i;
+
+	if (!calculate_plat_config()) {
+		ERRMSG("Can't determine platform config values\n");
+		return FALSE;
+	}
+
 	/*
 	 * We resolve phys_base from PT_LOAD segments. LMA contains physical
 	 * address of the segment, and we use the lowest start as

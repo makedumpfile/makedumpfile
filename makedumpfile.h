@@ -507,8 +507,7 @@ int get_va_bits_arm64(void);
 #define ARM64_PGTABLE_LEVELS	get_pgtable_level_arm64()
 #define VA_BITS			get_va_bits_arm64()
 #define PAGE_SHIFT		get_page_shift_arm64()
-#define KVBASE_MASK		(0xffffffffffffffffUL << (VA_BITS - 1))
-#define KVBASE			(SYMBOL(_stext) & KVBASE_MASK)
+#define KVBASE			VMALLOC_START
 #endif /* aarch64 */
 
 #ifdef __arm__

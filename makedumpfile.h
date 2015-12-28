@@ -54,8 +54,6 @@
 #define COMPLETED	(0)
 #define FAILED		(1)
 #define WRONG_RELEASE	(2)	/* utsname.release does not match. */
-#define ANALYSIS_FAILED	(3)	/* detected illegal page descriptor. */
-#define OUTPUT_FAILED	(4)	/* detected an output error. */
 
 /*
  * Type of memory management

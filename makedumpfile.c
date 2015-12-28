@@ -4706,7 +4706,6 @@ reset_bitmap_of_free_pages(unsigned long node_zones, struct cycle *cycle)
 				}
 				if (previous != curr_prev) {
 					ERRMSG("The free list is broken.\n");
-					retcd = ANALYSIS_FAILED;
 					return FALSE;
 				}
 				for (i = 0; i < (1<<order); i++) {

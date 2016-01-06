@@ -54,7 +54,9 @@ static int va_bits;
 #define PAGE_MASK		(~(PAGESIZE() - 1))
 #define PGDIR_SHIFT		((PAGESHIFT() - 3) * pgtable_level + 3)
 #define PTRS_PER_PGD		(1 << (va_bits - PGDIR_SHIFT))
+#define PUD_SHIFT		get_pud_shift_arm64()
 #define PTRS_PER_PTE		(1 << (PAGESHIFT() - 3))
+#define PTRS_PER_PUD		PTRS_PER_PTE
 #define PMD_SHIFT		((PAGESHIFT() - 3) * 2 + 3)
 #define PMD_SIZE		(1UL << PMD_SHIFT)
 #define PMD_MASK		(~(PMD_SIZE - 1))
@@ -89,6 +91,18 @@ static int va_bits;
 #define pmd_offset_pgtbl_lvl_2(pud, vaddr) ((pmd_t *)pud)
 #define pmd_offset_pgtbl_lvl_3(pud, vaddr) ((pmd_t *)pud_page_paddr((*pud)) + pmd_index(vaddr))
 
+#define pud_index(vaddr)		(((vaddr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
+#define pgd_page_paddr(pgd)		(pgd_val(pgd) & PHYS_MASK & (int32_t)PAGE_MASK)
+
+static int
+get_pud_shift_arm64(void)
+{
+	if (pgtable_level == 4)
+		return ((PAGESHIFT() - 3) * 3 + 3);
+	else
+		return PGDIR_SHIFT;
+}
+
 static pmd_t *
 pmd_offset(pud_t *puda, pud_t *pudv, unsigned long vaddr)
 {
@@ -97,6 +111,15 @@ pmd_offset(pud_t *puda, pud_t *pudv, unsigned long vaddr)
 	} else {
 		return pmd_offset_pgtbl_lvl_3(pudv, vaddr);
 	}
+}
+
+static pud_t *
+pud_offset(pgd_t *pgda, pgd_t *pgdv, unsigned long vaddr)
+{
+	if (pgtable_level == 4)
+		return ((pud_t *)pgd_page_paddr((*pgdv)) + pud_index(vaddr));
+	else
+		return (pud_t *)(pgda);
 }
 
 static int calculate_plat_config(void)
@@ -212,8 +235,11 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
 		return NOT_PADDR;
 	}
 
-	pudv.pgd = pgdv;
-	puda = (pud_t *)pgda;
+	puda = pud_offset(pgda, &pgdv, vaddr);
+	if (!readmem(PADDR, (unsigned long long)puda, &pudv, sizeof(pudv))) {
+		ERRMSG("Can't read pud\n");
+		return NOT_PADDR;
+	}
 
 	pmda = pmd_offset(puda, &pudv, vaddr);
 	if (!readmem(PADDR, (unsigned long long)pmda, &pmdv, sizeof(pmdv))) {

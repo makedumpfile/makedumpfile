@@ -240,6 +240,15 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 	return FALSE;
 }
 
+static inline int
+isHugetlb(dtor)
+{
+        return ((NUMBER(HUGETLB_PAGE_DTOR) != NOT_FOUND_NUMBER)
+		&& (NUMBER(HUGETLB_PAGE_DTOR) == dtor))
+                || ((SYMBOL(free_huge_page) != NOT_FOUND_SYMBOL)
+                    && (SYMBOL(free_huge_page) == dtor));
+}
+
 static inline unsigned long
 calculate_len_buf_out(long page_size)
 {
@@ -1574,6 +1583,8 @@ get_structure_info(void)
 	OFFSET_INIT(page.mapping, "page", "mapping");
 	OFFSET_INIT(page._mapcount, "page", "_mapcount");
 	OFFSET_INIT(page.private, "page", "private");
+	OFFSET_INIT(page.compound_dtor, "page", "compound_dtor");
+	OFFSET_INIT(page.compound_order, "page", "compound_order");
 
 	/*
 	 * Some vmlinux(s) don't have debugging information about
@@ -1679,6 +1690,8 @@ get_structure_info(void)
 		if (NUMBER(PG_head) != NOT_FOUND_NUMBER)
 			NUMBER(PG_head_mask) = 1UL << NUMBER(PG_head);
 	}
+
+	ENUM_NUMBER_INIT(HUGETLB_PAGE_DTOR, "HUGETLB_PAGE_DTOR");
 
 	ENUM_TYPE_SIZE_INIT(pageflags, "pageflags");
 
@@ -2124,6 +2137,8 @@ write_vmcoreinfo_data(void)
 	WRITE_MEMBER_OFFSET("page.lru", page.lru);
 	WRITE_MEMBER_OFFSET("page._mapcount", page._mapcount);
 	WRITE_MEMBER_OFFSET("page.private", page.private);
+	WRITE_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
+	WRITE_MEMBER_OFFSET("page.compound_order", page.compound_order);
 	WRITE_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	WRITE_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
@@ -2192,6 +2207,8 @@ write_vmcoreinfo_data(void)
 
 	WRITE_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 	WRITE_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
+
+	WRITE_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
 
 	/*
 	 * write the source file of 1st kernel
@@ -2459,6 +2476,8 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("page.lru", page.lru);
 	READ_MEMBER_OFFSET("page._mapcount", page._mapcount);
 	READ_MEMBER_OFFSET("page.private", page.private);
+	READ_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
+	READ_MEMBER_OFFSET("page.compound_order", page.compound_order);
 	READ_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	READ_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
@@ -2527,6 +2546,8 @@ read_vmcoreinfo(void)
 
 	READ_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 	READ_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
+
+	READ_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
 
 	return TRUE;
 }
@@ -5476,6 +5497,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 	unsigned char page_cache[SIZE(page) * PGMM_CACHED];
 	unsigned char *pcache;
 	unsigned int _count, _mapcount = 0, compound_order = 0;
+	unsigned int order_offset, dtor_offset;
 	unsigned long flags, mapping, private = 0;
 	unsigned long compound_dtor;
 
@@ -5544,26 +5566,52 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		_count  = UINT(pcache + OFFSET(page._count));
 		mapping = ULONG(pcache + OFFSET(page.mapping));
 
-		if ((index_pg < PGMM_CACHED - 1) &&
-		    isCompoundHead(flags)) {
-			compound_order = ULONG(pcache + SIZE(page) + OFFSET(page.lru)
-					       + OFFSET(list_head.prev));
-			compound_dtor = ULONG(pcache + SIZE(page) + OFFSET(page.lru)
-					     + OFFSET(list_head.next));
+		if (OFFSET(page.compound_order) != NOT_FOUND_STRUCTURE) {
+			order_offset = OFFSET(page.compound_order);
+		} else {
+			if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
+				order_offset = OFFSET(page.lru) + OFFSET(list_head.prev);
+			else
+				order_offset = 0;
+		}
+
+		if (OFFSET(page.compound_dtor) != NOT_FOUND_STRUCTURE) {
+			dtor_offset = OFFSET(page.compound_dtor);
+		} else {
+			if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
+				dtor_offset = OFFSET(page.lru) + OFFSET(list_head.next);
+			else
+				dtor_offset = 0;
+		}
+
+		compound_order = 0;
+		compound_dtor = 0;
+		/*
+		 * The last pfn of the mem_map cache must not be compound page
+		 * since all compound pages are aligned to its page order and
+		 * PGMM_CACHED is a power of 2.
+		 */
+		if ((index_pg < PGMM_CACHED - 1) && isCompoundHead(flags)) {
+			if (order_offset)
+				compound_order = USHORT(pcache + SIZE(page) + order_offset);
+
+			if (dtor_offset) {
+				/*
+				 * compound_dtor has been changed from the address of descriptor
+				 * to the ID of it since linux-4.4.
+				 */
+				if (info->kernel_version >= KERNEL_VERSION(4, 4, 0)) {
+					compound_dtor = USHORT(pcache + SIZE(page) + dtor_offset);
+				} else {
+					compound_dtor = ULONG(pcache + SIZE(page) + dtor_offset);
+				}
+			}
 
 			if ((compound_order >= sizeof(unsigned long) * 8)
 			    || ((pfn & ((1UL << compound_order) - 1)) != 0)) {
 				/* Invalid order */
 				compound_order = 0;
 			}
-		} else {
-			/*
-			 * The last pfn of the mem_map cache must not be compound page
-			 * since all compound pages are aligned to its page order and
-			 * PGMM_CACHED is a power of 2.
-			 */
-			compound_order = 0;
-			compound_dtor = 0;
 		}
 
 		if (OFFSET(page._mapcount) != NOT_FOUND_STRUCTURE)

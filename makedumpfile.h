@@ -153,8 +153,6 @@ test_bit(int nr, unsigned long addr)
 #define isLRU(flags)		test_bit(NUMBER(PG_lru), flags)
 #define isPrivate(flags)	test_bit(NUMBER(PG_private), flags)
 #define isCompoundHead(flags)   (!!((flags) & NUMBER(PG_head_mask)))
-#define isHugetlb(dtor)         ((SYMBOL(free_huge_page) != NOT_FOUND_SYMBOL) \
-				 && (SYMBOL(free_huge_page) == dtor))
 #define isSwapCache(flags)	test_bit(NUMBER(PG_swapcache), flags)
 #define isHWPOISON(flags)	(test_bit(NUMBER(PG_hwpoison), flags) \
 				&& (NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER))
@@ -1481,6 +1479,8 @@ struct offset_table {
 		long	lru;
 		long	_mapcount;
 		long	private;
+		long	compound_dtor;
+		long	compound_order;
 	} page;
 	struct mem_section {
 		long	section_mem_map;
@@ -1676,6 +1676,7 @@ struct number_table {
 	long	KERNEL_IMAGE_SIZE;
 	long	SECTION_SIZE_BITS;
 	long	MAX_PHYSMEM_BITS;
+	long    HUGETLB_PAGE_DTOR;
 };
 
 struct srcfile_table {

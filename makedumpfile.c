@@ -648,73 +648,51 @@ read_from_vmcore_parallel(int fd_memory, off_t offset, void *bufptr,
 static int
 readpage_elf(unsigned long long paddr, void *bufptr)
 {
-	off_t offset1, offset2;
-	size_t size1, size2;
-	unsigned long long phys_start, phys_end, frac_head = 0;
+	int idx;
+	off_t offset, size;
+	void *p, *endp;
+	unsigned long long phys_start, phys_end;
 
-	offset1 = paddr_to_offset(paddr);
-	offset2 = paddr_to_offset(paddr + info->page_size);
-	phys_start = paddr;
-	phys_end = paddr + info->page_size;
+	p = bufptr;
+	endp = p + info->page_size;
+	while (p < endp) {
+		idx = closest_pt_load(paddr + (p - bufptr), endp - p);
+		if (idx < 0)
+			break;
 
-	/*
-	 * Check the case phys_start isn't aligned by page size like below:
-	 *
-	 *                           phys_start
-	 *                           = 0x40ffda7000
-	 *         |<-- frac_head -->|------------- PT_LOAD -------------
-	 *     ----+-----------------------+---------------------+----
-	 *         |         pfn:N         |       pfn:N+1       | ...
-	 *     ----+-----------------------+---------------------+----
-	 *         |
-	 *     pfn_to_paddr(pfn:N)               # page size = 16k
-	 *     = 0x40ffda4000
-	 */
-	if (!offset1) {
-		phys_start = page_head_to_phys_start(paddr);
-		offset1 = paddr_to_offset(phys_start);
-		frac_head = phys_start - paddr;
-		memset(bufptr, 0, frac_head);
-	}
+		get_pt_load_extents(idx, &phys_start, &phys_end, &offset, &size);
+		if (phys_start > paddr + (p - bufptr)) {
+			memset(p, 0, phys_start - paddr);
+			p += phys_start - paddr;
+		}
 
-	/*
-	 * Check the case phys_end isn't aligned by page size like the
-	 * phys_start's case.
-	 */
-	if (!offset2) {
-		phys_end = page_head_to_phys_end(paddr);
-		offset2 = paddr_to_offset(phys_end);
-		memset(bufptr + (phys_end - paddr), 0, info->page_size - (phys_end - paddr));
-	}
-
-	/*
-	 * Check the separated page on different PT_LOAD segments.
-	 */
-	if (offset1 + (phys_end - phys_start) == offset2) {
-		size1 = phys_end - phys_start;
-	} else {
-		for (size1 = 1; size1 < info->page_size - frac_head; size1++) {
-			offset2 = paddr_to_offset(phys_start + size1);
-			if (offset1 + size1 != offset2)
-				break;
+		offset += paddr - phys_start;
+		if (size > paddr - phys_start) {
+			size -= paddr - phys_start;
+			if (size > endp - p)
+				size = endp - p;
+			if (!read_from_vmcore(offset, p, size)) {
+				ERRMSG("Can't read the dump memory(%s).\n",
+				       info->name_memory);
+				return FALSE;
+			}
+			p += size;
+		}
+		if (p < endp) {
+			size = phys_end - paddr;
+			if (size > endp - p)
+				size = endp - p;
+			memset(p, 0, size);
+			p += size;
 		}
 	}
 
-	if(!read_from_vmcore(offset1, bufptr + frac_head, size1)) {
-		ERRMSG("Can't read the dump memory(%s).\n",
-		       info->name_memory);
+	if (p == bufptr) {
+		ERRMSG("Attempt to read non-existent page at 0x%llx.\n",
+		       paddr);
 		return FALSE;
-	}
-
-	if (size1 + frac_head != info->page_size) {
-		size2 = phys_end - (phys_start + size1);
-
-		if(!read_from_vmcore(offset2, bufptr + frac_head + size1, size2)) {
-			ERRMSG("Can't read the dump memory(%s).\n",
-			       info->name_memory);
-			return FALSE;
-		}
-	}
+	} else if (p < bufptr)
+		memset(p, 0, endp - p);
 
 	return TRUE;
 }
@@ -722,76 +700,52 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 static int
 readpage_elf_parallel(int fd_memory, unsigned long long paddr, void *bufptr)
 {
-	off_t offset1, offset2;
-	size_t size1, size2;
-	unsigned long long phys_start, phys_end, frac_head = 0;
+	int idx;
+	off_t offset, size;
+	void *p, *endp;
+	unsigned long long phys_start, phys_end;
 
-	offset1 = paddr_to_offset(paddr);
-	offset2 = paddr_to_offset(paddr + info->page_size);
-	phys_start = paddr;
-	phys_end = paddr + info->page_size;
+	p = bufptr;
+	endp = p + info->page_size;
+	while (p < endp) {
+		idx = closest_pt_load(paddr + (p - bufptr), endp - p);
+		if (idx < 0)
+			break;
 
-	/*
-	 * Check the case phys_start isn't aligned by page size like below:
-	 *
-	 *                           phys_start
-	 *                           = 0x40ffda7000
-	 *         |<-- frac_head -->|------------- PT_LOAD -------------
-	 *     ----+-----------------------+---------------------+----
-	 *         |         pfn:N         |       pfn:N+1       | ...
-	 *     ----+-----------------------+---------------------+----
-	 *         |
-	 *     pfn_to_paddr(pfn:N)               # page size = 16k
-	 *     = 0x40ffda4000
-	 */
-	if (!offset1) {
-		phys_start = page_head_to_phys_start(paddr);
-		offset1 = paddr_to_offset(phys_start);
-		frac_head = phys_start - paddr;
-		memset(bufptr, 0, frac_head);
-	}
+		get_pt_load_extents(idx, &phys_start, &phys_end, &offset, &size);
+		if (phys_start > paddr + (p - bufptr)) {
+			memset(p, 0, phys_start - paddr);
+			p += phys_start - paddr;
+		}
 
-	/*
-	 * Check the case phys_end isn't aligned by page size like the
-	 * phys_start's case.
-	 */
-	if (!offset2) {
-		phys_end = page_head_to_phys_end(paddr);
-		offset2 = paddr_to_offset(phys_end);
-		memset(bufptr + (phys_end - paddr), 0, info->page_size
-							- (phys_end - paddr));
-	}
-
-	/*
-	 * Check the separated page on different PT_LOAD segments.
-	 */
-	if (offset1 + (phys_end - phys_start) == offset2) {
-		size1 = phys_end - phys_start;
-	} else {
-		for (size1 = 1; size1 < info->page_size - frac_head; size1++) {
-			offset2 = paddr_to_offset(phys_start + size1);
-			if (offset1 + size1 != offset2)
-				break;
+		offset += paddr - phys_start;
+		if (size > paddr - phys_start) {
+			size -= paddr - phys_start;
+			if (size > endp - p)
+				size = endp - p;
+			if (!read_from_vmcore_parallel(fd_memory, offset, bufptr,
+						       size)) {
+				ERRMSG("Can't read the dump memory(%s).\n",
+				       info->name_memory);
+				return FALSE;
+			}
+			p += size;
+		}
+		if (p < endp) {
+			size = phys_end - paddr;
+			if (size > endp - p)
+				size = endp - p;
+			memset(p, 0, size);
+			p += size;
 		}
 	}
 
-	if(!read_from_vmcore_parallel(fd_memory, offset1, bufptr + frac_head,
-								size1)) {
-		ERRMSG("Can't read the dump memory(%s).\n",
-		       info->name_memory);
+	if (p == bufptr) {
+		ERRMSG("Attempt to read non-existent page at 0x%llx.\n",
+		       paddr);
 		return FALSE;
-	}
-
-	if (size1 + frac_head != info->page_size) {
-		size2 = phys_end - (phys_start + size1);
-
-		if(!read_from_vmcore_parallel(fd_memory, offset2,
-					bufptr + frac_head + size1, size2)) {
-			ERRMSG("Can't read the dump memory(%s).\n",
-			       info->name_memory);
-			return FALSE;
-		}
-	}
+	} else if (p < bufptr)
+		memset(p, 0, endp - p);
 
 	return TRUE;
 }

@@ -4395,6 +4395,32 @@ read_start_flat_header(void)
 	return TRUE;
 }
 
+static void
+exclude_nodata_pages(struct cycle *cycle)
+{
+	int i;
+	unsigned long long phys_start, phys_end;
+	off_t file_size;
+
+	i = 0;
+	while (get_pt_load_extents(i, &phys_start, &phys_end,
+				   NULL, &file_size)) {
+		unsigned long long pfn, pfn_end;
+
+		pfn = paddr_to_pfn(phys_start + file_size);
+		pfn_end = paddr_to_pfn(phys_end);
+		if (pfn < cycle->start_pfn)
+			pfn = cycle->start_pfn;
+		if (pfn_end >= cycle->end_pfn)
+			pfn_end = cycle->end_pfn - 1;
+		while (pfn <= pfn_end) {
+			clear_bit_on_2nd_bitmap(pfn, cycle);
+			++pfn;
+		}
+		++i;
+	}
+}
+
 int
 read_flat_data_header(struct makedumpfile_data_header *fdh)
 {
@@ -6085,6 +6111,12 @@ create_2nd_bitmap(struct cycle *cycle)
 			return FALSE;
 		}
 	}
+
+	/*
+	 * If re-filtering ELF dump, exclude pages that were already
+	 * excluded in the original file.
+	 */
+	exclude_nodata_pages(cycle);
 
 	/*
 	 * Exclude cache pages, cache private pages, user data pages,

@@ -1096,6 +1096,32 @@ get_pt_load(int idx,
 	return TRUE;
 }
 
+int
+get_pt_load_extents(int idx,
+	unsigned long long *phys_start,
+	unsigned long long *phys_end,
+	off_t *file_offset,
+	off_t *file_size)
+{
+	struct pt_load_segment *pls;
+
+	if (num_pt_loads <= idx)
+		return FALSE;
+
+	pls = &pt_loads[idx];
+
+	if (phys_start)
+		*phys_start  = pls->phys_start;
+	if (phys_end)
+		*phys_end    = pls->phys_end;
+	if (file_offset)
+		*file_offset = pls->file_offset;
+	if (file_size)
+		*file_size   = pls->file_size;
+
+	return TRUE;
+}
+
 unsigned int
 get_num_pt_loads(void)
 {

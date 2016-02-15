@@ -6915,8 +6915,7 @@ create_dump_bitmap(void)
 
 	ret = TRUE;
 out:
-	/* Should keep the buffer in the 1-cycle case. */
-	if (info->flag_cyclic)
+	if (ret == FALSE)
 		free_bitmap_buffer();
 
 	return ret;

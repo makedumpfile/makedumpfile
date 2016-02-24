@@ -1481,6 +1481,7 @@ struct offset_table {
 		long	private;
 		long	compound_dtor;
 		long	compound_order;
+		long	compound_head;
 	} page;
 	struct mem_section {
 		long	section_mem_map;

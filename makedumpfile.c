@@ -1585,6 +1585,7 @@ get_structure_info(void)
 	OFFSET_INIT(page.private, "page", "private");
 	OFFSET_INIT(page.compound_dtor, "page", "compound_dtor");
 	OFFSET_INIT(page.compound_order, "page", "compound_order");
+	OFFSET_INIT(page.compound_head, "page", "compound_head");
 
 	/*
 	 * Some vmlinux(s) don't have debugging information about
@@ -2139,6 +2140,7 @@ write_vmcoreinfo_data(void)
 	WRITE_MEMBER_OFFSET("page.private", page.private);
 	WRITE_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
 	WRITE_MEMBER_OFFSET("page.compound_order", page.compound_order);
+	WRITE_MEMBER_OFFSET("page.compound_head", page.compound_head);
 	WRITE_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	WRITE_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
@@ -2478,6 +2480,7 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("page.private", page.private);
 	READ_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
 	READ_MEMBER_OFFSET("page.compound_order", page.compound_order);
+	READ_MEMBER_OFFSET("page.compound_head", page.compound_head);
 	READ_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	READ_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
@@ -5499,7 +5502,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 	unsigned int _count, _mapcount = 0, compound_order = 0;
 	unsigned int order_offset, dtor_offset;
 	unsigned long flags, mapping, private = 0;
-	unsigned long compound_dtor;
+	unsigned long compound_dtor, compound_head = 0;
 
 	/*
 	 * If a multi-page exclusion is pending, do it first
@@ -5587,9 +5590,9 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		compound_order = 0;
 		compound_dtor = 0;
 		/*
-		 * The last pfn of the mem_map cache must not be compound page
-		 * since all compound pages are aligned to its page order and
-		 * PGMM_CACHED is a power of 2.
+		 * The last pfn of the mem_map cache must not be compound head
+		 * page since all compound pages are aligned to its page order
+		 * and PGMM_CACHED is a power of 2.
 		 */
 		if ((index_pg < PGMM_CACHED - 1) && isCompoundHead(flags)) {
 			if (order_offset)
@@ -5613,6 +5616,8 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 				compound_order = 0;
 			}
 		}
+		if (OFFSET(page.compound_head) != NOT_FOUND_STRUCTURE)
+			compound_head = ULONG(pcache + OFFSET(page.compound_head));
 
 		if (OFFSET(page._mapcount) != NOT_FOUND_STRUCTURE)
 			_mapcount = UINT(pcache + OFFSET(page._mapcount));
@@ -5621,11 +5626,19 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 
 		nr_pages = 1 << compound_order;
 		pfn_counter = NULL;
+
+		/*
+		 * Excludable compound tail pages must have already been excluded by
+		 * exclude_range(), don't need to check them here.
+		 */
+		if (compound_head & 1) {
+			continue;
+		}
 		/*
 		 * Exclude the free page managed by a buddy
 		 * Use buddy identification of free pages whether cyclic or not.
 		 */
-		if ((info->dump_level & DL_EXCLUDE_FREE)
+		else if ((info->dump_level & DL_EXCLUDE_FREE)
 		    && info->page_is_buddy
 		    && info->page_is_buddy(flags, _mapcount, private, _count)) {
 			nr_pages = 1 << private;

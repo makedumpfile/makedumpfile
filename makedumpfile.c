@@ -656,14 +656,15 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 	p = bufptr;
 	endp = p + info->page_size;
 	while (p < endp) {
-		idx = closest_pt_load(paddr + (p - bufptr), endp - p);
+		idx = closest_pt_load(paddr, endp - p);
 		if (idx < 0)
 			break;
 
 		get_pt_load_extents(idx, &phys_start, &phys_end, &offset, &size);
-		if (phys_start > paddr + (p - bufptr)) {
+		if (phys_start > paddr) {
 			memset(p, 0, phys_start - paddr);
 			p += phys_start - paddr;
+			paddr = phys_start;
 		}
 
 		offset += paddr - phys_start;
@@ -677,6 +678,7 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 				return FALSE;
 			}
 			p += size;
+			paddr += size;
 		}
 		if (p < endp) {
 			size = phys_end - paddr;
@@ -684,6 +686,7 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 				size = endp - p;
 			memset(p, 0, size);
 			p += size;
+			paddr += size;
 		}
 	}
 
@@ -691,7 +694,7 @@ readpage_elf(unsigned long long paddr, void *bufptr)
 		ERRMSG("Attempt to read non-existent page at 0x%llx.\n",
 		       paddr);
 		return FALSE;
-	} else if (p < bufptr)
+	} else if (p < endp)
 		memset(p, 0, endp - p);
 
 	return TRUE;
@@ -708,14 +711,15 @@ readpage_elf_parallel(int fd_memory, unsigned long long paddr, void *bufptr)
 	p = bufptr;
 	endp = p + info->page_size;
 	while (p < endp) {
-		idx = closest_pt_load(paddr + (p - bufptr), endp - p);
+		idx = closest_pt_load(paddr, endp - p);
 		if (idx < 0)
 			break;
 
 		get_pt_load_extents(idx, &phys_start, &phys_end, &offset, &size);
-		if (phys_start > paddr + (p - bufptr)) {
+		if (phys_start > paddr) {
 			memset(p, 0, phys_start - paddr);
 			p += phys_start - paddr;
+			paddr = phys_start;
 		}
 
 		offset += paddr - phys_start;
@@ -730,6 +734,7 @@ readpage_elf_parallel(int fd_memory, unsigned long long paddr, void *bufptr)
 				return FALSE;
 			}
 			p += size;
+			paddr += size;
 		}
 		if (p < endp) {
 			size = phys_end - paddr;
@@ -737,6 +742,7 @@ readpage_elf_parallel(int fd_memory, unsigned long long paddr, void *bufptr)
 				size = endp - p;
 			memset(p, 0, size);
 			p += size;
+			paddr += size;
 		}
 	}
 
@@ -744,7 +750,7 @@ readpage_elf_parallel(int fd_memory, unsigned long long paddr, void *bufptr)
 		ERRMSG("Attempt to read non-existent page at 0x%llx.\n",
 		       paddr);
 		return FALSE;
-	} else if (p < bufptr)
+	} else if (p < endp)
 		memset(p, 0, endp - p);
 
 	return TRUE;

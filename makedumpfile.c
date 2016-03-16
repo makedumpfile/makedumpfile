@@ -3913,14 +3913,17 @@ out:
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		setup_page_is_buddy();
 
-	if (info->flag_usemmap == MMAP_TRY && initialize_mmap()) {
-		DEBUG_MSG("mmap() is available on the kernel.\n");
-		info->flag_usemmap = MMAP_ENABLE;
-	} else {
-		DEBUG_MSG("The kernel doesn't support mmap(),");
-		DEBUG_MSG("read() will be used instead.\n");
-		info->flag_usemmap = MMAP_DISABLE;
-        }
+	if (info->flag_usemmap == MMAP_TRY ) {
+		if (initialize_mmap()) {
+			DEBUG_MSG("mmap() is available on the kernel.\n");
+			info->flag_usemmap = MMAP_ENABLE;
+		} else {
+			DEBUG_MSG("The kernel doesn't support mmap(),");
+			DEBUG_MSG("read() will be used instead.\n");
+			info->flag_usemmap = MMAP_DISABLE;
+		}
+        } else if (info->flag_usemmap == MMAP_DISABLE)
+		DEBUG_MSG("mmap() is disabled by specified option '--non-mmap'.\n");
 
 	return TRUE;
 }

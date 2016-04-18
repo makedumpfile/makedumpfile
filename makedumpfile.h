@@ -44,6 +44,7 @@
 #include "print_info.h"
 #include "sadump_mod.h"
 #include <pthread.h>
+#include <semaphore.h>
 
 #define VMEMMAPSTART 0xffffea0000000000UL
 #define BITS_PER_WORD 64
@@ -968,10 +969,11 @@ typedef unsigned long long int ulonglong;
  * for parallel process
  */
 
-#define PAGE_DATA_NUM	(50)
+#define PAGE_FLAG_NUM	(20)
+#define PAGE_DATA_NUM	(5)
 #define WAIT_TIME	(60 * 10)
 #define PTHREAD_FAIL	((void *)-2)
-#define NUM_BUFFERS	(50)
+#define THREAD_REGION	(200 * 1024)
 
 struct mmap_cache {
 	char	*mmap_buf;
@@ -979,28 +981,33 @@ struct mmap_cache {
 	off_t   mmap_end_offset;
 };
 
+enum {
+	FLAG_UNUSED,
+	FLAG_READY,
+	FLAG_FILLING
+};
+struct page_flag {
+	mdf_pfn_t pfn;
+	char zero;
+	char ready;
+	short index;
+	struct page_flag *next;
+};
+
 struct page_data
 {
-	mdf_pfn_t pfn;
-	int dumpable;
-	int zero;
-	unsigned int flags;
 	long size;
 	unsigned char *buf;
-	pthread_mutex_t mutex;
-	/*
-	 * whether the page_data is ready to be consumed
-	 */
-	int ready;
+	int flags;
+	int used;
 };
 
 struct thread_args {
 	int thread_num;
 	unsigned long len_buf_out;
-	mdf_pfn_t start_pfn, end_pfn;
-	int page_data_num;
 	struct cycle *cycle;
 	struct page_data *page_data_buf;
+	struct page_flag *page_flag_buf;
 };
 
 /*
@@ -1290,11 +1297,12 @@ struct DumpInfo {
 	pthread_t **threads;
 	struct thread_args *kdump_thread_args;
 	struct page_data *page_data_buf;
+	struct page_flag **page_flag_buf;
+	sem_t page_flag_buf_sem;
 	pthread_rwlock_t usemmap_rwlock;
 	mdf_pfn_t current_pfn;
 	pthread_mutex_t current_pfn_mutex;
-	mdf_pfn_t consumed_pfn;
-	pthread_mutex_t consumed_pfn_mutex;
+	pthread_mutex_t page_data_mutex;
 	pthread_mutex_t filter_mutex;
 };
 extern struct DumpInfo		*info;

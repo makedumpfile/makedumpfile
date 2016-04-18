@@ -5979,7 +5979,7 @@ find_unused_vmemmap_pages(void)
 	unsigned long long pfn;
 	unsigned long *lp1, *lp2, startpfn, endpfn;
 	unsigned long vmapstartpfn, vmapnumpfns;
-	int i, sz, numpages=0, did_deletes;
+	int i, sz, numpages=0;
 	int startword, numwords, do_break=0;
 	long deleted_pages = 0;
 	off_t new_offset1, new_offset2;
@@ -5987,7 +5987,6 @@ find_unused_vmemmap_pages(void)
 	/* read each block of both bitmaps */
 	for (pfn = 0; pfn < info->max_mapnr; pfn += PFN_BUFBITMAP) { /* size in bits */
 		numpages++;
-		did_deletes = 0;
 		new_offset1 = bitmap1->offset + BUFSIZE_BITMAP * (pfn / PFN_BUFBITMAP);
 		if (lseek(bitmap1->fd, new_offset1, SEEK_SET) < 0 ) {
 			ERRMSG("Can't seek the bitmap(%s). %s\n",
@@ -6063,7 +6062,6 @@ find_unused_vmemmap_pages(void)
 								return FAILED;
 							}
 							deleted_pages += vmapnumpfns;
-							did_deletes = 1;
 						}
 					}
 				}
@@ -6085,7 +6083,6 @@ find_unused_vmemmap_pages(void)
 						return FAILED;
 					}
 					deleted_pages += vmapnumpfns;
-					did_deletes = 1;
 				}
 			}
 		}

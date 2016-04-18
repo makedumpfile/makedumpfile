@@ -1669,7 +1669,25 @@ get_structure_info(void)
 	OFFSET_INIT(module.list, "module", "list");
 	OFFSET_INIT(module.name, "module", "name");
 	OFFSET_INIT(module.module_core, "module", "module_core");
+	if (OFFSET(module.module_core) == NOT_FOUND_STRUCTURE) {
+		/* for kernel version 4.5 and above */
+		long core_layout;
+
+		OFFSET_INIT(module.module_core, "module", "core_layout");
+		core_layout = OFFSET(module.module_core);
+		OFFSET_INIT(module.module_core, "module_layout", "base");
+		OFFSET(module.module_core) += core_layout;
+	}
 	OFFSET_INIT(module.core_size, "module", "core_size");
+	if (OFFSET(module.core_size) == NOT_FOUND_STRUCTURE) {
+		/* for kernel version 4.5 and above */
+		long core_layout;
+
+		OFFSET_INIT(module.core_size, "module", "core_layout");
+		core_layout = OFFSET(module.core_size);
+		OFFSET_INIT(module.core_size, "module_layout", "size");
+		OFFSET(module.core_size) += core_layout;
+	}
 	OFFSET_INIT(module.module_init, "module", "module_init");
 	OFFSET_INIT(module.init_size, "module", "init_size");
 

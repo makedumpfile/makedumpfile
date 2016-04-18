@@ -110,15 +110,6 @@ static int pgtable_level;
 static int va_bits;
 static int page_shift;
 
-pmd_t *
-pmd_offset(pud_t *pud, unsigned long vaddr)
-{
-	if (pgtable_level == 2) {
-		return pmd_offset_pgtbl_lvl_2(pud, vaddr);
-	} else {
-		return pmd_offset_pgtbl_lvl_3(pud, vaddr);
-	}
-}
 int
 get_pgtable_level_arm64(void)
 {
@@ -135,6 +126,16 @@ int
 get_page_shift_arm64(void)
 {
 	return page_shift;
+}
+
+pmd_t *
+pmd_offset(pud_t *puda, pud_t *pudv, unsigned long vaddr)
+{
+	if (pgtable_level == 2) {
+		return pmd_offset_pgtbl_lvl_2(puda, vaddr);
+	} else {
+		return pmd_offset_pgtbl_lvl_3(pudv, vaddr);
+	}
 }
 
 #define PAGE_OFFSET_39 (0xffffffffffffffffUL << 39)
@@ -294,8 +295,9 @@ vtop_arm64(unsigned long vaddr)
 	}
 
 	pudv.pgd = pgdv;
+	puda = (pud_t *)pgda;
 
-	pmda = pmd_offset(&pudv, vaddr);
+	pmda = pmd_offset(puda, &pudv, vaddr);
 	if (!readmem(VADDR, (unsigned long long)pmda, &pmdv, sizeof(pmdv))) {
 		ERRMSG("Can't read pmd\n");
 		return NOT_PADDR;

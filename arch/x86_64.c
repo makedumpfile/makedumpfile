@@ -470,17 +470,17 @@ int
 find_vmemmap_x86_64()
 {
 	int i;
-	int pgd_index, pud_index;
+	int pgd_index;
 	int start_range = 1;
 	int num_pmds=0, num_pmds_valid=0;
 	int break_in_valids, break_after_invalids;
-	int do_break, done = 0;
+	int do_break;
 	int last_valid=0, last_invalid=0;
 	int pagestructsize, structsperhpage, hugepagesize;
 	long page_structs_per_pud;
 	long num_puds, groups = 0;
 	long pgdindex, pudindex, pmdindex;
-	long vaddr, vaddr_base;
+	long vaddr_base;
 	long rep_pfn_start = 0, rep_pfn_end = 0;
 	unsigned long init_level4_pgt;
 	unsigned long max_paddr, high_pfn;
@@ -511,7 +511,6 @@ find_vmemmap_x86_64()
 	pagestructsize = size_table.page;
 	hugepagesize = PTRS_PER_PMD * info->page_size;
 	vaddr_base = info->vmemmap_start;
-	vaddr = vaddr_base;
 	max_paddr = get_max_paddr();
 	/*
 	 * the page structures are mapped at VMEMMAP_START (info->vmemmap_start)
@@ -519,7 +518,6 @@ find_vmemmap_x86_64()
 	 */
 	high_pfn = max_paddr >> 12;
 	pgd_index = pgd4_index(vaddr_base);
-	pud_index = pud_index(vaddr_base);
 	pgd_addr = vaddr_to_paddr(init_level4_pgt); /* address of pgd */
 	pgd_addr += pgd_index * sizeof(unsigned long);
 	page_structs_per_pud = (PTRS_PER_PUD * PTRS_PER_PMD * info->page_size) /
@@ -565,7 +563,6 @@ find_vmemmap_x86_64()
 				tpfn = (pvaddr - VMEMMAP_START) /
 							pagestructsize;
 				if (tpfn >= high_pfn) {
-					done = 1;
 					break;
 				}
 				/*
@@ -721,7 +718,6 @@ find_vmemmap_x86_64()
 		}
 		tpfn = (pvaddr - VMEMMAP_START) / pagestructsize;
 		if (tpfn >= high_pfn) {
-			done = 1;
 			break;
 		}
 	}

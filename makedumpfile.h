@@ -771,6 +771,7 @@ int get_va_bits_arm64(void);
 /*
  * 4 Levels paging
  */
+#define PUD_SHIFT		(PMD_SHIFT + PTRS_PER_PTD_SHIFT)
 #define PGDIR_SHIFT_4L		(PUD_SHIFT + PTRS_PER_PTD_SHIFT)
 
 #define MASK_PUD   	((1UL << REGION_SHIFT) - 1) & (~((1UL << PUD_SHIFT) - 1))

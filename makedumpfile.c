@@ -241,7 +241,7 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 }
 
 static inline int
-isHugetlb(dtor)
+isHugetlb(int dtor)
 {
         return ((NUMBER(HUGETLB_PAGE_DTOR) != NOT_FOUND_NUMBER)
 		&& (NUMBER(HUGETLB_PAGE_DTOR) == dtor))

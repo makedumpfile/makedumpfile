@@ -2256,6 +2256,7 @@ write_vmcoreinfo_data(void)
 #ifdef __aarch64__
 	WRITE_NUMBER("VA_BITS", VA_BITS);
 	WRITE_NUMBER_UNSIGNED("PHYS_OFFSET", PHYS_OFFSET);
+	WRITE_NUMBER_UNSIGNED("kimage_voffset", kimage_voffset);
 #endif
 
 	/*
@@ -2641,6 +2642,7 @@ read_vmcoreinfo(void)
 #ifdef __aarch64__
 	READ_NUMBER("VA_BITS", VA_BITS);
 	READ_NUMBER_UNSIGNED("PHYS_OFFSET", PHYS_OFFSET);
+	READ_NUMBER_UNSIGNED("kimage_voffset", kimage_voffset);
 #endif
 
 	READ_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);

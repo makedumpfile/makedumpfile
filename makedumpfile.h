@@ -1731,6 +1731,7 @@ struct number_table {
 #ifdef __aarch64__
 	long 	VA_BITS;
 	unsigned long	PHYS_OFFSET;
+	unsigned long	kimage_voffset;
 #endif
 };
 

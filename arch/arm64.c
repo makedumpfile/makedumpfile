@@ -41,10 +41,12 @@ typedef struct {
 
 static int pgtable_level;
 static int va_bits;
+static unsigned long kimage_voffset;
 
 #define SZ_4K			(4 * 1024)
 #define SZ_16K			(16 * 1024)
 #define SZ_64K			(64 * 1024)
+#define SZ_128M			(128 * 1024 * 1024)
 
 #define pgd_val(x)		((x).pgd)
 #define pud_val(x)		(pgd_val((x).pgd))
@@ -77,8 +79,6 @@ static int va_bits;
 #define PMD_TYPE_SECT		1
 #define PMD_TYPE_TABLE		3
 
-#define __pa(vaddr) 			((vaddr) - PAGE_OFFSET + info->phys_base)
-
 #define pgd_index(vaddr) 		(((vaddr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
 #define pgd_offset(pgdir, vaddr)	((pgd_t *)(pgdir) + pgd_index(vaddr))
 
@@ -93,6 +93,16 @@ static int va_bits;
 
 #define pud_index(vaddr)		(((vaddr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
 #define pgd_page_paddr(pgd)		(pgd_val(pgd) & PHYS_MASK & (int32_t)PAGE_MASK)
+
+static unsigned long long
+__pa(unsigned long vaddr)
+{
+	if (kimage_voffset == NOT_FOUND_NUMBER ||
+			(vaddr >= PAGE_OFFSET))
+		return (vaddr - PAGE_OFFSET + info->phys_base);
+	else
+		return (vaddr - kimage_voffset);
+}
 
 static int
 get_pud_shift_arm64(void)
@@ -169,10 +179,12 @@ get_machdep_info_arm64(void)
 		return FALSE;
 	}
 
+	kimage_voffset = NUMBER(kimage_voffset);
 	info->max_physmem_bits = PHYS_MASK_SHIFT;
 	info->section_size_bits = SECTIONS_SIZE_BITS;
 	info->page_offset = 0xffffffffffffffffUL << (va_bits - 1);
 
+	DEBUG_MSG("kimage_voffset   : %lx\n", kimage_voffset);
 	DEBUG_MSG("max_physmem_bits : %lx\n", info->max_physmem_bits);
 	DEBUG_MSG("section_size_bits: %lx\n", info->section_size_bits);
 	DEBUG_MSG("page_offset      : %lx\n", info->page_offset);

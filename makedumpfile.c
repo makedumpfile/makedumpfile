@@ -4449,7 +4449,7 @@ exclude_nodata_pages(struct cycle *cycle)
 			pfn = cycle->start_pfn;
 		if (pfn_end >= cycle->end_pfn)
 			pfn_end = cycle->end_pfn - 1;
-		while (pfn <= pfn_end) {
+		while (pfn < pfn_end) {
 			clear_bit_on_2nd_bitmap(pfn, cycle);
 			++pfn;
 		}

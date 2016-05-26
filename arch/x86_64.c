@@ -537,6 +537,8 @@ find_vmemmap_x86_64()
 		}
 		/* mask the pgd entry for the address of the pud page */
 		pud_addr &= PMASK;
+		if (pud_addr == 0)
+			  continue;
 		/* read the entire pud page */
 		if (!readmem(PADDR, (unsigned long long)pud_addr, (void *)pud_page,
 					PTRS_PER_PUD * sizeof(unsigned long))) {
@@ -549,6 +551,8 @@ find_vmemmap_x86_64()
 					pudindex < PTRS_PER_PUD; pudindex++, pudp++) {
 			pmd_addr = *pudp & PMASK;
 			/* read the entire pmd page */
+			if (pmd_addr == 0)
+				continue;
 			if (!readmem(PADDR, pmd_addr, (void *)pmd_page,
 					PTRS_PER_PMD * sizeof(unsigned long))) {
 				ERRMSG("Can't get pud entry for slot %ld.\n", pudindex);

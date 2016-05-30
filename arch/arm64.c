@@ -44,14 +44,13 @@ typedef struct {
 #define pmd_val(x)		(pud_val((x).pud))
 #define pte_val(x)		((x).pte)
 
-#define PAGE_SIZE		(1UL << PAGE_SHIFT)
-#define PAGE_MASK		(~(PAGE_SIZE - 1))
-#define PGDIR_SHIFT		((PAGE_SHIFT - 3) * ARM64_PGTABLE_LEVELS + 3)
+#define PAGE_MASK		(~(PAGESIZE() - 1))
+#define PGDIR_SHIFT		((PAGESHIFT() - 3) * ARM64_PGTABLE_LEVELS + 3)
 #define PUD_SHIFT		PGDIR_SHIFT
 #define PUD_SIZE		(1UL << PUD_SHIFT)
 #define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
-#define PTRS_PER_PTE		(1 << (PAGE_SHIFT - 3))
-#define PMD_SHIFT		((PAGE_SHIFT - 3) * 2 + 3)
+#define PTRS_PER_PTE		(1 << (PAGESHIFT() - 3))
+#define PMD_SHIFT		((PAGESHIFT() - 3) * 2 + 3)
 #define PMD_SIZE		(1UL << PMD_SHIFT)
 #define PMD_MASK		(~(PMD_SIZE - 1))
 #define PTRS_PER_PMD		PTRS_PER_PTE
@@ -77,7 +76,7 @@ typedef struct {
 #define pgd_index(vaddr) 		(((vaddr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
 #define pgd_offset(pgdir, vaddr)	((pgd_t *)(pgdir) + pgd_index(vaddr))
 
-#define pte_index(vaddr) 		(((vaddr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+#define pte_index(vaddr) 		(((vaddr) >> PAGESHIFT()) & (PTRS_PER_PTE - 1))
 #define pmd_page_vaddr(pmd)		(__va(pmd_val(pmd) & PHYS_MASK & (int32_t)PAGE_MASK))
 #define pte_offset(dir, vaddr) 		((pte_t*)pmd_page_vaddr((*dir)) + pte_index(vaddr))
 
@@ -92,14 +91,13 @@ typedef struct {
 #define KERN_STRUCT_PAGE_SIZE		get_structure_size("page", DWARF_INFO_GET_STRUCT_SIZE)
 
 #define ALIGN(x, a) 			(((x) + (a) - 1) & ~((a) - 1))
-#define PFN_DOWN(x)			((x) >> PAGE_SHIFT)
-#define VMEMMAP_SIZE			ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * KERN_STRUCT_PAGE_SIZE, PUD_SIZE)
+#define PFN_DOWN(x)			((x) >> PAGESHIFT())
+#define VMEMMAP_SIZE			ALIGN((1UL << (VA_BITS - PAGESHIFT())) * KERN_STRUCT_PAGE_SIZE, PUD_SIZE)
 #define MODULES_END			PAGE_OFFSET
 #define MODULES_VADDR			(MODULES_END - 0x4000000)
 
 static int pgtable_level;
 static int va_bits;
-static int page_shift;
 
 int
 get_pgtable_level_arm64(void)
@@ -111,12 +109,6 @@ int
 get_va_bits_arm64(void)
 {
 	return va_bits;
-}
-
-int
-get_page_shift_arm64(void)
-{
-	return page_shift;
 }
 
 static pmd_t *
@@ -150,11 +142,9 @@ static int calculate_plat_config(void)
 	if ((stext & PAGE_OFFSET_39) == PAGE_OFFSET_39) {
 		pgtable_level = 3;
 		va_bits = 39;
-		page_shift = 12;
 	} else if ((stext & PAGE_OFFSET_42) == PAGE_OFFSET_42) {
 		pgtable_level = 2;
 		va_bits = 42;
-		page_shift = 16;
 	} else {
 		ERRMSG("Kernel Configuration not supported\n");
 		return FALSE;

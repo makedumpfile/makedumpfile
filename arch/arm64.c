@@ -203,8 +203,7 @@ get_machdep_info_arm64(void)
 {
 	info->max_physmem_bits = PHYS_MASK_SHIFT;
 	info->section_size_bits = SECTIONS_SIZE_BITS;
-	info->page_offset = SYMBOL(_stext)
-		& (0xffffffffffffffffUL << (VA_BITS - 1));
+	info->page_offset = 0xffffffffffffffffUL << (VA_BITS - 1);
 	info->vmalloc_start = 0xffffffffffffffffUL << VA_BITS;
 	info->vmalloc_end = PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - 0x10000;
 	info->vmemmap_start = VMALLOC_END + 0x10000;

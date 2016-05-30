@@ -39,16 +39,23 @@ typedef struct {
 	unsigned long pte;
 } pte_t;
 
+static int pgtable_level;
+static int va_bits;
+
+#define SZ_4K			(4 * 1024)
+#define SZ_16K			(16 * 1024)
+#define SZ_64K			(64 * 1024)
+
 #define pgd_val(x)		((x).pgd)
 #define pud_val(x)		(pgd_val((x).pgd))
 #define pmd_val(x)		(pud_val((x).pud))
 #define pte_val(x)		((x).pte)
 
 #define PAGE_MASK		(~(PAGESIZE() - 1))
-#define PGDIR_SHIFT		((PAGESHIFT() - 3) * ARM64_PGTABLE_LEVELS + 3)
+#define PGDIR_SHIFT		((PAGESHIFT() - 3) * pgtable_level + 3)
 #define PUD_SHIFT		PGDIR_SHIFT
 #define PUD_SIZE		(1UL << PUD_SHIFT)
-#define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
+#define PTRS_PER_PGD		(1 << (va_bits - PGDIR_SHIFT))
 #define PTRS_PER_PTE		(1 << (PAGESHIFT() - 3))
 #define PMD_SHIFT		((PAGESHIFT() - 3) * 2 + 3)
 #define PMD_SIZE		(1UL << PMD_SHIFT)
@@ -92,24 +99,9 @@ typedef struct {
 
 #define ALIGN(x, a) 			(((x) + (a) - 1) & ~((a) - 1))
 #define PFN_DOWN(x)			((x) >> PAGESHIFT())
-#define VMEMMAP_SIZE			ALIGN((1UL << (VA_BITS - PAGESHIFT())) * KERN_STRUCT_PAGE_SIZE, PUD_SIZE)
+#define VMEMMAP_SIZE			ALIGN((1UL << (va_bits - PAGESHIFT())) * KERN_STRUCT_PAGE_SIZE, PUD_SIZE)
 #define MODULES_END			PAGE_OFFSET
 #define MODULES_VADDR			(MODULES_END - 0x4000000)
-
-static int pgtable_level;
-static int va_bits;
-
-int
-get_pgtable_level_arm64(void)
-{
-	return pgtable_level;
-}
-
-int
-get_va_bits_arm64(void)
-{
-	return va_bits;
-}
 
 static pmd_t *
 pmd_offset(pud_t *puda, pud_t *pudv, unsigned long vaddr)
@@ -121,32 +113,23 @@ pmd_offset(pud_t *puda, pud_t *pudv, unsigned long vaddr)
 	}
 }
 
-#define PAGE_OFFSET_39 (0xffffffffffffffffUL << 39)
-#define PAGE_OFFSET_42 (0xffffffffffffffffUL << 42)
 static int calculate_plat_config(void)
 {
-	unsigned long long stext;
+	va_bits = NUMBER(VA_BITS);
 
-	/* Currently we assume that there are only two possible
-	 * configuration supported by kernel.
-	 * 1) Page Table Level:2, Page Size 64K and VA Bits 42
-	 * 1) Page Table Level:3, Page Size 4K and VA Bits 39
-	 * Ideally, we should have some mechanism to decide these values
-	 * from kernel symbols, but we have limited symbols in vmcore,
-	 * and we can not do much. So until some one comes with a better
-	 * way, we use following.
-	 */
-	stext = SYMBOL(_stext);
-
-	/* condition for minimum VA bits must be checked first and so on */
-	if ((stext & PAGE_OFFSET_39) == PAGE_OFFSET_39) {
-		pgtable_level = 3;
-		va_bits = 39;
-	} else if ((stext & PAGE_OFFSET_42) == PAGE_OFFSET_42) {
+	/* derive pgtable_level as per arch/arm64/Kconfig */
+	if ((PAGESIZE() == SZ_16K && va_bits == 36) ||
+			(PAGESIZE() == SZ_64K && va_bits == 42)) {
 		pgtable_level = 2;
-		va_bits = 42;
+	} else if ((PAGESIZE() == SZ_64K && va_bits == 48) ||
+			(PAGESIZE() == SZ_4K && va_bits == 39) ||
+			(PAGESIZE() == SZ_16K && va_bits == 47)) {
+		pgtable_level = 3;
+	} else if ((PAGESIZE() != SZ_64K && va_bits == 48)) {
+		pgtable_level = 4;
 	} else {
-		ERRMSG("Kernel Configuration not supported\n");
+		ERRMSG("PAGE SIZE %#lx and VA Bits %d not supported\n",
+				PAGESIZE(), va_bits);
 		return FALSE;
 	}
 
@@ -167,28 +150,9 @@ is_vtop_from_page_table_arm64(unsigned long vaddr)
 int
 get_phys_base_arm64(void)
 {
-	unsigned long phys_base = ULONG_MAX;
-	unsigned long long phys_start;
-	int i;
+	info->phys_base = NUMBER(PHYS_OFFSET);
 
-	/*
-	 * We resolve phys_base from PT_LOAD segments. LMA contains physical
-	 * address of the segment, and we use the lowest start as
-	 * phys_base.
-	 */
-	for (i = 0; get_pt_load(i, &phys_start, NULL, NULL, NULL); i++) {
-		if (phys_start < phys_base)
-			phys_base = phys_start;
-	}
-
-	if (phys_base == ULONG_MAX) {
-		ERRMSG("Can't determine phys_base\n");
-		return FALSE;
-	}
-
-	info->phys_base = phys_base;
-
-	DEBUG_MSG("phys_base    : %lx\n", phys_base);
+	DEBUG_MSG("phys_base    : %lx\n", info->phys_base);
 
 	return TRUE;
 }
@@ -203,8 +167,8 @@ get_machdep_info_arm64(void)
 
 	info->max_physmem_bits = PHYS_MASK_SHIFT;
 	info->section_size_bits = SECTIONS_SIZE_BITS;
-	info->page_offset = 0xffffffffffffffffUL << (VA_BITS - 1);
-	info->vmalloc_start = 0xffffffffffffffffUL << VA_BITS;
+	info->page_offset = 0xffffffffffffffffUL << (va_bits - 1);
+	info->vmalloc_start = 0xffffffffffffffffUL << va_bits;
 	info->vmalloc_end = PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - 0x10000;
 	info->vmemmap_start = VMALLOC_END + 0x10000;
 	info->vmemmap_end = VMEMMAP_START + VMEMMAP_SIZE;

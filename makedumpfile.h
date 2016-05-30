@@ -516,9 +516,6 @@ do { \
 #define PMASK			(0x7ffffffffffff000UL)
 
 #ifdef __aarch64__
-int get_va_bits_arm64(void);
-#define ARM64_PGTABLE_LEVELS	get_pgtable_level_arm64()
-#define VA_BITS			get_va_bits_arm64()
 #define KVBASE			VMALLOC_START
 #endif /* aarch64 */
 
@@ -1730,6 +1727,10 @@ struct number_table {
 	long	MAX_PHYSMEM_BITS;
 	long    HUGETLB_PAGE_DTOR;
 	long	phys_base;
+#ifdef __aarch64__
+	long 	VA_BITS;
+	unsigned long	PHYS_OFFSET;
+#endif
 };
 
 struct srcfile_table {

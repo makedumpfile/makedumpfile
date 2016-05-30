@@ -2253,6 +2253,10 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER("phys_base", phys_base);
 
 	WRITE_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
+#ifdef __aarch64__
+	WRITE_NUMBER("VA_BITS", VA_BITS);
+	WRITE_NUMBER_UNSIGNED("PHYS_OFFSET", PHYS_OFFSET);
+#endif
 
 	/*
 	 * write the source file of 1st kernel
@@ -2634,6 +2638,10 @@ read_vmcoreinfo(void)
 
 	READ_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 	READ_NUMBER("phys_base", phys_base);
+#ifdef __aarch64__
+	READ_NUMBER("VA_BITS", VA_BITS);
+	READ_NUMBER_UNSIGNED("PHYS_OFFSET", PHYS_OFFSET);
+#endif
 
 	READ_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
 

@@ -516,7 +516,8 @@ do { \
 #define PMASK			(0x7ffffffffffff000UL)
 
 #ifdef __aarch64__
-#define KVBASE			VMALLOC_START
+unsigned long get_kvbase_arm64(void);
+#define KVBASE			get_kvbase_arm64()
 #endif /* aarch64 */
 
 #ifdef __arm__

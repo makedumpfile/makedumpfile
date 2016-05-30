@@ -35,25 +35,21 @@ typedef struct {
 	pud_t pud;
 } pmd_t;
 
-#define pud_offset(pgd, vaddr) 	((pud_t *)pgd)
+typedef struct {
+	unsigned long pte;
+} pte_t;
 
 #define pgd_val(x)		((x).pgd)
 #define pud_val(x)		(pgd_val((x).pgd))
 #define pmd_val(x)		(pud_val((x).pud))
-
-#define PUD_SHIFT		PGDIR_SHIFT
-#define PUD_SIZE		(1UL << PUD_SHIFT)
-
-typedef struct {
-	unsigned long pte;
-} pte_t;
 #define pte_val(x)		((x).pte)
 
 #define PAGE_SIZE		(1UL << PAGE_SHIFT)
 #define PAGE_MASK		(~(PAGE_SIZE - 1))
 #define PGDIR_SHIFT		((PAGE_SHIFT - 3) * ARM64_PGTABLE_LEVELS + 3)
+#define PUD_SHIFT		PGDIR_SHIFT
+#define PUD_SIZE		(1UL << PUD_SHIFT)
 #define PTRS_PER_PGD		(1 << (VA_BITS - PGDIR_SHIFT))
-#define PMD_SHIFT		((PAGE_SHIFT - 3) * 2 + 3)
 #define PTRS_PER_PTE		(1 << (PAGE_SHIFT - 3))
 #define PMD_SHIFT		((PAGE_SHIFT - 3) * 2 + 3)
 #define PMD_SIZE		(1UL << PMD_SHIFT)
@@ -62,17 +58,14 @@ typedef struct {
 
 #define PAGE_PRESENT		(1 << 0)
 #define SECTIONS_SIZE_BITS	30
-/*
-
-* Highest possible physical address supported.
-*/
+/* Highest possible physical address supported */
 #define PHYS_MASK_SHIFT		48
 #define PHYS_MASK		((1UL << PHYS_MASK_SHIFT) - 1)
 /*
  * Remove the highest order bits that are not a part of the
  * physical address in a section
  */
-#define PMD_SECTION_MASK        ((1UL << 40) - 1)
+#define PMD_SECTION_MASK	((1UL << 40) - 1)
 
 #define PMD_TYPE_MASK		3
 #define PMD_TYPE_SECT		1
@@ -84,15 +77,13 @@ typedef struct {
 #define pgd_index(vaddr) 		(((vaddr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
 #define pgd_offset(pgdir, vaddr)	((pgd_t *)(pgdir) + pgd_index(vaddr))
 
-#define pte_index(addr) 		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+#define pte_index(vaddr) 		(((vaddr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pmd_page_vaddr(pmd)		(__va(pmd_val(pmd) & PHYS_MASK & (int32_t)PAGE_MASK))
 #define pte_offset(dir, vaddr) 		((pte_t*)pmd_page_vaddr((*dir)) + pte_index(vaddr))
 
-
-#define pmd_offset_pgtbl_lvl_2(pud, vaddr) ((pmd_t *)pud)
-
 #define pmd_index(vaddr)		(((vaddr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
 #define pud_page_vaddr(pud)		(__va(pud_val(pud) & PHYS_MASK & (int32_t)PAGE_MASK))
+#define pmd_offset_pgtbl_lvl_2(pud, vaddr) ((pmd_t *)pud)
 #define pmd_offset_pgtbl_lvl_3(pud, vaddr) ((pmd_t *)pud_page_vaddr((*pud)) + pmd_index(vaddr))
 
 /* kernel struct page size can be kernel version dependent, currently
@@ -128,7 +119,7 @@ get_page_shift_arm64(void)
 	return page_shift;
 }
 
-pmd_t *
+static pmd_t *
 pmd_offset(pud_t *puda, pud_t *pudv, unsigned long vaddr)
 {
 	if (pgtable_level == 2) {

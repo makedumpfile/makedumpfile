@@ -736,7 +736,7 @@ readpage_elf_parallel(int fd_memory, unsigned long long paddr, void *bufptr)
 			size -= paddr - phys_start;
 			if (size > endp - p)
 				size = endp - p;
-			if (!read_from_vmcore_parallel(fd_memory, offset, bufptr,
+			if (!read_from_vmcore_parallel(fd_memory, offset, p,
 						       size)) {
 				ERRMSG("Can't read the dump memory(%s).\n",
 				       info->name_memory);

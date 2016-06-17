@@ -1100,6 +1100,7 @@ struct DumpInfo {
 	int		flag_nospace;	     /* the flag of "No space on device" error */
 	int		flag_vmemmap;        /* kernel supports vmemmap address space */
 	int		flag_excludevm;      /* -e - excluding unused vmemmap pages */
+	int		flag_use_count;      /* _refcount is named _count in struct page */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
@@ -1483,7 +1484,7 @@ struct size_table {
 struct offset_table {
 	struct page {
 		long	flags;
-		long	_count;
+		long	_refcount;
 		long	mapping;
 		long	lru;
 		long	_mapcount;

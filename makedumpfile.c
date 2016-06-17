@@ -1579,7 +1579,14 @@ get_structure_info(void)
 	 */
 	SIZE_INIT(page, "page");
 	OFFSET_INIT(page.flags, "page", "flags");
-	OFFSET_INIT(page._count, "page", "_count");
+	OFFSET_INIT(page._refcount, "page", "_refcount");
+	if (OFFSET(page._refcount) == NOT_FOUND_STRUCTURE) {
+		info->flag_use_count = TRUE;
+		OFFSET_INIT(page._refcount, "page", "_count");
+	} else {
+		info->flag_use_count = FALSE;
+	}
+
 	OFFSET_INIT(page.mapping, "page", "mapping");
 	OFFSET_INIT(page._mapcount, "page", "_mapcount");
 	OFFSET_INIT(page.private, "page", "private");
@@ -2044,7 +2051,7 @@ get_mem_type(void)
 
 	if ((SIZE(page) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page.flags) == NOT_FOUND_STRUCTURE)
-	    || (OFFSET(page._count) == NOT_FOUND_STRUCTURE)
+	    || (OFFSET(page._refcount) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(page.mapping) == NOT_FOUND_STRUCTURE)) {
 		ret = NOT_FOUND_MEMTYPE;
 	} else if ((((SYMBOL(node_data) != NOT_FOUND_SYMBOL)
@@ -2151,7 +2158,10 @@ write_vmcoreinfo_data(void)
 	 * write the member offset of 1st kernel
 	 */
 	WRITE_MEMBER_OFFSET("page.flags", page.flags);
-	WRITE_MEMBER_OFFSET("page._count", page._count);
+	if (info->flag_use_count)
+		WRITE_MEMBER_OFFSET("page._count", page._refcount);
+	else
+		WRITE_MEMBER_OFFSET("page._refcount", page._refcount);
 	WRITE_MEMBER_OFFSET("page.mapping", page.mapping);
 	WRITE_MEMBER_OFFSET("page.lru", page.lru);
 	WRITE_MEMBER_OFFSET("page._mapcount", page._mapcount);
@@ -2491,7 +2501,13 @@ read_vmcoreinfo(void)
 
 
 	READ_MEMBER_OFFSET("page.flags", page.flags);
-	READ_MEMBER_OFFSET("page._count", page._count);
+	READ_MEMBER_OFFSET("page._refcount", page._refcount);
+	if (OFFSET(page._refcount) == NOT_FOUND_STRUCTURE) {
+		info->flag_use_count = TRUE;
+		READ_MEMBER_OFFSET("page._count", page._refcount);
+	} else {
+		info->flag_use_count = FALSE;
+	}
 	READ_MEMBER_OFFSET("page.mapping", page.mapping);
 	READ_MEMBER_OFFSET("page.lru", page.lru);
 	READ_MEMBER_OFFSET("page._mapcount", page._mapcount);
@@ -5615,7 +5631,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		pcache  = page_cache + (index_pg * SIZE(page));
 
 		flags   = ULONG(pcache + OFFSET(page.flags));
-		_count  = UINT(pcache + OFFSET(page._count));
+		_count  = UINT(pcache + OFFSET(page._refcount));
 		mapping = ULONG(pcache + OFFSET(page.mapping));
 
 		if (OFFSET(page.compound_order) != NOT_FOUND_STRUCTURE) {

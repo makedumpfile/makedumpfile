@@ -2402,6 +2402,40 @@ read_vmcoreinfo_symbol(char *str_symbol)
 	return symbol;
 }
 
+unsigned long
+read_vmcoreinfo_ulong(char *str_structure)
+{
+	long data = NOT_FOUND_LONG_VALUE;
+	char buf[BUFSIZE_FGETS], *endp;
+	unsigned int i;
+
+	if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
+		ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
+		    info->name_vmcoreinfo, strerror(errno));
+		return INVALID_STRUCTURE_DATA;
+	}
+
+	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
+		i = strlen(buf);
+		if (!i)
+			break;
+		if (buf[i - 1] == '\n')
+			buf[i - 1] = '\0';
+		if (strncmp(buf, str_structure, strlen(str_structure)) == 0) {
+			data = strtoul(buf + strlen(str_structure), &endp, 10);
+			if (strlen(endp) != 0)
+				data = strtoul(buf + strlen(str_structure), &endp, 16);
+			if ((data == LONG_MAX) || strlen(endp) != 0) {
+				ERRMSG("Invalid data in %s: %s",
+				    info->name_vmcoreinfo, buf);
+				return INVALID_STRUCTURE_DATA;
+			}
+			break;
+		}
+	}
+	return data;
+}
+
 long
 read_vmcoreinfo_long(char *str_structure)
 {

@@ -393,6 +393,22 @@ do { \
 			return FALSE; \
 	} \
 } while (0)
+#define WRITE_NUMBER_UNSIGNED(str_number, number) \
+do { \
+	if (NUMBER(number) != NOT_FOUND_NUMBER) { \
+		fprintf(info->file_vmcoreinfo, "%s%lu\n", \
+		    STR_NUMBER(str_number), NUMBER(number)); \
+	} \
+} while (0)
+#define READ_NUMBER_UNSIGNED(str_number, number) \
+do { \
+	if (NUMBER(number) == NOT_FOUND_NUMBER) { \
+		NUMBER(number) = read_vmcoreinfo_ulong(STR_NUMBER(str_number)); \
+		if (NUMBER(number) == INVALID_STRUCTURE_DATA) \
+			return FALSE; \
+	} \
+} while (0)
+
 
 /*
  * for source file name

@@ -2423,6 +2423,8 @@ read_vmcoreinfo_long(char *str_structure)
 			buf[i - 1] = '\0';
 		if (strncmp(buf, str_structure, strlen(str_structure)) == 0) {
 			data = strtol(buf + strlen(str_structure), &endp, 10);
+			if (strlen(endp) != 0)
+				data = strtol(buf + strlen(str_structure), &endp, 16);
 			if ((data == LONG_MAX) || strlen(endp) != 0) {
 				ERRMSG("Invalid data in %s: %s",
 				    info->name_vmcoreinfo, buf);

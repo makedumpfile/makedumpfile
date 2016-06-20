@@ -171,11 +171,6 @@ get_phys_base_arm64(void)
 	unsigned long long phys_start;
 	int i;
 
-	if (!calculate_plat_config()) {
-		ERRMSG("Can't determine platform config values\n");
-		return FALSE;
-	}
-
 	/*
 	 * We resolve phys_base from PT_LOAD segments. LMA contains physical
 	 * address of the segment, and we use the lowest start as
@@ -201,6 +196,11 @@ get_phys_base_arm64(void)
 int
 get_machdep_info_arm64(void)
 {
+	if (!calculate_plat_config()) {
+		ERRMSG("Can't determine platform config values\n");
+		return FALSE;
+	}
+
 	info->max_physmem_bits = PHYS_MASK_SHIFT;
 	info->section_size_bits = SECTIONS_SIZE_BITS;
 	info->page_offset = 0xffffffffffffffffUL << (VA_BITS - 1);

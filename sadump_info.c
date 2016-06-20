@@ -213,6 +213,8 @@ sadump_copy_1st_bitmap_from_memory(void)
 	char buf[si->sh_memory->block_size];
 	off_t offset_page;
 	unsigned long bitmap_offset, bitmap_len;
+	mdf_pfn_t pfn, pfn_bitmap1;
+	extern mdf_pfn_t pfn_memhole;
 
 	bitmap_offset =	si->sub_hdr_offset + sh->block_size*sh->sub_hdr_size;
 	bitmap_len = sh->block_size * sh->bitmap_blocks;
@@ -249,6 +251,13 @@ sadump_copy_1st_bitmap_from_memory(void)
 		}
 		offset_page += sizeof(buf);
 	}
+
+	pfn_bitmap1 = 0;
+	for (pfn = 0; pfn < info->max_mapnr; ++pfn) {
+		if (sadump_is_ram(pfn))
+			pfn_bitmap1++;
+	}
+	pfn_memhole = info->max_mapnr - pfn_bitmap1;
 
 	/*
 	 * kdump uses the first 640kB on the 2nd kernel. But both

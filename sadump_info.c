@@ -832,11 +832,20 @@ sadump_initialize_bitmap_memory(void)
 		       strerror(errno));
 		return FALSE;
 	}
+
 	bmp->fd = info->fd_memory;
 	bmp->file_name = info->name_memory;
 	bmp->no_block = -1;
-	memset(bmp->buf, 0, BUFSIZE_BITMAP);
 	bmp->offset = dumpable_bitmap_offset;
+
+	bmp->buf = malloc(BUFSIZE_BITMAP);
+	if (!bmp->buf) {
+		ERRMSG("Can't allocate memory for the memory-bitmap's buffer. %s\n",
+		       strerror(errno));
+		free(bmp);
+		return FALSE;
+	}
+	memset(bmp->buf, 0, BUFSIZE_BITMAP);
 
 	max_section = divideup(si->max_mapnr, SADUMP_PF_SECTION_NUM);
 
@@ -844,6 +853,7 @@ sadump_initialize_bitmap_memory(void)
 	if (block_table == NULL) {
 		ERRMSG("Can't allocate memory for the block_table. %s\n",
 		       strerror(errno));
+		free(bmp->buf);
 		free(bmp);
 		return FALSE;
 	}
@@ -870,8 +880,17 @@ sadump_initialize_bitmap_memory(void)
 	bmp->fd = info->fd_memory;
 	bmp->file_name = info->name_memory;
 	bmp->no_block = -1;
-	memset(bmp->buf, 0, BUFSIZE_BITMAP);
 	bmp->offset = si->sub_hdr_offset + sh->block_size * sh->sub_hdr_size;
+
+	bmp->buf = malloc(BUFSIZE_BITMAP);
+	if (!bmp->buf) {
+		ERRMSG("Can't allocate memory for the memory-bitmap's buffer. %s\n",
+		       strerror(errno));
+		free(bmp);
+		return FALSE;
+	}
+	memset(bmp->buf, 0, BUFSIZE_BITMAP);
+
 	si->ram_bitmap = bmp;
 
 	/*
@@ -1904,6 +1923,11 @@ free_sadump_info(void)
 		fclose(si->file_elf_note);
 	if (si->cpu_online_mask_buf)
 		free(si->cpu_online_mask_buf);
+	if (si->ram_bitmap) {
+		if (si->ram_bitmap->buf)
+			free(si->ram_bitmap->buf);
+		free(si->ram_bitmap);
+	}
 }
 
 void

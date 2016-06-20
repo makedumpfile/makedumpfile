@@ -11245,8 +11245,11 @@ out:
 			free(info->kh_memory);
 		if (info->valid_pages)
 			free(info->valid_pages);
-		if (info->bitmap_memory)
+		if (info->bitmap_memory) {
+			if (info->bitmap_memory->buf)
+				free(info->bitmap_memory->buf);
 			free(info->bitmap_memory);
+		}
 		if (info->fd_memory)
 			close(info->fd_memory);
 		if (info->fd_dumpfile)

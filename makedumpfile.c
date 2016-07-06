@@ -1696,7 +1696,25 @@ get_structure_info(void)
 		OFFSET(module.core_size) += core_layout;
 	}
 	OFFSET_INIT(module.module_init, "module", "module_init");
+	if (OFFSET(module.module_init) == NOT_FOUND_STRUCTURE) {
+		/* for kernel version 4.5 and above */
+		long init_layout;
+
+		OFFSET_INIT(module.module_init, "module", "init_layout");
+		init_layout = OFFSET(module.module_init);
+		OFFSET_INIT(module.module_init, "module_layout", "base");
+		OFFSET(module.module_init) += init_layout;
+	}
 	OFFSET_INIT(module.init_size, "module", "init_size");
+	if (OFFSET(module.init_size) == NOT_FOUND_STRUCTURE) {
+		/* for kernel version 4.5 and above */
+		long init_layout;
+
+		OFFSET_INIT(module.init_size, "module", "init_layout");
+		init_layout = OFFSET(module.init_size);
+		OFFSET_INIT(module.init_size, "module_layout", "size");
+		OFFSET(module.init_size) += init_layout;
+	}
 
 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
 	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");

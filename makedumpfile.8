@@ -376,6 +376,8 @@ the kdump\-compressed format.
 \fB\-\-num\-threads\fR \fITHREADNUM\fR
 Using multiple threads to read and compress data of each page in parallel.
 And it will reduces time for saving \fIDUMPFILE\fR.
+Note that if the usable cpu number is less than the thread number, it may
+lead to great performance degradation.
 This feature only supports creating \fIDUMPFILE\fR in kdump\-comressed
 format from \fIVMCORE\fR in kdump\-compressed format or elf format.
 .br

@@ -200,6 +200,8 @@ print_usage(void)
 	MSG("  [--num-threads THREADNUM]:\n");
 	MSG("      Using multiple threads to read and compress data of each page in parallel.\n");
 	MSG("      And it will reduces time for saving DUMPFILE.\n");
+	MSG("      Note that if the usable cpu number is less than the thread number, it may\n");
+	MSG("      lead to great performance degradation.\n");
 	MSG("      This feature only supports creating DUMPFILE in kdump-comressed format from\n");
 	MSG("      VMCORE in kdump-compressed format or elf format.\n");
 	MSG("\n");

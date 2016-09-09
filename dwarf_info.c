@@ -53,7 +53,9 @@ struct dwarf_info {
 	char	src_name[LEN_SRCFILE];	/* OUT */
 	Dwarf_Off die_offset;		/* OUT */
 };
-static struct dwarf_info	dwarf_info;
+static struct dwarf_info	dwarf_info = {
+	.fd_debuginfo = -1,
+};
 
 
 /*
@@ -1595,7 +1597,7 @@ set_dwarf_debuginfo(char *mod_name, char *os_release,
 	if (dwarf_info.module_name
 			&& strcmp(dwarf_info.module_name, "vmlinux")
 			&& strcmp(dwarf_info.module_name, "xen-syms")) {
-		if (dwarf_info.fd_debuginfo > 0)
+		if (dwarf_info.fd_debuginfo >= 0)
 			close(dwarf_info.fd_debuginfo);
 		if (dwarf_info.name_debuginfo)
 			free(dwarf_info.name_debuginfo);

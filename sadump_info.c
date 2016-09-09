@@ -1853,6 +1853,7 @@ sadump_add_diskset_info(char *name_memory)
 	}
 
 	si->diskset_info[si->num_disks - 1].name_memory = name_memory;
+	si->diskset_info[si->num_disks - 1].fd_memory = -1;
 
 	return TRUE;
 }
@@ -1917,7 +1918,7 @@ free_sadump_info(void)
 		int i;
 
 		for (i = 1; i < si->num_disks; ++i) {
-			if (si->diskset_info[i].fd_memory)
+			if (si->diskset_info[i].fd_memory >= 0)
 				close(si->diskset_info[i].fd_memory);
 			if (si->diskset_info[i].sph_memory)
 				free(si->diskset_info[i].sph_memory);

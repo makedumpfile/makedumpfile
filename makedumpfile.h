@@ -1955,7 +1955,7 @@ is_dumpable_file(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 static inline int
 is_dumpable(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
 {
-	if (bitmap->fd == 0) {
+	if (bitmap->fd < 0) {
 		return is_dumpable_buffer(bitmap, pfn, cycle);
 	} else {
 		return is_dumpable_file(bitmap, pfn);

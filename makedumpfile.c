@@ -3730,10 +3730,10 @@ free_for_parallel()
 		return;
 
 	for (i = 0; i < info->num_threads; i++) {
-		if (FD_MEMORY_PARALLEL(i) > 0)
+		if (FD_MEMORY_PARALLEL(i) >= 0)
 			close(FD_MEMORY_PARALLEL(i));
 
-		if (FD_BITMAP_MEMORY_PARALLEL(i) > 0)
+		if (FD_BITMAP_MEMORY_PARALLEL(i) >= 0)
 			close(FD_BITMAP_MEMORY_PARALLEL(i));
 	}
 }
@@ -4038,13 +4038,13 @@ out:
 void
 initialize_bitmap(struct dump_bitmap *bitmap)
 {
-	if (info->fd_bitmap) {
+	if (info->fd_bitmap >= 0) {
 		bitmap->fd        = info->fd_bitmap;
 		bitmap->file_name = info->name_bitmap;
 		bitmap->no_block  = -1;
 		memset(bitmap->buf, 0, BUFSIZE_BITMAP);
 	} else {
-		bitmap->fd        = 0;
+		bitmap->fd        = -1;
 		bitmap->file_name = NULL;
 		bitmap->no_block  = -1;
 		memset(bitmap->buf, 0, info->bufsize_cyclic);
@@ -4154,7 +4154,7 @@ set_bitmap_buffer(struct dump_bitmap *bitmap, mdf_pfn_t pfn, int val, struct cyc
 int
 set_bitmap(struct dump_bitmap *bitmap, mdf_pfn_t pfn, int val, struct cycle *cycle)
 {
-	if (bitmap->fd) {
+	if (bitmap->fd >= 0) {
 		return set_bitmap_file(bitmap, pfn, val);
 	} else {
 		return set_bitmap_buffer(bitmap, pfn, val, cycle);
@@ -4170,7 +4170,7 @@ sync_bitmap(struct dump_bitmap *bitmap)
 	/*
 	 * The bitmap doesn't have the fd, it's a on-memory bitmap.
 	 */
-	if (bitmap->fd == 0)
+	if (bitmap->fd < 0)
 		return TRUE;
 	/*
 	 * The bitmap buffer is not dirty, and it is not necessary
@@ -5403,7 +5403,7 @@ create_1st_bitmap_buffer(struct cycle *cycle)
 int
 create_1st_bitmap(struct cycle *cycle)
 {
-	if (info->bitmap1->fd) {
+	if (info->bitmap1->fd >= 0) {
 		return create_1st_bitmap_file();
 	} else {
 		return create_1st_bitmap_buffer(cycle);
@@ -5414,7 +5414,7 @@ static inline int
 is_in_segs(unsigned long long paddr)
 {
 	if (info->flag_refiltering || info->flag_sadump) {
-		if (info->bitmap1->fd == 0) {
+		if (info->bitmap1->fd < 0) {
 			initialize_1st_bitmap(info->bitmap1);
 			create_1st_bitmap_file();
 		}
@@ -5872,7 +5872,7 @@ copy_bitmap_file(void)
 int
 copy_bitmap(void)
 {
-	if (info->fd_bitmap) {
+	if (info->fd_bitmap >= 0) {
 		return copy_bitmap_file();
 	} else {
 		return copy_bitmap_buffer();
@@ -6313,7 +6313,7 @@ prepare_bitmap1_buffer(void)
 		return FALSE;
 	}
 
-	if (info->fd_bitmap) {
+	if (info->fd_bitmap >= 0) {
 		if ((info->bitmap1->buf = (char *)malloc(BUFSIZE_BITMAP)) == NULL) {
 			ERRMSG("Can't allocate memory for the 1st bitmaps's buffer. %s\n",
 			       strerror(errno));
@@ -6352,7 +6352,7 @@ prepare_bitmap2_buffer(void)
 		       strerror(errno));
 		return FALSE;
 	}
-	if (info->fd_bitmap) {
+	if (info->fd_bitmap >= 0) {
 		if ((info->bitmap2->buf = (char *)malloc(BUFSIZE_BITMAP)) == NULL) {
 			ERRMSG("Can't allocate memory for the 2nd bitmaps's buffer. %s\n",
 			       strerror(errno));
@@ -7582,7 +7582,7 @@ kdump_thread_function_cyclic(void *arg) {
 
 	fd_memory = FD_MEMORY_PARALLEL(kdump_thread_args->thread_num);
 
-	if (info->fd_bitmap) {
+	if (info->fd_bitmap >= 0) {
 		bitmap_parallel.buf = malloc(BUFSIZE_BITMAP);
 		if (bitmap_parallel.buf == NULL){
 			ERRMSG("Can't allocate memory for bitmap_parallel.buf. %s\n",
@@ -7628,7 +7628,7 @@ kdump_thread_function_cyclic(void *arg) {
 			pthread_mutex_lock(&info->current_pfn_mutex);
 			for (pfn = info->current_pfn; pfn < cycle->end_pfn; pfn++) {
 				dumpable = is_dumpable(
-					info->fd_bitmap ? &bitmap_parallel : info->bitmap2,
+					info->fd_bitmap >= 0 ? &bitmap_parallel : info->bitmap2,
 					pfn,
 					cycle);
 				if (dumpable)
@@ -7723,7 +7723,7 @@ next:
 	retval = NULL;
 
 fail:
-	if (bitmap_memory_parallel.fd > 0)
+	if (bitmap_memory_parallel.fd >= 0)
 		close(bitmap_memory_parallel.fd);
 	if (bitmap_parallel.buf != NULL)
 		free(bitmap_parallel.buf);
@@ -8461,7 +8461,7 @@ out:
 
 int
 write_kdump_bitmap1(struct cycle *cycle) {
-	if (info->bitmap1->fd) {
+	if (info->bitmap1->fd >= 0) {
 		return write_kdump_bitmap1_file();
 	} else {
 		return write_kdump_bitmap1_buffer(cycle);
@@ -8470,7 +8470,7 @@ write_kdump_bitmap1(struct cycle *cycle) {
 
 int
 write_kdump_bitmap2(struct cycle *cycle) {
-	if (info->bitmap2->fd) {
+	if (info->bitmap2->fd >= 0) {
 		return write_kdump_bitmap2_file();
 	} else {
 		return write_kdump_bitmap2_buffer(cycle);
@@ -8597,9 +8597,10 @@ close_vmcoreinfo(void)
 void
 close_dump_memory(void)
 {
-	if ((info->fd_memory = close(info->fd_memory)) < 0)
+	if (close(info->fd_memory) < 0)
 		ERRMSG("Can't close the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
+	info->fd_memory = -1;
 }
 
 void
@@ -8608,9 +8609,10 @@ close_dump_file(void)
 	if (info->flag_flatten)
 		return;
 
-	if ((info->fd_dumpfile = close(info->fd_dumpfile)) < 0)
+	if (close(info->fd_dumpfile) < 0)
 		ERRMSG("Can't close the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
+	info->fd_dumpfile = -1;
 }
 
 void
@@ -8620,9 +8622,10 @@ close_dump_bitmap(void)
 	    && !info->flag_sadump && !info->flag_mem_usage)
 		return;
 
-	if ((info->fd_bitmap = close(info->fd_bitmap)) < 0)
+	if (close(info->fd_bitmap) < 0)
 		ERRMSG("Can't close the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));
+	info->fd_bitmap = -1;
 	free(info->name_bitmap);
 	info->name_bitmap = NULL;
 }
@@ -8631,16 +8634,18 @@ void
 close_kernel_file(void)
 {
 	if (info->name_vmlinux) {
-		if ((info->fd_vmlinux = close(info->fd_vmlinux)) < 0) {
+		if (close(info->fd_vmlinux) < 0) {
 			ERRMSG("Can't close the kernel file(%s). %s\n",
 			    info->name_vmlinux, strerror(errno));
 		}
+		info->fd_vmlinux = -1;
 	}
 	if (info->name_xen_syms) {
-		if ((info->fd_xen_syms = close(info->fd_xen_syms)) < 0) {
+		if (close(info->fd_xen_syms) < 0) {
 			ERRMSG("Can't close the kernel file(%s). %s\n",
 			    info->name_xen_syms, strerror(errno));
 		}
+		info->fd_xen_syms = -1;
 	}
 }
 
@@ -10202,7 +10207,7 @@ reassemble_kdump_header(void)
 
 	ret = TRUE;
 out:
-	if (fd > 0)
+	if (fd >= 0)
 		close(fd);
 	free(buf_bitmap);
 
@@ -10212,7 +10217,7 @@ out:
 int
 reassemble_kdump_pages(void)
 {
-	int i, fd = 0, ret = FALSE;
+	int i, fd = -1, ret = FALSE;
 	off_t offset_first_ph, offset_ph_org, offset_eraseinfo;
 	off_t offset_data_new, offset_zero_page = 0;
 	mdf_pfn_t pfn, start_pfn, end_pfn;
@@ -10336,7 +10341,7 @@ reassemble_kdump_pages(void)
 			offset_data_new += pd.size;
 		}
 		close(fd);
-		fd = 0;
+		fd = -1;
 	}
 	if (!write_cache_bufsz(&cd_pd))
 		goto out;
@@ -10379,7 +10384,7 @@ reassemble_kdump_pages(void)
 		size_eraseinfo += SPLITTING_SIZE_EI(i);
 
 		close(fd);
-		fd = 0;
+		fd = -1;
 	}
 	if (size_eraseinfo) {
 		if (!write_cache_bufsz(&cd_data))
@@ -10400,7 +10405,7 @@ out:
 
 	if (data)
 		free(data);
-	if (fd > 0)
+	if (fd >= 0)
 		close(fd);
 
 	return ret;
@@ -10973,6 +10978,11 @@ main(int argc, char *argv[])
 		    strerror(errno));
 		goto out;
 	}
+	info->fd_vmlinux = -1;
+	info->fd_xen_syms = -1;
+	info->fd_memory = -1;
+	info->fd_dumpfile = -1;
+	info->fd_bitmap = -1;
 	initialize_tables();
 
 	/*
@@ -11268,11 +11278,11 @@ out:
 				free(info->bitmap_memory->buf);
 			free(info->bitmap_memory);
 		}
-		if (info->fd_memory)
+		if (info->fd_memory >= 0)
 			close(info->fd_memory);
-		if (info->fd_dumpfile)
+		if (info->fd_dumpfile >= 0)
 			close(info->fd_dumpfile);
-		if (info->fd_bitmap)
+		if (info->fd_bitmap >= 0)
 			close(info->fd_bitmap);
 		if (vt.node_online_map != NULL)
 			free(vt.node_online_map);

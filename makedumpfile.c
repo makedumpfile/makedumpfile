@@ -1365,7 +1365,7 @@ open_dump_bitmap(void)
 
 	/* Unnecessary to open */
 	if (!info->working_dir && !info->flag_reassemble && !info->flag_refiltering
-	    && !info->flag_sadump && !info->flag_mem_usage)
+	    && !info->flag_sadump && !info->flag_mem_usage && info->flag_cyclic)
 		return TRUE;
 
 	tmpname = getenv("TMPDIR");

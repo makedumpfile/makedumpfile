@@ -1480,9 +1480,6 @@ open_files_for_creating_dumpfile(void)
 	if (!open_dump_memory())
 		return FALSE;
 
-	if (!open_dump_bitmap())
-		return FALSE;
-
 	return TRUE;
 }
 
@@ -9747,6 +9744,9 @@ create_dumpfile(void)
 	if (!initial())
 		return FALSE;
 
+	if (!open_dump_bitmap())
+		return FALSE;
+
 	/* create an array of translations from pfn to vmemmap pages */
 	if (info->flag_excludevm) {
 		if (find_vmemmap() == FAILED) {
@@ -10915,6 +10915,9 @@ int show_mem_usage(void)
 		return FALSE;
 
 	if (!initial())
+		return FALSE;
+
+	if (!open_dump_bitmap())
 		return FALSE;
 
 	if (!prepare_bitmap_buffer())

@@ -8615,8 +8615,7 @@ close_dump_file(void)
 void
 close_dump_bitmap(void)
 {
-	if (!info->working_dir && !info->flag_reassemble && !info->flag_refiltering
-	    && !info->flag_sadump && !info->flag_mem_usage)
+	if (info->fd_bitmap < 0)
 		return;
 
 	if (close(info->fd_bitmap) < 0)

@@ -635,6 +635,8 @@ int get_va_bits_arm64(void);
 #define PUD_INDEX_SIZE_L4_4K_3_7  9
 #define PTE_RPN_SHIFT_L4_4K  17
 #define PTE_RPN_SHIFT_L4_4K_4_5  18
+#define PGD_MASKED_BITS_4K  0
+#define PUD_MASKED_BITS_4K  0
 #define PMD_MASKED_BITS_4K  0
 
 /* 64K pagesize */
@@ -645,9 +647,22 @@ int get_va_bits_arm64(void);
 #define PTE_INDEX_SIZE_L4_64K_3_10  8
 #define PMD_INDEX_SIZE_L4_64K_3_10  10
 #define PGD_INDEX_SIZE_L4_64K_3_10  12
+#define PMD_INDEX_SIZE_L4_64K_4_6  5
+#define PUD_INDEX_SIZE_L4_64K_4_6  5
 #define PTE_RPN_SHIFT_L4_64K_V1  32
 #define PTE_RPN_SHIFT_L4_64K_V2  30
+#define PGD_MASKED_BITS_64K  0
+#define PUD_MASKED_BITS_64K  0x1ff
 #define PMD_MASKED_BITS_64K  0x1ff
+#define PMD_MASKED_BITS_64K_3_11 0xfff
+#define PGD_MASKED_BITS_64K_4_6  0xc0000000000000ffUL
+#define PUD_MASKED_BITS_64K_4_6  0xc0000000000000ffUL
+#define PMD_MASKED_BITS_64K_4_6  0xc0000000000000ffUL
+
+#define PTE_RPN_MASK_DEFAULT  0xffffffffffffffffUL
+#define PTE_RPN_SIZE_L4_4_6   (info->page_size == 65536 ? 41 : 45)
+#define PTE_RPN_MASK_L4_4_6   (((1UL << PTE_RPN_SIZE_L4_4_6) - 1) << info->page_shift)
+#define PTE_RPN_SHIFT_L4_4_6  info->page_shift
 
 #define PGD_MASK_L4		\
 	(info->kernel_version >= KERNEL_VERSION(3, 10, 0) ? (info->ptrs_per_pgd - 1) : 0x1ff)
@@ -1124,7 +1139,10 @@ struct DumpInfo {
 	uint		l2_shift;
 	uint		l1_shift;
 	uint		pte_rpn_shift;
-	uint		l2_masked_bits;
+	ulong		pte_rpn_mask;
+	ulong		pgd_masked_bits;
+	ulong		pud_masked_bits;
+	ulong		pmd_masked_bits;
 	ulong		kernel_pgd;
 	char		*page_buf; /* Page buffer to read page tables */
 

@@ -25,6 +25,68 @@
 #include "../makedumpfile.h"
 
 /*
+ * Convert physical address to kernel virtual address
+ */
+static inline ulong paddr_to_vaddr_ppc64(ulong paddr)
+{
+	return (paddr + info->kernel_start);
+}
+
+/*
+ * Convert the raw pgd entry to next pgtable adress
+ */
+static inline ulong pgd_page_vaddr_l4(ulong pgd)
+{
+	ulong pgd_val;
+
+	pgd_val = (pgd & ~info->pgd_masked_bits);
+	if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+		/*
+		 * physical address is stored starting from kernel v4.6
+		 */
+		pgd_val = paddr_to_vaddr_ppc64(pgd_val);
+	}
+
+	return pgd_val;
+}
+
+/*
+ * Convert the raw pud entry to next pgtable adress
+ */
+static inline ulong pud_page_vaddr_l4(ulong pud)
+{
+	ulong pud_val;
+
+	pud_val = (pud & ~info->pud_masked_bits);
+	if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+		/*
+		 * physical address is stored starting from kernel v4.6
+		 */
+		pud_val = paddr_to_vaddr_ppc64(pud_val);
+	}
+
+	return pud_val;
+}
+
+/*
+ * Convert the raw pmd entry to next pgtable adress
+ */
+static inline ulong pmd_page_vaddr_l4(ulong pmd)
+{
+	ulong pmd_val;
+
+	pmd_val = (pmd & ~info->pmd_masked_bits);
+	if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+		/*
+		 * physical address is stored starting from kernel v4.6
+		 */
+		pmd_val = paddr_to_vaddr_ppc64(pmd_val);
+	}
+
+	return pmd_val;
+}
+
+/*
  * This function traverses vmemmap list to get the count of vmemmap regions
  * and populates the regions' info in info->vmemmap_list[]
  */
@@ -156,7 +218,13 @@ ppc64_vmalloc_init(void)
 		/*
 		 * 64K pagesize
 		 */
-		if (info->kernel_version >= KERNEL_VERSION(3, 10, 0)) {
+		if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+			info->l1_index_size = PTE_INDEX_SIZE_L4_64K_3_10;
+			info->l2_index_size = PMD_INDEX_SIZE_L4_64K_4_6;
+			info->l3_index_size = PUD_INDEX_SIZE_L4_64K_4_6;
+			info->l4_index_size = PGD_INDEX_SIZE_L4_64K_3_10;
+
+		} else if (info->kernel_version >= KERNEL_VERSION(3, 10, 0)) {
 			info->l1_index_size = PTE_INDEX_SIZE_L4_64K_3_10;
 			info->l2_index_size = PMD_INDEX_SIZE_L4_64K_3_10;
 			info->l3_index_size = PUD_INDEX_SIZE_L4_64K;
@@ -170,7 +238,17 @@ ppc64_vmalloc_init(void)
 
 		info->pte_rpn_shift = (SYMBOL(demote_segment_4k) ?
 			PTE_RPN_SHIFT_L4_64K_V2 : PTE_RPN_SHIFT_L4_64K_V1);
-		info->l2_masked_bits = PMD_MASKED_BITS_64K;
+
+		if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+			info->pgd_masked_bits = PGD_MASKED_BITS_64K_4_6;
+			info->pud_masked_bits = PUD_MASKED_BITS_64K_4_6;
+			info->pmd_masked_bits = PMD_MASKED_BITS_64K_4_6;
+		} else {
+			info->pgd_masked_bits = PGD_MASKED_BITS_64K;
+			info->pud_masked_bits = PUD_MASKED_BITS_64K;
+			info->pmd_masked_bits = (info->kernel_version >= KERNEL_VERSION(3, 11, 0) ?
+				PMD_MASKED_BITS_64K_3_11 : PMD_MASKED_BITS_64K);
+		}
 	} else {
 		/*
 		 * 4K pagesize
@@ -183,7 +261,16 @@ ppc64_vmalloc_init(void)
 
 		info->pte_rpn_shift = (info->kernel_version >= KERNEL_VERSION(4, 5, 0) ?
 			PTE_RPN_SHIFT_L4_4K_4_5 : PTE_RPN_SHIFT_L4_4K);
-		info->l2_masked_bits = PMD_MASKED_BITS_4K;
+
+		info->pgd_masked_bits = PGD_MASKED_BITS_4K;
+		info->pud_masked_bits = PUD_MASKED_BITS_4K;
+		info->pmd_masked_bits = PMD_MASKED_BITS_4K;
+	}
+
+	info->pte_rpn_mask = PTE_RPN_MASK_DEFAULT;
+	if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+		info->pte_rpn_mask = PTE_RPN_MASK_L4_4_6;
+		info->pte_rpn_shift = PTE_RPN_SHIFT_L4_4_6;
 	}
 
 	/*
@@ -265,6 +352,7 @@ ppc64_vtop_level4(unsigned long vaddr)
 	 * Sometimes we don't have level3 pagetable entries
 	 */
 	if (info->l3_index_size != 0) {
+		pgd_pte = pgd_page_vaddr_l4(pgd_pte);
 		page_upper = (ulong *)((ulong *)pgd_pte + PUD_OFFSET_L4(vaddr));
 		if (!readmem(VADDR, PAGEBASE(pgd_pte), info->page_buf, PAGESIZE())) {
 			ERRMSG("Can't read PUD page: 0x%llx\n", PAGEBASE(pgd_pte));
@@ -277,6 +365,7 @@ ppc64_vtop_level4(unsigned long vaddr)
 		pud_pte = pgd_pte;
 	}
 
+	pud_pte = pud_page_vaddr_l4(pud_pte);
 	page_middle = (ulong *)((ulong *)pud_pte + PMD_OFFSET_L4(vaddr));
 	if (!readmem(VADDR, PAGEBASE(pud_pte), info->page_buf, PAGESIZE())) {
 		ERRMSG("Can't read PMD page: 0x%llx\n", PAGEBASE(pud_pte));
@@ -286,7 +375,8 @@ ppc64_vtop_level4(unsigned long vaddr)
 	if (!(pmd_pte))
 		return NOT_PADDR;
 
-	page_table = (ulong *)(pmd_pte & ~(info->l2_masked_bits))
+	pmd_pte = pmd_page_vaddr_l4(pmd_pte);
+	page_table = (ulong *)(pmd_pte)
 			+ (BTOP(vaddr) & (info->ptrs_per_l1 - 1));
 	if (!readmem(VADDR, PAGEBASE(pmd_pte), info->page_buf, PAGESIZE())) {
 		ERRMSG("Can't read page table: 0x%llx\n", PAGEBASE(pmd_pte));
@@ -301,7 +391,8 @@ ppc64_vtop_level4(unsigned long vaddr)
 	if (!pte)
 		return NOT_PADDR;
 
-	paddr = PAGEBASE(PTOB(pte >> info->pte_rpn_shift)) + PAGEOFFSET(vaddr);
+	paddr = PAGEBASE(PTOB((pte & info->pte_rpn_mask) >> info->pte_rpn_shift))
+			+ PAGEOFFSET(vaddr);
 
 	return paddr;
 }

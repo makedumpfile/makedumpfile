@@ -650,6 +650,7 @@ int get_va_bits_arm64(void);
 #define PMD_INDEX_SIZE_L4_4K  7
 #define PUD_INDEX_SIZE_L4_4K  7
 #define PGD_INDEX_SIZE_L4_4K  9
+#define PUD_INDEX_SIZE_L4_4K_3_7  9
 #define PTE_SHIFT_L4_4K  17
 #define PMD_MASKED_BITS_4K  0
 
@@ -666,7 +667,7 @@ int get_va_bits_arm64(void);
 #define PMD_MASKED_BITS_64K  0x1ff
 
 #define L4_MASK		\
-	(info->kernel_version >= KERNEL_VERSION(3, 10, 0) ? 0xfff : 0x1ff)
+	(info->kernel_version >= KERNEL_VERSION(3, 10, 0) ? (info->ptrs_per_pgd - 1) : 0x1ff)
 #define L4_OFFSET(vaddr)	((vaddr >> (info->l4_shift)) & L4_MASK)
 
 #define PGD_OFFSET_L4(vaddr)	\
@@ -1123,9 +1124,11 @@ struct DumpInfo {
 	 * page table info for ppc64
 	 */
 	int		ptrs_per_pgd;
+	uint		l4_index_size;
 	uint		l3_index_size;
 	uint		l2_index_size;
 	uint		l1_index_size;
+	uint		ptrs_per_l4;
 	uint		ptrs_per_l3;
 	uint		ptrs_per_l2;
 	uint		ptrs_per_l1;

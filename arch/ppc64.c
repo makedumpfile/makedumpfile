@@ -160,10 +160,12 @@ ppc64_vmalloc_init(void)
 			info->l1_index_size = PTE_INDEX_SIZE_L4_64K_3_10;
 			info->l2_index_size = PMD_INDEX_SIZE_L4_64K_3_10;
 			info->l3_index_size = PUD_INDEX_SIZE_L4_64K;
+			info->l4_index_size = PGD_INDEX_SIZE_L4_64K_3_10;
 		} else {
 			info->l1_index_size = PTE_INDEX_SIZE_L4_64K;
 			info->l2_index_size = PMD_INDEX_SIZE_L4_64K;
 			info->l3_index_size = PUD_INDEX_SIZE_L4_64K;
+			info->l4_index_size = PGD_INDEX_SIZE_L4_64K;
 		}
 
 		info->pte_shift = SYMBOL(demote_segment_4k) ?
@@ -175,7 +177,9 @@ ppc64_vmalloc_init(void)
 		 */
 		info->l1_index_size = PTE_INDEX_SIZE_L4_4K;
 		info->l2_index_size = PMD_INDEX_SIZE_L4_4K;
-		info->l3_index_size = PUD_INDEX_SIZE_L4_4K;
+		info->l3_index_size = (info->kernel_version >= KERNEL_VERSION(3, 7, 0) ?
+			PUD_INDEX_SIZE_L4_4K_3_7 : PUD_INDEX_SIZE_L4_4K);
+		info->l4_index_size = PGD_INDEX_SIZE_L4_4K;
 
 		info->pte_shift = PTE_SHIFT_L4_4K;
 		info->l2_masked_bits = PMD_MASKED_BITS_4K;
@@ -188,8 +192,8 @@ ppc64_vmalloc_init(void)
 	info->ptrs_per_l1 = (1 << info->l1_index_size);
 	info->ptrs_per_l2 = (1 << info->l2_index_size);
 	info->ptrs_per_l3 = (1 << info->l3_index_size);
-
-	info->ptrs_per_pgd = info->ptrs_per_l3;
+	info->ptrs_per_l4 = (1 << info->l4_index_size);
+	info->ptrs_per_pgd = info->ptrs_per_l4;
 
 	/*
 	 * Compute shifts

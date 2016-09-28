@@ -660,7 +660,10 @@ int get_va_bits_arm64(void);
 	((vaddr >> (info->l2_shift)) & (info->ptrs_per_l2 - 1))
 
 #define _PAGE_PRESENT		\
-	(info->kernel_version >= KERNEL_VERSION(4, 5, 0) ? 0x2UL : 0x1UL)
+	(info->kernel_version >= KERNEL_VERSION(4, 6, 0) ? \
+	(0x1UL << 63) : (info->kernel_version >= KERNEL_VERSION(4, 5, 0) ? \
+			0x2UL : 0x1UL))
+
 #endif
 
 #ifdef __powerpc32__

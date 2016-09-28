@@ -168,8 +168,8 @@ ppc64_vmalloc_init(void)
 			info->l4_index_size = PGD_INDEX_SIZE_L4_64K;
 		}
 
-		info->pte_shift = SYMBOL(demote_segment_4k) ?
-			PTE_SHIFT_L4_64K_V2 : PTE_SHIFT_L4_64K_V1;
+		info->pte_rpn_shift = (SYMBOL(demote_segment_4k) ?
+			PTE_RPN_SHIFT_L4_64K_V2 : PTE_RPN_SHIFT_L4_64K_V1);
 		info->l2_masked_bits = PMD_MASKED_BITS_64K;
 	} else {
 		/*
@@ -181,7 +181,8 @@ ppc64_vmalloc_init(void)
 			PUD_INDEX_SIZE_L4_4K_3_7 : PUD_INDEX_SIZE_L4_4K);
 		info->l4_index_size = PGD_INDEX_SIZE_L4_4K;
 
-		info->pte_shift = PTE_SHIFT_L4_4K;
+		info->pte_rpn_shift = (info->kernel_version >= KERNEL_VERSION(4, 5, 0) ?
+			PTE_RPN_SHIFT_L4_4K_4_5 : PTE_RPN_SHIFT_L4_4K);
 		info->l2_masked_bits = PMD_MASKED_BITS_4K;
 	}
 
@@ -300,7 +301,7 @@ ppc64_vtop_level4(unsigned long vaddr)
 	if (!pte)
 		return NOT_PADDR;
 
-	paddr = PAGEBASE(PTOB(pte >> info->pte_shift)) + PAGEOFFSET(vaddr);
+	paddr = PAGEBASE(PTOB(pte >> info->pte_rpn_shift)) + PAGEOFFSET(vaddr);
 
 	return paddr;
 }

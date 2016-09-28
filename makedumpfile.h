@@ -625,24 +625,6 @@ int get_va_bits_arm64(void);
 #define REGION_SHIFT            (60UL)
 #define VMEMMAP_REGION_ID       (0xfUL)
 
-#define PGDIR_SHIFT	\
-	(PAGESHIFT() + (PAGESHIFT() - 3) + (PAGESHIFT() - 2))
-#define PMD_SHIFT       (PAGESHIFT() + (PAGESHIFT() - 3))
-
-/* shift to put page number into pte */
-#define PTE_SHIFT 16
-
-#define PTE_INDEX_SIZE  9
-#define PMD_INDEX_SIZE  10
-#define PGD_INDEX_SIZE  10
-
-#define PTRS_PER_PTE    (1 << PTE_INDEX_SIZE)
-#define PTRS_PER_PMD    (1 << PMD_INDEX_SIZE)
-#define PTRS_PER_PGD    (1 << PGD_INDEX_SIZE)
-
-#define PGD_OFFSET(vaddr)       ((vaddr >> PGDIR_SHIFT) & 0x7ff)
-#define PMD_OFFSET(vaddr)       ((vaddr >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
-
 /* 4-level page table support */
 
 /* 4K pagesize */
@@ -651,7 +633,8 @@ int get_va_bits_arm64(void);
 #define PUD_INDEX_SIZE_L4_4K  7
 #define PGD_INDEX_SIZE_L4_4K  9
 #define PUD_INDEX_SIZE_L4_4K_3_7  9
-#define PTE_SHIFT_L4_4K  17
+#define PTE_RPN_SHIFT_L4_4K  17
+#define PTE_RPN_SHIFT_L4_4K_4_5  18
 #define PMD_MASKED_BITS_4K  0
 
 /* 64K pagesize */
@@ -662,8 +645,8 @@ int get_va_bits_arm64(void);
 #define PTE_INDEX_SIZE_L4_64K_3_10  8
 #define PMD_INDEX_SIZE_L4_64K_3_10  10
 #define PGD_INDEX_SIZE_L4_64K_3_10  12
-#define PTE_SHIFT_L4_64K_V1  32
-#define PTE_SHIFT_L4_64K_V2  30
+#define PTE_RPN_SHIFT_L4_64K_V1  32
+#define PTE_RPN_SHIFT_L4_64K_V2  30
 #define PMD_MASKED_BITS_64K  0x1ff
 
 #define PGD_MASK_L4		\
@@ -676,7 +659,8 @@ int get_va_bits_arm64(void);
 #define PMD_OFFSET_L4(vaddr)	\
 	((vaddr >> (info->l2_shift)) & (info->ptrs_per_l2 - 1))
 
-#define _PAGE_PRESENT		0x1UL
+#define _PAGE_PRESENT		\
+	(info->kernel_version >= KERNEL_VERSION(4, 5, 0) ? 0x2UL : 0x1UL)
 #endif
 
 #ifdef __powerpc32__
@@ -1136,7 +1120,7 @@ struct DumpInfo {
 	uint		l3_shift;
 	uint		l2_shift;
 	uint		l1_shift;
-	uint		pte_shift;
+	uint		pte_rpn_shift;
 	uint		l2_masked_bits;
 	ulong		kernel_pgd;
 	char		*page_buf; /* Page buffer to read page tables */

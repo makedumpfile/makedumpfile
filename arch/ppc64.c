@@ -23,6 +23,25 @@
 #include "../print_info.h"
 #include "../elf_info.h"
 #include "../makedumpfile.h"
+#include <endian.h>
+
+/*
+ * Swaps a 8 byte value
+ */
+static ulong swap64(ulong val, uint swap)
+{
+	if (swap)
+		return (((val & 0x00000000000000ffULL) << 56) |
+			((val & 0x000000000000ff00ULL) << 40) |
+			((val & 0x0000000000ff0000ULL) << 24) |
+			((val & 0x00000000ff000000ULL) <<  8) |
+			((val & 0x000000ff00000000ULL) >>  8) |
+			((val & 0x0000ff0000000000ULL) >> 24) |
+			((val & 0x00ff000000000000ULL) >> 40) |
+			((val & 0xff00000000000000ULL) >> 56));
+	else
+		return val;
+}
 
 /*
  * Convert physical address to kernel virtual address
@@ -325,6 +344,7 @@ ppc64_vtop_level4(unsigned long vaddr)
 	unsigned long long pgd_pte, pud_pte;
 	unsigned long long pmd_pte, pte;
 	unsigned long long paddr = NOT_PADDR;
+	uint swap = 0;
 
 	if (info->page_buf == NULL) {
 		/*
@@ -338,13 +358,23 @@ ppc64_vtop_level4(unsigned long vaddr)
 		}
 	}
 
+	if (info->kernel_version >= KERNEL_VERSION(4, 7, 0)) {
+		/*
+		 * Starting with kernel v4.7, page table entries are always
+		 * big endian on server processors. Set this flag if
+		 * kernel is not big endian.
+		 */
+		if (__BYTE_ORDER == __LITTLE_ENDIAN)
+			swap = 1;
+	}
+
 	level4 = (ulong *)info->kernel_pgd;
 	pgdir = (ulong *)((ulong *)level4 + PGD_OFFSET_L4(vaddr));
 	if (!readmem(VADDR, PAGEBASE(level4), info->page_buf, PAGESIZE())) {
 		ERRMSG("Can't read PGD page: 0x%llx\n", PAGEBASE(level4));
 		return NOT_PADDR;
 	}
-	pgd_pte = ULONG((info->page_buf + PAGEOFFSET(pgdir)));
+	pgd_pte = swap64(ULONG((info->page_buf + PAGEOFFSET(pgdir))), swap);
 	if (!pgd_pte)
 		return NOT_PADDR;
 
@@ -358,7 +388,7 @@ ppc64_vtop_level4(unsigned long vaddr)
 			ERRMSG("Can't read PUD page: 0x%llx\n", PAGEBASE(pgd_pte));
 			return NOT_PADDR;
 		}
-		pud_pte = ULONG((info->page_buf + PAGEOFFSET(page_upper)));
+		pud_pte = swap64(ULONG((info->page_buf + PAGEOFFSET(page_upper))), swap);
 		if (!pud_pte)
 			return NOT_PADDR;
 	} else {
@@ -371,7 +401,7 @@ ppc64_vtop_level4(unsigned long vaddr)
 		ERRMSG("Can't read PMD page: 0x%llx\n", PAGEBASE(pud_pte));
 		return NOT_PADDR;
 	}
-	pmd_pte = ULONG((info->page_buf + PAGEOFFSET(page_middle)));
+	pmd_pte = swap64(ULONG((info->page_buf + PAGEOFFSET(page_middle))), swap);
 	if (!(pmd_pte))
 		return NOT_PADDR;
 
@@ -382,7 +412,7 @@ ppc64_vtop_level4(unsigned long vaddr)
 		ERRMSG("Can't read page table: 0x%llx\n", PAGEBASE(pmd_pte));
 		return NOT_PADDR;
 	}
-	pte = ULONG((info->page_buf + PAGEOFFSET(page_table)));
+	pte = swap64(ULONG((info->page_buf + PAGEOFFSET(page_table))), swap);
 	if (!(pte & _PAGE_PRESENT)) {
 		ERRMSG("Page not present!\n");
 		return NOT_PADDR;

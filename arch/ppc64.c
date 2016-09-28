@@ -237,7 +237,13 @@ ppc64_vmalloc_init(void)
 		/*
 		 * 64K pagesize
 		 */
-		if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+		if (info->cur_mmu_type & RADIX_MMU) {
+			info->l1_index_size = PTE_INDEX_SIZE_RADIX_64K;
+			info->l2_index_size = PMD_INDEX_SIZE_RADIX_64K;
+			info->l3_index_size = PUD_INDEX_SIZE_RADIX_64K;
+			info->l4_index_size = PGD_INDEX_SIZE_RADIX_64K;
+
+		} else if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
 			info->l1_index_size = PTE_INDEX_SIZE_L4_64K_3_10;
 			info->l2_index_size = PMD_INDEX_SIZE_L4_64K_4_6;
 			info->l3_index_size = PUD_INDEX_SIZE_L4_64K_4_6;
@@ -272,11 +278,19 @@ ppc64_vmalloc_init(void)
 		/*
 		 * 4K pagesize
 		 */
-		info->l1_index_size = PTE_INDEX_SIZE_L4_4K;
-		info->l2_index_size = PMD_INDEX_SIZE_L4_4K;
-		info->l3_index_size = (info->kernel_version >= KERNEL_VERSION(3, 7, 0) ?
-			PUD_INDEX_SIZE_L4_4K_3_7 : PUD_INDEX_SIZE_L4_4K);
-		info->l4_index_size = PGD_INDEX_SIZE_L4_4K;
+		if (info->cur_mmu_type & RADIX_MMU) {
+			info->l1_index_size = PTE_INDEX_SIZE_RADIX_4K;
+			info->l2_index_size = PMD_INDEX_SIZE_RADIX_4K;
+			info->l3_index_size = PUD_INDEX_SIZE_RADIX_4K;
+			info->l4_index_size = PGD_INDEX_SIZE_RADIX_4K;
+
+		} else {
+			info->l1_index_size = PTE_INDEX_SIZE_L4_4K;
+			info->l2_index_size = PMD_INDEX_SIZE_L4_4K;
+			info->l3_index_size = (info->kernel_version >= KERNEL_VERSION(3, 7, 0) ?
+				PUD_INDEX_SIZE_L4_4K_3_7 : PUD_INDEX_SIZE_L4_4K);
+			info->l4_index_size = PGD_INDEX_SIZE_L4_4K;
+		}
 
 		info->pte_rpn_shift = (info->kernel_version >= KERNEL_VERSION(4, 5, 0) ?
 			PTE_RPN_SHIFT_L4_4K_4_5 : PTE_RPN_SHIFT_L4_4K);
@@ -537,6 +551,27 @@ get_machdep_info_ppc64(void)
 int
 get_versiondep_info_ppc64()
 {
+	unsigned long cur_cpu_spec;
+	uint mmu_features;
+
+	/*
+	 * On PowerISA 3.0 based server processors, a kernel can run with
+	 * radix MMU or standard MMU. Get the current MMU type.
+	 */
+	info->cur_mmu_type = STD_MMU;
+	if ((SYMBOL(cur_cpu_spec) != NOT_FOUND_SYMBOL)
+	    && (OFFSET(cpu_spec.mmu_features) != NOT_FOUND_STRUCTURE)) {
+		if (readmem(VADDR, SYMBOL(cur_cpu_spec), &cur_cpu_spec,
+		    sizeof(cur_cpu_spec))) {
+			if (readmem(VADDR, cur_cpu_spec + OFFSET(cpu_spec.mmu_features),
+			    &mmu_features, sizeof(mmu_features)))
+				info->cur_mmu_type = mmu_features & RADIX_MMU;
+		}
+	}
+
+	/*
+	 * Initialize Linux page table info
+	 */
 	if (ppc64_vmalloc_init() == FALSE) {
 		ERRMSG("Can't initialize for vmalloc translation\n");
 		return FALSE;

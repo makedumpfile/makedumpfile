@@ -1564,6 +1564,7 @@ get_symbol_info(void)
 
 	SYMBOL_INIT(cpu_pgd, "cpu_pgd");
 	SYMBOL_INIT(demote_segment_4k, "demote_segment_4k");
+	SYMBOL_INIT(cur_cpu_spec, "cur_cpu_spec");
 
 	return TRUE;
 }
@@ -1946,6 +1947,12 @@ get_structure_info(void)
 	SIZE_INIT(mmu_psize_def, "mmu_psize_def");
 	OFFSET_INIT(mmu_psize_def.shift, "mmu_psize_def", "shift");
 
+	/*
+	 * Get offsets of the cpu_spec's members.
+	 */
+	SIZE_INIT(cpu_spec, "cpu_spec");
+	OFFSET_INIT(cpu_spec.mmu_features, "cpu_spec", "mmu_features");
+
 	return TRUE;
 }
 
@@ -2148,6 +2155,7 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
 	WRITE_SYMBOL("cpu_pgd", cpu_pgd);
 	WRITE_SYMBOL("demote_segment_4k", demote_segment_4k);
+	WRITE_SYMBOL("cur_cpu_spec", cur_cpu_spec);
 	WRITE_SYMBOL("free_huge_page", free_huge_page);
 
 	/*
@@ -2223,6 +2231,7 @@ write_vmcoreinfo_data(void)
 	    vmemmap_backing.virt_addr);
 	WRITE_MEMBER_OFFSET("vmemmap_backing.list", vmemmap_backing.list);
 	WRITE_MEMBER_OFFSET("mmu_psize_def.shift", mmu_psize_def.shift);
+	WRITE_MEMBER_OFFSET("cpu_spec.mmu_features", cpu_spec.mmu_features);
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("node_data", node_data);
@@ -2500,6 +2509,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("mmu_vmemmap_psize", mmu_vmemmap_psize);
 	READ_SYMBOL("cpu_pgd", cpu_pgd);
 	READ_SYMBOL("demote_segment_4k", demote_segment_4k);
+	READ_SYMBOL("cur_cpu_spec", cur_cpu_spec);
 	READ_SYMBOL("free_huge_page", free_huge_page);
 
 	READ_STRUCTURE_SIZE("page", page);
@@ -2558,6 +2568,7 @@ read_vmcoreinfo(void)
 	    vmemmap_backing.virt_addr);
 	READ_MEMBER_OFFSET("vmemmap_backing.list", vmemmap_backing.list);
 	READ_MEMBER_OFFSET("mmu_psize_def.shift", mmu_psize_def.shift);
+	READ_MEMBER_OFFSET("cpu_spec.mmu_features", cpu_spec.mmu_features);
 
 	READ_STRUCTURE_SIZE("printk_log", printk_log);
 	if (SIZE(printk_log) != NOT_FOUND_STRUCTURE) {

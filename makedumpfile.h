@@ -633,6 +633,10 @@ int get_va_bits_arm64(void);
 #define PUD_INDEX_SIZE_L4_4K  7
 #define PGD_INDEX_SIZE_L4_4K  9
 #define PUD_INDEX_SIZE_L4_4K_3_7  9
+#define PTE_INDEX_SIZE_RADIX_4K  9
+#define PMD_INDEX_SIZE_RADIX_4K  9
+#define PUD_INDEX_SIZE_RADIX_4K  9
+#define PGD_INDEX_SIZE_RADIX_4K  13
 #define PTE_RPN_SHIFT_L4_4K  17
 #define PTE_RPN_SHIFT_L4_4K_4_5  18
 #define PGD_MASKED_BITS_4K  0
@@ -649,6 +653,10 @@ int get_va_bits_arm64(void);
 #define PGD_INDEX_SIZE_L4_64K_3_10  12
 #define PMD_INDEX_SIZE_L4_64K_4_6  5
 #define PUD_INDEX_SIZE_L4_64K_4_6  5
+#define PTE_INDEX_SIZE_RADIX_64K  5
+#define PMD_INDEX_SIZE_RADIX_64K  9
+#define PUD_INDEX_SIZE_RADIX_64K  9
+#define PGD_INDEX_SIZE_RADIX_64K  13
 #define PTE_RPN_SHIFT_L4_64K_V1  32
 #define PTE_RPN_SHIFT_L4_64K_V2  30
 #define PGD_MASKED_BITS_64K  0
@@ -667,6 +675,17 @@ int get_va_bits_arm64(void);
 #define PGD_MASKED_BITS_4_7  0xc0000000000000ffUL
 #define PUD_MASKED_BITS_4_7  0xc0000000000000ffUL
 #define PMD_MASKED_BITS_4_7  0xc0000000000000ffUL
+
+/*
+ * Supported MMU types
+ */
+#define STD_MMU         0x0
+/*
+ * The flag bit for radix MMU in cpu_spec.mmu_features
+ * in the kernel. Use the same flag here.
+ */
+#define RADIX_MMU       0x40
+
 
 #define PGD_MASK_L4		\
 	(info->kernel_version >= KERNEL_VERSION(3, 10, 0) ? (info->ptrs_per_pgd - 1) : 0x1ff)
@@ -1129,6 +1148,7 @@ struct DumpInfo {
 	/*
 	 * page table info for ppc64
 	 */
+	int		cur_mmu_type;
 	int		ptrs_per_pgd;
 	uint		l4_index_size;
 	uint		l3_index_size;
@@ -1438,17 +1458,14 @@ struct symbol_table {
 	unsigned long long	kexec_crash_image;
 
 	/*
-	 * vmemmap symbols on ppc64 arch
+	 * symbols on ppc64 arch
 	 */
 	unsigned long long		vmemmap_list;
 	unsigned long long		mmu_vmemmap_psize;
 	unsigned long long		mmu_psize_defs;
-
-	/*
-	 * vm related symbols for ppc64 arch
-	 */
 	unsigned long long		cpu_pgd;
 	unsigned long long		demote_segment_4k;
+	unsigned long long		cur_cpu_spec;
 };
 
 struct size_table {
@@ -1485,10 +1502,11 @@ struct size_table {
 	long	elf64_hdr;
 
 	/*
-	 * vmemmap symbols on ppc64 arch
+	 * symbols on ppc64 arch
 	 */
 	long	vmemmap_backing;
 	long	mmu_psize_def;
+	long	cpu_spec;
 
 	long	pageflags;
 };
@@ -1637,18 +1655,21 @@ struct offset_table {
 	} printk_log;
 
 	/*
-	 * vmemmap symbols on ppc64 arch
+	 * symbols on ppc64 arch
 	 */
-	struct mmu_psize_def {
+	struct mmu_psize_def_s {
 		long	shift;
 	} mmu_psize_def;
 
-	struct vmemmap_backing {
+	struct vmemmap_backing_s {
 		long	phys;
 		long	virt_addr;
 		long	list;
 	} vmemmap_backing;
 
+	struct cpu_spec_s {
+		long	mmu_features;
+	} cpu_spec;
 };
 
 /*

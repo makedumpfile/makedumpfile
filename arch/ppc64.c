@@ -286,6 +286,12 @@ ppc64_vmalloc_init(void)
 		info->pmd_masked_bits = PMD_MASKED_BITS_4K;
 	}
 
+	if (info->kernel_version >= KERNEL_VERSION(4, 7, 0)) {
+		info->pgd_masked_bits = PGD_MASKED_BITS_4_7;
+		info->pud_masked_bits = PUD_MASKED_BITS_4_7;
+		info->pmd_masked_bits = PMD_MASKED_BITS_4_7;
+	}
+
 	info->pte_rpn_mask = PTE_RPN_MASK_DEFAULT;
 	if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
 		info->pte_rpn_mask = PTE_RPN_MASK_L4_4_6;

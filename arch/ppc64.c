@@ -231,10 +231,10 @@ ppc64_vmemmap_to_phys(unsigned long vaddr)
 static unsigned long long
 ppc64_vtop_level4(unsigned long vaddr)
 {
-	ulong *level4, *level4_dir;
-	ulong *page_dir, *page_middle;
-	ulong *page_table;
-	unsigned long long level4_pte, pgd_pte;
+	ulong *level4;
+	ulong *pgdir, *page_upper;
+	ulong *page_middle, *page_table;
+	unsigned long long pgd_pte, pud_pte;
 	unsigned long long pmd_pte, pte;
 	unsigned long long paddr = NOT_PADDR;
 
@@ -251,34 +251,34 @@ ppc64_vtop_level4(unsigned long vaddr)
 	}
 
 	level4 = (ulong *)info->kernel_pgd;
-	level4_dir = (ulong *)((ulong *)level4 + L4_OFFSET(vaddr));
+	pgdir = (ulong *)((ulong *)level4 + PGD_OFFSET_L4(vaddr));
 	if (!readmem(VADDR, PAGEBASE(level4), info->page_buf, PAGESIZE())) {
-		ERRMSG("Can't read level4 page: 0x%llx\n", PAGEBASE(level4));
+		ERRMSG("Can't read PGD page: 0x%llx\n", PAGEBASE(level4));
 		return NOT_PADDR;
 	}
-	level4_pte = ULONG((info->page_buf + PAGEOFFSET(level4_dir)));
-	if (!level4_pte)
+	pgd_pte = ULONG((info->page_buf + PAGEOFFSET(pgdir)));
+	if (!pgd_pte)
 		return NOT_PADDR;
 
 	/*
 	 * Sometimes we don't have level3 pagetable entries
 	 */
 	if (info->l3_index_size != 0) {
-		page_dir = (ulong *)((ulong *)level4_pte + PGD_OFFSET_L4(vaddr));
-		if (!readmem(VADDR, PAGEBASE(level4_pte), info->page_buf, PAGESIZE())) {
-			ERRMSG("Can't read PGD page: 0x%llx\n", PAGEBASE(level4_pte));
+		page_upper = (ulong *)((ulong *)pgd_pte + PUD_OFFSET_L4(vaddr));
+		if (!readmem(VADDR, PAGEBASE(pgd_pte), info->page_buf, PAGESIZE())) {
+			ERRMSG("Can't read PUD page: 0x%llx\n", PAGEBASE(pgd_pte));
 			return NOT_PADDR;
 		}
-		pgd_pte = ULONG((info->page_buf + PAGEOFFSET(page_dir)));
-		if (!pgd_pte)
+		pud_pte = ULONG((info->page_buf + PAGEOFFSET(page_upper)));
+		if (!pud_pte)
 			return NOT_PADDR;
 	} else {
-		pgd_pte = level4_pte;
+		pud_pte = pgd_pte;
 	}
 
-	page_middle = (ulong *)((ulong *)pgd_pte + PMD_OFFSET_L4(vaddr));
-	if (!readmem(VADDR, PAGEBASE(pgd_pte), info->page_buf, PAGESIZE())) {
-		ERRMSG("Can't read PMD page: 0x%llx\n", PAGEBASE(pgd_pte));
+	page_middle = (ulong *)((ulong *)pud_pte + PMD_OFFSET_L4(vaddr));
+	if (!readmem(VADDR, PAGEBASE(pud_pte), info->page_buf, PAGESIZE())) {
+		ERRMSG("Can't read PMD page: 0x%llx\n", PAGEBASE(pud_pte));
 		return NOT_PADDR;
 	}
 	pmd_pte = ULONG((info->page_buf + PAGEOFFSET(page_middle)));

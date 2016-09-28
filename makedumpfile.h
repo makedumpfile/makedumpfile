@@ -666,11 +666,11 @@ int get_va_bits_arm64(void);
 #define PTE_SHIFT_L4_64K_V2  30
 #define PMD_MASKED_BITS_64K  0x1ff
 
-#define L4_MASK		\
+#define PGD_MASK_L4		\
 	(info->kernel_version >= KERNEL_VERSION(3, 10, 0) ? (info->ptrs_per_pgd - 1) : 0x1ff)
-#define L4_OFFSET(vaddr)	((vaddr >> (info->l4_shift)) & L4_MASK)
+#define PGD_OFFSET_L4(vaddr)	((vaddr >> (info->l4_shift)) & PGD_MASK_L4)
 
-#define PGD_OFFSET_L4(vaddr)	\
+#define PUD_OFFSET_L4(vaddr)	\
 	((vaddr >> (info->l3_shift)) & (info->ptrs_per_l3 - 1))
 
 #define PMD_OFFSET_L4(vaddr)	\

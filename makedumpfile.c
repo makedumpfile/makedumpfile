@@ -11245,6 +11245,7 @@ main(int argc, char *argv[])
 		}
 		if (info->flag_split) {
 			for (i = 0; i < info->num_dumpfile; i++) {
+				SPLITTING_FD_BITMAP(i) = -1;
 				if (!check_dump_file(SPLITTING_DUMPFILE(i)))
 					goto out;
 			}

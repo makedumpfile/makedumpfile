@@ -575,8 +575,6 @@ int get_va_bits_arm64(void);
 #define __START_KERNEL_map	(0xffffffff80000000)
 #define KERNEL_IMAGE_SIZE_ORIG		(0x0000000008000000) /* 2.6.25, or former */
 #define KERNEL_IMAGE_SIZE_2_6_26	(0x0000000020000000) /* 2.6.26, or later  */
-#define MODULES_VADDR          (__START_KERNEL_map + NUMBER(KERNEL_IMAGE_SIZE))
-#define MODULES_END		(0xfffffffffff00000)
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
 #define _MAX_PHYSMEM_BITS_ORIG		(40)

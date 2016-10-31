@@ -169,13 +169,9 @@ get_versiondep_info_x86_64(void)
 		return FALSE;
 
 	if (info->kernel_version < KERNEL_VERSION(2, 6, 31)) {
-		info->vmalloc_start = VMALLOC_START_ORIG;
-		info->vmalloc_end   = VMALLOC_END_ORIG;
 		info->vmemmap_start = VMEMMAP_START_ORIG;
 		info->vmemmap_end   = VMEMMAP_END_ORIG;
 	} else {
-		info->vmalloc_start = VMALLOC_START_2_6_31;
-		info->vmalloc_end   = VMALLOC_END_2_6_31;
 		info->vmemmap_start = VMEMMAP_START_2_6_31;
 		info->vmemmap_end   = VMEMMAP_END_2_6_31;
 	}

@@ -21,17 +21,6 @@
 extern struct vmap_pfns *gvmem_pfns;
 extern int nr_gvmem_pfns;
 
-int
-is_vmalloc_addr_x86_64(ulong vaddr)
-{
-	/*
-	 *  vmalloc, virtual memmap, and module space as VMALLOC space.
-	 */
-	return ((vaddr >= VMALLOC_START && vaddr <= VMALLOC_END)
-	    || (vaddr >= VMEMMAP_START && vaddr <= VMEMMAP_END)
-	    || (vaddr >= MODULES_VADDR && vaddr <= MODULES_END));
-}
-
 static unsigned long
 get_xen_p2m_mfn(void)
 {
@@ -75,8 +64,7 @@ get_phys_base_x86_64(void)
 	info->phys_base = 0; /* default/traditional */
 
 	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
-		if ((virt_start >= __START_KERNEL_map) &&
-		    !(is_vmalloc_addr_x86_64(virt_start))) {
+		if (virt_start >= __START_KERNEL_map) {
 
 			info->phys_base = phys_start -
 			    (virt_start & ~(__START_KERNEL_map));

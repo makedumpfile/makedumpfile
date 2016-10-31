@@ -859,7 +859,6 @@ unsigned long long vaddr_to_paddr_x86(unsigned long vaddr);
 #endif /* x86 */
 
 #ifdef __x86_64__
-int is_vmalloc_addr_x86_64(ulong vaddr);
 int get_phys_base_x86_64(void);
 int get_machdep_info_x86_64(void);
 int get_versiondep_info_x86_64(void);
@@ -869,7 +868,7 @@ unsigned long long vtop4_x86_64(unsigned long vaddr);
 #define get_machdep_info()	get_machdep_info_x86_64()
 #define get_versiondep_info()	get_versiondep_info_x86_64()
 #define vaddr_to_paddr(X)	vtop4_x86_64(X)
-#define is_phys_addr(X)		(!is_vmalloc_addr_x86_64(X))
+#define is_phys_addr(X)		stub_true_ul(X)
 #endif /* x86_64 */
 
 #ifdef __powerpc64__ /* powerpc64 */

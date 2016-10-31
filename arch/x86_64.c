@@ -44,6 +44,24 @@ get_xen_p2m_mfn(void)
 	return NOT_FOUND_LONG_VALUE;
 }
 
+static int
+get_page_offset_x86_64(void)
+{
+	int i;
+	unsigned long long phys_start;
+	unsigned long long virt_start;
+
+	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
+		if (virt_start < __START_KERNEL_map) {
+			info->page_offset = virt_start - phys_start;
+			return TRUE;
+		}
+	}
+
+	ERRMSG("Can't get any pt_load to calculate page offset.\n");
+	return FALSE;
+}
+
 int
 get_phys_base_x86_64(void)
 {
@@ -159,10 +177,8 @@ get_versiondep_info_x86_64(void)
 	else
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_31;
 
-	if (info->kernel_version < KERNEL_VERSION(2, 6, 27))
-		info->page_offset = __PAGE_OFFSET_ORIG;
-	else
-		info->page_offset = __PAGE_OFFSET_2_6_27;
+	if (!get_page_offset_x86_64())
+		return FALSE;
 
 	if (info->kernel_version < KERNEL_VERSION(2, 6, 31)) {
 		info->vmalloc_start = VMALLOC_START_ORIG;

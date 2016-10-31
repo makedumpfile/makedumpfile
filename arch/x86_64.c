@@ -203,6 +203,12 @@ vtop4_x86_64(unsigned long vaddr)
 {
 	unsigned long page_dir, pml4, pgd_paddr, pgd_pte, pmd_paddr, pmd_pte;
 	unsigned long pte_paddr, pte;
+	unsigned long phys_base;
+
+	if (SYMBOL(phys_base) != NOT_FOUND_SYMBOL)
+		phys_base = info->phys_base;
+	else
+		phys_base = 0;
 
 	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of init_level4_pgt.\n");
@@ -212,9 +218,9 @@ vtop4_x86_64(unsigned long vaddr)
 	/*
 	 * Get PGD.
 	 */
-	page_dir  = SYMBOL(init_level4_pgt);
+	page_dir = SYMBOL(init_level4_pgt) - __START_KERNEL_map + phys_base;
 	page_dir += pml4_index(vaddr) * sizeof(unsigned long);
-	if (!readmem(VADDR, page_dir, &pml4, sizeof pml4)) {
+	if (!readmem(PADDR, page_dir, &pml4, sizeof pml4)) {
 		ERRMSG("Can't get pml4 (page_dir:%lx).\n", page_dir);
 		return NOT_PADDR;
 	}
@@ -283,38 +289,6 @@ vtop4_x86_64(unsigned long vaddr)
 		return NOT_PADDR;
 	}
 	return (pte & ENTRY_MASK) + PAGEOFFSET(vaddr);
-}
-
-unsigned long long
-vaddr_to_paddr_x86_64(unsigned long vaddr)
-{
-	unsigned long phys_base;
-	unsigned long long paddr;
-
-	/*
-	 * Check the relocatable kernel.
-	 */
-	if (SYMBOL(phys_base) != NOT_FOUND_SYMBOL)
-		phys_base = info->phys_base;
-	else
-		phys_base = 0;
-
-	if (is_vmalloc_addr_x86_64(vaddr)) {
-		if ((paddr = vtop4_x86_64(vaddr)) == NOT_PADDR) {
-			ERRMSG("Can't convert a virtual address(%lx) to " \
-			    "physical address.\n", vaddr);
-			return NOT_PADDR;
-		}
-	} else if (vaddr >= __START_KERNEL_map) {
-		paddr = vaddr - __START_KERNEL_map + phys_base;
-
-	} else {
-		if (is_xen_memory())
-			paddr = vaddr - PAGE_OFFSET_XEN_DOM0;
-		else
-			paddr = vaddr - PAGE_OFFSET;
-	}
-	return paddr;
 }
 
 /*

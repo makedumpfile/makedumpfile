@@ -863,12 +863,12 @@ int is_vmalloc_addr_x86_64(ulong vaddr);
 int get_phys_base_x86_64(void);
 int get_machdep_info_x86_64(void);
 int get_versiondep_info_x86_64(void);
-unsigned long long vaddr_to_paddr_x86_64(unsigned long vaddr);
+unsigned long long vtop4_x86_64(unsigned long vaddr);
 #define find_vmemmap()		find_vmemmap_x86_64()
 #define get_phys_base()		get_phys_base_x86_64()
 #define get_machdep_info()	get_machdep_info_x86_64()
 #define get_versiondep_info()	get_versiondep_info_x86_64()
-#define vaddr_to_paddr(X)	vaddr_to_paddr_x86_64(X)
+#define vaddr_to_paddr(X)	vtop4_x86_64(X)
 #define is_phys_addr(X)		(!is_vmalloc_addr_x86_64(X))
 #endif /* x86_64 */
 

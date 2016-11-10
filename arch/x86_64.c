@@ -62,6 +62,10 @@ get_phys_base_x86_64(void)
 	 * Get the relocatable offset
 	 */
 	info->phys_base = 0; /* default/traditional */
+	if (NUMBER(phys_base) != NOT_FOUND_NUMBER) {
+		info->phys_base = NUMBER(phys_base);
+		return TRUE;
+	}
 
 	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
 		if (virt_start >= __START_KERNEL_map) {
@@ -187,12 +191,6 @@ vtop4_x86_64(unsigned long vaddr)
 {
 	unsigned long page_dir, pml4, pgd_paddr, pgd_pte, pmd_paddr, pmd_pte;
 	unsigned long pte_paddr, pte;
-	unsigned long phys_base;
-
-	if (SYMBOL(phys_base) != NOT_FOUND_SYMBOL)
-		phys_base = info->phys_base;
-	else
-		phys_base = 0;
 
 	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of init_level4_pgt.\n");
@@ -202,7 +200,7 @@ vtop4_x86_64(unsigned long vaddr)
 	/*
 	 * Get PGD.
 	 */
-	page_dir = SYMBOL(init_level4_pgt) - __START_KERNEL_map + phys_base;
+	page_dir = SYMBOL(init_level4_pgt) - __START_KERNEL_map + info->phys_base;
 	page_dir += pml4_index(vaddr) * sizeof(unsigned long);
 	if (!readmem(PADDR, page_dir, &pml4, sizeof pml4)) {
 		ERRMSG("Can't get pml4 (page_dir:%lx).\n", page_dir);

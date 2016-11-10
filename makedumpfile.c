@@ -1507,7 +1507,6 @@ get_symbol_info(void)
 	SYMBOL_INIT(init_level4_pgt, "init_level4_pgt");
 	SYMBOL_INIT(vmlist, "vmlist");
 	SYMBOL_INIT(vmap_area_list, "vmap_area_list");
-	SYMBOL_INIT(phys_base, "phys_base");
 	SYMBOL_INIT(node_online_map, "node_online_map");
 	SYMBOL_INIT(node_states, "node_states");
 	SYMBOL_INIT(node_memblk, "node_memblk");
@@ -2134,7 +2133,6 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("init_level4_pgt", init_level4_pgt);
 	WRITE_SYMBOL("vmlist", vmlist);
 	WRITE_SYMBOL("vmap_area_list", vmap_area_list);
-	WRITE_SYMBOL("phys_base", phys_base);
 	WRITE_SYMBOL("node_online_map", node_online_map);
 	WRITE_SYMBOL("node_states", node_states);
 	WRITE_SYMBOL("node_data", node_data);
@@ -2261,6 +2259,7 @@ write_vmcoreinfo_data(void)
 
 	WRITE_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 	WRITE_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
+	WRITE_NUMBER("phys_base", phys_base);
 
 	WRITE_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
 
@@ -2488,7 +2487,6 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("init_level4_pgt", init_level4_pgt);
 	READ_SYMBOL("vmlist", vmlist);
 	READ_SYMBOL("vmap_area_list", vmap_area_list);
-	READ_SYMBOL("phys_base", phys_base);
 	READ_SYMBOL("node_online_map", node_online_map);
 	READ_SYMBOL("node_states", node_states);
 	READ_SYMBOL("node_data", node_data);
@@ -2609,6 +2607,7 @@ read_vmcoreinfo(void)
 
 	READ_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 	READ_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
+	READ_NUMBER("phys_base", phys_base);
 
 	READ_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
 

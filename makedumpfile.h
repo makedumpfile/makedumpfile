@@ -1394,7 +1394,6 @@ struct symbol_table {
 	unsigned long long	init_level4_pgt;
 	unsigned long long	vmlist;
 	unsigned long long	vmap_area_list;
-	unsigned long long	phys_base;
 	unsigned long long	node_online_map;
 	unsigned long long	node_states;
 	unsigned long long	node_memblk;
@@ -1718,6 +1717,7 @@ struct number_table {
 	long	SECTION_SIZE_BITS;
 	long	MAX_PHYSMEM_BITS;
 	long    HUGETLB_PAGE_DTOR;
+	long	phys_base;
 };
 
 struct srcfile_table {

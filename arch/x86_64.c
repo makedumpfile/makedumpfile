@@ -67,6 +67,14 @@ get_phys_base_x86_64(void)
 		return TRUE;
 	}
 
+	/* linux-2.6.21 or older don't have phys_base, should be set to 0. */
+	if (!has_vmcoreinfo()) {
+		SYMBOL_INIT(phys_base, "phys_base");
+		if (SYMBOL(phys_base) == NOT_FOUND_SYMBOL) {
+			return TRUE;
+		}
+	}
+
 	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
 		if (virt_start >= __START_KERNEL_map) {
 

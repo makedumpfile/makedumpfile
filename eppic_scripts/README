@@ -2,9 +2,15 @@
  Eppic scripts README
 ==================================
 
-The eppic scripts are based on the fedora 19 kernel.
+These eppic scripts are based on the fedora 19 kernel. eppic scripts
+naming convention follows the format:
+<eppic_script name>-<valid from kernel version>_to_<valid until kernel version>.c
 
-1. Eppic script: proc_names.c
+For example consider dir_names_3_10_to_3_13.c. This script would scrub
+sensitive information successfully, when run against kernel version >= 3.10
+and kernel version <= 3.13.
+
+1. Eppic script: proc_names_3_10_to_4_8.c
    Description: Scrubs executable name of each user process
 
    Explanation:
@@ -29,7 +35,7 @@ The eppic scripts are based on the fedora 19 kernel.
        }
 
 
-2. Eppic script: dir_names.c
+2. Eppic script: dir_names_3_10_to_3_13.c
    Description: Scrubs filenames of cached dentries
 
    Explanation:
@@ -73,7 +79,7 @@ The eppic scripts are based on the fedora 19 kernel.
                walk_dentries(child);
        }
 
-3. Eppic script: keyring.c
+3. Eppic script: keyring_3_10_to_4_3.c
    Description: Scrubs all entries in the keyring
 
    Explanation:
@@ -114,7 +120,7 @@ The eppic scripts are based on the fedora 19 kernel.
 
        Clear value/rcudata/data dependent on the type of the key.
 
-4. Eppic script: ap_messages.c
+4. Eppic script: ap_messages_3_10_to_4_8.c
    Description: Clear the message data of all ap_bus requests
 
    Explanation:
@@ -158,7 +164,7 @@ The eppic scripts are based on the fedora 19 kernel.
 
        memset(apmsg->message, 0, apmsg->length);
 
-5. Eppic script: tcp_sk_buf.c
+5. Eppic script: tcp_sk_buf_3_10_to_4_8.c
    Description: Scrub data in tcp socket buffers
 
    Explanation:
@@ -206,7 +212,7 @@ The eppic scripts are based on the fedora 19 kernel.
                 ...
            };
 
-6. Eppic script: udp_sk_buf.c
+6. Eppic script: udp_sk_buf_3_10_to_4_8.c
    Description: Scrub data of udp socket buffers
 
    Explanation:
@@ -232,7 +238,7 @@ The eppic scripts are based on the fedora 19 kernel.
       For each struct sk_buff in the two lists clear the memory referenced
       by skb->data / skb->data_len.
 
-7. Eppic script: unix_sk_buf.c
+7. Eppic script: unix_sk_buff_3_10_to_4_8.c
    Description: Scrub data of unix socket buffers
 
    Explanation:
@@ -252,7 +258,7 @@ The eppic scripts are based on the fedora 19 kernel.
        For each struct sk_buff in the two lists clear the memory referenced
        by skb->data / skb->data_len.
 
-8. Eppic script: vhost_net_buffers.c
+8. Eppic script: vhost_net_buffers_3_10_to_3_18.c
    Description: Scrub socket buffers of guest network I/O
 
    Explanation:
@@ -278,7 +284,7 @@ The eppic scripts are based on the fedora 19 kernel.
          sk_write_queue list
 
 
-9. Eppic script: vhost_scsi_buffers.c
+9. Eppic script: vhost_scsi_buffers_3_10_to_4_8.c
    Description: Scrub buffers involved in guest block I/O
 
    Explanation:

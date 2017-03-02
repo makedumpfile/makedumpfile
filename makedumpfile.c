@@ -3878,6 +3878,9 @@ initial(void)
 	if (!get_value_for_old_linux())
 		return FALSE;
 
+	if (!is_xen_memory() && !cache_init())
+		return FALSE;
+
 	if (info->flag_mem_usage && !get_kcore_dump_loads())
 		return FALSE;
 
@@ -3999,9 +4002,6 @@ out:
 			return FALSE;
 		}
 	}
-
-	if (!is_xen_memory() && !cache_init())
-		return FALSE;
 
 	if (debug_info && !get_machdep_info())
 		return FALSE;

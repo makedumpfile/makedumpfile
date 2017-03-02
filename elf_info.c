@@ -857,22 +857,6 @@ static int exclude_segment(struct pt_load_segment **pt_loads,
 	return 0;
 }
 
-static int
-process_dump_load(struct pt_load_segment	*pls)
-{
-	unsigned long long paddr;
-
-	paddr = vaddr_to_paddr(pls->virt_start);
-	pls->phys_start  = paddr;
-	pls->phys_end    = paddr + (pls->virt_end - pls->virt_start);
-	DEBUG_MSG("process_dump_load\n");
-	DEBUG_MSG("  phys_start : %llx\n", pls->phys_start);
-	DEBUG_MSG("  phys_end   : %llx\n", pls->phys_end);
-	DEBUG_MSG("  virt_start : %llx\n", pls->virt_start);
-	DEBUG_MSG("  virt_end   : %llx\n", pls->virt_end);
-
-	return TRUE;
-}
 
 int get_kcore_dump_loads(void)
 {
@@ -917,7 +901,6 @@ int get_kcore_dump_loads(void)
 		}
 
 		pls[j] = *p;
-		process_dump_load(&pls[j]);
 		j++;
 	}
 

@@ -41,7 +41,8 @@ get_page_offset_x86_64(void)
 	unsigned long long virt_start;
 
 	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
-		if (virt_start < __START_KERNEL_map) {
+		if (virt_start < __START_KERNEL_map
+				&& phys_start != NOT_PADDR) {
 			info->page_offset = virt_start - phys_start;
 			return TRUE;
 		}
@@ -76,7 +77,8 @@ get_phys_base_x86_64(void)
 	}
 
 	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
-		if (virt_start >= __START_KERNEL_map) {
+		if (virt_start >= __START_KERNEL_map
+				&& phys_start != NOT_PADDR) {
 
 			info->phys_base = phys_start -
 			    (virt_start & ~(__START_KERNEL_map));

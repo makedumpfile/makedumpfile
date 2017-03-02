@@ -10944,13 +10944,13 @@ int show_mem_usage(void)
 
 	info->dump_level = MAX_DUMP_LEVEL;
 
-	if (!get_page_offset())
-		return FALSE;
-
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
 
 	if (!get_elf_loads(info->fd_memory, info->name_memory))
+		return FALSE;
+
+	if (!get_page_offset())
 		return FALSE;
 
 	if (!get_sys_kernel_vmcoreinfo(&vmcoreinfo_addr, &vmcoreinfo_len))

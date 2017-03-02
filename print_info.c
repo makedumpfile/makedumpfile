@@ -310,6 +310,7 @@ print_usage(void)
 	MSG("\n");
 	MSG("  [-f]:\n");
 	MSG("      Overwrite DUMPFILE even if it already exists.\n");
+	MSG("      Force mem-usage to work with older kernel as well.\n");
 	MSG("\n");
 	MSG("  [-h, --help]:\n");
 	MSG("      Show help message and LZO/snappy support status (enabled/disabled).\n");

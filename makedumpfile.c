@@ -11269,6 +11269,12 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->kernel_version < KERNEL_VERSION(4, 11, 0) &&
+				!info->flag_force) {
+			MSG("mem-usage not supported for this kernel.\n");
+			MSG("You can try with -f if your kernel's kcore has valid p_paddr\n");
+			goto out;
+		}
 
 		if (!show_mem_usage())
 			goto out;

@@ -235,13 +235,20 @@ the ELF format does not support compressed data.
 
 .TP
 \fB\-f\fR
-Force existing DUMPFILE to be overwritten.
+Force existing DUMPFILE to be overwritten and mem-usage to work with older
+kernel as well.
 .br
 .B Example:
 .br
 # makedumpfile \-f \-d 31 \-x vmlinux /proc/vmcore dumpfile
 .br
 This command overwrites \fIDUMPFILE\fR even if it already exists.
+.br
+# makedumpfile \-f \-\-mem\-usage /proc/kcore
+.br
+Kernel version lesser than v4.11 will not work with \-\-mem\-usage
+functionality until it has been patched with upstream commit 464920104bf7.
+Therefore if you have patched your older kernel then use \-f.
 
 .TP
 \fB\-x\fR \fIVMLINUX\fR

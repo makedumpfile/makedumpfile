@@ -640,7 +640,7 @@ restart:
 
 		if (memcmp(&sph->disk_set_id, &smh->disk_set_id,
 			   sizeof(efi_guid_t)) != 0) {
-			DEBUG_MSG("sadump: disk set ID mismtch\n");
+			DEBUG_MSG("sadump: disk set ID mismatch\n");
 			DEBUG_MSG("  partition header: %s\n",
 				  guid_to_str(&sph->disk_set_id, guid,
 					      sizeof(guid)));
@@ -2047,7 +2047,7 @@ DEBUG_MSG("sadump: No PT_LOAD in elfcorehdr for backup area\n");
 			bufsize = backup_src_size - total;
 
 		if (!readmem(PADDR, backup_offset + total, buf, bufsize)) {
-			ERRMSG("Can't read bacckup region. %s\n",
+			ERRMSG("Can't read backup region. %s\n",
 			       strerror(errno));
 			return;
 		}

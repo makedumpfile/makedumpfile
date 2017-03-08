@@ -334,7 +334,7 @@ __load_module_symbol(struct module_info *modules, unsigned long addr_module)
 	/* check if symtab and strtab are inside the module space. */
 	if (!IN_RANGE(symtab, mod_base, mod_size) &&
 		!IN_RANGE(symtab, mod_init, mod_init_size)) {
-		ERRMSG("%s: module symtab is outseide of module "
+		ERRMSG("%s: module symtab is outside of module "
 			"address space\n", module_name);
 		goto out;
 	}
@@ -345,7 +345,7 @@ __load_module_symbol(struct module_info *modules, unsigned long addr_module)
 
 	if (!IN_RANGE(strtab, mod_base, mod_size) &&
 		!IN_RANGE(strtab, mod_init, mod_init_size)) {
-		ERRMSG("%s: module strtab is outseide of module "
+		ERRMSG("%s: module strtab is outside of module "
 			"address space\n", module_name);
 		goto out;
 	}

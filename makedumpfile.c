@@ -9765,7 +9765,7 @@ writeout_multiple_dumpfiles(void)
 	for (i = 0; i < info->num_dumpfile; i++) {
 		waitpid(array_pid[i], &status, WUNTRACED);
 		if (!WIFEXITED(status) || WEXITSTATUS(status) == 1) {
-			ERRMSG("Child process(%d) finished imcompletely.(%d)\n",
+			ERRMSG("Child process(%d) finished incompletely.(%d)\n",
 			    array_pid[i], status);
 			ret = FALSE;
 		} else if ((ret == TRUE) && (WEXITSTATUS(status) == 2))

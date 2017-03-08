@@ -202,7 +202,7 @@ print_usage(void)
 	MSG("      And it will reduces time for saving DUMPFILE.\n");
 	MSG("      Note that if the usable cpu number is less than the thread number, it may\n");
 	MSG("      lead to great performance degradation.\n");
-	MSG("      This feature only supports creating DUMPFILE in kdump-comressed format from\n");
+	MSG("      This feature only supports creating DUMPFILE in kdump-compressed format from\n");
 	MSG("      VMCORE in kdump-compressed format or elf format.\n");
 	MSG("\n");
 	MSG("  [--reassemble]:\n");
@@ -286,7 +286,7 @@ print_usage(void)
 	MSG("\n");
 	MSG("  [--vtop VIRTUAL_ADDRESS]:\n");
 	MSG("      This option is useful, when user debugs the translation problem\n");
-	MSG("      of virtual address. If specifing the VIRTUAL_ADDRESS, its physical\n");
+	MSG("      of virtual address. If specifying the VIRTUAL_ADDRESS, its physical\n");
 	MSG("      address is printed.\n");
 	MSG("\n");
 	MSG("  [--dump-dmesg]:\n");
@@ -294,7 +294,7 @@ print_usage(void)
 	MSG("      compressing and filtering a VMCORE to make it smaller, it simply\n");
 	MSG("      extracts the dmesg log from a VMCORE and writes it to the specified\n");
 	MSG("      LOGFILE. If a VMCORE does not contain VMCOREINFO for dmesg, it is\n");
-	MSG("      necessary to specfiy [-x VMLINUX] or [-i VMCOREINFO].\n");
+	MSG("      necessary to specify [-x VMLINUX] or [-i VMCOREINFO].\n");
 	MSG("\n");
 	MSG("  [--mem-usage]:\n");
 	MSG("      This option is only for x86_64.\n");

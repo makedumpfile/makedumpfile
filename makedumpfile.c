@@ -10938,7 +10938,7 @@ int show_mem_usage(void)
 	struct cycle cycle = {0};
 
 	if (!is_crashkernel_mem_reserved()) {
-		ERRMSG("No memory is reserved for crashkenrel!\n");
+		ERRMSG("No memory is reserved for crashkernel!\n");
 		return FALSE;
 	}
 

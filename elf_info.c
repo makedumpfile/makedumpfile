@@ -890,12 +890,14 @@ int get_kcore_dump_loads(void)
 				|| !is_phys_addr(p->virt_start))
 			continue;
 		if (j >= loads)
+			free(pls);
 			return FALSE;
 
 		if (j == 0) {
 			offset_pt_load_memory = p->file_offset;
 			if (offset_pt_load_memory == 0) {
 				ERRMSG("Can't get the offset of page data.\n");
+				free(pls);
 				return FALSE;
 			}
 		}

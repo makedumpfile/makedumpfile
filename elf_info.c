@@ -826,9 +826,12 @@ static int exclude_segment(struct pt_load_segment **pt_loads,
 				temp_seg.virt_end = vend;
 				temp_seg.file_offset = (*pt_loads)[i].file_offset
 					+ temp_seg.virt_start - (*pt_loads)[i].virt_start;
+				temp_seg.file_size = temp_seg.phys_end
+					- temp_seg.phys_start;
 
 				(*pt_loads)[i].virt_end = kvstart - 1;
 				(*pt_loads)[i].phys_end =  start - 1;
+				(*pt_loads)[i].file_size -= temp_seg.file_size;
 
 				tidx = i+1;
 			} else if (kvstart != vstart) {
@@ -838,6 +841,7 @@ static int exclude_segment(struct pt_load_segment **pt_loads,
 				(*pt_loads)[i].phys_start = end + 1;
 				(*pt_loads)[i].virt_start = kvend + 1;
 			}
+			(*pt_loads)[i].file_size -= (end -start);
 		}
 	}
 	/* Insert split load segment, if any. */

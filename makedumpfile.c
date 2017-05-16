@@ -9774,10 +9774,25 @@ writeout_multiple_dumpfiles(void)
 	return ret;
 }
 
+void
+update_dump_level(void)
+{
+	int new_level;
+
+	new_level = info->dump_level | info->kh_memory->dump_level;
+	if (new_level != info->dump_level) {
+		info->dump_level = new_level;
+		MSG("dump_level is changed to %d, " \
+			"because %s was created by dump_level(%d).",
+			new_level, info->name_memory,
+			info->kh_memory->dump_level);
+	}
+}
+
 int
 create_dumpfile(void)
 {
-	int num_retry, status, new_level;
+	int num_retry, status;
 
 	if (!open_files_for_creating_dumpfile())
 		return FALSE;
@@ -9786,6 +9801,10 @@ create_dumpfile(void)
 		if (!get_elf_info(info->fd_memory, info->name_memory))
 			return FALSE;
 	}
+
+	if (info->flag_refiltering)
+		update_dump_level();
+
 	if (!initial())
 		return FALSE;
 
@@ -9804,17 +9823,8 @@ create_dumpfile(void)
 
 	num_retry = 0;
 retry:
-	if (info->flag_refiltering) {
-		/* Change dump level */
-		new_level = info->dump_level | info->kh_memory->dump_level;
-		if (new_level != info->dump_level) {
-			info->dump_level = new_level;
-			MSG("dump_level is changed to %d, " \
-				"because %s was created by dump_level(%d).",
-				new_level, info->name_memory,
-				info->kh_memory->dump_level);
-		}
-	}
+	if (info->flag_refiltering)
+		update_dump_level();
 
 	if ((info->name_filterconfig || info->name_eppic_config)
 			&& !gather_filter_info())

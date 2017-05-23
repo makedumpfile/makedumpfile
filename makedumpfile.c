@@ -3921,6 +3921,9 @@ initial(void)
 	if (!get_value_for_old_linux())
 		return FALSE;
 
+	if (info->flag_sadump && !set_page_size(sadump_page_size()))
+			return FALSE;
+
 	if (!is_xen_memory() && !cache_init())
 		return FALSE;
 
@@ -3948,9 +3951,6 @@ initial(void)
 			    info->name_memory, sadump_format_type_name());
 			return FALSE;
 		}
-
-		if (!set_page_size(sadump_page_size()))
-			return FALSE;
 
 		if (!sadump_initialize_bitmap_memory())
 			return FALSE;

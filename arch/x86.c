@@ -233,8 +233,11 @@ vaddr_to_paddr_x86(unsigned long vaddr)
 {
 	unsigned long long paddr;
 
-	if ((paddr = vtop_x86_remap(vaddr)) != NOT_PADDR)
+	if ((paddr = vtop_x86_remap(vaddr)) != NOT_PADDR) {
+		if (is_xen_memory())
+			paddr = ptom_xen(paddr);
 		return paddr;
+	}
 
 	if ((paddr = vaddr_to_paddr_general(vaddr)) != NOT_PADDR)
 		return paddr;
@@ -247,8 +250,12 @@ vaddr_to_paddr_x86(unsigned long vaddr)
 		ERRMSG("Can't get necessary information for vmalloc translation.\n");
 		return NOT_PADDR;
 	}
-	if (!is_vmalloc_addr_x86(vaddr))
-		return (vaddr - info->kernel_start);
+	if (!is_vmalloc_addr_x86(vaddr)) {
+		paddr = vaddr - info->kernel_start;
+		if (is_xen_memory())
+			paddr = ptom_xen(paddr);
+		return paddr;
+	}
 
 	if (vt.mem_flags & MEMORY_X86_PAE) {
 		paddr = vtop_x86_PAE(vaddr);
@@ -280,7 +287,7 @@ kvtop_xen_x86(unsigned long kvaddr)
 	if ((dirp = kvtop_xen_x86(SYMBOL(pgd_l3))) == NOT_PADDR)
 		return NOT_PADDR;
 	dirp += pgd_index_PAE(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -288,7 +295,7 @@ kvtop_xen_x86(unsigned long kvaddr)
 
 	dirp = entry & ENTRY_MASK;
 	dirp += pmd_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT))
@@ -301,7 +308,7 @@ kvtop_xen_x86(unsigned long kvaddr)
 
 	dirp = entry & ENTRY_MASK;
 	dirp += pte_index(kvaddr) * sizeof(unsigned long long);
-	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_PRESENT)) {

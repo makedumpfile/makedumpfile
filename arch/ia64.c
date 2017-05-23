@@ -243,6 +243,8 @@ vtop_ia64(unsigned long vaddr)
 	if (!is_vmalloc_addr_ia64(vaddr)) {
 		paddr = vaddr - info->kernel_start +
 			(info->phys_base & KERNEL_TR_PAGE_MASK);
+		if (is_xen_memory())
+			paddr = ptom_xen(paddr);
 		return paddr;
 	}
 
@@ -301,7 +303,7 @@ kvtop_xen_ia64(unsigned long kvaddr)
 
 	dirp = SYMBOL(frametable_pg_dir) - DIRECTMAP_VIRT_START;
 	dirp += ((addr >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)) * sizeof(unsigned long long);
-	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	dirp = entry & _PFN_MASK;
@@ -309,7 +311,7 @@ kvtop_xen_ia64(unsigned long kvaddr)
 		return NOT_PADDR;
 
 	dirp += ((addr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)) * sizeof(unsigned long long);
-	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	dirp = entry & _PFN_MASK;
@@ -317,7 +319,7 @@ kvtop_xen_ia64(unsigned long kvaddr)
 		return NOT_PADDR;
 
 	dirp += ((addr >> PAGESHIFT()) & (PTRS_PER_PTE - 1)) * sizeof(unsigned long long);
-	if (!readmem(MADDR_XEN, dirp, &entry, sizeof(entry)))
+	if (!readmem(PADDR, dirp, &entry, sizeof(entry)))
 		return NOT_PADDR;
 
 	if (!(entry & _PAGE_P))

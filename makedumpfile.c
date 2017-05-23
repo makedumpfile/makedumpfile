@@ -149,7 +149,7 @@ ptom_xen(unsigned long long paddr)
 	}
 	maddr = pfn_to_paddr(info->p2m_mfn_frame_list[mfn_idx])
 		+ sizeof(unsigned long) * frame_idx;
-	if (!readmem(MADDR_XEN, maddr, &mfn, sizeof(mfn))) {
+	if (!readmem(PADDR, maddr, &mfn, sizeof(mfn))) {
 		ERRMSG("Can't get mfn.\n");
 		return NOT_PADDR;
 	}
@@ -211,7 +211,7 @@ get_dom0_mapnr()
 		unsigned i;
 
 		maddr = pfn_to_paddr(info->p2m_mfn_frame_list[mfn_idx]);
-		if (!readmem(MADDR_XEN, maddr, &mfns, sizeof(mfns))) {
+		if (!readmem(PADDR, maddr, &mfns, sizeof(mfns))) {
 			ERRMSG("Can't read %ld domain-0 mfns at 0x%llu\n",
 				(long)MFNS_PER_FRAME, maddr);
 			return FALSE;
@@ -924,7 +924,7 @@ int
 readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size)
 {
 	size_t read_size, size_orig = size;
-	unsigned long long paddr, maddr = NOT_PADDR;
+	unsigned long long paddr;
 	unsigned long long pgaddr;
 	void *pgbuf;
 	struct cache_entry *cached;
@@ -937,25 +937,9 @@ next_page:
 			    addr);
 			goto error;
 		}
-		if (is_xen_memory()) {
-			if ((maddr = ptom_xen(paddr)) == NOT_PADDR) {
-				ERRMSG("Can't convert a physical address(%llx) to machine address.\n",
-				    paddr);
-				return FALSE;
-			}
-			paddr = maddr;
-		}
 		break;
 	case PADDR:
 		paddr = addr;
-		if (is_xen_memory()) {
-			if ((maddr  = ptom_xen(paddr)) == NOT_PADDR) {
-				ERRMSG("Can't convert a physical address(%llx) to machine address.\n",
-				    paddr);
-				return FALSE;
-			}
-			paddr = maddr;
-		}
 		break;
 	case VADDR_XEN:
 		if ((paddr = kvtop_xen(addr)) == NOT_PADDR) {
@@ -963,9 +947,6 @@ next_page:
 			    addr);
 			goto error;
 		}
-		break;
-	case MADDR_XEN:
-		paddr = addr;
 		break;
 	default:
 		ERRMSG("Invalid address type (%d).\n", type_addr);
@@ -5536,18 +5517,10 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 		if (!is_dumpable(info->bitmap2, pfn, cycle))
 			continue;
 
-		if (is_xen_memory()) {
-			if (!readmem(MADDR_XEN, paddr, buf, info->page_size)) {
-				ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
-				    pfn, info->max_mapnr);
-				return FALSE;
-			}
-		} else {
-			if (!readmem(PADDR, paddr, buf, info->page_size)) {
-				ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
-				    pfn, info->max_mapnr);
-				return FALSE;
-			}
+		if (!readmem(PADDR, paddr, buf, info->page_size)) {
+			ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
+			    pfn, info->max_mapnr);
+			return FALSE;
 		}
 		if (is_zero_page(buf, info->page_size)) {
 			if (clear_bit_on_2nd_bitmap(pfn, cycle))
@@ -7188,11 +7161,9 @@ int
 read_pfn(mdf_pfn_t pfn, unsigned char *buf)
 {
 	unsigned long long paddr;
-	int type_addr;
 
 	paddr = pfn_to_paddr(pfn);
-	type_addr = is_xen_memory() ? MADDR_XEN : PADDR;
-	if (!readmem(type_addr, paddr, buf, info->page_size)) {
+	if (!readmem(PADDR, paddr, buf, info->page_size)) {
 		ERRMSG("Can't get the page data.\n");
 		return FALSE;
 	}

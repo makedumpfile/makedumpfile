@@ -889,9 +889,10 @@ int get_kcore_dump_loads(void)
 		if (p->phys_start == NOT_PADDR
 				|| !is_phys_addr(p->virt_start))
 			continue;
-		if (j >= loads)
+		if (j >= loads) {
 			free(pls);
 			return FALSE;
+		}
 
 		if (j == 0) {
 			offset_pt_load_memory = p->file_offset;

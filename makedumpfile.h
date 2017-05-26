@@ -253,10 +253,14 @@ static inline int string_exists(char *s) { return (s ? TRUE : FALSE); }
 #define SYMBOL_INIT(symbol, str_symbol) \
 do { \
 	SYMBOL(symbol) = get_symbol_addr(str_symbol); \
+	if (SYMBOL(symbol) != NOT_FOUND_SYMBOL) \
+		SYMBOL(symbol) += info->kaslr_offset; \
 } while (0)
 #define SYMBOL_INIT_NEXT(symbol, str_symbol) \
 do { \
 	SYMBOL(symbol) = get_next_symbol_addr(str_symbol); \
+	if (SYMBOL(symbol) != NOT_FOUND_SYMBOL) \
+		SYMBOL(symbol) += info->kaslr_offset; \
 } while (0)
 #define WRITE_SYMBOL(str_symbol, symbol) \
 do { \
@@ -495,6 +499,7 @@ do { \
 #define STR_CONFIG_X86_PAE	"CONFIG_X86_PAE=y"
 #define STR_CONFIG_PGTABLE_4	"CONFIG_PGTABLE_4=y"
 #define STR_CONFIG_PGTABLE_3	"CONFIG_PGTABLE_3=y"
+#define STR_KERNELOFFSET	"KERNELOFFSET="
 
 /*
  * common value
@@ -925,6 +930,7 @@ int get_xen_info_arm64(void);
 #define get_phys_base()		get_phys_base_arm64()
 #define get_machdep_info()	get_machdep_info_arm64()
 #define get_versiondep_info()	get_versiondep_info_arm64()
+#define get_kaslr_offset(X)	stub_false()
 #define get_xen_basic_info_arch(X) get_xen_basic_info_arm64(X)
 #define get_xen_info_arch(X) get_xen_info_arm64(X)
 #define is_phys_addr(X)		stub_true_ul(X)
@@ -938,6 +944,7 @@ unsigned long long vaddr_to_paddr_arm(unsigned long vaddr);
 #define get_phys_base()		get_phys_base_arm()
 #define get_machdep_info()	get_machdep_info_arm()
 #define get_versiondep_info()	stub_true()
+#define get_kaslr_offset(X)	stub_false()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_arm(X)
 #define is_phys_addr(X)		stub_true_ul(X)
 #endif /* arm */
@@ -950,11 +957,13 @@ unsigned long long vaddr_to_paddr_x86(unsigned long vaddr);
 #define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_x86()
 #define get_versiondep_info()	get_versiondep_info_x86()
+#define get_kaslr_offset(X)	stub_false()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_x86(X)
 #define is_phys_addr(X)		stub_true_ul(X)
 #endif /* x86 */
 
 #ifdef __x86_64__
+unsigned long get_kaslr_offset_x86_64(unsigned long vaddr);
 int get_phys_base_x86_64(void);
 int get_machdep_info_x86_64(void);
 int get_versiondep_info_x86_64(void);
@@ -963,6 +972,7 @@ unsigned long long vtop4_x86_64(unsigned long vaddr);
 #define get_phys_base()		get_phys_base_x86_64()
 #define get_machdep_info()	get_machdep_info_x86_64()
 #define get_versiondep_info()	get_versiondep_info_x86_64()
+#define get_kaslr_offset(X)	get_kaslr_offset_x86_64(X)
 #define vaddr_to_paddr(X)	vtop4_x86_64(X)
 #define is_phys_addr(X)		stub_true_ul(X)
 #endif /* x86_64 */
@@ -975,6 +985,7 @@ unsigned long long vaddr_to_paddr_ppc64(unsigned long vaddr);
 #define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_ppc64()
 #define get_versiondep_info()	get_versiondep_info_ppc64()
+#define get_kaslr_offset(X)	stub_false()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc64(X)
 #define is_phys_addr(X)		stub_true_ul(X)
 #endif          /* powerpc64 */
@@ -986,6 +997,7 @@ unsigned long long vaddr_to_paddr_ppc(unsigned long vaddr);
 #define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_ppc()
 #define get_versiondep_info()	stub_true()
+#define get_kaslr_offset(X)	stub_false()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ppc(X)
 #define is_phys_addr(X)		stub_true_ul(X)
 #endif          /* powerpc32 */
@@ -998,6 +1010,7 @@ int is_iomem_phys_addr_s390x(unsigned long addr);
 #define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_s390x()
 #define get_versiondep_info()	stub_true()
+#define get_kaslr_offset(X)	stub_false()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_s390x(X)
 #define is_phys_addr(X)		is_iomem_phys_addr_s390x(X)
 #endif          /* s390x */
@@ -1010,6 +1023,7 @@ unsigned long long vaddr_to_paddr_ia64(unsigned long vaddr);
 #define get_machdep_info()	get_machdep_info_ia64()
 #define get_phys_base()		get_phys_base_ia64()
 #define get_versiondep_info()	stub_true()
+#define get_kaslr_offset(X)	stub_false()
 #define vaddr_to_paddr(X)	vaddr_to_paddr_ia64(X)
 #define VADDR_REGION(X)		(((unsigned long)(X)) >> REGION_SHIFT)
 #define is_phys_addr(X)		stub_true_ul(X)
@@ -1251,6 +1265,7 @@ struct DumpInfo {
 	int		vmemmap_psize;
 	int		vmemmap_cnt;
 	struct ppc64_vmemmap	*vmemmap_list;
+	unsigned long	kaslr_offset;
 
 	/*
 	 * page table info for ppc64
@@ -1907,6 +1922,7 @@ struct memory_range {
 struct memory_range crash_reserved_mem[CRASH_RESERVED_MEM_NR];
 int crash_reserved_mem_nr;
 
+unsigned long read_vmcoreinfo_symbol(char *str_symbol);
 int readmem(int type_addr, unsigned long long addr, void *bufptr, size_t size);
 int get_str_osrelease_from_vmlinux(void);
 int read_vmcoreinfo_xen(void);

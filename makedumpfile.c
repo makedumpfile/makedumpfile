@@ -3782,6 +3782,46 @@ free_for_parallel()
 }
 
 int
+find_kaslr_offsets()
+{
+	off_t offset;
+	unsigned long size;
+	int ret = FALSE;
+
+	get_vmcoreinfo(&offset, &size);
+
+	if (!(info->name_vmcoreinfo = strdup(FILENAME_VMCOREINFO))) {
+		MSG("Can't duplicate strings(%s).\n", FILENAME_VMCOREINFO);
+		return FALSE;
+	}
+	if (!copy_vmcoreinfo(offset, size))
+		goto out;
+
+	if (!open_vmcoreinfo("r"))
+		goto out;
+
+	unlink(info->name_vmcoreinfo);
+
+	/*
+	 * This arch specific function should update info->kaslr_offset. If
+	 * kaslr is not enabled then offset will be set to 0. arch specific
+	 * function might need to read from vmcoreinfo, therefore we have
+	 * called this function between open_vmcoreinfo() and
+	 * close_vmcoreinfo()
+	 */
+	get_kaslr_offset(SYMBOL(_stext));
+
+	close_vmcoreinfo();
+
+	ret = TRUE;
+out:
+	free(info->name_vmcoreinfo);
+	info->name_vmcoreinfo = NULL;
+
+	return ret;
+}
+
+int
 initial(void)
 {
 	off_t offset;
@@ -3832,6 +3872,9 @@ initial(void)
 	} else if (info->name_vmlinux) {
 		set_dwarf_debuginfo("vmlinux", NULL,
 					info->name_vmlinux, info->fd_vmlinux);
+
+		if (has_vmcoreinfo() && !find_kaslr_offsets())
+			return FALSE;
 
 		if (!get_symbol_info())
 			return FALSE;
@@ -8635,6 +8678,7 @@ close_vmcoreinfo(void)
 	if(fclose(info->file_vmcoreinfo) < 0)
 		ERRMSG("Can't close the vmcoreinfo file(%s). %s\n",
 		    info->name_vmcoreinfo, strerror(errno));
+	info->file_vmcoreinfo = NULL;
 }
 
 void
@@ -11036,11 +11080,13 @@ main(int argc, char *argv[])
 		    strerror(errno));
 		goto out;
 	}
+	info->file_vmcoreinfo = NULL;
 	info->fd_vmlinux = -1;
 	info->fd_xen_syms = -1;
 	info->fd_memory = -1;
 	info->fd_dumpfile = -1;
 	info->fd_bitmap = -1;
+	info->kaslr_offset = 0;
 	initialize_tables();
 
 	/*

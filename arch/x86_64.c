@@ -33,6 +33,42 @@ get_xen_p2m_mfn(void)
 	return NOT_FOUND_LONG_VALUE;
 }
 
+unsigned long
+get_kaslr_offset_x86_64(unsigned long vaddr)
+{
+	unsigned int i;
+	char buf[BUFSIZE_FGETS], *endp;
+
+	if (!info->kaslr_offset && info->file_vmcoreinfo) {
+		if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
+			ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
+					info->name_vmcoreinfo, strerror(errno));
+			return FALSE;
+		}
+
+		while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
+			i = strlen(buf);
+			if (!i)
+				break;
+			if (buf[i - 1] == '\n')
+				buf[i - 1] = '\0';
+			if (strncmp(buf, STR_KERNELOFFSET,
+					strlen(STR_KERNELOFFSET)) == 0)
+				info->kaslr_offset =
+					strtoul(buf+strlen(STR_KERNELOFFSET),&endp,16);
+		}
+	}
+	if (vaddr >= __START_KERNEL_map &&
+			vaddr < __START_KERNEL_map + info->kaslr_offset)
+		return info->kaslr_offset;
+	else
+		/*
+		 * TODO: we need to check if it is vmalloc/vmmemmap/module
+		 * address, we will have different offset
+		 */
+		return 0;
+}
+
 static int
 get_page_offset_x86_64(void)
 {

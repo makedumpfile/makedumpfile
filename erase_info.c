@@ -1088,6 +1088,7 @@ resolve_config_entry(struct config_entry *ce, unsigned long long base_vaddr,
 							ce->line, ce->name);
 			return FALSE;
 		}
+		ce->sym_addr += get_kaslr_offset(ce->sym_addr);
 		ce->type_name = get_symbol_type_name(ce->name,
 					DWARF_INFO_GET_SYMBOL_TYPE,
 					&ce->size, &ce->type_flag);

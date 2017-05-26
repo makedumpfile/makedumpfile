@@ -75,17 +75,39 @@ get_page_offset_x86_64(void)
 	int i;
 	unsigned long long phys_start;
 	unsigned long long virt_start;
+	unsigned long page_offset_base;
 
-	for (i = 0; get_pt_load(i, &phys_start, NULL, &virt_start, NULL); i++) {
-		if (virt_start < __START_KERNEL_map
-				&& phys_start != NOT_PADDR) {
-			info->page_offset = virt_start - phys_start;
-			return TRUE;
+	if (info->kaslr_offset) {
+		page_offset_base = get_symbol_addr("page_offset_base");
+		page_offset_base += info->kaslr_offset;
+		if (!readmem(VADDR, page_offset_base, &info->page_offset,
+					sizeof(info->page_offset))) {
+			 ERRMSG("Can't read page_offset_base.\n");
+			 return FALSE;
+		}
+		return TRUE;
+	}
+
+	if (get_num_pt_loads()) {
+		for (i = 0;
+			get_pt_load(i, &phys_start, NULL, &virt_start, NULL);
+			i++) {
+			if (virt_start != NOT_KV_ADDR
+					&& virt_start < __START_KERNEL_map
+					&& phys_start != NOT_PADDR) {
+				info->page_offset = virt_start - phys_start;
+				return TRUE;
+			}
 		}
 	}
 
-	ERRMSG("Can't get any pt_load to calculate page offset.\n");
-	return FALSE;
+	if (info->kernel_version < KERNEL_VERSION(2, 6, 27)) {
+		info->page_offset = __PAGE_OFFSET_ORIG;
+	} else {
+		info->page_offset = __PAGE_OFFSET_2_6_27;
+	}
+
+	return TRUE;
 }
 
 int

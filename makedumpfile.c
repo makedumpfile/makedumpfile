@@ -1498,6 +1498,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(log_buf_len, "log_buf_len");
 	SYMBOL_INIT(log_end, "log_end");
 	SYMBOL_INIT(log_first_idx, "log_first_idx");
+	SYMBOL_INIT(clear_idx, "clear_idx");
 	SYMBOL_INIT(log_next_idx, "log_next_idx");
 	SYMBOL_INIT(max_pfn, "max_pfn");
 	SYMBOL_INIT(modules, "modules");
@@ -2115,6 +2116,7 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("log_buf_len", log_buf_len);
 	WRITE_SYMBOL("log_end", log_end);
 	WRITE_SYMBOL("log_first_idx", log_first_idx);
+	WRITE_SYMBOL("clear_idx", clear_idx);
 	WRITE_SYMBOL("log_next_idx", log_next_idx);
 	WRITE_SYMBOL("max_pfn", max_pfn);
 	WRITE_SYMBOL("high_memory", high_memory);
@@ -2509,6 +2511,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("log_buf_len", log_buf_len);
 	READ_SYMBOL("log_end", log_end);
 	READ_SYMBOL("log_first_idx", log_first_idx);
+	READ_SYMBOL("clear_idx", clear_idx);
 	READ_SYMBOL("log_next_idx", log_next_idx);
 	READ_SYMBOL("max_pfn", max_pfn);
 	READ_SYMBOL("high_memory", high_memory);
@@ -5025,6 +5028,7 @@ dump_dmesg()
 	int log_buf_len, length_log, length_oldlog, ret = FALSE;
 	unsigned long index, log_buf, log_end;
 	unsigned int idx, log_first_idx, log_next_idx;
+	unsigned long long first_idx_sym;
 	unsigned long log_end_2_6_24;
 	unsigned      log_end_2_6_25;
 	char *log_buffer = NULL, *log_ptr = NULL;
@@ -5058,7 +5062,13 @@ dump_dmesg()
 			ERRMSG("Can't find variable-length record symbols");
 			return FALSE;
 		} else {
-			if (!readmem(VADDR, SYMBOL(log_first_idx), &log_first_idx,
+			if (info->flag_partial_dmesg
+			    && SYMBOL(clear_idx) != NOT_FOUND_SYMBOL)
+				first_idx_sym = SYMBOL(clear_idx);
+			else
+				first_idx_sym = SYMBOL(log_first_idx);
+
+			if (!readmem(VADDR, first_idx_sym, &log_first_idx,
 			    sizeof(log_first_idx))) {
 				ERRMSG("Can't get log_first_idx.\n");
 				return FALSE;
@@ -5102,7 +5112,10 @@ dump_dmesg()
 	DEBUG_MSG("log_buf       : %lx\n", log_buf);
 	DEBUG_MSG("log_end       : %lx\n", log_end);
 	DEBUG_MSG("log_buf_len   : %d\n", log_buf_len);
-	DEBUG_MSG("log_first_idx : %u\n", log_first_idx);
+	if (info->flag_partial_dmesg)
+		DEBUG_MSG("clear_idx : %u\n", log_first_idx);
+	else
+		DEBUG_MSG("log_first_idx : %u\n", log_first_idx);
 	DEBUG_MSG("log_next_idx  : %u\n", log_next_idx);
 
 	if ((log_buffer = malloc(log_buf_len)) == NULL) {
@@ -10618,6 +10631,9 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 		}
 	}
 
+	if (info->flag_partial_dmesg && !info->flag_dmesg)
+		return FALSE;
+
 	if ((argc == optind + 2) && !info->flag_flatten
 				 && !info->flag_split
 				 && !info->flag_sadump_diskset) {
@@ -11022,6 +11038,7 @@ static struct option longopts[] = {
 	{"message-level", required_argument, NULL, OPT_MESSAGE_LEVEL},
 	{"vtop", required_argument, NULL, OPT_VTOP},
 	{"dump-dmesg", no_argument, NULL, OPT_DUMP_DMESG},
+	{"partial-dmesg", no_argument, NULL, OPT_PARTIAL_DMESG},
 	{"config", required_argument, NULL, OPT_CONFIG},
 	{"help", no_argument, NULL, OPT_HELP},
 	{"diskset", required_argument, NULL, OPT_DISKSET},
@@ -11134,6 +11151,9 @@ main(int argc, char *argv[])
 			break;
 		case OPT_DUMP_DMESG:
 			info->flag_dmesg = 1;
+			break;
+		case OPT_PARTIAL_DMESG:
+			info->flag_partial_dmesg = 1;
 			break;
 		case OPT_MEM_USAGE:
 		       info->flag_mem_usage = 1;

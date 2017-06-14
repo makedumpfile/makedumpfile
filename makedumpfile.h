@@ -1241,6 +1241,7 @@ struct DumpInfo {
 	int		flag_force;	     /* overwrite existing stuff */
 	int		flag_exclude_xen_dom;/* exclude Domain-U from xen-kdump */
 	int             flag_dmesg;          /* dump the dmesg log out of the vmcore file */
+	int             flag_partial_dmesg;  /* dmesg dump only from the last cleared index*/
 	int             flag_mem_usage;  /*show the page number of memory in different use*/
 	int		flag_use_printk_log; /* did we read printk_log symbol name? */
 	int		flag_nospace;	     /* the flag of "No space on device" error */
@@ -1529,6 +1530,7 @@ struct symbol_table {
 	unsigned long long	log_buf_len;
 	unsigned long long	log_end;
 	unsigned long long	log_first_idx;
+	unsigned long long	clear_idx;
 	unsigned long long	log_next_idx;
 	unsigned long long	max_pfn;
 	unsigned long long	node_remap_start_vaddr;
@@ -2268,6 +2270,7 @@ struct elf_prstatus {
 #define OPT_SPLITBLOCK_SIZE	OPT_START+14
 #define OPT_WORKING_DIR         OPT_START+15
 #define OPT_NUM_THREADS	OPT_START+16
+#define OPT_PARTIAL_DMESG	OPT_START+17
 
 /*
  * Function Prototype.

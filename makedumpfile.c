@@ -5212,7 +5212,7 @@ _exclude_free_page(struct cycle *cycle)
 
 	for (num_nodes = 1; num_nodes <= vt.numnodes; num_nodes++) {
 
-		print_progress(PROGRESS_FREE_PAGES, num_nodes - 1, vt.numnodes);
+		print_progress(PROGRESS_FREE_PAGES, num_nodes - 1, vt.numnodes, NULL);
 
 		node_zones = pgdat + OFFSET(pglist_data.node_zones);
 
@@ -5225,7 +5225,7 @@ _exclude_free_page(struct cycle *cycle)
 		for (i = 0; i < nr_zones; i++) {
 
 			print_progress(PROGRESS_FREE_PAGES, i + nr_zones * (num_nodes - 1),
-					nr_zones * vt.numnodes);
+					nr_zones * vt.numnodes, NULL);
 
 			zone = node_zones + (i * SIZE(zone));
 			if (!readmem(VADDR, zone + OFFSET(zone.spanned_pages),
@@ -5253,7 +5253,7 @@ _exclude_free_page(struct cycle *cycle)
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_FREE_PAGES, vt.numnodes, vt.numnodes);
+	print_progress(PROGRESS_FREE_PAGES, vt.numnodes, vt.numnodes, NULL);
 	print_execution_time(PROGRESS_FREE_PAGES, &tv_start);
 
 	return TRUE;
@@ -5440,7 +5440,7 @@ create_1st_bitmap_file(void)
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
 
 		if (!info->flag_mem_usage)
-			print_progress(PROGRESS_HOLES, i, num_pt_loads);
+			print_progress(PROGRESS_HOLES, i, num_pt_loads, NULL);
 
 		pfn_start = paddr_to_pfn(phys_start);
 		pfn_end   = paddr_to_pfn(phys_end);
@@ -5459,7 +5459,7 @@ create_1st_bitmap_file(void)
 	 * print 100 %
 	 */
 	if (!info->flag_mem_usage) {
-		print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr);
+		print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr, NULL);
 		print_execution_time(PROGRESS_HOLES, &tv_start);
 	}
 
@@ -5577,7 +5577,7 @@ create_bitmap_from_memhole(struct cycle *cycle, struct dump_bitmap *bitmap, int 
 		pfn_start = MAX(paddr_to_pfn(phys_start), cycle->start_pfn);
 		pfn_end = MIN(paddr_to_pfn(phys_end), cycle->end_pfn);
 
-		print_progress(PROGRESS_HOLES, i, num_pt_loads);
+		print_progress(PROGRESS_HOLES, i, num_pt_loads, NULL);
 
 		if (pfn_start >= pfn_end)
 			continue;
@@ -5616,7 +5616,7 @@ create_bitmap_from_memhole(struct cycle *cycle, struct dump_bitmap *bitmap, int 
 	/*
 	 * print 100 %
 	 */
-	print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr);
+	print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr, NULL);
 	print_execution_time(PROGRESS_HOLES, &tv_start);
 
 	return TRUE;
@@ -5871,7 +5871,7 @@ exclude_unnecessary_pages(struct cycle *cycle)
 	for (mm = 0; mm < info->num_mem_map; mm++) {
 
 		if (!info->flag_mem_usage)
-			print_progress(PROGRESS_UNN_PAGES, mm, info->num_mem_map);
+			print_progress(PROGRESS_UNN_PAGES, mm, info->num_mem_map, NULL);
 
 		mmd = &info->mem_map_data[mm];
 
@@ -5889,7 +5889,7 @@ exclude_unnecessary_pages(struct cycle *cycle)
 	 * print [100 %]
 	 */
 	if (!info->flag_mem_usage) {
-		print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map);
+		print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map, NULL);
 		print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
 	}
 
@@ -7361,7 +7361,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 				}
 
 				if ((num_dumped % per) == 0)
-					print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
+					print_progress(PROGRESS_COPY, num_dumped, num_dumpable, &tv_start);
 
 				num_dumped++;
 
@@ -7480,7 +7480,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
+	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable, &tv_start);
 	print_execution_time(PROGRESS_COPY, &tv_start);
 	PROGRESS_MSG("\n");
 
@@ -7958,7 +7958,7 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 		}
 
 		if ((num_dumped % per) == 0)
-			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable);
+			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
 
 		num_dumped++;
 
@@ -7994,7 +7994,7 @@ finish:
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable);
+	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
 	print_execution_time(PROGRESS_COPY, &tv_start);
 	PROGRESS_MSG("\n");
 
@@ -8111,7 +8111,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 
 		if ((num_dumped % per) == 0)
-			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable);
+			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
 
 		/*
 		 * Check the excluded page.
@@ -8191,7 +8191,7 @@ out:
 		free(wrkmem);
 #endif
 
-	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable);
+	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
 	print_execution_time(PROGRESS_COPY, &tv_start);
 
 	return ret;
@@ -8649,7 +8649,7 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable);
+	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
 	print_execution_time(PROGRESS_COPY, &tv_start);
 	PROGRESS_MSG("\n");
 
@@ -9244,7 +9244,7 @@ exclude_xen3_user_domain(void)
 	 */
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
 
-		print_progress(PROGRESS_XEN_DOMAIN, i, num_pt_loads);
+		print_progress(PROGRESS_XEN_DOMAIN, i, num_pt_loads, NULL);
 
 		pfn     = paddr_to_pfn(phys_start);
 		pfn_end = paddr_to_pfn(phys_end);
@@ -9252,7 +9252,7 @@ exclude_xen3_user_domain(void)
 
 		for (j = 0; pfn < pfn_end; pfn++, j++) {
 			print_progress(PROGRESS_XEN_DOMAIN, j + (size * i),
-					size * num_pt_loads);
+					size * num_pt_loads, NULL);
 
 			if (!allocated_in_map(pfn)) {
 				clear_bit_on_2nd_bitmap(pfn, NULL);
@@ -9308,7 +9308,7 @@ exclude_xen4_user_domain(void)
 	 */
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
 
-		print_progress(PROGRESS_XEN_DOMAIN, i, num_pt_loads);
+		print_progress(PROGRESS_XEN_DOMAIN, i, num_pt_loads, NULL);
 
 		pfn     = paddr_to_pfn(phys_start);
 		pfn_end = paddr_to_pfn(phys_end);
@@ -9316,7 +9316,7 @@ exclude_xen4_user_domain(void)
 
 		for (j = 0; pfn < pfn_end; pfn++, j++) {
 			print_progress(PROGRESS_XEN_DOMAIN, j + (size * i),
-					size * num_pt_loads);
+					size * num_pt_loads, NULL);
 
 			page_info_addr = info->frame_table_vaddr + pfn * SIZE(page_info);
 			if (!readmem(VADDR_XEN,
@@ -9384,7 +9384,7 @@ exclude_xen_user_domain(void)
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_XEN_DOMAIN, 1, 1);
+	print_progress(PROGRESS_XEN_DOMAIN, 1, 1, NULL);
 	print_execution_time(PROGRESS_XEN_DOMAIN, &tv_start);
 
 	return ret;
@@ -10380,7 +10380,7 @@ reassemble_kdump_pages(void)
 
 			num_dumped++;
 
-			print_progress(PROGRESS_COPY, num_dumped, num_dumpable);
+			print_progress(PROGRESS_COPY, num_dumped, num_dumpable, &tv_start);
 
 			if (lseek(fd, offset_ph_org, SEEK_SET) < 0) {
 				ERRMSG("Can't seek a file(%s). %s\n",
@@ -10477,7 +10477,7 @@ reassemble_kdump_pages(void)
 						    size_eraseinfo))
 			goto out;
 	}
-	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable);
+	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable, &tv_start);
 	print_execution_time(PROGRESS_COPY, &tv_start);
 
 	ret = TRUE;

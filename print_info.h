@@ -25,7 +25,8 @@ extern int flag_ignore_r_char;
 
 void show_version(void);
 void print_usage(void);
-void print_progress(const char *msg, unsigned long current, unsigned long end);
+void print_progress(const char *msg, unsigned long current, unsigned long end, struct timeval *start);
+
 void print_execution_time(char *step_name, struct timeval *tv_start);
 
 /*

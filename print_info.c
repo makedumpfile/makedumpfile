@@ -337,6 +337,19 @@ print_usage(void)
 	MSG("\n");
 }
 
+static void calc_delta(struct timeval *tv_start, struct timeval *delta)
+{
+	struct timeval tv_end;
+
+	gettimeofday(&tv_end, NULL);
+	delta->tv_sec = tv_end.tv_sec - tv_start->tv_sec;
+	delta->tv_usec = tv_end.tv_usec - tv_start->tv_usec;
+	if (delta->tv_usec < 0) {
+		delta->tv_sec--;
+		delta->tv_usec += 1000000;
+	}
+}
+
 void
 print_progress(const char *msg, unsigned long current, unsigned long end)
 {
@@ -369,19 +382,10 @@ print_progress(const char *msg, unsigned long current, unsigned long end)
 void
 print_execution_time(char *step_name, struct timeval *tv_start)
 {
-	struct timeval tv_end;
-	time_t diff_sec;
-	suseconds_t diff_usec;
+	struct timeval delta;
 
-	gettimeofday(&tv_end, NULL);
-
-	diff_sec  = tv_end.tv_sec - tv_start->tv_sec;
-	diff_usec = tv_end.tv_usec - tv_start->tv_usec;
-	if (diff_usec < 0) {
-		diff_sec--;
-		diff_usec += 1000000;
-	}
+	calc_delta(tv_start, &delta);
 	REPORT_MSG("STEP [%s] : %ld.%06ld seconds\n",
-		   step_name, diff_sec, diff_usec);
+		   step_name, delta.tv_sec, delta.tv_usec);
 }
 

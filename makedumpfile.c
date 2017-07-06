@@ -181,7 +181,7 @@ get_max_mapnr(void)
 	}
 
 	max_paddr = get_max_paddr();
-	info->max_mapnr = paddr_to_pfn(max_paddr);
+	info->max_mapnr = paddr_to_pfn(roundup(max_paddr, PAGESIZE()));
 
 	DEBUG_MSG("\n");
 	DEBUG_MSG("max_mapnr    : %llx\n", info->max_mapnr);
@@ -4548,7 +4548,8 @@ exclude_nodata_pages(struct cycle *cycle)
 		unsigned long long pfn, pfn_end;
 
 		pfn = paddr_to_pfn(phys_start + file_size);
-		pfn_end = paddr_to_pfn(phys_end);
+		pfn_end = paddr_to_pfn(roundup(phys_end, PAGESIZE()));
+
 		if (pfn < cycle->start_pfn)
 			pfn = cycle->start_pfn;
 		if (pfn_end >= cycle->end_pfn)
@@ -9250,7 +9251,7 @@ exclude_xen3_user_domain(void)
 		print_progress(PROGRESS_XEN_DOMAIN, i, num_pt_loads, NULL);
 
 		pfn     = paddr_to_pfn(phys_start);
-		pfn_end = paddr_to_pfn(phys_end);
+		pfn_end = paddr_to_pfn(roundup(phys_end, PAGESIZE()));
 		size    = pfn_end - pfn;
 
 		for (j = 0; pfn < pfn_end; pfn++, j++) {
@@ -9314,7 +9315,7 @@ exclude_xen4_user_domain(void)
 		print_progress(PROGRESS_XEN_DOMAIN, i, num_pt_loads, NULL);
 
 		pfn     = paddr_to_pfn(phys_start);
-		pfn_end = paddr_to_pfn(phys_end);
+		pfn_end = paddr_to_pfn(roundup(phys_end, PAGESIZE()));
 		size    = pfn_end - pfn;
 
 		for (j = 0; pfn < pfn_end; pfn++, j++) {

@@ -5447,6 +5447,9 @@ create_1st_bitmap_file(void)
 		if (pfn_start > info->max_mapnr)
 			continue;
 		pfn_end = MIN(pfn_end, info->max_mapnr);
+		/* Account for last page if it has less than page_size data in it */
+		if (phys_end & (info->page_size - 1))
+			++pfn_end;
 
 		for (pfn = pfn_start; pfn < pfn_end; pfn++) {
 			set_bit_on_1st_bitmap(pfn, NULL);

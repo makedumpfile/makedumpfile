@@ -8301,7 +8301,7 @@ write_eraseinfo(struct cache_data *cd_page, unsigned long *size_out)
 			}
 			sprintf(obuf, "erase %s %s", erase_info[i].symbol_expr,
 							size_str);
-			DEBUG_MSG(obuf);
+			DEBUG_MSG("%s", obuf);
 			if (!write_cache(cd_page, obuf, strlen(obuf)))
 				goto out;
 			size_eraseinfo += strlen(obuf);

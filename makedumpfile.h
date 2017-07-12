@@ -2108,6 +2108,7 @@ static inline int
 is_dumpable_file(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 {
 	off_t offset;
+	ssize_t rcode;
 	if (pfn == 0 || bitmap->no_block != pfn/PFN_BUFBITMAP) {
 		offset = bitmap->offset + BUFSIZE_BITMAP*(pfn/PFN_BUFBITMAP);
 		if (lseek(bitmap->fd, offset, SEEK_SET) < 0 ) {
@@ -2116,7 +2117,10 @@ is_dumpable_file(struct dump_bitmap *bitmap, mdf_pfn_t pfn)
 			return FALSE;
 		}
 
-		read(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP);
+		rcode = read(bitmap->fd, bitmap->buf, BUFSIZE_BITMAP);
+		if (rcode != BUFSIZE_BITMAP)
+			ERRMSG("Can't read the bitmap(%s). %s\n",
+				bitmap->file_name, strerror(errno));
 		if (pfn == 0)
 			bitmap->no_block = 0;
 		else

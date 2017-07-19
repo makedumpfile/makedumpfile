@@ -3905,15 +3905,6 @@ initial(void)
 	if (!get_value_for_old_linux())
 		return FALSE;
 
-	if (info->flag_sadump && !set_page_size(sadump_page_size()))
-			return FALSE;
-
-	if (!is_xen_memory() && !cache_init())
-		return FALSE;
-
-	if (info->flag_mem_usage && !get_kcore_dump_loads())
-		return FALSE;
-
 	if (info->flag_refiltering) {
 		if (info->flag_elf_dumpfile) {
 			MSG("'-E' option is disable, ");
@@ -3936,6 +3927,9 @@ initial(void)
 			return FALSE;
 		}
 
+		if (!set_page_size(sadump_page_size()))
+			return FALSE;
+
 		if (!sadump_initialize_bitmap_memory())
 			return FALSE;
 
@@ -3949,9 +3943,7 @@ initial(void)
 		 * postponed until debug information becomes
 		 * available.
 		 */
-
-	} else if (!get_phys_base())
-		return FALSE;
+	}
 
 out:
 	if (!info->page_size) {
@@ -3962,6 +3954,18 @@ out:
 		if (!fallback_to_current_page_size())
 			return FALSE;
 	}
+
+	if (!is_xen_memory() && !cache_init())
+		return FALSE;
+
+	if (info->flag_mem_usage && !get_kcore_dump_loads())
+		return FALSE;
+
+	if (!info->flag_refiltering && !info->flag_sadump) {
+		if (!get_phys_base())
+			return FALSE;
+	}
+
 	if (!get_max_mapnr())
 		return FALSE;
 

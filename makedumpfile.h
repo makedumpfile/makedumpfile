@@ -2244,7 +2244,7 @@ struct elf_prstatus {
 #define OPT_DEBUG               'D'
 #define OPT_DUMP_LEVEL          'd'
 #define OPT_ELF_DUMPFILE        'E'
-#define OPT_EXCLUDE_UNUSED_VM	'e'
+#define OPT_EXCLUDE_UNUSED_VM   'e'
 #define OPT_FLATTEN             'F'
 #define OPT_FORCE               'f'
 #define OPT_GENERATE_VMCOREINFO 'g'
@@ -2271,10 +2271,10 @@ struct elf_prstatus {
 #define OPT_EPPIC               OPT_START+11
 #define OPT_NON_MMAP            OPT_START+12
 #define OPT_MEM_USAGE           OPT_START+13
-#define OPT_SPLITBLOCK_SIZE	OPT_START+14
+#define OPT_SPLITBLOCK_SIZE     OPT_START+14
 #define OPT_WORKING_DIR         OPT_START+15
-#define OPT_NUM_THREADS	OPT_START+16
-#define OPT_PARTIAL_DMESG	OPT_START+17
+#define OPT_NUM_THREADS         OPT_START+16
+#define OPT_PARTIAL_DMESG       OPT_START+17
 
 /*
  * Function Prototype.

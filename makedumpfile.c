@@ -1486,6 +1486,8 @@ get_symbol_info(void)
 	SYMBOL_INIT(_stext, "_stext");
 	SYMBOL_INIT(swapper_pg_dir, "swapper_pg_dir");
 	SYMBOL_INIT(init_level4_pgt, "init_level4_pgt");
+	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL)
+		SYMBOL_INIT(init_level4_pgt, "init_top_pgt");
 	SYMBOL_INIT(vmlist, "vmlist");
 	SYMBOL_INIT(vmap_area_list, "vmap_area_list");
 	SYMBOL_INIT(node_online_map, "node_online_map");
@@ -2500,6 +2502,8 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("_stext", _stext);
 	READ_SYMBOL("swapper_pg_dir", swapper_pg_dir);
 	READ_SYMBOL("init_level4_pgt", init_level4_pgt);
+	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL)
+		READ_SYMBOL("init_top_pgt", init_level4_pgt);
 	READ_SYMBOL("vmlist", vmlist);
 	READ_SYMBOL("vmap_area_list", vmap_area_list);
 	READ_SYMBOL("node_online_map", node_online_map);

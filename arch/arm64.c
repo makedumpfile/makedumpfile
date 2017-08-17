@@ -57,6 +57,8 @@ static unsigned long kimage_voffset;
 #define PGDIR_SHIFT		((PAGESHIFT() - 3) * pgtable_level + 3)
 #define PTRS_PER_PGD		(1 << (va_bits - PGDIR_SHIFT))
 #define PUD_SHIFT		get_pud_shift_arm64()
+#define PUD_SIZE		(1UL << PUD_SHIFT)
+#define PUD_MASK		(~(PUD_SIZE - 1))
 #define PTRS_PER_PTE		(1 << (PAGESHIFT() - 3))
 #define PTRS_PER_PUD		PTRS_PER_PTE
 #define PMD_SHIFT		((PAGESHIFT() - 3) * 2 + 3)
@@ -78,6 +80,10 @@ static unsigned long kimage_voffset;
 #define PMD_TYPE_MASK		3
 #define PMD_TYPE_SECT		1
 #define PMD_TYPE_TABLE		3
+
+#define PUD_TYPE_MASK		3
+#define PUD_TYPE_SECT		1
+#define PUD_TYPE_TABLE		3
 
 #define pgd_index(vaddr) 		(((vaddr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
 #define pgd_offset(pgdir, vaddr)	((pgd_t *)(pgdir) + pgd_index(vaddr))
@@ -253,6 +259,13 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
 		return NOT_PADDR;
 	}
 
+	if ((pud_val(pudv) & PUD_TYPE_MASK) == PUD_TYPE_SECT) {
+		/* 1GB section for Page Table level = 4 and Page Size = 4KB */
+		paddr = (pud_val(pudv) & (PUD_MASK & PMD_SECTION_MASK))
+					+ (vaddr & (PUD_SIZE - 1));
+		return paddr;
+	}
+
 	pmda = pmd_offset(puda, &pudv, vaddr);
 	if (!readmem(PADDR, (unsigned long long)pmda, &pmdv, sizeof(pmdv))) {
 		ERRMSG("Can't read pmd\n");
@@ -278,7 +291,7 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
 		}
 		break;
 	case PMD_TYPE_SECT:
-		/* 1GB section */
+		/* 512MB section for Page Table level = 3 and Page Size = 64KB*/
 		paddr = (pmd_val(pmdv) & (PMD_MASK & PMD_SECTION_MASK))
 					+ (vaddr & (PMD_SIZE - 1));
 		break;

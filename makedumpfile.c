@@ -3304,7 +3304,10 @@ section_mem_map_addr(unsigned long addr)
 		return NOT_KV_ADDR;
 	}
 	map = ULONG(mem_section + OFFSET(mem_section.section_mem_map));
-	map &= SECTION_MAP_MASK;
+	if (info->kernel_version < KERNEL_VERSION(4, 13, 0))
+		map &= SECTION_MAP_MASK_4_12;
+	else
+		map &= SECTION_MAP_MASK;
 	free(mem_section);
 
 	return map;

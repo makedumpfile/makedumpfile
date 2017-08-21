@@ -617,4 +617,40 @@ vaddr_to_paddr_ppc64(unsigned long vaddr)
 	return ppc64_vtop_level4(vaddr);
 }
 
+int arch_crashkernel_mem_size_ppc64()
+{
+	const char f_crashsize[] = "/proc/device-tree/chosen/linux,crashkernel-size";
+	const char f_crashbase[] = "/proc/device-tree/chosen/linux,crashkernel-base";
+	unsigned long crashk_sz_be, crashk_sz;
+	unsigned long crashk_base_be, crashk_base;
+	uint swap;
+	FILE *fp, *fpb;
+
+	fp = fopen(f_crashsize, "r");
+	if (!fp) {
+		ERRMSG("Cannot open %s\n", f_crashsize);
+		return FALSE;
+	}
+	fpb = fopen(f_crashbase, "r");
+	if (!fp) {
+		ERRMSG("Cannot open %s\n", f_crashbase);
+		fclose(fp);
+		return FALSE;
+	}
+
+	fread(&crashk_sz_be, sizeof(crashk_sz_be), 1, fp);
+	fread(&crashk_base_be, sizeof(crashk_base_be), 1, fpb);
+	fclose(fp);
+	fclose(fpb);
+	/* dev tree is always big endian */
+	swap = !is_bigendian();
+	crashk_sz = swap64(crashk_sz_be, swap);
+	crashk_base = swap64(crashk_base_be, swap);
+	crash_reserved_mem_nr = 1;
+	crash_reserved_mem[0].start = crashk_base;
+	crash_reserved_mem[0].end   = crashk_base + crashk_sz - 1;
+
+	return TRUE;
+}
+
 #endif /* powerpc64 */

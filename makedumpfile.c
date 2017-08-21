@@ -10932,6 +10932,9 @@ int is_crashkernel_mem_reserved(void)
 {
 	int ret;
 
+	if (arch_crashkernel_mem_size())
+		return TRUE;
+
 	ret = iomem_for_each_line("Crash kernel\n",
 					crashkernel_mem_callback, NULL);
 	crash_reserved_mem_nr = ret;

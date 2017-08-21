@@ -576,6 +576,7 @@ get_versiondep_info_ppc64()
 		ERRMSG("Can't initialize for vmalloc translation\n");
 		return FALSE;
 	}
+	info->page_offset = __PAGE_OFFSET;
 
 	return TRUE;
 }

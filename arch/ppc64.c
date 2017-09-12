@@ -307,9 +307,15 @@ ppc64_vmalloc_init(void)
 	}
 
 	info->pte_rpn_mask = PTE_RPN_MASK_DEFAULT;
-	if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
+	if ((info->kernel_version >= KERNEL_VERSION(4, 6, 0)) &&
+	    (info->kernel_version < KERNEL_VERSION(4, 11, 0))) {
 		info->pte_rpn_mask = PTE_RPN_MASK_L4_4_6;
 		info->pte_rpn_shift = PTE_RPN_SHIFT_L4_4_6;
+	}
+
+	if (info->kernel_version >= KERNEL_VERSION(4, 11, 0)) {
+		info->pte_rpn_mask = PTE_RPN_MASK_L4_4_11;
+		info->pte_rpn_shift = PTE_RPN_SHIFT_L4_4_11;
 	}
 
 	/*

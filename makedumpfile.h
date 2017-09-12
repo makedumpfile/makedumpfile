@@ -691,6 +691,11 @@ unsigned long get_kvbase_arm64(void);
 #define PUD_MASKED_BITS_4_7  0xc0000000000000ffUL
 #define PMD_MASKED_BITS_4_7  0xc0000000000000ffUL
 
+#define PTE_RPN_SIZE_L4_4_11  53
+#define PTE_RPN_MASK_L4_4_11   \
+	(((1UL << PTE_RPN_SIZE_L4_4_11) - 1) & ~((1UL << info->page_shift) - 1))
+#define PTE_RPN_SHIFT_L4_4_11  info->page_shift
+
 /*
  * Supported MMU types
  */

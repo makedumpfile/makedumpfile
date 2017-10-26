@@ -1519,8 +1519,13 @@ get_symbol_info(void)
 	SYMBOL_INIT(__per_cpu_load, "__per_cpu_load");
 	SYMBOL_INIT(__per_cpu_offset, "__per_cpu_offset");
 	SYMBOL_INIT(cpu_online_mask, "cpu_online_mask");
-	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL)
-		SYMBOL_INIT(cpu_online_mask, "cpu_online_map");
+	SYMBOL_INIT(__cpu_online_mask, "__cpu_online_mask");
+	if (SYMBOL(cpu_online_mask) == NOT_FOUND_SYMBOL) {
+		if (SYMBOL(__cpu_online_mask) == NOT_FOUND_SYMBOL)
+			SYMBOL_INIT(cpu_online_mask, "cpu_online_map");
+		else
+			SYMBOL_INIT(cpu_online_mask, "__cpu_online_mask");
+	}
 	SYMBOL_INIT(kexec_crash_image, "kexec_crash_image");
 	SYMBOL_INIT(node_remap_start_vaddr, "node_remap_start_vaddr");
 	SYMBOL_INIT(node_remap_end_vaddr, "node_remap_end_vaddr");

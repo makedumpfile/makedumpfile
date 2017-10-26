@@ -1595,6 +1595,7 @@ struct symbol_table {
 	unsigned long long	__per_cpu_offset;
 	unsigned long long	__per_cpu_load;
 	unsigned long long	cpu_online_mask;
+	unsigned long long	__cpu_online_mask;
 	unsigned long long	kexec_crash_image;
 
 	/*

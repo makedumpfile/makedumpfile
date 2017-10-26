@@ -953,7 +953,8 @@ cpu_online_mask_init(void)
 		return FALSE;
 	}
 
-	if (SIZE(cpumask) == NOT_FOUND_STRUCTURE)
+	if ((SIZE(cpumask) == NOT_FOUND_STRUCTURE) ||
+	    (SYMBOL(__cpu_online_mask) != NOT_FOUND_SYMBOL))
 		cpu_online_mask_addr = SYMBOL(cpu_online_mask);
 
 	else {

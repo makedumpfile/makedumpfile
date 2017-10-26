@@ -1554,6 +1554,9 @@ get_symbol_info(void)
 	SYMBOL_INIT(demote_segment_4k, "demote_segment_4k");
 	SYMBOL_INIT(cur_cpu_spec, "cur_cpu_spec");
 
+	SYMBOL_INIT(divide_error, "divide_error");
+	SYMBOL_INIT(idt_table, "idt_table");
+
 	return TRUE;
 }
 
@@ -2248,6 +2251,13 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER_UNSIGNED("PHYS_OFFSET", PHYS_OFFSET);
 	WRITE_NUMBER_UNSIGNED("kimage_voffset", kimage_voffset);
 #endif
+
+	if (info->phys_base)
+		fprintf(info->file_vmcoreinfo, "%s%lu\n", STR_NUMBER("phys_base"),
+			info->phys_base);
+	if (info->kaslr_offset)
+		fprintf(info->file_vmcoreinfo, "%s%lx\n", STR_KERNELOFFSET,
+			info->kaslr_offset);
 
 	/*
 	 * write the source file of 1st kernel

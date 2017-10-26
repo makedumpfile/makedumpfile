@@ -1035,6 +1035,138 @@ sadump_get_max_mapnr(void)
 
 #ifdef __x86_64__
 
+/*
+ * Get address of vector0 interrupt handler (Devide Error) form Interrupt
+ * Descriptor Table.
+ */
+static unsigned long
+get_vec0_addr(ulong idtr)
+{
+	struct gate_struct64 {
+		uint16_t offset_low;
+		uint16_t segment;
+		uint32_t ist : 3, zero0 : 5, type : 5, dpl : 2, p : 1;
+		uint16_t offset_middle;
+		uint32_t offset_high;
+		uint32_t zero1;
+	} __attribute__((packed)) gate;
+
+	readmem(PADDR, idtr, &gate, sizeof(gate));
+
+	return ((ulong)gate.offset_high << 32)
+		+ ((ulong)gate.offset_middle << 16)
+		+ gate.offset_low;
+}
+
+/*
+ * Calculate kaslr_offset and phys_base
+ *
+ * kaslr_offset:
+ *   The difference between original address in vmlinux and actual address
+ *   placed randomly by kaslr feature. To be more accurate,
+ *   kaslr_offset = actual address  - original address
+ *
+ * phys_base:
+ *   Physical address where the kerenel is placed. In other words, it's a
+ *   physical address of __START_KERNEL_map. This is also decided randomly by
+ *   kaslr.
+ *
+ * kaslr offset and phys_base are calculated as follows:
+ *
+ * kaslr_offset:
+ * 1) Get IDTR and CR3 value from the dump header.
+ * 2) Get a virtual address of IDT from IDTR value
+ *    --- (A)
+ * 3) Translate (A) to physical address using CR3, which points a top of
+ *    page table.
+ *    --- (B)
+ * 4) Get an address of vector0 (Devide Error) interrupt handler from
+ *    IDT, which are pointed by (B).
+ *    --- (C)
+ * 5) Get an address of symbol "divide_error" form vmlinux
+ *    --- (D)
+ *
+ * Now we have two addresses:
+ * (C)-> Actual address of "divide_error"
+ * (D)-> Original address of "divide_error" in the vmlinux
+ *
+ * kaslr_offset can be calculated by the difference between these two
+ * value.
+ *
+ * phys_base;
+ * 1) Get IDT virtual address from vmlinux
+ *    --- (E)
+ *
+ * So phys_base can be calculated using relationship of directly mapped
+ * address.
+ *
+ * phys_base =
+ *   Physical address(B) -
+ *   (Virtual address(E) + kaslr_offset - __START_KERNEL_map)
+ *
+ * Note that the address (A) cannot be used instead of (E) because (A) is
+ * not direct map address, it's a fixed map address.
+ */
+int
+calc_kaslr_offset(void)
+{
+	struct sadump_header *sh = si->sh_memory;
+	uint64_t idtr = 0, cr3 = 0, idtr_paddr;
+	struct sadump_smram_cpu_state smram, zero;
+	int apicid;
+	unsigned long divide_error_vmcore, divide_error_vmlinux;
+	unsigned long kaslr_offset, phys_base;
+
+	memset(&zero, 0, sizeof(zero));
+	for (apicid = 0; apicid < sh->nr_cpus; ++apicid) {
+		if (!get_smram_cpu_state(apicid, &smram)) {
+			ERRMSG("get_smram_cpu_state error\n");
+			return FALSE;
+		}
+
+		if (memcmp(&smram, &zero, sizeof(smram)) != 0)
+			break;
+	}
+	if (apicid >= sh->nr_cpus) {
+		ERRMSG("Can't get smram state\n");
+		return FALSE;
+	}
+
+	idtr = ((uint64_t)smram.IdtUpper)<<32 | (uint64_t)smram.IdtLower;
+	cr3 = smram.Cr3;
+
+	/* Convert virtual address of IDT table to physical address */
+	if ((idtr_paddr = vtop4_x86_64_pagetable(idtr, cr3)) == NOT_PADDR)
+		return FALSE;
+
+	/* Now we can calculate kaslr_offset and phys_base */
+	divide_error_vmlinux = SYMBOL(divide_error);
+	divide_error_vmcore = get_vec0_addr(idtr_paddr);
+	kaslr_offset = divide_error_vmcore - divide_error_vmlinux;
+	phys_base = idtr_paddr -
+		(SYMBOL(idt_table) + kaslr_offset - __START_KERNEL_map);
+
+	info->kaslr_offset = kaslr_offset;
+	info->phys_base = phys_base;
+
+	DEBUG_MSG("sadump: idtr=%" PRIx64 "\n", idtr);
+	DEBUG_MSG("sadump: cr3=%" PRIx64 "\n", cr3);
+	DEBUG_MSG("sadump: idtr(phys)=%" PRIx64 "\n", idtr_paddr);
+	DEBUG_MSG("sadump: devide_error(vmlinux)=%lx\n",
+		divide_error_vmlinux);
+	DEBUG_MSG("sadump: devide_error(vmcore)=%lx\n",
+		divide_error_vmcore);
+
+	/* Reload symbol */
+	if (!get_symbol_info())
+		return FALSE;
+
+	DEBUG_MSG("sadump: kaslr_offset=%lx\n", info->kaslr_offset);
+	DEBUG_MSG("sadump: phys_base=%lx\n", info->phys_base);
+
+	return TRUE;
+}
+
 int
 sadump_virt_phys_base(void)
 {
@@ -1065,6 +1197,9 @@ sadump_virt_phys_base(void)
 	}
 
 failed:
+	if (calc_kaslr_offset())
+		return TRUE;
+
 	info->phys_base = 0;
 
 	DEBUG_MSG("sadump: failed to calculate phys_base; default to 0\n");
@@ -1518,10 +1653,14 @@ cpu_to_apicid(int cpu, int *apicid)
 		if (!readmem(VADDR, SYMBOL(x86_bios_cpu_apicid_early_ptr),
 			     &early_ptr, sizeof(early_ptr)))
 			return FALSE;
-
+		/*
+		 * Note: SYMBOL(name) value is adjusted by info->kaslr_offset,
+		 * but per_cpu symbol does not need to be adjusted becasue it
+		 * is not affected by kaslr.
+		 */
 		apicid_addr = early_ptr
 			? SYMBOL(x86_bios_cpu_apicid_early_map)+cpu*sizeof(uint16_t)
-			: per_cpu_ptr(SYMBOL(x86_bios_cpu_apicid), cpu);
+			: per_cpu_ptr(SYMBOL(x86_bios_cpu_apicid) - info->kaslr_offset, cpu);
 
 		if (!readmem(VADDR, apicid_addr, &apicid_u16, sizeof(uint16_t)))
 			return FALSE;

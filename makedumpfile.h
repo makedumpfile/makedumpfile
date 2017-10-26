@@ -45,6 +45,7 @@
 #include "sadump_mod.h"
 #include <pthread.h>
 #include <semaphore.h>
+#include <inttypes.h>
 
 #define VMEMMAPSTART 0xffffea0000000000UL
 #define BITS_PER_WORD 64
@@ -1598,6 +1599,8 @@ struct symbol_table {
 	unsigned long long	cpu_online_mask;
 	unsigned long long	__cpu_online_mask;
 	unsigned long long	kexec_crash_image;
+	unsigned long long	divide_error;
+	unsigned long long	idt_table;
 
 	/*
 	 * symbols on ppc64 arch
@@ -1959,7 +1962,7 @@ int iomem_for_each_line(char *match, int (*callback)(void *data, int nr,
 						     unsigned long length),
 			void *data);
 int is_bigendian(void);
-
+int get_symbol_info(void);
 
 /*
  * for Xen extraction

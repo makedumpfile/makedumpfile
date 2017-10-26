@@ -1601,6 +1601,7 @@ struct symbol_table {
 	unsigned long long	kexec_crash_image;
 	unsigned long long	divide_error;
 	unsigned long long	idt_table;
+	unsigned long long	saved_command_line;
 
 	/*
 	 * symbols on ppc64 arch

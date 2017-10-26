@@ -255,20 +255,15 @@ get_versiondep_info_x86_64(void)
  * Translate a virtual address to a physical address by using 4 levels paging.
  */
 unsigned long long
-vtop4_x86_64(unsigned long vaddr)
+__vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 {
 	unsigned long page_dir, pml4, pgd_paddr, pgd_pte, pmd_paddr, pmd_pte;
 	unsigned long pte_paddr, pte;
 
-	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL) {
-		ERRMSG("Can't get the symbol of init_level4_pgt.\n");
-		return NOT_PADDR;
-	}
-
 	/*
 	 * Get PGD.
 	 */
-	page_dir = SYMBOL(init_level4_pgt) - __START_KERNEL_map + info->phys_base;
+	page_dir = pagetable;
 	if (is_xen_memory()) {
 		page_dir = ptom_xen(page_dir);
 		if (page_dir == NOT_PADDR)
@@ -344,6 +339,27 @@ vtop4_x86_64(unsigned long vaddr)
 		return NOT_PADDR;
 	}
 	return (pte & ENTRY_MASK) + PAGEOFFSET(vaddr);
+}
+
+unsigned long long
+vtop4_x86_64(unsigned long vaddr)
+{
+	unsigned long pagetable;
+
+	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't get the symbol of init_level4_pgt.\n");
+		return NOT_PADDR;
+	}
+
+	pagetable = SYMBOL(init_level4_pgt) - __START_KERNEL_map + info->phys_base;
+
+	return __vtop4_x86_64(vaddr, pagetable);
+}
+
+unsigned long long
+vtop4_x86_64_pagetable(unsigned long vaddr, unsigned long pagetable)
+{
+	return __vtop4_x86_64(vaddr, pagetable);
 }
 
 /*

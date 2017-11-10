@@ -245,10 +245,16 @@ ppc64_vmalloc_init(void)
 
 		} else if (info->kernel_version >= KERNEL_VERSION(4, 6, 0)) {
 			info->l1_index_size = PTE_INDEX_SIZE_L4_64K_3_10;
-			info->l2_index_size = PMD_INDEX_SIZE_L4_64K_4_6;
-			info->l3_index_size = PUD_INDEX_SIZE_L4_64K_4_6;
-			info->l4_index_size = PGD_INDEX_SIZE_L4_64K_3_10;
 
+			if (info->kernel_version >= KERNEL_VERSION(4, 12, 0)) {
+				info->l2_index_size = PMD_INDEX_SIZE_L4_64K_4_12;
+				info->l3_index_size = PUD_INDEX_SIZE_L4_64K_4_12;
+				info->l4_index_size = PGD_INDEX_SIZE_L4_64K_4_12;
+			} else {
+				info->l2_index_size = PMD_INDEX_SIZE_L4_64K_4_6;
+				info->l3_index_size = PUD_INDEX_SIZE_L4_64K_4_6;
+				info->l4_index_size = PGD_INDEX_SIZE_L4_64K_3_10;
+			}
 		} else if (info->kernel_version >= KERNEL_VERSION(3, 10, 0)) {
 			info->l1_index_size = PTE_INDEX_SIZE_L4_64K_3_10;
 			info->l2_index_size = PMD_INDEX_SIZE_L4_64K_3_10;

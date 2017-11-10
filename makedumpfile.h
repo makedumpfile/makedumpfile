@@ -669,6 +669,9 @@ unsigned long get_kvbase_arm64(void);
 #define PGD_INDEX_SIZE_L4_64K_3_10  12
 #define PMD_INDEX_SIZE_L4_64K_4_6  5
 #define PUD_INDEX_SIZE_L4_64K_4_6  5
+#define PMD_INDEX_SIZE_L4_64K_4_12 10
+#define PUD_INDEX_SIZE_L4_64K_4_12 7
+#define PGD_INDEX_SIZE_L4_64K_4_12 8
 #define PTE_INDEX_SIZE_RADIX_64K  5
 #define PMD_INDEX_SIZE_RADIX_64K  9
 #define PUD_INDEX_SIZE_RADIX_64K  9

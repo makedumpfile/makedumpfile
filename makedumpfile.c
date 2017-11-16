@@ -1089,6 +1089,21 @@ fallback_to_current_page_size(void)
 	return TRUE;
 }
 
+static int populate_kernel_version(void)
+{
+	struct utsname utsname;
+
+	if (uname(&utsname)) {
+		ERRMSG("Cannot get name and information about current kernel : %s\n",
+		       strerror(errno));
+		return FALSE;
+	}
+
+	info->kernel_version = get_kernel_version(utsname.release);
+
+	return TRUE;
+}
+
 int
 check_release(void)
 {
@@ -1120,11 +1135,8 @@ check_release(void)
 		}
 	}
 
-	info->kernel_version = get_kernel_version(info->system_utsname.release);
-	if (info->kernel_version == FALSE) {
-		ERRMSG("Can't get the kernel version.\n");
+	if (!populate_kernel_version())
 		return FALSE;
-	}
 
 	return TRUE;
 }
@@ -10960,19 +10972,13 @@ int is_crashkernel_mem_reserved(void)
 
 static int get_page_offset(void)
 {
-	struct utsname utsname;
-	if (uname(&utsname)) {
-		ERRMSG("Cannot get name and information about current kernel : %s",
-		       strerror(errno));
+	if (!populate_kernel_version())
 		return FALSE;
-	}
 
-	info->kernel_version = get_kernel_version(utsname.release);
 	get_versiondep_info();
 
 	return TRUE;
 }
-
 
 /* Returns the physical address of start of crash notes buffer for a kernel. */
 static int get_sys_kernel_vmcoreinfo(uint64_t *addr, uint64_t *len)
@@ -11350,6 +11356,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (!populate_kernel_version())
+			goto out;
+
 		if (info->kernel_version < KERNEL_VERSION(4, 11, 0) &&
 				!info->flag_force) {
 			MSG("mem-usage not supported for this kernel.\n");

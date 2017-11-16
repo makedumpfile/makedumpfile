@@ -9424,15 +9424,15 @@ exclude_xen_user_domain(void)
 int
 initial_xen(void)
 {
-	int xen_info_required = TRUE;
-	off_t offset;
-	unsigned long size;
-
 #if defined(__powerpc64__) || defined(__powerpc32__)
 	MSG("\n");
 	MSG("Xen is not supported on powerpc.\n");
 	return FALSE;
 #else
+	int xen_info_required = TRUE;
+	off_t offset;
+	unsigned long size;
+
 #ifndef __x86_64__
 	if (DL_EXCLUDE_ZERO < info->max_dump_level) {
 		MSG("Dump_level is invalid. It should be 0 or 1.\n");

@@ -345,13 +345,23 @@ unsigned long long
 vtop4_x86_64(unsigned long vaddr)
 {
 	unsigned long pagetable;
+	unsigned long init_level4_pgt;
 
-	if (SYMBOL(init_level4_pgt) == NOT_FOUND_SYMBOL) {
+	if (SYMBOL(init_level4_pgt) != NOT_FOUND_SYMBOL)
+		init_level4_pgt = SYMBOL(init_level4_pgt);
+	else if (SYMBOL(init_top_pgt) != NOT_FOUND_SYMBOL)
+		init_level4_pgt = SYMBOL(init_top_pgt);
+	else {
 		ERRMSG("Can't get the symbol of init_level4_pgt.\n");
 		return NOT_PADDR;
 	}
 
-	pagetable = SYMBOL(init_level4_pgt) - __START_KERNEL_map + info->phys_base;
+	if (SYMBOL(level4_kernel_pgt) != NOT_FOUND_SYMBOL) {
+		ERRMSG("Kernel is built with 5-level page tables\n");
+		return NOT_PADDR;
+	}
+
+	pagetable = init_level4_pgt - __START_KERNEL_map + info->phys_base;
 
 	return __vtop4_x86_64(vaddr, pagetable);
 }
@@ -565,8 +575,16 @@ find_vmemmap_x86_64()
 	struct vmap_pfns *vmapp, *vmaphead = NULL, *cur, *tail;
 
 	init_level4_pgt = SYMBOL(init_level4_pgt);
+	if (init_level4_pgt == NOT_FOUND_SYMBOL)
+		init_level4_pgt = SYMBOL(init_top_pgt);
+
 	if (init_level4_pgt == NOT_FOUND_SYMBOL) {
-		ERRMSG("init_level4_pgt not found\n");
+		ERRMSG("init_level4_pgt/init_top_pgt not found\n");
+		return FAILED;
+	}
+
+	if (SYMBOL(level4_kernel_pgt) != NOT_FOUND_SYMBOL) {
+		ERRMSG("kernel is configured for 5-level page tables\n");
 		return FAILED;
 	}
 	pagestructsize = size_table.page;

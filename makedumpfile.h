@@ -1539,6 +1539,8 @@ struct symbol_table {
 	unsigned long long	_stext;
 	unsigned long long	swapper_pg_dir;
 	unsigned long long	init_level4_pgt;
+	unsigned long long	level4_kernel_pgt;
+	unsigned long long	init_top_pgt;
 	unsigned long long	vmlist;
 	unsigned long long	vmap_area_list;
 	unsigned long long	phys_base;

@@ -2125,9 +2125,18 @@ is_on(char *bitmap, mdf_pfn_t i)
 }
 
 static inline int
-is_dumpable_buffer(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
+is_cyclic_region(mdf_pfn_t pfn, struct cycle *cycle)
 {
 	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
+		return FALSE;
+	else
+		return TRUE;
+}
+
+static inline int
+is_dumpable_buffer(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
+{
+	if (!is_cyclic_region(pfn, cycle))
 		return FALSE;
 	else
 		return is_on(bitmap->buf, pfn - cycle->start_pfn);
@@ -2166,15 +2175,6 @@ is_dumpable(struct dump_bitmap *bitmap, mdf_pfn_t pfn, struct cycle *cycle)
 	} else {
 		return is_dumpable_file(bitmap, pfn);
 	}
-}
-
-static inline int
-is_cyclic_region(mdf_pfn_t pfn, struct cycle *cycle)
-{
-	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
-		return FALSE;
-	else
-		return TRUE;
 }
 
 static inline int

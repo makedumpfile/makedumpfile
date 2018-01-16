@@ -4240,7 +4240,7 @@ set_bitmap_buffer(struct dump_bitmap *bitmap, mdf_pfn_t pfn, int val, struct cyc
 	int byte, bit;
 	static int warning = 0;
 
-        if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn) {
+        if (!is_cyclic_region(pfn, cycle)) {
 		if (warning == 0) {
 			MSG("WARNING: PFN out of cycle range. (pfn:%llx, ", pfn);
 			MSG("cycle:[%llx-%llx])\n", cycle->start_pfn, cycle->end_pfn);

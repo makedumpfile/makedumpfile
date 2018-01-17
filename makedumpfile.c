@@ -1135,8 +1135,11 @@ check_release(void)
 		}
 	}
 
-	if (!populate_kernel_version())
+	info->kernel_version = get_kernel_version(info->system_utsname.release);
+	if (info->kernel_version == FALSE) {
+		ERRMSG("Can't get the kernel version.\n");
 		return FALSE;
+	}
 
 	return TRUE;
 }

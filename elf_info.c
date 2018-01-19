@@ -820,26 +820,26 @@ static int exclude_segment(struct pt_load_segment **pt_loads,
 		if (kvstart <  vend && kvend > vstart) {
 			if (kvstart != vstart && kvend != vend) {
 				/* Split load segment */
-				temp_seg.phys_start = end + 1;
+				temp_seg.phys_start = end;
 				temp_seg.phys_end = (*pt_loads)[i].phys_end;
-				temp_seg.virt_start = kvend + 1;
+				temp_seg.virt_start = kvend;
 				temp_seg.virt_end = vend;
 				temp_seg.file_offset = (*pt_loads)[i].file_offset
 					+ temp_seg.virt_start - (*pt_loads)[i].virt_start;
 				temp_seg.file_size = temp_seg.phys_end
 					- temp_seg.phys_start;
 
-				(*pt_loads)[i].virt_end = kvstart - 1;
-				(*pt_loads)[i].phys_end =  start - 1;
+				(*pt_loads)[i].virt_end = kvstart;
+				(*pt_loads)[i].phys_end =  start;
 				(*pt_loads)[i].file_size -= temp_seg.file_size;
 
 				tidx = i+1;
 			} else if (kvstart != vstart) {
-				(*pt_loads)[i].phys_end = start - 1;
-				(*pt_loads)[i].virt_end = kvstart - 1;
+				(*pt_loads)[i].phys_end = start;
+				(*pt_loads)[i].virt_end = kvstart;
 			} else {
-				(*pt_loads)[i].phys_start = end + 1;
-				(*pt_loads)[i].virt_start = kvend + 1;
+				(*pt_loads)[i].phys_start = end;
+				(*pt_loads)[i].virt_start = kvend;
 			}
 			(*pt_loads)[i].file_size -= (end -start);
 		}
@@ -917,7 +917,7 @@ int get_kcore_dump_loads(void)
 
 	for (i = 0; i < crash_reserved_mem_nr; i++)	{
 		exclude_segment(&pt_loads, &num_pt_loads,
-				crash_reserved_mem[i].start, crash_reserved_mem[i].end);
+				crash_reserved_mem[i].start, crash_reserved_mem[i].end + 1);
 	}
 
 	max_file_offset = 0;

@@ -1607,6 +1607,8 @@ struct symbol_table {
 	unsigned long long	divide_error;
 	unsigned long long	idt_table;
 	unsigned long long	saved_command_line;
+	unsigned long long	pti_init;
+	unsigned long long	kaiser_init;
 
 	/*
 	 * symbols on ppc64 arch

@@ -1572,6 +1572,8 @@ get_symbol_info(void)
 	SYMBOL_INIT(divide_error, "divide_error");
 	SYMBOL_INIT(idt_table, "idt_table");
 	SYMBOL_INIT(saved_command_line, "saved_command_line");
+	SYMBOL_INIT(pti_init, "pti_init");
+	SYMBOL_INIT(kaiser_init, "kaiser_init");
 
 	return TRUE;
 }

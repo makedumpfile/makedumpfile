@@ -1362,6 +1362,9 @@ finish:
  *    kernel. Retrieve vmcoreinfo from address of "elfcorehdr=" and
  *    get kaslr_offset and phys_base from vmcoreinfo.
  */
+#define PTI_USER_PGTABLE_BIT		(info->page_shift)
+#define PTI_USER_PGTABLE_MASK		(1 << PTI_USER_PGTABLE_BIT)
+#define CR3_PCID_MASK			0xFFFull
 int
 calc_kaslr_offset(void)
 {
@@ -1389,7 +1392,11 @@ calc_kaslr_offset(void)
 	}
 
 	idtr = ((uint64_t)smram.IdtUpper)<<32 | (uint64_t)smram.IdtLower;
-	cr3 = smram.Cr3;
+	if ((SYMBOL(pti_init) != NOT_FOUND_SYMBOL) ||
+	    (SYMBOL(kaiser_init) != NOT_FOUND_SYMBOL))
+		cr3 = smram.Cr3 & ~(CR3_PCID_MASK|PTI_USER_PGTABLE_MASK);
+	else
+		cr3 = smram.Cr3 & ~CR3_PCID_MASK;
 
 	/* Convert virtual address of IDT table to physical address */
 	if ((idtr_paddr = vtop4_x86_64_pagetable(idtr, cr3)) == NOT_PADDR)

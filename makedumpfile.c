@@ -7733,11 +7733,13 @@ kdump_thread_function_cyclic(void *arg) {
 		buf_ready = FALSE;
 
 		pthread_mutex_lock(&info->page_data_mutex);
+		pthread_cleanup_push(pthread_mutex_unlock, &info->page_data_mutex);
 		while (page_data_buf[index].used != FALSE) {
+			pthread_testcancel();
 			index = (index + 1) % info->num_buffers;
 		}
 		page_data_buf[index].used = TRUE;
-		pthread_mutex_unlock(&info->page_data_mutex);
+		pthread_cleanup_pop(1);
 
 		while (buf_ready == FALSE) {
 			pthread_testcancel();

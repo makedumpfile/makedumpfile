@@ -184,6 +184,7 @@ isAnon(unsigned long mapping)
 #define SECTIONS_PER_ROOT()	(info->sections_per_root)
 #define SECTION_ROOT_MASK()	(SECTIONS_PER_ROOT() - 1)
 #define SECTION_NR_TO_ROOT(sec)	((sec) / SECTIONS_PER_ROOT())
+#define SECTION_MARKED_PRESENT  (1UL<<0)
 #define SECTION_IS_ONLINE	(1UL<<2)
 /*
  * SECTION_MAP_LAST_BIT was 1UL<<2 before Linux 4.13.0.

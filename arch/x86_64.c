@@ -33,6 +33,16 @@ get_xen_p2m_mfn(void)
 	return NOT_FOUND_LONG_VALUE;
 }
 
+static int
+check_5level_paging(void)
+{
+	if (NUMBER(pgtable_l5_enabled) != NOT_FOUND_NUMBER &&
+	    NUMBER(pgtable_l5_enabled) != 0)
+		return TRUE;
+	else
+		return FALSE;
+}
+
 unsigned long
 get_kaslr_offset_x86_64(unsigned long vaddr)
 {

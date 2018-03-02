@@ -1870,6 +1870,7 @@ struct array_table {
 struct number_table {
 	long	NR_FREE_PAGES;
 	long	N_ONLINE;
+	long	pgtable_l5_enabled;
 
 	/*
  	* Page flags

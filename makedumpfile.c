@@ -1725,6 +1725,7 @@ get_structure_info(void)
 
 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
 	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");
+	ENUM_NUMBER_INIT(pgtable_l5_enabled, "pgtable_l5_enabled");
 
 	ENUM_NUMBER_INIT(PG_lru, "PG_lru");
 	ENUM_NUMBER_INIT(PG_private, "PG_private");
@@ -2253,6 +2254,7 @@ write_vmcoreinfo_data(void)
 
 	WRITE_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	WRITE_NUMBER("N_ONLINE", N_ONLINE);
+	WRITE_NUMBER("pgtable_l5_enabled", pgtable_l5_enabled);
 
 	WRITE_NUMBER("PG_lru", PG_lru);
 	WRITE_NUMBER("PG_private", PG_private);
@@ -2647,6 +2649,7 @@ read_vmcoreinfo(void)
 
 	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	READ_NUMBER("N_ONLINE", N_ONLINE);
+	READ_NUMBER("pgtable_l5_enabled", pgtable_l5_enabled);
 
 	READ_NUMBER("PG_lru", PG_lru);
 	READ_NUMBER("PG_private", PG_private);

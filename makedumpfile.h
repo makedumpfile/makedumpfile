@@ -614,25 +614,22 @@ unsigned long get_kvbase_arm64(void);
 /*
  * 4 Levels paging
  */
-#define PML4_SHIFT		(39)
-#define PTRS_PER_PML4		(512)
-#define PGDIR_SHIFT		(30)
-#define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
-#define PGDIR_MASK		(~(PGDIR_SIZE - 1))
-#define PTRS_PER_PGD		(512)
 #define PGD_SHIFT		(39)
 #define PUD_SHIFT		(30)
 #define PMD_SHIFT		(21)
-#define PMD_SIZE		(1UL << PMD_SHIFT)
-#define PMD_MASK		(~(PMD_SIZE - 1))
+#define PTE_SHIFT		(12)
+
+#define PTRS_PER_PGD		(512)
 #define PTRS_PER_PUD		(512)
 #define PTRS_PER_PMD		(512)
 #define PTRS_PER_PTE		(512)
-#define PTE_SHIFT		(12)
 
-#define pml4_index(address) (((address) >> PML4_SHIFT) & (PTRS_PER_PML4 - 1))
-#define pgd_index(address)  (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
-#define pgd4_index(address) (((address) >> PGD_SHIFT) & (PTRS_PER_PGD - 1))
+#define PUD_SIZE		(1UL << PUD_SHIFT)
+#define PUD_MASK		(~(PUD_SIZE - 1))
+#define PMD_SIZE		(1UL << PMD_SHIFT)
+#define PMD_MASK		(~(PMD_SIZE - 1))
+
+#define pgd_index(address)  (((address) >> PGD_SHIFT) & (PTRS_PER_PGD - 1))
 #define pud_index(address)  (((address) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
 #define pmd_index(address)  (((address) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
 #define pte_index(address)  (((address) >> PTE_SHIFT) & (PTRS_PER_PTE - 1))

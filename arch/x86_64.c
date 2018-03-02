@@ -113,6 +113,8 @@ get_page_offset_x86_64(void)
 
 	if (info->kernel_version < KERNEL_VERSION(2, 6, 27)) {
 		info->page_offset = __PAGE_OFFSET_ORIG;
+	} else if(check_5level_paging()) {
+		info->page_offset = __PAGE_OFFSET_5LEVEL;
 	} else {
 		info->page_offset = __PAGE_OFFSET_2_6_27;
 	}
@@ -244,6 +246,8 @@ get_versiondep_info_x86_64(void)
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_ORIG;
 	else if (info->kernel_version < KERNEL_VERSION(2, 6, 31))
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_26;
+	else if(check_5level_paging())
+		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_5LEVEL;
 	else
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_31;
 
@@ -253,6 +257,9 @@ get_versiondep_info_x86_64(void)
 	if (info->kernel_version < KERNEL_VERSION(2, 6, 31)) {
 		info->vmemmap_start = VMEMMAP_START_ORIG;
 		info->vmemmap_end   = VMEMMAP_END_ORIG;
+	} else if(check_5level_paging()) {
+		info->vmemmap_start = VMEMMAP_START_5LEVEL;
+		info->vmemmap_end   = VMEMMAP_END_5LEVEL;
 	} else {
 		info->vmemmap_start = VMEMMAP_START_2_6_31;
 		info->vmemmap_end   = VMEMMAP_END_2_6_31;
@@ -269,6 +276,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 {
 	unsigned long page_dir, pgd, pud_paddr, pud_pte, pmd_paddr, pmd_pte;
 	unsigned long pte_paddr, pte;
+	unsigned long p4d_paddr, p4d_pte;
 
 	/*
 	 * Get PGD.
@@ -279,23 +287,56 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 		if (page_dir == NOT_PADDR)
 			return NOT_PADDR;
 	}
-	page_dir += pgd_index(vaddr) * sizeof(unsigned long);
-	if (!readmem(PADDR, page_dir, &pgd, sizeof pgd)) {
-		ERRMSG("Can't get pgd (page_dir:%lx).\n", page_dir);
-		return NOT_PADDR;
-	}
-	if (info->vaddr_for_vtop == vaddr)
-		MSG("  PGD : %16lx => %16lx\n", page_dir, pgd);
 
-	if (!(pgd & _PAGE_PRESENT)) {
-		ERRMSG("Can't get a valid pgd.\n");
-		return NOT_PADDR;
+	if (check_5level_paging()) {
+		page_dir += pgd5_index(vaddr) * sizeof(unsigned long);
+		if (!readmem(PADDR, page_dir, &pgd, sizeof pgd)) {
+			ERRMSG("Can't get pgd (page_dir:%lx).\n", page_dir);
+			return NOT_PADDR;
+		}
+		if (info->vaddr_for_vtop == vaddr)
+			MSG("  PGD : %16lx => %16lx\n", page_dir, pgd);
+
+		if (!(pgd & _PAGE_PRESENT)) {
+			ERRMSG("Can't get a valid pgd.\n");
+			return NOT_PADDR;
+		}
+		/*
+		 * Get P4D.
+		 */
+		p4d_paddr  = pgd & ENTRY_MASK;
+		p4d_paddr += p4d_index(vaddr) * sizeof(unsigned long);
+		if (!readmem(PADDR, p4d_paddr, &p4d_pte, sizeof p4d_pte)) {
+			ERRMSG("Can't get p4d_pte (p4d_paddr:%lx).\n", p4d_paddr);
+			return NOT_PADDR;
+		}
+		if (info->vaddr_for_vtop == vaddr)
+			MSG("  P4D : %16lx => %16lx\n", p4d_paddr, p4d_pte);
+
+		if (!(p4d_pte & _PAGE_PRESENT)) {
+			ERRMSG("Can't get a valid p4d_pte.\n");
+			return NOT_PADDR;
+		}
+		pud_paddr  = p4d_pte & ENTRY_MASK;
+	}else {
+		page_dir += pgd_index(vaddr) * sizeof(unsigned long);
+		if (!readmem(PADDR, page_dir, &pgd, sizeof pgd)) {
+			ERRMSG("Can't get pgd (page_dir:%lx).\n", page_dir);
+			return NOT_PADDR;
+		}
+		if (info->vaddr_for_vtop == vaddr)
+			MSG("  PGD : %16lx => %16lx\n", page_dir, pgd);
+
+		if (!(pgd & _PAGE_PRESENT)) {
+			ERRMSG("Can't get a valid pgd.\n");
+			return NOT_PADDR;
+		}
+		pud_paddr  = pgd & ENTRY_MASK;
 	}
 
 	/*
 	 * Get PUD.
 	 */
-	pud_paddr  = pgd & ENTRY_MASK;
 	pud_paddr += pud_index(vaddr) * sizeof(unsigned long);
 	if (!readmem(PADDR, pud_paddr, &pud_pte, sizeof pud_pte)) {
 		ERRMSG("Can't get pud_pte (pud_paddr:%lx).\n", pud_paddr);
@@ -362,12 +403,7 @@ vtop4_x86_64(unsigned long vaddr)
 	else if (SYMBOL(init_top_pgt) != NOT_FOUND_SYMBOL)
 		init_level4_pgt = SYMBOL(init_top_pgt);
 	else {
-		ERRMSG("Can't get the symbol of init_level4_pgt.\n");
-		return NOT_PADDR;
-	}
-
-	if (SYMBOL(level4_kernel_pgt) != NOT_FOUND_SYMBOL) {
-		ERRMSG("Kernel is built with 5-level page tables\n");
+		ERRMSG("Can't get the symbol of init_level4_pgt/init_top_pgt.\n");
 		return NOT_PADDR;
 	}
 
@@ -606,10 +642,6 @@ find_vmemmap_x86_64()
 		return FAILED;
 	}
 
-	if (SYMBOL(level4_kernel_pgt) != NOT_FOUND_SYMBOL) {
-		ERRMSG("kernel is configured for 5-level page tables\n");
-		return FAILED;
-	}
 	pagestructsize = size_table.page;
 	hugepagesize = PTRS_PER_PMD * info->page_size;
 	vaddr_base = info->vmemmap_start;
@@ -631,12 +663,14 @@ find_vmemmap_x86_64()
 	/* outer loop is for pud entries in the pgd */
 	for (pgdindex = 0, pgdp = (unsigned long *)pgd_addr; pgdindex < num_puds;
 								pgdindex++, pgdp++) {
+
 		/* read the pgd one word at a time, into pud_addr */
 		if (!readmem(PADDR, (unsigned long long)pgdp, (void *)&pud_addr,
 								sizeof(unsigned long))) {
 			ERRMSG("Can't get pgd entry for slot %d.\n", pgd_index);
 			return FAILED;
 		}
+
 		/* mask the pgd entry for the address of the pud page */
 		pud_addr &= PMASK;
 		if (pud_addr == 0)

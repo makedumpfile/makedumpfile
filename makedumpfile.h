@@ -593,16 +593,21 @@ unsigned long get_kvbase_arm64(void);
 #ifdef __x86_64__
 #define __PAGE_OFFSET_ORIG	(0xffff810000000000) /* 2.6.26, or former */
 #define __PAGE_OFFSET_2_6_27	(0xffff880000000000) /* 2.6.27, or later  */
+#define __PAGE_OFFSET_5LEVEL	(0xff10000000000000) /* 5-level page table */
 
 #define VMALLOC_START_ORIG	(0xffffc20000000000) /* 2.6.30, or former */
 #define VMALLOC_START_2_6_31	(0xffffc90000000000) /* 2.6.31, or later  */
+#define VMALLOC_START_5LEVEL	(0xffa0000000000000) /* 5-level page table */
 #define VMALLOC_END_ORIG	(0xffffe1ffffffffff) /* 2.6.30, or former */
 #define VMALLOC_END_2_6_31	(0xffffe8ffffffffff) /* 2.6.31, or later  */
+#define VMALLOC_END_5LEVEL	(0xffd1ffffffffffff) /* 5-level page table */
 
 #define VMEMMAP_START_ORIG	(0xffffe20000000000) /* 2.6.30, or former */
 #define VMEMMAP_START_2_6_31	(0xffffea0000000000) /* 2.6.31, or later  */
+#define VMEMMAP_START_5LEVEL	(0xffd4000000000000) /* 5-level page table */
 #define VMEMMAP_END_ORIG	(0xffffe2ffffffffff) /* 2.6.30, or former */
 #define VMEMMAP_END_2_6_31	(0xffffeaffffffffff) /* 2.6.31, or later  */
+#define VMEMMAP_END_5LEVEL	(0xffd5ffffffffffff) /* 5-level page table */
 
 #define __START_KERNEL_map	(0xffffffff80000000)
 #define KVBASE			PAGE_OFFSET
@@ -610,6 +615,7 @@ unsigned long get_kvbase_arm64(void);
 #define _MAX_PHYSMEM_BITS_ORIG		(40)
 #define _MAX_PHYSMEM_BITS_2_6_26	(44)
 #define _MAX_PHYSMEM_BITS_2_6_31	(46)
+#define _MAX_PHYSMEM_BITS_5LEVEL	(52)
 
 /*
  * 4 Levels paging
@@ -629,7 +635,18 @@ unsigned long get_kvbase_arm64(void);
 #define PMD_SIZE		(1UL << PMD_SHIFT)
 #define PMD_MASK		(~(PMD_SIZE - 1))
 
+/*
+ * 5 Levels paging
+ */
+#define PGD_SHIFT_5LEVEL	(48)
+#define P4D_SHIFT		(39)
+
+#define PTRS_PER_PGD_5LEVEL	(512)
+#define PTRS_PER_P4D		(512)
+
+#define pgd5_index(address)  (((address) >> PGD_SHIFT_5LEVEL) & (PTRS_PER_PGD_5LEVEL - 1))
 #define pgd_index(address)  (((address) >> PGD_SHIFT) & (PTRS_PER_PGD - 1))
+#define p4d_index(address)  (((address) >> P4D_SHIFT) & (PTRS_PER_P4D - 1))
 #define pud_index(address)  (((address) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
 #define pmd_index(address)  (((address) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
 #define pte_index(address)  (((address) >> PTE_SHIFT) & (PTRS_PER_PTE - 1))

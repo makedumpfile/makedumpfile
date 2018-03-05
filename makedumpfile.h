@@ -244,6 +244,9 @@ isAnon(unsigned long mapping)
 #define MIN_ELF_HEADER_SIZE \
 	MAX(MIN_ELF32_HEADER_SIZE, MIN_ELF64_HEADER_SIZE)
 static inline int string_exists(char *s) { return (s ? TRUE : FALSE); }
+#define STREQ(A, B) (string_exists((char *)A) && 	\
+		     string_exists((char *)B) && 	\
+	(strcmp((char *)(A), (char *)(B)) == 0))
 #define STRNEQ(A, B)(string_exists((char *)(A)) &&	\
 		     string_exists((char *)(B)) &&	\
 	(strncmp((char *)(A), (char *)(B), strlen((char *)(B))) == 0))
@@ -2327,5 +2330,16 @@ int calculate_cyclic_buffer_size(void);
 int prepare_splitblock_table(void);
 int initialize_zlib(z_stream *stream, int level);
 int finalize_zlib(z_stream *stream);
+
+int parse_line(char *str, char *argv[]);
+char *shift_string_left(char *s, int cnt);
+char *clean_line(char *line);
+char *strip_linefeeds(char *line);
+char *strip_beginning_whitespace(char *line);
+char *strip_ending_whitespace(char *line);
+ulong htol(char *s, int flags);
+int hexadecimal(char *s, int count);
+int decimal(char *s, int count);
+int file_exists(char *file);
 
 #endif /* MAKEDUMPFILE_H */

@@ -48,6 +48,12 @@ static unsigned long kimage_voffset;
 #define SZ_64K			(64 * 1024)
 #define SZ_128M			(128 * 1024 * 1024)
 
+#define PAGE_OFFSET_36 ((0xffffffffffffffffUL) << 36)
+#define PAGE_OFFSET_39 ((0xffffffffffffffffUL) << 39)
+#define PAGE_OFFSET_42 ((0xffffffffffffffffUL) << 42)
+#define PAGE_OFFSET_47 ((0xffffffffffffffffUL) << 47)
+#define PAGE_OFFSET_48 ((0xffffffffffffffffUL) << 48)
+
 #define pgd_val(x)		((x).pgd)
 #define pud_val(x)		(pgd_val((x).pgd))
 #define pmd_val(x)		(pud_val((x).pud))
@@ -140,8 +146,6 @@ pud_offset(pgd_t *pgda, pgd_t *pgdv, unsigned long vaddr)
 
 static int calculate_plat_config(void)
 {
-	va_bits = NUMBER(VA_BITS);
-
 	/* derive pgtable_level as per arch/arm64/Kconfig */
 	if ((PAGESIZE() == SZ_16K && va_bits == 36) ||
 			(PAGESIZE() == SZ_64K && va_bits == 42)) {
@@ -177,6 +181,44 @@ get_phys_base_arm64(void)
 	return TRUE;
 }
 
+ulong
+get_stext_symbol(void)
+{
+	int found;
+	FILE *fp;
+	char buf[BUFSIZE];
+	char *kallsyms[MAXARGS];
+	ulong kallsym;
+
+	if (!file_exists("/proc/kallsyms")) {
+		ERRMSG("(%s) does not exist, will not be able to read symbols. %s\n",
+		       "/proc/kallsyms", strerror(errno));
+		return FALSE;
+	}
+
+	if ((fp = fopen("/proc/kallsyms", "r")) == NULL) {
+		ERRMSG("Cannot open (%s) to read symbols. %s\n",
+		       "/proc/kallsyms", strerror(errno));
+		return FALSE;
+	}
+
+	found = FALSE;
+	kallsym = 0;
+
+	while (!found && fgets(buf, BUFSIZE, fp) &&
+	      (parse_line(buf, kallsyms) == 3)) {
+		if (hexadecimal(kallsyms[0], 0) &&
+		    STREQ(kallsyms[2], "_stext")) {
+			kallsym = htol(kallsyms[0], 0);
+			found = TRUE;
+			break;
+		}
+	}
+	fclose(fp);
+
+	return(found ? kallsym : FALSE);
+}
+
 int
 get_machdep_info_arm64(void)
 {
@@ -188,12 +230,10 @@ get_machdep_info_arm64(void)
 	kimage_voffset = NUMBER(kimage_voffset);
 	info->max_physmem_bits = PHYS_MASK_SHIFT;
 	info->section_size_bits = SECTIONS_SIZE_BITS;
-	info->page_offset = 0xffffffffffffffffUL << (va_bits - 1);
 
 	DEBUG_MSG("kimage_voffset   : %lx\n", kimage_voffset);
 	DEBUG_MSG("max_physmem_bits : %lx\n", info->max_physmem_bits);
 	DEBUG_MSG("section_size_bits: %lx\n", info->section_size_bits);
-	DEBUG_MSG("page_offset      : %lx\n", info->page_offset);
 
 	return TRUE;
 }
@@ -219,6 +259,35 @@ get_xen_info_arm64(void)
 int
 get_versiondep_info_arm64(void)
 {
+	ulong _stext;
+
+	_stext = get_stext_symbol();
+	if (!_stext) {
+		ERRMSG("Can't get the symbol of _stext.\n");
+		return FALSE;
+	}
+
+	/* Derive va_bits as per arch/arm64/Kconfig */
+	if ((_stext & PAGE_OFFSET_36) == PAGE_OFFSET_36) {
+		va_bits = 36;
+	} else if ((_stext & PAGE_OFFSET_39) == PAGE_OFFSET_39) {
+		va_bits = 39;
+	} else if ((_stext & PAGE_OFFSET_42) == PAGE_OFFSET_42) {
+		va_bits = 42;
+	} else if ((_stext & PAGE_OFFSET_47) == PAGE_OFFSET_47) {
+		va_bits = 47;
+	} else if ((_stext & PAGE_OFFSET_48) == PAGE_OFFSET_48) {
+		va_bits = 48;
+	} else {
+		ERRMSG("Cannot find a proper _stext for calculating VA_BITS\n");
+		return FALSE;
+	}
+
+	info->page_offset = (0xffffffffffffffffUL) << (va_bits - 1);
+
+	DEBUG_MSG("page_offset=%lx, va_bits=%d\n", info->page_offset,
+			va_bits);
+
 	return TRUE;
 }
 

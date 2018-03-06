@@ -16,6 +16,8 @@
 #include "print_info.h"
 #include <time.h>
 #include <string.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #define PROGRESS_MAXLEN		"50"
 
@@ -352,18 +354,21 @@ static void calc_delta(struct timeval *tv_start, struct timeval *delta)
 }
 
 /* produce less than 12 bytes on msg */
-static int eta_to_human_short (int secs, char* msg)
+static int eta_to_human_short (int64_t secs, char* msg, int maxsize)
 {
 	strcpy(msg, "eta: ");
 	msg += strlen("eta: ");
 	if (secs < 100)
-		sprintf(msg, "%ds", secs);
+		snprintf(msg, maxsize, "%"PRId64"s", secs);
 	else if (secs < 100 * 60)
-		sprintf(msg, "%dm%ds", secs / 60, secs % 60);
+		snprintf(msg, maxsize, "%"PRId64"m""%"PRId64"s",
+			secs / 60, secs % 60);
 	else if (secs < 48 * 3600)
-		sprintf(msg, "%dh%dm", secs / 3600, (secs / 60) % 60);
+		snprintf(msg, maxsize, "%"PRId64"h""%"PRId64"m",
+			secs / 3600, (secs / 60) % 60);
 	else if (secs < 100 * 86400)
-		sprintf(msg, "%dd%dh", secs / 86400, (secs / 3600) % 24);
+		snprintf(msg, maxsize, "%"PRId64"d""%"PRId64"h",
+			secs / 86400, (secs / 3600) % 24);
 	else
 		sprintf(msg, ">2day");
 	return 0;
@@ -379,8 +384,8 @@ print_progress(const char *msg, unsigned long current, unsigned long end, struct
 	static unsigned int lapse = 0;
 	static const char *spinner = "/|\\-";
 	struct timeval delta;
-	double eta;
-	char eta_msg[16] = " ";
+	int64_t eta;
+	char eta_msg[32] = " ";
 
 	if (current < end) {
 		tm = time(NULL);
@@ -395,7 +400,7 @@ print_progress(const char *msg, unsigned long current, unsigned long end, struct
 		calc_delta(start, &delta);
 		eta = delta.tv_sec + delta.tv_usec / 1e6;
 		eta = (100 - progress) * eta / progress;
-		eta_to_human_short(eta, eta_msg);
+		eta_to_human_short(eta, eta_msg, sizeof(eta_msg));
 	}
 	if (flag_ignore_r_char) {
 		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%5.1f %%] %c  %16s\n",

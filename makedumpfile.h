@@ -251,6 +251,7 @@ static inline int string_exists(char *s) { return (s ? TRUE : FALSE); }
 		     string_exists((char *)(B)) &&	\
 	(strncmp((char *)(A), (char *)(B), strlen((char *)(B))) == 0))
 
+#define UCHAR(ADDR)	*((unsigned char *)(ADDR))
 #define USHORT(ADDR)	*((unsigned short *)(ADDR))
 #define UINT(ADDR)	*((unsigned int *)(ADDR))
 #define ULONG(ADDR)	*((unsigned long *)(ADDR))

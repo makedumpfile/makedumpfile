@@ -241,7 +241,7 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 }
 
 static inline int
-isHugetlb(int dtor)
+isHugetlb(unsigned long dtor)
 {
         return ((NUMBER(HUGETLB_PAGE_DTOR) != NOT_FOUND_NUMBER)
 		&& (NUMBER(HUGETLB_PAGE_DTOR) == dtor))
@@ -5797,18 +5797,36 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 * and PGMM_CACHED is a power of 2.
 		 */
 		if ((index_pg < PGMM_CACHED - 1) && isCompoundHead(flags)) {
-			if (order_offset)
-				compound_order = USHORT(pcache + SIZE(page) + order_offset);
+			unsigned long long addr =
+				(unsigned long long)(pcache + SIZE(page));
+
+			if (order_offset) {
+				if (info->kernel_version >=
+				    KERNEL_VERSION(4, 16, 0)) {
+					compound_order =
+						UCHAR(addr + order_offset);
+				} else {
+					compound_order =
+						USHORT(addr + order_offset);
+				}
+			}
 
 			if (dtor_offset) {
 				/*
 				 * compound_dtor has been changed from the address of descriptor
 				 * to the ID of it since linux-4.4.
 				 */
-				if (info->kernel_version >= KERNEL_VERSION(4, 4, 0)) {
-					compound_dtor = USHORT(pcache + SIZE(page) + dtor_offset);
+				if (info->kernel_version >=
+				    KERNEL_VERSION(4, 16, 0)) {
+					compound_dtor =
+						UCHAR(addr + dtor_offset);
+				} else if (info->kernel_version >=
+					   KERNEL_VERSION(4, 4, 0)) {
+					compound_dtor =
+						USHORT(addr + dtor_offset);
 				} else {
-					compound_dtor = ULONG(pcache + SIZE(page) + dtor_offset);
+					compound_dtor =
+						ULONG(addr + dtor_offset);
 				}
 			}
 

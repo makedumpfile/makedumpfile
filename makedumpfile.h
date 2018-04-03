@@ -185,8 +185,15 @@ isAnon(unsigned long mapping)
 #define SECTION_ROOT_MASK()	(SECTIONS_PER_ROOT() - 1)
 #define SECTION_NR_TO_ROOT(sec)	((sec) / SECTIONS_PER_ROOT())
 #define SECTION_IS_ONLINE	(1UL<<2)
+/*
+ * SECTION_MAP_LAST_BIT was 1UL<<2 before Linux 4.13.0.
+ * However, we always use the higher value, because:
+ *  1. at least one distributor backported commit 2d070eab2e82 to kernel
+ *     version 4.12,
+ *  2. it has been verified that (1UL<<2) was never set, so it is
+ *     safe to mask that bit off even in old kernels.
+ */
 #define SECTION_MAP_LAST_BIT	(1UL<<3)
-#define SECTION_MAP_MASK_4_12	(~(SECTION_IS_ONLINE-1))
 #define SECTION_MAP_MASK	(~(SECTION_MAP_LAST_BIT-1))
 #define NR_SECTION_ROOTS()	divideup(num_section, SECTIONS_PER_ROOT())
 #define SECTION_NR_TO_PFN(sec)	((sec) << PFN_SECTION_SHIFT())

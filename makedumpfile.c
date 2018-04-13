@@ -249,6 +249,12 @@ isHugetlb(unsigned long dtor)
                     && (SYMBOL(free_huge_page) == dtor));
 }
 
+static int
+is_cache_page(unsigned long flags)
+{
+	return isLRU(flags) || isSwapCache(flags);
+}
+
 static inline unsigned long
 calculate_len_buf_out(long page_size)
 {
@@ -5952,7 +5958,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 * Exclude the non-private cache page.
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_CACHE)
-		    && (isLRU(flags) || isSwapCache(flags))
+		    && is_cache_page(flags)
 		    && !isPrivate(flags) && !isAnon(mapping)) {
 			pfn_counter = &pfn_cache;
 		}
@@ -5960,7 +5966,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 * Exclude the cache page whether private or non-private.
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
-		    && (isLRU(flags) || isSwapCache(flags))
+		    && is_cache_page(flags)
 		    && !isAnon(mapping)) {
 			if (isPrivate(flags))
 				pfn_counter = &pfn_cache_private;

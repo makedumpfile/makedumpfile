@@ -155,6 +155,7 @@ test_bit(int nr, unsigned long addr)
 #define isPrivate(flags)	test_bit(NUMBER(PG_private), flags)
 #define isCompoundHead(flags)   (!!((flags) & NUMBER(PG_head_mask)))
 #define isSwapCache(flags)	test_bit(NUMBER(PG_swapcache), flags)
+#define isSwapBacked(flags)	test_bit(NUMBER(PG_swapbacked), flags)
 #define isHWPOISON(flags)	(test_bit(NUMBER(PG_hwpoison), flags) \
 				&& (NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER))
 
@@ -1897,6 +1898,7 @@ struct number_table {
 	long	PG_head;
 	long	PG_head_mask;
 	long	PG_swapcache;
+	long	PG_swapbacked;
 	long	PG_buddy;
 	long	PG_slab;
 	long    PG_hwpoison;

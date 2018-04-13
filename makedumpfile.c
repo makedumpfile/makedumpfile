@@ -252,7 +252,18 @@ isHugetlb(unsigned long dtor)
 static int
 is_cache_page(unsigned long flags)
 {
-	return isLRU(flags) || isSwapCache(flags);
+	if (isLRU(flags))
+		return TRUE;
+
+	/* PG_swapcache is valid only if:
+	 *   a. PG_swapbacked bit is set, or
+	 *   b. PG_swapbacked did not exist (kernels before 4.10-rc1).
+	 */
+	if ((NUMBER(PG_swapbacked) == NOT_FOUND_NUMBER || isSwapBacked(flags))
+	    && isSwapCache(flags))
+		return TRUE;
+
+	return FALSE;
 }
 
 static inline unsigned long
@@ -1736,6 +1747,7 @@ get_structure_info(void)
 	ENUM_NUMBER_INIT(PG_lru, "PG_lru");
 	ENUM_NUMBER_INIT(PG_private, "PG_private");
 	ENUM_NUMBER_INIT(PG_swapcache, "PG_swapcache");
+	ENUM_NUMBER_INIT(PG_swapbacked, "PG_swapbacked");
 	ENUM_NUMBER_INIT(PG_buddy, "PG_buddy");
 	ENUM_NUMBER_INIT(PG_slab, "PG_slab");
 	ENUM_NUMBER_INIT(PG_hwpoison, "PG_hwpoison");
@@ -1989,6 +2001,9 @@ get_value_for_old_linux(void)
 		NUMBER(PG_private) = PG_private_ORIGINAL;
 	if (NUMBER(PG_swapcache) == NOT_FOUND_NUMBER)
 		NUMBER(PG_swapcache) = PG_swapcache_ORIGINAL;
+	if (NUMBER(PG_swapbacked) == NOT_FOUND_NUMBER
+	    && NUMBER(PG_swapcache) < NUMBER(PG_private))
+		NUMBER(PG_swapbacked) = NUMBER(PG_private) + 6;
 	if (NUMBER(PG_slab) == NOT_FOUND_NUMBER)
 		NUMBER(PG_slab) = PG_slab_ORIGINAL;
 	if (NUMBER(PG_head_mask) == NOT_FOUND_NUMBER)
@@ -2266,6 +2281,7 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER("PG_private", PG_private);
 	WRITE_NUMBER("PG_head_mask", PG_head_mask);
 	WRITE_NUMBER("PG_swapcache", PG_swapcache);
+	WRITE_NUMBER("PG_swapbacked", PG_swapbacked);
 	WRITE_NUMBER("PG_buddy", PG_buddy);
 	WRITE_NUMBER("PG_slab", PG_slab);
 	WRITE_NUMBER("PG_hwpoison", PG_hwpoison);
@@ -2661,6 +2677,7 @@ read_vmcoreinfo(void)
 	READ_NUMBER("PG_private", PG_private);
 	READ_NUMBER("PG_head_mask", PG_head_mask);
 	READ_NUMBER("PG_swapcache", PG_swapcache);
+	READ_NUMBER("PG_swapbacked", PG_swapbacked);
 	READ_NUMBER("PG_slab", PG_slab);
 	READ_NUMBER("PG_buddy", PG_buddy);
 	READ_NUMBER("PG_hwpoison", PG_hwpoison);

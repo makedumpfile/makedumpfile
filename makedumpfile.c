@@ -2082,8 +2082,9 @@ get_str_osrelease_from_vmlinux(void)
 int
 is_sparsemem_extreme(void)
 {
-	if (ARRAY_LENGTH(mem_section)
+	if ((ARRAY_LENGTH(mem_section)
 	     == divideup(NR_MEM_SECTIONS(), _SECTIONS_PER_ROOT_EXTREME()))
+	    || (ARRAY_LENGTH(mem_section) == NOT_FOUND_SYMBOL))
 		return TRUE;
 	else
 		return FALSE;
@@ -2112,8 +2113,7 @@ get_mem_type(void)
 		ret = DISCONTIGMEM;
 	} else if ((SYMBOL(mem_section) != NOT_FOUND_SYMBOL)
 	    && (SIZE(mem_section) != NOT_FOUND_STRUCTURE)
-	    && (OFFSET(mem_section.section_mem_map) != NOT_FOUND_STRUCTURE)
-	    && (ARRAY_LENGTH(mem_section) != NOT_FOUND_STRUCTURE)) {
+	    && (OFFSET(mem_section.section_mem_map) != NOT_FOUND_STRUCTURE)) {
 		if (is_sparsemem_extreme())
 			ret = SPARSEMEM_EX;
 		else

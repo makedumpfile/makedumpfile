@@ -3992,8 +3992,20 @@ initial(void)
 	 * Get the debug information for analysis from the vmcoreinfo file
 	 */
 	if (info->flag_read_vmcoreinfo) {
+		char *name_vmcoreinfo = info->name_vmcoreinfo;
+		FILE *file_vmcoreinfo = info->file_vmcoreinfo;
+
+		if (has_vmcoreinfo() && !find_kaslr_offsets())
+			return FALSE;
+
+		info->name_vmcoreinfo = name_vmcoreinfo;
+		info->file_vmcoreinfo = file_vmcoreinfo;
+
+		info->read_text_vmcoreinfo = 1;
 		if (!read_vmcoreinfo())
 			return FALSE;
+		info->read_text_vmcoreinfo = 0;
+
 		close_vmcoreinfo();
 		debug_info = TRUE;
 	/*

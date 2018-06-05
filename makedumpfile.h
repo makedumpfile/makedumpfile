@@ -290,6 +290,10 @@ do { \
 		SYMBOL(symbol) = read_vmcoreinfo_symbol(STR_SYMBOL(str_symbol)); \
 		if (SYMBOL(symbol) == INVALID_SYMBOL_DATA) \
 			return FALSE; \
+		if (info->read_text_vmcoreinfo && \
+		    (SYMBOL(symbol) != NOT_FOUND_SYMBOL) && \
+		    (SYMBOL(symbol) != INVALID_SYMBOL_DATA)) \
+			SYMBOL(symbol) += info->kaslr_offset; \
 	} \
 } while (0)
 
@@ -1414,6 +1418,7 @@ struct DumpInfo {
 	FILE			*file_vmcoreinfo;
 	char			*name_vmcoreinfo;	     /* vmcoreinfo file */
 	char			release[STRLEN_OSRELEASE];
+	int			read_text_vmcoreinfo;
 
 	/*
 	 * ELF NOTE section in dump memory image info:

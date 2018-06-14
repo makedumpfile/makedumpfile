@@ -3402,6 +3402,8 @@ validate_mem_section(unsigned long *mem_sec,
 	unsigned int section_nr;
 	unsigned long map_mask;
 	unsigned long section, mem_map;
+	int ret = FALSE;
+
 	if (!readmem(VADDR, mem_section_ptr, mem_sec, mem_section_size)) {
 		ERRMSG("Can't read mem_section array.\n");
 		return FALSE;
@@ -3423,11 +3425,12 @@ validate_mem_section(unsigned long *mem_sec,
 				if (!is_kvaddr(mem_map)) {
 					return FALSE;
 				}
+				ret = TRUE;
 			}
 		}
 		mem_maps[section_nr] = mem_map;
 	}
-	return TRUE;
+	return ret;
 }
 
 static int

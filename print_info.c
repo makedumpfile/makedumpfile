@@ -19,6 +19,8 @@
 
 #define PROGRESS_MAXLEN		"50"
 
+#define NSEC_PER_SEC		1000000000L
+
 int message_level;
 int flag_strerr_message;
 int flag_ignore_r_char; /* 0: '\r' is effective. 1: not effective. */
@@ -338,16 +340,16 @@ print_usage(void)
 	MSG("\n");
 }
 
-static void calc_delta(struct timeval *tv_start, struct timeval *delta)
+static void calc_delta(struct timespec *ts_start, struct timespec *delta)
 {
-	struct timeval tv_end;
+	struct timespec ts_end;
 
-	gettimeofday(&tv_end, NULL);
-	delta->tv_sec = tv_end.tv_sec - tv_start->tv_sec;
-	delta->tv_usec = tv_end.tv_usec - tv_start->tv_usec;
-	if (delta->tv_usec < 0) {
+	clock_gettime(CLOCK_MONOTONIC, &ts_end);
+	delta->tv_sec = ts_end.tv_sec - ts_start->tv_sec;
+	delta->tv_nsec = ts_end.tv_nsec - ts_start->tv_nsec;
+	if (delta->tv_nsec < 0) {
 		delta->tv_sec--;
-		delta->tv_usec += 1000000;
+		delta->tv_nsec += NSEC_PER_SEC;
 	}
 }
 
@@ -371,14 +373,14 @@ static int eta_to_human_short (unsigned long secs, char* msg)
 
 
 void
-print_progress(const char *msg, unsigned long current, unsigned long end, struct timeval *start)
+print_progress(const char *msg, unsigned long current, unsigned long end, struct timespec *start)
 {
 	unsigned progress;	/* in promilles (tenths of a percent) */
 	time_t tm;
 	static time_t last_time = 0;
 	static unsigned int lapse = 0;
 	static const char *spinner = "/|\\-";
-	struct timeval delta;
+	struct timespec delta;
 	unsigned long eta;
 	char eta_msg[16] = " ";
 
@@ -393,7 +395,7 @@ print_progress(const char *msg, unsigned long current, unsigned long end, struct
 
 	if (start != NULL && progress != 0) {
 		calc_delta(start, &delta);
-		eta = 1000 * delta.tv_sec + delta.tv_usec / 1000;
+		eta = 1000 * delta.tv_sec + delta.tv_nsec / (NSEC_PER_SEC / 1000);
 		eta = eta / progress - delta.tv_sec;
 		eta_to_human_short(eta, eta_msg);
 	}
@@ -411,12 +413,12 @@ print_progress(const char *msg, unsigned long current, unsigned long end, struct
 }
 
 void
-print_execution_time(char *step_name, struct timeval *tv_start)
+print_execution_time(char *step_name, struct timespec *ts_start)
 {
-	struct timeval delta;
+	struct timespec delta;
 
-	calc_delta(tv_start, &delta);
+	calc_delta(ts_start, &delta);
 	REPORT_MSG("STEP [%s] : %ld.%06ld seconds\n",
-		   step_name, delta.tv_sec, delta.tv_usec);
+		   step_name, delta.tv_sec, delta.tv_nsec / 1000);
 }
 

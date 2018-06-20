@@ -5364,7 +5364,7 @@ _exclude_free_page(struct cycle *cycle)
 {
 	int i, nr_zones, num_nodes, node;
 	unsigned long node_zones, zone, spanned_pages, pgdat;
-	struct timeval tv_start;
+	struct timespec ts_start;
 
 	if ((node = next_online_node(0)) < 0) {
 		ERRMSG("Can't get next online node.\n");
@@ -5374,7 +5374,7 @@ _exclude_free_page(struct cycle *cycle)
 		ERRMSG("Can't get pgdat list.\n");
 		return FALSE;
 	}
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	for (num_nodes = 1; num_nodes <= vt.numnodes; num_nodes++) {
 
@@ -5420,7 +5420,7 @@ _exclude_free_page(struct cycle *cycle)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_FREE_PAGES, vt.numnodes, vt.numnodes, NULL);
-	print_execution_time(PROGRESS_FREE_PAGES, &tv_start);
+	print_execution_time(PROGRESS_FREE_PAGES, &ts_start);
 
 	return TRUE;
 }
@@ -5567,7 +5567,7 @@ create_1st_bitmap_file(void)
  	char buf[info->page_size];
 	mdf_pfn_t pfn, pfn_start, pfn_end, pfn_bitmap1;
 	unsigned long long phys_start, phys_end;
-	struct timeval tv_start;
+	struct timespec ts_start;
 	off_t offset_page;
 
 	if (info->flag_refiltering)
@@ -5597,7 +5597,7 @@ create_1st_bitmap_file(void)
 		offset_page += info->page_size;
 	}
 
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	/*
 	 * If page is on memory hole, set bit on the 1st-bitmap.
@@ -5629,7 +5629,7 @@ create_1st_bitmap_file(void)
 	 */
 	if (!info->flag_mem_usage) {
 		print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr, NULL);
-		print_execution_time(PROGRESS_HOLES, &tv_start);
+		print_execution_time(PROGRESS_HOLES, &ts_start);
 	}
 
 	if (!sync_1st_bitmap())
@@ -5731,7 +5731,7 @@ create_bitmap_from_memhole(struct cycle *cycle, struct dump_bitmap *bitmap, int 
 	mdf_pfn_t pfn_start_roundup, pfn_end_round;
 	unsigned long pfn_start_byte, pfn_end_byte;
 	unsigned int num_pt_loads = get_num_pt_loads();
-	struct timeval tv_start;
+	struct timespec ts_start;
 
 	/*
 	 * At first, clear all the bits on the bitmap.
@@ -5741,7 +5741,7 @@ create_bitmap_from_memhole(struct cycle *cycle, struct dump_bitmap *bitmap, int 
 	/*
 	 * If page is on memory hole, set bit on the bitmap.
 	 */
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 	for (i = 0; get_pt_load(i, &phys_start, &phys_end, NULL, NULL); i++) {
 		pfn_start = MAX(paddr_to_pfn(phys_start), cycle->start_pfn);
 		pfn_end = MIN(paddr_to_pfn(phys_end), cycle->end_pfn);
@@ -5786,7 +5786,7 @@ create_bitmap_from_memhole(struct cycle *cycle, struct dump_bitmap *bitmap, int 
 	 * print 100 %
 	 */
 	print_progress(PROGRESS_HOLES, info->max_mapnr, info->max_mapnr, NULL);
-	print_execution_time(PROGRESS_HOLES, &tv_start);
+	print_execution_time(PROGRESS_HOLES, &ts_start);
 
 	return TRUE;
 }
@@ -6045,14 +6045,14 @@ exclude_unnecessary_pages(struct cycle *cycle)
 {
 	unsigned int mm;
 	struct mem_map_data *mmd;
-	struct timeval tv_start;
+	struct timespec ts_start;
 
 	if (is_xen_memory() && !info->dom0_mapnr) {
 		ERRMSG("Can't get max domain-0 PFN for excluding pages.\n");
 		return FALSE;
 	}
 
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	for (mm = 0; mm < info->num_mem_map; mm++) {
 
@@ -6076,7 +6076,7 @@ exclude_unnecessary_pages(struct cycle *cycle)
 	 */
 	if (!info->flag_mem_usage) {
 		print_progress(PROGRESS_UNN_PAGES, info->num_mem_map, info->num_mem_map, NULL);
-		print_execution_time(PROGRESS_UNN_PAGES, &tv_start);
+		print_execution_time(PROGRESS_UNN_PAGES, &ts_start);
 	}
 
 	return TRUE;
@@ -7474,7 +7474,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	unsigned long frac_head, frac_tail;
 	off_t off_seg_load, off_memory;
 	Elf64_Phdr load;
-	struct timeval tv_start;
+	struct timespec ts_start;
 	struct cycle cycle = {0};
 
 	if (!info->flag_elf_dumpfile)
@@ -7499,7 +7499,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	if (!(phnum = get_phnum_memory()))
 		return FALSE;
 
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	for (i = 0; i < phnum; i++) {
 		if (!get_phdr_memory(i, &load))
@@ -7547,7 +7547,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 				}
 
 				if ((num_dumped % per) == 0)
-					print_progress(PROGRESS_COPY, num_dumped, num_dumpable, &tv_start);
+					print_progress(PROGRESS_COPY, num_dumped, num_dumpable, &ts_start);
 
 				num_dumped++;
 
@@ -7666,8 +7666,8 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable, &tv_start);
-	print_execution_time(PROGRESS_COPY, &tv_start);
+	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable, &ts_start);
+	print_execution_time(PROGRESS_COPY, &ts_start);
 	PROGRESS_MSG("\n");
 
 	return TRUE;
@@ -8008,8 +8008,8 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 	mdf_pfn_t per;
 	mdf_pfn_t start_pfn, end_pfn;
 	struct page_desc pd;
-	struct timeval tv_start;
-	struct timeval last, new;
+	struct timespec ts_start;
+	struct timespec last, new;
 	pthread_t **threads = NULL;
 	struct thread_args *kdump_thread_args = NULL;
 	void *thread_result;
@@ -8047,7 +8047,7 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 	per = info->num_dumpable / 10000;
 	per = per ? per : 1;
 
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	start_pfn = cycle->start_pfn;
 	end_pfn   = cycle->end_pfn;
@@ -8095,7 +8095,7 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 		 * The next pfn is smallest pfn in all page_flag_buf.
 		 */
 		sem_wait(&info->page_flag_buf_sem);
-		gettimeofday(&last, NULL);
+		clock_gettime(CLOCK_MONOTONIC, &last);
 		while (1) {
 			current_pfn = end_pfn;
 
@@ -8138,7 +8138,7 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 			 * So we should recheck.
 			 */
 			if (info->page_flag_buf[consuming]->ready != FLAG_READY) {
-				gettimeofday(&new, NULL);
+				clock_gettime(CLOCK_MONOTONIC, &new);
 				if (new.tv_sec - last.tv_sec > WAIT_TIME) {
 					ERRMSG("Can't get data of pfn.\n");
 					goto out;
@@ -8151,7 +8151,7 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 		}
 
 		if ((num_dumped % per) == 0)
-			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
+			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
 
 		num_dumped++;
 
@@ -8187,8 +8187,8 @@ finish:
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
-	print_execution_time(PROGRESS_COPY, &tv_start);
+	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
+	print_execution_time(PROGRESS_COPY, &ts_start);
 	PROGRESS_MSG("\n");
 
 out:
@@ -8238,7 +8238,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	struct page_desc pd;
 	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
-	struct timeval tv_start;
+	struct timespec ts_start;
 	const off_t failed = (off_t)-1;
 	unsigned long len_buf_out_zlib, len_buf_out_lzo, len_buf_out_snappy;
 
@@ -8299,12 +8299,12 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 			end_pfn = info->split_end_pfn;
 	}
 
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 
 		if ((num_dumped % per) == 0)
-			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
+			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
 
 		/*
 		 * Check the excluded page.
@@ -8384,8 +8384,8 @@ out:
 		free(wrkmem);
 #endif
 
-	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
-	print_execution_time(PROGRESS_COPY, &tv_start);
+	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
+	print_execution_time(PROGRESS_COPY, &ts_start);
 
 	return ret;
 }
@@ -8747,7 +8747,7 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	off_t offset_data=0;
 	struct disk_dump_header *dh = info->dump_header;
 	unsigned char buf[info->page_size];
-	struct timeval tv_start;
+	struct timespec ts_start;
 
 	cd_header->offset
 		= (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size + dh->bitmap_blocks)
@@ -8829,7 +8829,7 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	}
 	free_bitmap2_buffer();
 
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	/*
 	 * Write the remainder.
@@ -8842,8 +8842,8 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	/*
 	 * print [100 %]
 	 */
-	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &tv_start);
-	print_execution_time(PROGRESS_COPY, &tv_start);
+	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
+	print_execution_time(PROGRESS_COPY, &ts_start);
 	PROGRESS_MSG("\n");
 
 	return TRUE;
@@ -9563,10 +9563,10 @@ exclude_xen4_user_domain(void)
 int
 exclude_xen_user_domain(void)
 {
-	struct timeval tv_start;
+	struct timespec ts_start;
 	int ret;
 
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	if (info->xen_crash_info.com &&
 	    info->xen_crash_info.com->xen_major_version >= 4)
@@ -9578,7 +9578,7 @@ exclude_xen_user_domain(void)
 	 * print [100 %]
 	 */
 	print_progress(PROGRESS_XEN_DOMAIN, 1, 1, NULL);
-	print_execution_time(PROGRESS_XEN_DOMAIN, &tv_start);
+	print_execution_time(PROGRESS_XEN_DOMAIN, &ts_start);
 
 	return ret;
 }
@@ -10502,7 +10502,7 @@ reassemble_kdump_pages(void)
 	struct disk_dump_header dh;
 	struct page_desc pd, pd_zero;
 	struct cache_data cd_pd, cd_data;
-	struct timeval tv_start;
+	struct timespec ts_start;
 	char *data = NULL;
 	unsigned long data_buf_size = info->page_size;
 
@@ -10538,7 +10538,7 @@ reassemble_kdump_pages(void)
 	/*
 	 * Write page header of zero-filled page.
 	 */
-	gettimeofday(&tv_start, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 	if (info->dump_level & DL_EXCLUDE_ZERO) {
 		/*
 		 * makedumpfile outputs the data of zero-filled page at first
@@ -10573,7 +10573,7 @@ reassemble_kdump_pages(void)
 
 			num_dumped++;
 
-			print_progress(PROGRESS_COPY, num_dumped, num_dumpable, &tv_start);
+			print_progress(PROGRESS_COPY, num_dumped, num_dumpable, &ts_start);
 
 			if (lseek(fd, offset_ph_org, SEEK_SET) < 0) {
 				ERRMSG("Can't seek a file(%s). %s\n",
@@ -10670,8 +10670,8 @@ reassemble_kdump_pages(void)
 						    size_eraseinfo))
 			goto out;
 	}
-	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable, &tv_start);
-	print_execution_time(PROGRESS_COPY, &tv_start);
+	print_progress(PROGRESS_COPY, num_dumpable, num_dumpable, &ts_start);
+	print_execution_time(PROGRESS_COPY, &ts_start);
 
 	ret = TRUE;
 out:

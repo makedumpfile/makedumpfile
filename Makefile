@@ -68,6 +68,18 @@ endif
 
 LIBS := -lpthread $(LIBS)
 
+try-run = $(shell set -e;		\
+	TMP=".$$$$.tmp";		\
+	if ($(1)) >/dev/null 2>&1;	\
+	then echo "$(2)";		\
+	else echo "$(3)";		\
+	fi;				\
+	rm -f "$$TMP")
+
+LINK_TEST_PROG="int clock_gettime(); int main(){ return clock_gettime(); }"
+LIBS := $(LIBS) $(call try-run,\
+	echo $(LINK_TEST_PROG) | $(CC) $(CFLAGS) -o "$$TMP" -x c -,,-lrt)
+
 all: makedumpfile
 
 $(OBJ_PART): $(SRC_PART)

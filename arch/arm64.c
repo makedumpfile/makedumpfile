@@ -222,6 +222,12 @@ get_stext_symbol(void)
 int
 get_machdep_info_arm64(void)
 {
+	/* Check if va_bits is still not initialized. If still 0, call
+	 * get_versiondep_info() to initialize the same.
+	 */
+	if (!va_bits)
+		get_versiondep_info_arm64();
+
 	if (!calculate_plat_config()) {
 		ERRMSG("Can't determine platform config values\n");
 		return FALSE;

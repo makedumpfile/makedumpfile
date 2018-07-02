@@ -5919,8 +5919,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 * and PGMM_CACHED is a power of 2.
 		 */
 		if ((index_pg < PGMM_CACHED - 1) && isCompoundHead(flags)) {
-			unsigned long long addr =
-				(unsigned long long)(pcache + SIZE(page));
+			unsigned char *addr = pcache + SIZE(page);
 
 			if (order_offset) {
 				if (info->kernel_version >=
@@ -6333,7 +6332,7 @@ find_unused_vmemmap_pages(void)
 		for (i = 0; i < sz; i++, lp1++, lp2++) {
 			/* for each whole word in the block */
 			/* deal in full 64-page chunks only */
-			if (*lp1 == 0xffffffffffffffffUL) {
+			if (*lp1 == 0xffffffffffffffffULL) {
 				if (*lp2 == 0) {
 					/* we are in a series we want */
 					if (startword == -1) {
@@ -7807,6 +7806,11 @@ int finalize_zlib(z_stream *stream)
 	return err;
 }
 
+static void
+cleanup_mutex(void *mutex) {
+	pthread_mutex_unlock(mutex);
+}
+
 void *
 kdump_thread_function_cyclic(void *arg) {
 	void *retval = PTHREAD_FAIL;
@@ -7870,7 +7874,7 @@ kdump_thread_function_cyclic(void *arg) {
 		buf_ready = FALSE;
 
 		pthread_mutex_lock(&info->page_data_mutex);
-		pthread_cleanup_push(pthread_mutex_unlock, &info->page_data_mutex);
+		pthread_cleanup_push(cleanup_mutex, &info->page_data_mutex);
 		while (page_data_buf[index].used != FALSE) {
 			pthread_testcancel();
 			index = (index + 1) % info->num_buffers;

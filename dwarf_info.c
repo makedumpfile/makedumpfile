@@ -752,7 +752,8 @@ search_typedef(Dwarf_Die *die, int *found)
 				continue;
 
 			*found = TRUE;
-			strncpy(dwarf_info.src_name, src_name, LEN_SRCFILE);
+			strncpy(dwarf_info.src_name, src_name, LEN_SRCFILE-1);
+			dwarf_info.src_name[LEN_SRCFILE-1] = '\0';
 			break;
 		}
 	} while (!dwarf_siblingof(die, die));

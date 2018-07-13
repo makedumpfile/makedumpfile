@@ -311,7 +311,7 @@ sadump_generate_vmcoreinfo_from_vmlinux(size_t *vmcoreinfo_size)
 	}
 
 	strncpy(info->release, info->system_utsname.release,
-		strlen(info->system_utsname.release) + 1);
+		STRLEN_OSRELEASE);
 
 	write_vmcoreinfo_data();
 

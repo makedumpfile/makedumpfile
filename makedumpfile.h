@@ -542,6 +542,10 @@ do { \
 #ifdef __aarch64__
 unsigned long get_kvbase_arm64(void);
 #define KVBASE			get_kvbase_arm64()
+
+#define __START_KERNEL_map	(0xffffffff80000000UL)
+#define NOT_PADDR_ARM64		(0x0000000010a80000UL)
+
 #endif /* aarch64 */
 
 #ifdef __arm__

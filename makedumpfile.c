@@ -5516,6 +5516,27 @@ out:
 			  "follow free lists instead of mem_map array.\n");
 }
 
+static mdf_pfn_t count_bits(char *buf, int sz)
+{
+	char *p = buf;
+	int i, j;
+	mdf_pfn_t cnt = 0;
+
+	for (i = 0; i < sz; i++, p++) {
+		if (*p == 0)
+			continue;
+		else if (*p == 0xff) {
+			cnt += 8;
+			continue;
+		}
+		for (j = 0; j < 8; j++) {
+			if (*p & (1<<j))
+				cnt++;
+		}
+	}
+	return cnt;
+}
+
 /*
  * If using a dumpfile in kdump-compressed format as a source file
  * instead of /proc/vmcore, 1st-bitmap of a new dumpfile must be
@@ -5549,6 +5570,7 @@ copy_1st_bitmap_from_memory(void)
 					info->name_memory, strerror(errno));
 			return FALSE;
 		}
+		pfn_memhole -= count_bits(buf, sizeof(buf));
 		if (write(info->bitmap1->fd, buf, sizeof(buf)) != sizeof(buf)) {
 			ERRMSG("Can't write the bitmap(%s). %s\n",
 			    info->bitmap1->file_name, strerror(errno));
@@ -6093,19 +6115,27 @@ copy_bitmap_buffer(void)
 int
 copy_bitmap_file(void)
 {
-	off_t offset;
+	off_t base, offset = 0;
 	unsigned char buf[info->page_size];
  	const off_t failed = (off_t)-1;
+	int fd;
+	struct disk_dump_header *dh = info->dh_memory;
 
-	offset = 0;
+	if (info->flag_refiltering) {
+		fd = info->fd_memory;
+		base = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size) * dh->block_size;
+		base += info->len_bitmap / 2;
+	} else {
+		fd = info->bitmap1->fd;
+		base = info->bitmap1->offset;
+	}
 	while (offset < (info->len_bitmap / 2)) {
-		if (lseek(info->bitmap1->fd, info->bitmap1->offset + offset,
-		    SEEK_SET) == failed) {
+		if (lseek(fd, base + offset, SEEK_SET) == failed) {
 			ERRMSG("Can't seek the bitmap(%s). %s\n",
 			    info->name_bitmap, strerror(errno));
 			return FALSE;
 		}
-		if (read(info->bitmap1->fd, buf, sizeof(buf)) != sizeof(buf)) {
+		if (read(fd, buf, sizeof(buf)) != sizeof(buf)) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
 			return FALSE;

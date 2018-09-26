@@ -481,6 +481,11 @@ set_ppc64_max_physmem_bits(void)
 		|| (array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT())))
 		return TRUE;
 
+	info->max_physmem_bits  = _MAX_PHYSMEM_BITS_4_19;
+	if ((array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT_EXTREME()))
+		|| (array_len == (NR_MEM_SECTIONS() / _SECTIONS_PER_ROOT())))
+		return TRUE;
+
 	return FALSE;
 }
 

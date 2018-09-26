@@ -673,6 +673,7 @@ unsigned long get_kvbase_arm64(void);
 #define _SECTION_SIZE_BITS	(24)
 #define _MAX_PHYSMEM_BITS_ORIG  (44)
 #define _MAX_PHYSMEM_BITS_3_7   (46)
+#define _MAX_PHYSMEM_BITS_4_19  (47)
 #define REGION_SHIFT            (60UL)
 #define VMEMMAP_REGION_ID       (0xfUL)
 

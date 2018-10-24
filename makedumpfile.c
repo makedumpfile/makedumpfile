@@ -2084,7 +2084,7 @@ is_sparsemem_extreme(void)
 {
 	if ((ARRAY_LENGTH(mem_section)
 	     == divideup(NR_MEM_SECTIONS(), _SECTIONS_PER_ROOT_EXTREME()))
-	    || (ARRAY_LENGTH(mem_section) == NOT_FOUND_SYMBOL))
+	    || (ARRAY_LENGTH(mem_section) == NOT_FOUND_STRUCTURE))
 		return TRUE;
 	else
 		return FALSE;

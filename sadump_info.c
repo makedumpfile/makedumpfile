@@ -2395,7 +2395,7 @@ sadump_kdump_backup_region_init(void)
 	elfcorehdr_p = 0;
 	for (i = 0; i < ARRAY_LENGTH(kimage.segment); ++i) {
 		char e_ident[EI_NIDENT];
-		unsigned mem;
+		unsigned long mem;
 
 		mem=ULONG(buf+i*SIZE(kexec_segment)+OFFSET(kexec_segment.mem));
 		if (!mem)

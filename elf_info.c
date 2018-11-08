@@ -372,7 +372,7 @@ int set_kcore_vmcoreinfo(uint64_t vmcoreinfo_addr, uint64_t vmcoreinfo_len)
 	off_t offset_desc;
 
 	offset = UNINITIALIZED;
-	kvaddr = (ulong)vmcoreinfo_addr + PAGE_OFFSET;
+	kvaddr = paddr_to_vaddr(vmcoreinfo_addr);
 
 	for (i = 0; i < num_pt_loads; ++i) {
 		struct pt_load_segment *p = &pt_loads[i];
@@ -810,9 +810,10 @@ static int exclude_segment(struct pt_load_segment **pt_loads,
 	int i, j, tidx = -1;
 	unsigned long long	vstart, vend, kvstart, kvend;
 	struct pt_load_segment temp_seg = {0};
-	kvstart = (ulong)start + PAGE_OFFSET;
-	kvend = (ulong)end + PAGE_OFFSET;
 	unsigned long size;
+
+	kvstart = paddr_to_vaddr(start);
+	kvend = paddr_to_vaddr(end);
 
 	for (i = 0; i < (*num_pt_loads); i++) {
 		vstart = (*pt_loads)[i].virt_start;

@@ -174,11 +174,35 @@ get_kvbase_arm64(void)
 int
 get_phys_base_arm64(void)
 {
-	info->phys_base = NUMBER(PHYS_OFFSET);
+	int i;
+	unsigned long long phys_start;
+	unsigned long long virt_start;
 
-	DEBUG_MSG("phys_base    : %lx\n", info->phys_base);
+	if (NUMBER(PHYS_OFFSET) != NOT_FOUND_NUMBER) {
+		info->phys_base = NUMBER(PHYS_OFFSET);
+		DEBUG_MSG("phys_base    : %lx (vmcoreinfo)\n",
+				info->phys_base);
+		return TRUE;
+	}
 
-	return TRUE;
+	if (get_num_pt_loads() && PAGE_OFFSET) {
+		for (i = 0;
+		    get_pt_load(i, &phys_start, NULL, &virt_start, NULL);
+		    i++) {
+			if (virt_start != NOT_KV_ADDR
+			    && virt_start >= PAGE_OFFSET
+			    && phys_start != NOT_PADDR) {
+				info->phys_base = phys_start -
+					(virt_start & ~PAGE_OFFSET);
+				DEBUG_MSG("phys_base    : %lx (pt_load)\n",
+						info->phys_base);
+				return TRUE;
+			}
+		}
+	}
+
+	ERRMSG("Cannot determine phys_base\n");
+	return FALSE;
 }
 
 unsigned long
@@ -306,9 +330,6 @@ get_xen_info_arm64(void)
 int
 get_versiondep_info_arm64(void)
 {
-	int i;
-	unsigned long long phys_start;
-	unsigned long long virt_start;
 	ulong _stext;
 
 	_stext = get_stext_symbol();
@@ -333,25 +354,10 @@ get_versiondep_info_arm64(void)
 		return FALSE;
 	}
 
-	if (get_num_pt_loads()) {
-		for (i = 0;
-		    get_pt_load(i, &phys_start, NULL, &virt_start, NULL);
-		    i++) {
-			if (virt_start != NOT_KV_ADDR
-			    && virt_start < __START_KERNEL_map
-			    && phys_start != NOT_PADDR
-			    && phys_start != NOT_PADDR_ARM64) {
-				info->page_offset = virt_start - phys_start;
-				DEBUG_MSG("info->page_offset: %lx, VA_BITS: %d\n",
-						info->page_offset, va_bits);
-				return TRUE;
-			}
-		}
-	}
-
 	info->page_offset = (0xffffffffffffffffUL) << (va_bits - 1);
-	DEBUG_MSG("page_offset=%lx, va_bits=%d\n", info->page_offset,
-			va_bits);
+
+	DEBUG_MSG("va_bits      : %d\n", va_bits);
+	DEBUG_MSG("page_offset  : %lx\n", info->page_offset);
 
 	return TRUE;
 }

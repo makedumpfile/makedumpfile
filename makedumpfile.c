@@ -11214,6 +11214,10 @@ int show_mem_usage(void)
 	if (!get_page_offset())
 		return FALSE;
 
+	/* paddr_to_vaddr() on arm64 needs phys_base. */
+	if (!get_phys_base())
+		return FALSE;
+
 	if (!get_sys_kernel_vmcoreinfo(&vmcoreinfo_addr, &vmcoreinfo_len))
 		return FALSE;
 

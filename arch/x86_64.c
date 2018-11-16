@@ -87,7 +87,7 @@ get_page_offset_x86_64(void)
 	unsigned long long virt_start;
 	unsigned long page_offset_base;
 
-	if (info->kaslr_offset && (info->fd_vmlinux != -1)) {
+	if (info->kaslr_offset && info->name_vmlinux) {
 		page_offset_base = get_symbol_addr("page_offset_base");
 		page_offset_base += info->kaslr_offset;
 		if (!readmem(VADDR, page_offset_base, &info->page_offset,
@@ -139,7 +139,7 @@ get_phys_base_x86_64(void)
 	}
 
 	/* linux-2.6.21 or older don't have phys_base, should be set to 0. */
-	if (!has_vmcoreinfo()) {
+	if (!has_vmcoreinfo() && info->name_vmlinux) {
 		SYMBOL_INIT(phys_base, "phys_base");
 		if (SYMBOL(phys_base) == NOT_FOUND_SYMBOL) {
 			return TRUE;

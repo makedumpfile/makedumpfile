@@ -86,6 +86,7 @@ get_page_offset_x86_64(void)
 	unsigned long long phys_start;
 	unsigned long long virt_start;
 	unsigned long page_offset_base;
+	unsigned long page_offset = 0;
 
 	if (info->kaslr_offset && info->name_vmlinux) {
 		page_offset_base = get_symbol_addr("page_offset_base");
@@ -95,19 +96,31 @@ get_page_offset_x86_64(void)
 			 ERRMSG("Can't read page_offset_base.\n");
 			 return FALSE;
 		}
+		DEBUG_MSG("page_offset  : %lx (vmlinux page_offset_base)\n",
+			info->page_offset);
 		return TRUE;
 	}
 
 	if (get_num_pt_loads()) {
+		/*
+		 * Linux 4.19 (only) adds KCORE_REMAP PT_LOADs, which have
+		 * virt_start < __START_KERNEL_map, to /proc/kcore. In order
+		 * not to select them, we select the last valid PT_LOAD.
+		 */
 		for (i = 0;
 			get_pt_load(i, &phys_start, NULL, &virt_start, NULL);
 			i++) {
 			if (virt_start != NOT_KV_ADDR
 					&& virt_start < __START_KERNEL_map
 					&& phys_start != NOT_PADDR) {
-				info->page_offset = virt_start - phys_start;
-				return TRUE;
+				page_offset = virt_start - phys_start;
 			}
+		}
+		if (page_offset) {
+			info->page_offset = page_offset;
+			DEBUG_MSG("page_offset  : %lx (pt_load)\n",
+				info->page_offset);
+			return TRUE;
 		}
 	}
 
@@ -119,6 +132,7 @@ get_page_offset_x86_64(void)
 		info->page_offset = __PAGE_OFFSET_2_6_27;
 	}
 
+	DEBUG_MSG("page_offset  : %lx (constant)\n", info->page_offset);
 	return TRUE;
 }
 

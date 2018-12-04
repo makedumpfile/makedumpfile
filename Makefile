@@ -1,7 +1,7 @@
 # makedumpfile
 
-VERSION=1.6.4
-DATE=3 Jul 2018
+VERSION=1.6.5
+DATE=5 Dec 2018
 
 # Honour the environment variable CC
 ifeq ($(strip $CC),)

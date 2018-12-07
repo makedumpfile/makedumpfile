@@ -149,6 +149,8 @@ get_phys_base_x86_64(void)
 	info->phys_base = 0; /* default/traditional */
 	if (NUMBER(phys_base) != NOT_FOUND_NUMBER) {
 		info->phys_base = NUMBER(phys_base);
+		DEBUG_MSG("phys_base    : %lx (vmcoreinfo)\n",
+			info->phys_base);
 		return TRUE;
 	}
 
@@ -156,6 +158,8 @@ get_phys_base_x86_64(void)
 	if (!has_vmcoreinfo() && info->name_vmlinux) {
 		SYMBOL_INIT(phys_base, "phys_base");
 		if (SYMBOL(phys_base) == NOT_FOUND_SYMBOL) {
+			DEBUG_MSG("phys_base    : %lx (no phys_base)\n",
+				info->phys_base);
 			return TRUE;
 		}
 	}
@@ -167,6 +171,8 @@ get_phys_base_x86_64(void)
 			info->phys_base = phys_start -
 			    (virt_start & ~(__START_KERNEL_map));
 
+			DEBUG_MSG("phys_base    : %lx (pt_load)\n",
+				info->phys_base);
 			break;
 		}
 	}

@@ -2362,12 +2362,15 @@ read_vmcoreinfo_basic_info(void)
 		return FALSE;
 	}
 
+	DEBUG_MSG("VMCOREINFO   :\n");
 	while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
 		i = strlen(buf);
 		if (!i)
 			break;
 		if (buf[i - 1] == '\n')
 			buf[i - 1] = '\0';
+
+		DEBUG_MSG("  %s\n", buf);
 		if (strncmp(buf, STR_OSRELEASE, strlen(STR_OSRELEASE)) == 0) {
 			get_release = TRUE;
 			/* if the release have been stored, skip this time. */
@@ -2411,6 +2414,8 @@ read_vmcoreinfo_basic_info(void)
 		    strlen(STR_CONFIG_PGTABLE_4)) == 0)
 			vt.mem_flags |= MEMORY_PAGETABLE_4L;
 	}
+	DEBUG_MSG("\n");
+
 	if (!get_release || !info->page_size) {
 		ERRMSG("Invalid format in %s", info->name_vmcoreinfo);
 		return FALSE;
@@ -2836,9 +2841,7 @@ get_numnodes(void)
 	if (!(vt.numnodes = get_nodes_online())) {
 		vt.numnodes = 1;
 	}
-	DEBUG_MSG("\n");
 	DEBUG_MSG("num of NODEs : %d\n", vt.numnodes);
-	DEBUG_MSG("\n");
 
 	return TRUE;
 }
@@ -2968,10 +2971,12 @@ dump_mem_map(mdf_pfn_t pfn_start, mdf_pfn_t pfn_end,
 	mmd->pfn_end   = pfn_end;
 	mmd->mem_map   = mem_map;
 
-	DEBUG_MSG("mem_map (%d)\n", num_mm);
-	DEBUG_MSG("  mem_map    : %lx\n", mem_map);
-	DEBUG_MSG("  pfn_start  : %llx\n", pfn_start);
-	DEBUG_MSG("  pfn_end    : %llx\n", pfn_end);
+	if (num_mm == 0)
+		DEBUG_MSG("%13s %16s %16s %16s\n",
+			"", "mem_map", "pfn_start", "pfn_end");
+
+	DEBUG_MSG("mem_map[%4d] %16lx %16llx %16llx\n",
+		num_mm, mem_map, pfn_start, pfn_end);
 
 	return;
 }
@@ -3561,27 +3566,19 @@ get_mem_map(void)
 
 	switch (get_mem_type()) {
 	case SPARSEMEM:
-		DEBUG_MSG("\n");
-		DEBUG_MSG("Memory type  : SPARSEMEM\n");
-		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : SPARSEMEM\n\n");
 		ret = get_mm_sparsemem();
 		break;
 	case SPARSEMEM_EX:
-		DEBUG_MSG("\n");
-		DEBUG_MSG("Memory type  : SPARSEMEM_EX\n");
-		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : SPARSEMEM_EX\n\n");
 		ret = get_mm_sparsemem();
 		break;
 	case DISCONTIGMEM:
-		DEBUG_MSG("\n");
-		DEBUG_MSG("Memory type  : DISCONTIGMEM\n");
-		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : DISCONTIGMEM\n\n");
 		ret = get_mm_discontigmem();
 		break;
 	case FLATMEM:
-		DEBUG_MSG("\n");
-		DEBUG_MSG("Memory type  : FLATMEM\n");
-		DEBUG_MSG("\n");
+		DEBUG_MSG("Memory type  : FLATMEM\n\n");
 		ret = get_mm_flatmem();
 		break;
 	default:

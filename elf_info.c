@@ -169,11 +169,12 @@ dump_Elf_load(Elf64_Phdr *prog, int num_load)
 	pls->file_offset = prog->p_offset;
 	pls->file_size   = prog->p_filesz;
 
-	DEBUG_MSG("LOAD (%d)\n", num_load);
-	DEBUG_MSG("  phys_start : %llx\n", pls->phys_start);
-	DEBUG_MSG("  phys_end   : %llx\n", pls->phys_end);
-	DEBUG_MSG("  virt_start : %llx\n", pls->virt_start);
-	DEBUG_MSG("  virt_end   : %llx\n", pls->virt_end);
+	if (num_load == 0)
+		DEBUG_MSG("%8s %16s %16s %16s %16s\n", "",
+			"phys_start", "phys_end", "virt_start", "virt_end");
+
+	DEBUG_MSG("LOAD[%2d] %16llx %16llx %16llx %16llx\n", num_load,
+		pls->phys_start, pls->phys_end, pls->virt_start, pls->virt_end);
 
 	return TRUE;
 }
@@ -928,13 +929,13 @@ int get_kcore_dump_loads(void)
 				      p->file_offset + p->phys_end - p->phys_start);
 	}
 
+	DEBUG_MSG("%8s %16s %16s %16s %16s\n", "",
+		"phys_start", "phys_end", "virt_start", "virt_end");
 	for (i = 0; i < num_pt_loads; ++i) {
 		struct pt_load_segment *p = &pt_loads[i];
-		DEBUG_MSG("LOAD (%d)\n", i);
-		DEBUG_MSG("  phys_start : %llx\n", p->phys_start);
-		DEBUG_MSG("  phys_end   : %llx\n", p->phys_end);
-		DEBUG_MSG("  virt_start : %llx\n", p->virt_start);
-		DEBUG_MSG("  virt_end   : %llx\n", p->virt_end);
+
+		DEBUG_MSG("LOAD[%2d] %16llx %16llx %16llx %16llx\n", i,
+			p->phys_start, p->phys_end, p->virt_start, p->virt_end);
 	}
 
 	return TRUE;

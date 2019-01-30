@@ -993,6 +993,8 @@ next_page:
 	read_size = MIN(info->page_size - PAGEOFFSET(paddr), size);
 
 	pgaddr = PAGEBASE(paddr);
+	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
+		pgaddr = pgaddr & ~(NUMBER(sme_mask));
 	pgbuf = cache_search(pgaddr, read_size);
 	if (!pgbuf) {
 		++cache_miss;
@@ -2292,6 +2294,7 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	WRITE_NUMBER("N_ONLINE", N_ONLINE);
 	WRITE_NUMBER("pgtable_l5_enabled", pgtable_l5_enabled);
+	WRITE_NUMBER("sme_mask", sme_mask);
 
 	WRITE_NUMBER("PG_lru", PG_lru);
 	WRITE_NUMBER("PG_private", PG_private);
@@ -2695,6 +2698,7 @@ read_vmcoreinfo(void)
 	READ_NUMBER("NR_FREE_PAGES", NR_FREE_PAGES);
 	READ_NUMBER("N_ONLINE", N_ONLINE);
 	READ_NUMBER("pgtable_l5_enabled", pgtable_l5_enabled);
+	READ_NUMBER("sme_mask", sme_mask);
 
 	READ_NUMBER("PG_lru", PG_lru);
 	READ_NUMBER("PG_private", PG_private);

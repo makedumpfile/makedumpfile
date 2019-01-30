@@ -297,6 +297,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 	unsigned long page_dir, pgd, pud_paddr, pud_pte, pmd_paddr, pmd_pte;
 	unsigned long pte_paddr, pte;
 	unsigned long p4d_paddr, p4d_pte;
+	unsigned long entry_mask = ENTRY_MASK;
 
 	/*
 	 * Get PGD.
@@ -307,6 +308,9 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 		if (page_dir == NOT_PADDR)
 			return NOT_PADDR;
 	}
+
+	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
+		entry_mask &= ~(NUMBER(sme_mask));
 
 	if (check_5level_paging()) {
 		page_dir += pgd5_index(vaddr) * sizeof(unsigned long);
@@ -324,7 +328,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 		/*
 		 * Get P4D.
 		 */
-		p4d_paddr  = pgd & ENTRY_MASK;
+		p4d_paddr = pgd & entry_mask;
 		p4d_paddr += p4d_index(vaddr) * sizeof(unsigned long);
 		if (!readmem(PADDR, p4d_paddr, &p4d_pte, sizeof p4d_pte)) {
 			ERRMSG("Can't get p4d_pte (p4d_paddr:%lx).\n", p4d_paddr);
@@ -337,7 +341,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 			ERRMSG("Can't get a valid p4d_pte.\n");
 			return NOT_PADDR;
 		}
-		pud_paddr  = p4d_pte & ENTRY_MASK;
+		pud_paddr = p4d_pte & entry_mask;
 	}else {
 		page_dir += pgd_index(vaddr) * sizeof(unsigned long);
 		if (!readmem(PADDR, page_dir, &pgd, sizeof pgd)) {
@@ -351,7 +355,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 			ERRMSG("Can't get a valid pgd.\n");
 			return NOT_PADDR;
 		}
-		pud_paddr  = pgd & ENTRY_MASK;
+		pud_paddr = pgd & entry_mask;
 	}
 
 	/*
@@ -370,13 +374,13 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 		return NOT_PADDR;
 	}
 	if (pud_pte & _PAGE_PSE)	/* 1GB pages */
-		return (pud_pte & ENTRY_MASK & PUD_MASK) +
+		return (pud_pte & entry_mask & PUD_MASK) +
 			(vaddr & ~PUD_MASK);
 
 	/*
 	 * Get PMD.
 	 */
-	pmd_paddr  = pud_pte & ENTRY_MASK;
+	pmd_paddr = pud_pte & entry_mask;
 	pmd_paddr += pmd_index(vaddr) * sizeof(unsigned long);
 	if (!readmem(PADDR, pmd_paddr, &pmd_pte, sizeof pmd_pte)) {
 		ERRMSG("Can't get pmd_pte (pmd_paddr:%lx).\n", pmd_paddr);
@@ -390,13 +394,13 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 		return NOT_PADDR;
 	}
 	if (pmd_pte & _PAGE_PSE)	/* 2MB pages */
-		return (pmd_pte & ENTRY_MASK & PMD_MASK) +
+		return (pmd_pte & entry_mask & PMD_MASK) +
 			(vaddr & ~PMD_MASK);
 
 	/*
 	 * Get PTE.
 	 */
-	pte_paddr  = pmd_pte & ENTRY_MASK;
+	pte_paddr = pmd_pte & entry_mask;
 	pte_paddr += pte_index(vaddr) * sizeof(unsigned long);
 	if (!readmem(PADDR, pte_paddr, &pte, sizeof pte)) {
 		ERRMSG("Can't get pte (pte_paddr:%lx).\n", pte_paddr);
@@ -409,7 +413,7 @@ __vtop4_x86_64(unsigned long vaddr, unsigned long pagetable)
 		ERRMSG("Can't get a valid pte.\n");
 		return NOT_PADDR;
 	}
-	return (pte & ENTRY_MASK) + PAGEOFFSET(vaddr);
+	return (pte & entry_mask) + PAGEOFFSET(vaddr);
 }
 
 unsigned long long
@@ -642,6 +646,7 @@ find_vmemmap_x86_64()
 	unsigned long pmd, tpfn;
 	unsigned long pvaddr = 0;
 	unsigned long data_addr = 0, last_data_addr = 0, start_data_addr = 0;
+	unsigned long pmask = PMASK;
 	/*
 	 * data_addr is the paddr of the page holding the page structs.
 	 * We keep lists of contiguous pages and the pfn's that their
@@ -661,6 +666,9 @@ find_vmemmap_x86_64()
 		ERRMSG("init_level4_pgt/init_top_pgt not found\n");
 		return FAILED;
 	}
+
+	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
+		pmask &= ~(NUMBER(sme_mask));
 
 	pagestructsize = size_table.page;
 	hugepagesize = PTRS_PER_PMD * info->page_size;
@@ -692,7 +700,7 @@ find_vmemmap_x86_64()
 		}
 
 		/* mask the pgd entry for the address of the pud page */
-		pud_addr &= PMASK;
+		pud_addr &= pmask;
 		if (pud_addr == 0)
 			  continue;
 		/* read the entire pud page */
@@ -705,7 +713,7 @@ find_vmemmap_x86_64()
 		/* pudp points to an entry in the pud page */
 		for (pudp = (unsigned long *)pud_page, pudindex = 0;
 					pudindex < PTRS_PER_PUD; pudindex++, pudp++) {
-			pmd_addr = *pudp & PMASK;
+			pmd_addr = *pudp & pmask;
 			/* read the entire pmd page */
 			if (pmd_addr == 0)
 				continue;
@@ -747,7 +755,7 @@ find_vmemmap_x86_64()
 				 * - we discontiguous page is a string of valids
 				 */
 				if (pmd) {
-					data_addr = (pmd & PMASK);
+					data_addr = (pmd & pmask);
 					if (start_range) {
 						/* first-time kludge */
 						start_data_addr = data_addr;

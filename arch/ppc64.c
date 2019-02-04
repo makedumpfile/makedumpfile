@@ -657,7 +657,7 @@ int arch_crashkernel_mem_size_ppc64()
 		return FALSE;
 	}
 	fpb = fopen(f_crashbase, "r");
-	if (!fp) {
+	if (!fpb) {
 		ERRMSG("Cannot open %s\n", f_crashbase);
 		fclose(fp);
 		return FALSE;

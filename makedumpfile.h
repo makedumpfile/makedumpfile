@@ -617,6 +617,7 @@ unsigned long get_kvbase_arm64(void);
 #define VMEMMAP_END_5LEVEL	(0xffd5ffffffffffff) /* 5-level page table */
 
 #define __START_KERNEL_map	(0xffffffff80000000)
+#define KERNEL_IMAGE_SIZE_KASLR_ORIG	(1024*1024*1024) /* 3.14, or later */
 #define KVBASE			PAGE_OFFSET
 #define _SECTION_SIZE_BITS	(27)
 #define _MAX_PHYSMEM_BITS_ORIG		(40)
@@ -1934,6 +1935,7 @@ struct number_table {
 	long	MAX_PHYSMEM_BITS;
 	long    HUGETLB_PAGE_DTOR;
 	long	phys_base;
+	long	KERNEL_IMAGE_SIZE;
 #ifdef __aarch64__
 	long 	VA_BITS;
 	unsigned long	PHYS_OFFSET;

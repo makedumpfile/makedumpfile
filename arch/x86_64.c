@@ -48,6 +48,7 @@ get_kaslr_offset_x86_64(unsigned long vaddr)
 {
 	unsigned int i;
 	char buf[BUFSIZE_FGETS], *endp;
+	unsigned long kernel_image_size;
 
 	if (!info->kaslr_offset && info->file_vmcoreinfo) {
 		if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
@@ -68,8 +69,16 @@ get_kaslr_offset_x86_64(unsigned long vaddr)
 					strtoul(buf+strlen(STR_KERNELOFFSET),&endp,16);
 		}
 	}
+	if (!info->kaslr_offset)
+		return 0;
+
+	if (NUMBER(KERNEL_IMAGE_SIZE) != NOT_FOUND_NUMBER)
+		kernel_image_size = NUMBER(KERNEL_IMAGE_SIZE);
+	else
+		kernel_image_size = KERNEL_IMAGE_SIZE_KASLR_ORIG;
+
 	if (vaddr >= __START_KERNEL_map &&
-			vaddr < __START_KERNEL_map + info->kaslr_offset)
+			vaddr < __START_KERNEL_map + kernel_image_size)
 		return info->kaslr_offset;
 	else
 		/*

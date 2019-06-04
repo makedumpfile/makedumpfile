@@ -210,6 +210,8 @@ get_kaslr_offset_arm64(unsigned long vaddr)
 {
 	unsigned int i;
 	char buf[BUFSIZE_FGETS], *endp;
+	static unsigned long _text = NOT_FOUND_SYMBOL;
+	static unsigned long _end = NOT_FOUND_SYMBOL;
 
 	if (!info->kaslr_offset && info->file_vmcoreinfo) {
 		if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
@@ -232,9 +234,27 @@ get_kaslr_offset_arm64(unsigned long vaddr)
 			}
 		}
 	}
+	if (!info->kaslr_offset)
+		return 0;
 
-	if (vaddr >= __START_KERNEL_map &&
-			vaddr < __START_KERNEL_map + info->kaslr_offset) {
+	if (_text == NOT_FOUND_SYMBOL) {
+		/*
+		 * Currently, the return value of this function is used in
+		 * resolve_config_entry() only, and in that case, we must
+		 * have a vmlinux.
+		 */
+		if (info->name_vmlinux) {
+			_text = get_symbol_addr("_text");
+			_end = get_symbol_addr("_end");
+		}
+		DEBUG_MSG("_text: %lx, _end: %lx\n", _text, _end);
+		if (_text == NOT_FOUND_SYMBOL || _end == NOT_FOUND_SYMBOL) {
+			ERRMSG("Cannot determine _text and _end address\n");
+			return FALSE;
+		}
+	}
+
+	if (_text <= vaddr && vaddr <= _end) {
 		DEBUG_MSG("info->kaslr_offset: %lx\n", info->kaslr_offset);
 		return info->kaslr_offset;
 	} else {

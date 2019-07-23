@@ -7344,7 +7344,8 @@ create_dump_bitmap(void)
 		if (!prepare_bitmap2_buffer())
 			goto out;
 
-		info->num_dumpable = get_num_dumpable_cyclic();
+		if (!(info->num_dumpable = get_num_dumpable_cyclic()))
+			goto out;
 
 		if (!info->flag_elf_dumpfile)
 			free_bitmap2_buffer();
@@ -7362,7 +7363,8 @@ create_dump_bitmap(void)
 		if (!create_2nd_bitmap(&cycle))
 			goto out;
 
-		info->num_dumpable = get_num_dumpable_cyclic();
+		if (!(info->num_dumpable = get_num_dumpable_cyclic()))
+			goto out;
 	}
 
 	ret = TRUE;

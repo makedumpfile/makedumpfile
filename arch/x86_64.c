@@ -679,6 +679,16 @@ find_vmemmap_x86_64()
 	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
 		pmask &= ~(NUMBER(sme_mask));
 
+	/*
+	 * vmemmap region can be randomized by KASLR.
+	 * (currently we don't utilize info->vmemmap_end on x86_64.)
+	 */
+	if (info->mem_map_data &&
+	    info->mem_map_data[0].mem_map != NOT_MEMMAP_ADDR)
+		info->vmemmap_start = info->mem_map_data[0].mem_map;
+
+	DEBUG_MSG("vmemmap_start: %16lx\n", info->vmemmap_start);
+
 	pagestructsize = size_table.page;
 	hugepagesize = PTRS_PER_PMD * info->page_size;
 	vaddr_base = info->vmemmap_start;

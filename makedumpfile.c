@@ -6315,7 +6315,7 @@ find_vmemmap_pages(unsigned long startpfn, unsigned long endpfn, unsigned long *
 			start_vmemmap_pfn = vmapp->vmap_pfn_start + vmemmap_pfns;
 			*vmappfn = start_vmemmap_pfn;
 
-			npfns_offset = endpfn - vmapp->rep_pfn_start;
+			npfns_offset = (endpfn+1) - vmapp->rep_pfn_start;
 			vmemmap_offset = npfns_offset * size_table.page;
 			// round down to page boundary
 			vmemmap_offset -= (vmemmap_offset % pagesize);

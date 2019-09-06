@@ -673,7 +673,7 @@ find_vmemmap_x86_64()
 
 	if (init_level4_pgt == NOT_FOUND_SYMBOL) {
 		ERRMSG("init_level4_pgt/init_top_pgt not found\n");
-		return FAILED;
+		return FALSE;
 	}
 
 	if (NUMBER(sme_mask) != NOT_FOUND_NUMBER)
@@ -715,7 +715,7 @@ find_vmemmap_x86_64()
 		if (!readmem(PADDR, (unsigned long long)pgdp, (void *)&pud_addr,
 								sizeof(unsigned long))) {
 			ERRMSG("Can't get pgd entry for slot %d.\n", pgd_index);
-			return FAILED;
+			return FALSE;
 		}
 
 		/* mask the pgd entry for the address of the pud page */
@@ -726,7 +726,7 @@ find_vmemmap_x86_64()
 		if (!readmem(PADDR, (unsigned long long)pud_addr, (void *)pud_page,
 					PTRS_PER_PUD * sizeof(unsigned long))) {
 			ERRMSG("Can't get pud entry for pgd slot %ld.\n", pgdindex);
-			return FAILED;
+			return FALSE;
 		}
 		/* step thru each pmd address in the pud page */
 		/* pudp points to an entry in the pud page */
@@ -739,7 +739,7 @@ find_vmemmap_x86_64()
 			if (!readmem(PADDR, pmd_addr, (void *)pmd_page,
 					PTRS_PER_PMD * sizeof(unsigned long))) {
 				ERRMSG("Can't get pud entry for slot %ld.\n", pudindex);
-				return FAILED;
+				return FALSE;
 			}
 			/* pmdp points to an entry in the pmd */
 			for (pmdp = (unsigned long *)pmd_page, pmdindex = 0;
@@ -815,7 +815,7 @@ find_vmemmap_x86_64()
 					num_pmds_valid++;
 					if (!(pmd & _PAGE_PSE)) {
 						printf("vmemmap pmd not huge, abort\n");
-						return FAILED;
+						return FALSE;
 					}
 				} else {
 					if (last_valid) {
@@ -947,7 +947,7 @@ find_vmemmap_x86_64()
 		i++;
 	} while (cur != vmaphead);
 	nr_gvmem_pfns = i;
-	return COMPLETED;
+	return TRUE;
 }
 
 #endif /* x86_64 */

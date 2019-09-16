@@ -8295,13 +8295,23 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	struct timespec ts_start;
 	const off_t failed = (off_t)-1;
 	int ret = FALSE;
+	z_stream z_stream, *stream = NULL;
+#ifdef USELZO
+	lzo_bytep wrkmem = NULL;
+#endif
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
 
-#ifdef USELZO
-	lzo_bytep wrkmem;
+	if (info->flag_compress & DUMP_DH_COMPRESSED_ZLIB) {
+		if (!initialize_zlib(&z_stream, Z_BEST_SPEED)) {
+			ERRMSG("Can't initialize the zlib stream.\n");
+			goto out;
+		}
+		stream = &z_stream;
+	}
 
+#ifdef USELZO
 	if ((wrkmem = malloc(LZO1X_1_MEM_COMPRESS)) == NULL) {
 		ERRMSG("Can't allocate memory for the working memory. %s\n",
 		       strerror(errno));
@@ -8375,8 +8385,8 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		size_out = len_buf_out;
 		if ((info->flag_compress & DUMP_DH_COMPRESSED_ZLIB)
 		    && ((size_out = len_buf_out),
-			compress2(buf_out, &size_out, buf, info->page_size,
-				  Z_BEST_SPEED) == Z_OK)
+			compress_mdf(stream, buf_out, &size_out,
+				buf, info->page_size, Z_BEST_SPEED) == Z_OK)
 		    && (size_out < info->page_size)) {
 			pd.flags = DUMP_DH_COMPRESSED_ZLIB;
 			pd.size  = size_out;
@@ -8424,6 +8434,8 @@ out:
 	if (wrkmem != NULL)
 		free(wrkmem);
 #endif
+	if (stream != NULL)
+		finalize_zlib(stream);
 
 	print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
 	print_execution_time(PROGRESS_COPY, &ts_start);

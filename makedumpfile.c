@@ -7891,10 +7891,6 @@ kdump_thread_function_cyclic(void *arg) {
 #ifdef USELZO
 	lzo_bytep wrkmem = WRKMEM_PARALLEL(kdump_thread_args->thread_num);
 #endif
-#ifdef USESNAPPY
-	unsigned long len_buf_out_snappy =
-				snappy_max_compressed_length(info->page_size);
-#endif
 
 	buf = BUF_PARALLEL(kdump_thread_args->thread_num);
 	buf_out = BUF_OUT_PARALLEL(kdump_thread_args->thread_num);
@@ -8016,7 +8012,7 @@ kdump_thread_function_cyclic(void *arg) {
 #ifdef USESNAPPY
 			} else if ((info->flag_compress
 				    & DUMP_DH_COMPRESSED_SNAPPY)
-				   && ((size_out = len_buf_out_snappy),
+				   && ((size_out = kdump_thread_args->len_buf_out),
 				       snappy_compress((char *)buf,
 						       info->page_size,
 						       (char *)buf_out,
@@ -8298,14 +8294,10 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	unsigned long len_buf_out;
 	struct timespec ts_start;
 	const off_t failed = (off_t)-1;
-	unsigned long len_buf_out_zlib, len_buf_out_lzo, len_buf_out_snappy;
-
 	int ret = FALSE;
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
-
-	len_buf_out_zlib = len_buf_out_lzo = len_buf_out_snappy = 0;
 
 #ifdef USELZO
 	lzo_bytep wrkmem;
@@ -8315,18 +8307,9 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		       strerror(errno));
 		goto out;
 	}
-
-	len_buf_out_lzo = info->page_size + info->page_size / 16 + 64 + 3;
-#endif
-#ifdef USESNAPPY
-	len_buf_out_snappy = snappy_max_compressed_length(info->page_size);
 #endif
 
-	len_buf_out_zlib = compressBound(info->page_size);
-
-	len_buf_out = MAX(len_buf_out_zlib,
-			  MAX(len_buf_out_lzo,
-			      len_buf_out_snappy));
+	len_buf_out = calculate_len_buf_out(info->page_size);
 
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
@@ -8409,7 +8392,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 #endif
 #ifdef USESNAPPY
 		} else if ((info->flag_compress & DUMP_DH_COMPRESSED_SNAPPY)
-			   && ((size_out = len_buf_out_snappy),
+			   && ((size_out = len_buf_out),
 			       snappy_compress((char *)buf, info->page_size,
 					       (char *)buf_out,
 					       (size_t *)&size_out)

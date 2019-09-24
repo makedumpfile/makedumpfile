@@ -9773,8 +9773,6 @@ print_report(void)
 
 	pfn_excluded = pfn_zero + pfn_cache + pfn_cache_private
 	    + pfn_user + pfn_free + pfn_hwpoison + pfn_offline;
-	shrinking = (pfn_original - pfn_excluded) * 100;
-	shrinking = shrinking / pfn_original;
 
 	REPORT_MSG("\n");
 	REPORT_MSG("Original pages  : 0x%016llx\n", pfn_original);
@@ -9789,8 +9787,13 @@ print_report(void)
 	REPORT_MSG("    Offline pages           : 0x%016llx\n", pfn_offline);
 	REPORT_MSG("  Remaining pages  : 0x%016llx\n",
 	    pfn_original - pfn_excluded);
-	REPORT_MSG("  (The number of pages is reduced to %lld%%.)\n",
-	    shrinking);
+
+	if (pfn_original != 0) {
+		shrinking = (pfn_original - pfn_excluded) * 100;
+		shrinking = shrinking / pfn_original;
+		REPORT_MSG("  (The number of pages is reduced to %lld%%.)\n",
+		    shrinking);
+	}
 	REPORT_MSG("Memory Hole     : 0x%016llx\n", pfn_memhole);
 	REPORT_MSG("--------------------------------------------------\n");
 	REPORT_MSG("Total pages     : 0x%016llx\n", info->max_mapnr);

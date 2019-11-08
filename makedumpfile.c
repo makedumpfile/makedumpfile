@@ -6871,10 +6871,17 @@ write_elf_header(struct cache_data *cd_header)
 			ERRMSG("Can't get ehdr64.\n");
 			goto out;
 		}
+
+		/* For PT_NOTE */
+		num_loads_dumpfile++;
+
 		/*
-		 * PT_NOTE(1) + PT_LOAD(1+)
+		 * Extended Numbering support
+		 * See include/uapi/linux/elf.h and elf(5) for more information.
 		 */
-		ehdr64.e_phnum = 1 + num_loads_dumpfile;
+		ehdr64.e_phnum = (num_loads_dumpfile >= PN_XNUM) ?
+					PN_XNUM : num_loads_dumpfile;
+
 	} else {                /* ELF32 */
 		if (!get_elf32_ehdr(info->fd_memory,
 				    info->name_memory, &ehdr32)) {
@@ -6885,20 +6892,6 @@ write_elf_header(struct cache_data *cd_header)
 		 * PT_NOTE(1) + PT_LOAD(1+)
 		 */
 		ehdr32.e_phnum = 1 + num_loads_dumpfile;
-	}
-
-	/*
-	 * Write an ELF header.
-	 */
-	if (is_elf64_memory()) { /* ELF64 */
-		if (!write_buffer(info->fd_dumpfile, 0, &ehdr64, sizeof(ehdr64),
-		    info->name_dumpfile))
-			goto out;
-
-	} else {                /* ELF32 */
-		if (!write_buffer(info->fd_dumpfile, 0, &ehdr32, sizeof(ehdr32),
-		    info->name_dumpfile))
-			goto out;
 	}
 
 	/*
@@ -6934,15 +6927,12 @@ write_elf_header(struct cache_data *cd_header)
 	if (is_elf64_memory()) { /* ELF64 */
 		cd_header->offset    = sizeof(ehdr64);
 		offset_note_dumpfile = sizeof(ehdr64)
-		    + sizeof(Elf64_Phdr) * ehdr64.e_phnum;
+		    + sizeof(Elf64_Phdr) * num_loads_dumpfile;
 	} else {
 		cd_header->offset    = sizeof(ehdr32);
 		offset_note_dumpfile = sizeof(ehdr32)
 		    + sizeof(Elf32_Phdr) * ehdr32.e_phnum;
 	}
-	offset_note_memory = note.p_offset;
-	note.p_offset      = offset_note_dumpfile;
-	size_note          = note.p_filesz;
 
 	/*
 	 * Reserve a space to store the whole program headers.
@@ -6950,6 +6940,35 @@ write_elf_header(struct cache_data *cd_header)
 	if (!reserve_diskspace(cd_header->fd, cd_header->offset,
 				offset_note_dumpfile, cd_header->file_name))
 		goto out;
+
+	/*
+	 * Write the initial section header just after the program headers
+	 * if necessary. This order is not typical, but looks enough for now.
+	 */
+	if (is_elf64_memory() && ehdr64.e_phnum == PN_XNUM) {
+		Elf64_Shdr shdr64;
+
+		ehdr64.e_shoff = offset_note_dumpfile;
+		ehdr64.e_shentsize = sizeof(shdr64);
+		ehdr64.e_shnum = 1;
+		ehdr64.e_shstrndx = SHN_UNDEF;
+
+		memset(&shdr64, 0, sizeof(shdr64));
+		shdr64.sh_type = SHT_NULL;
+		shdr64.sh_size = ehdr64.e_shnum;
+		shdr64.sh_link = ehdr64.e_shstrndx;
+		shdr64.sh_info = num_loads_dumpfile;
+
+		if (!write_buffer(info->fd_dumpfile, offset_note_dumpfile,
+				&shdr64, sizeof(shdr64), info->name_dumpfile))
+			goto out;
+
+		offset_note_dumpfile += sizeof(shdr64);
+	}
+
+	offset_note_memory = note.p_offset;
+	note.p_offset      = offset_note_dumpfile;
+	size_note          = note.p_filesz;
 
 	/*
 	 * Modify the note size in PT_NOTE header to accomodate eraseinfo data.
@@ -6966,6 +6985,20 @@ write_elf_header(struct cache_data *cd_header)
 
 	if (!write_elf_phdr(cd_header, &note))
 		goto out;
+
+	/*
+	 * Write the ELF header.
+	 */
+	if (is_elf64_memory()) { /* ELF64 */
+		if (!write_buffer(info->fd_dumpfile, 0, &ehdr64, sizeof(ehdr64),
+		    info->name_dumpfile))
+			goto out;
+
+	} else {                 /* ELF32 */
+		if (!write_buffer(info->fd_dumpfile, 0, &ehdr32, sizeof(ehdr32),
+		    info->name_dumpfile))
+			goto out;
+	}
 
 	/*
 	 * Write a PT_NOTE segment.

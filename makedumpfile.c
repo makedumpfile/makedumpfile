@@ -10091,6 +10091,10 @@ writeout_multiple_dumpfiles(void)
 			info->split_start_pfn = SPLITTING_START_PFN(i);
 			info->split_end_pfn   = SPLITTING_END_PFN(i);
 
+			if (!info->flag_cyclic) {
+				info->bitmap1->fd = info->fd_bitmap;
+				info->bitmap2->fd = info->fd_bitmap;
+			}
 			if (!reopen_dump_memory())
 				exit(1);
 			if ((status = writeout_dumpfile()) == FALSE)

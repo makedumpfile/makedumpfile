@@ -11546,6 +11546,13 @@ main(int argc, char *argv[])
 		return COMPLETED;
 	}
 
+	DEBUG_MSG("makedumpfile: version " VERSION " (released on " RELEASE_DATE ")\n");
+	DEBUG_MSG("command line: ");
+	for (i = 0; i < argc; i++) {
+		DEBUG_MSG("%s ", argv[i]);
+	}
+	DEBUG_MSG("\n\n");
+
 	if (elf_version(EV_CURRENT) == EV_NONE ) {
 		/*
 		 * library out of date

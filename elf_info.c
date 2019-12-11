@@ -1049,13 +1049,13 @@ get_elf64_phnum(int fd, char *filename, Elf64_Ehdr *ehdr, int *phnum)
 	 */
 	if (ehdr->e_phnum == PN_XNUM) {
 		if (lseek(fd, ehdr->e_shoff, SEEK_SET) < 0) {
-			ERRMSG("Can't seek %s at 0x%lx. %s\n", filename,
-				ehdr->e_shoff, strerror(errno));
+			ERRMSG("Can't seek %s at 0x%llx. %s\n", filename,
+				(ulonglong)ehdr->e_shoff, strerror(errno));
 			return FALSE;
 		}
 		if (read(fd, &shdr, ehdr->e_shentsize) != ehdr->e_shentsize) {
-			ERRMSG("Can't read %s at 0x%lx. %s\n", filename,
-				ehdr->e_shoff, strerror(errno));
+			ERRMSG("Can't read %s at 0x%llx. %s\n", filename,
+				(ulonglong)ehdr->e_shoff, strerror(errno));
 			return FALSE;
 		}
 

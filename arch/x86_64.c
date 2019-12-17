@@ -77,14 +77,14 @@ get_kaslr_offset_x86_64(unsigned long vaddr)
 	else
 		kernel_image_size = KERNEL_IMAGE_SIZE_KASLR_ORIG;
 
+	/*
+	 * Returns the kaslr offset only if the vaddr needs it to be added,
+	 * i.e. only kernel text address for now.  Otherwise returns 0.
+	 */
 	if (vaddr >= __START_KERNEL_map &&
 			vaddr < __START_KERNEL_map + kernel_image_size)
 		return info->kaslr_offset;
 	else
-		/*
-		 * TODO: we need to check if it is vmalloc/vmmemmap/module
-		 * address, we will have different offset
-		 */
 		return 0;
 }
 

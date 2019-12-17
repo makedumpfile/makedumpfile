@@ -205,67 +205,6 @@ get_phys_base_arm64(void)
 	return FALSE;
 }
 
-unsigned long
-get_kaslr_offset_arm64(unsigned long vaddr)
-{
-	unsigned int i;
-	char buf[BUFSIZE_FGETS], *endp;
-	static unsigned long _text = NOT_FOUND_SYMBOL;
-	static unsigned long _end = NOT_FOUND_SYMBOL;
-
-	if (!info->kaslr_offset && info->file_vmcoreinfo) {
-		if (fseek(info->file_vmcoreinfo, 0, SEEK_SET) < 0) {
-			ERRMSG("Can't seek the vmcoreinfo file(%s). %s\n",
-					info->name_vmcoreinfo, strerror(errno));
-			return FALSE;
-		}
-
-		while (fgets(buf, BUFSIZE_FGETS, info->file_vmcoreinfo)) {
-			i = strlen(buf);
-			if (!i)
-				break;
-			if (buf[i - 1] == '\n')
-				buf[i - 1] = '\0';
-			if (strncmp(buf, STR_KERNELOFFSET,
-					strlen(STR_KERNELOFFSET)) == 0) {
-				info->kaslr_offset =
-					strtoul(buf+strlen(STR_KERNELOFFSET),&endp,16);
-				DEBUG_MSG("info->kaslr_offset: %lx\n", info->kaslr_offset);
-			}
-		}
-	}
-	if (!info->kaslr_offset)
-		return 0;
-
-	if (_text == NOT_FOUND_SYMBOL) {
-		/*
-		 * Currently, the return value of this function is used in
-		 * resolve_config_entry() only, and in that case, we must
-		 * have a vmlinux.
-		 */
-		if (info->name_vmlinux) {
-			_text = get_symbol_addr("_text");
-			_end = get_symbol_addr("_end");
-		}
-		DEBUG_MSG("_text: %lx, _end: %lx\n", _text, _end);
-		if (_text == NOT_FOUND_SYMBOL || _end == NOT_FOUND_SYMBOL) {
-			ERRMSG("Cannot determine _text and _end address\n");
-			return FALSE;
-		}
-	}
-
-	if (_text <= vaddr && vaddr <= _end) {
-		DEBUG_MSG("info->kaslr_offset: %lx\n", info->kaslr_offset);
-		return info->kaslr_offset;
-	} else {
-		/*
-		 * TODO: we need to check if it is vmalloc/vmmemmap/module
-		 * address, we will have different offset
-		 */
-		return 0;
-	}
-}
-
 ulong
 get_stext_symbol(void)
 {

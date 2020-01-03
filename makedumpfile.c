@@ -3975,7 +3975,7 @@ get_kaslr_offset_general(unsigned long vaddr)
 			}
 		}
 	}
-	if (!info->kaslr_offset)
+	if (!info->kaslr_offset || !vaddr)
 		return 0;
 
 	if (_text == NOT_FOUND_SYMBOL) {
@@ -4032,8 +4032,10 @@ find_kaslr_offsets()
 	 * function might need to read from vmcoreinfo, therefore we have
 	 * called this function between open_vmcoreinfo() and
 	 * close_vmcoreinfo()
+	 * And the argument is not needed, because we don't use the return
+	 * value here. So pass it 0 explicitly.
 	 */
-	get_kaslr_offset(SYMBOL(_stext));
+	get_kaslr_offset(0);
 
 	close_vmcoreinfo();
 

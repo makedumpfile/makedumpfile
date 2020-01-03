@@ -69,7 +69,7 @@ get_kaslr_offset_x86_64(unsigned long vaddr)
 					strtoul(buf+strlen(STR_KERNELOFFSET),&endp,16);
 		}
 	}
-	if (!info->kaslr_offset)
+	if (!info->kaslr_offset || !vaddr)
 		return 0;
 
 	if (NUMBER(KERNEL_IMAGE_SIZE) != NOT_FOUND_NUMBER)

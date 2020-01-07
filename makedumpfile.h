@@ -1075,7 +1075,7 @@ int is_iomem_phys_addr_s390x(unsigned long addr);
 #define get_phys_base()		stub_true()
 #define get_machdep_info()	get_machdep_info_s390x()
 #define get_versiondep_info()	stub_true()
-#define get_kaslr_offset(X)	stub_false()
+#define get_kaslr_offset(X)	get_kaslr_offset_general(X)
 #define vaddr_to_paddr(X)	vaddr_to_paddr_s390x(X)
 #define paddr_to_vaddr(X)	paddr_to_vaddr_general(X)
 #define is_phys_addr(X)		is_iomem_phys_addr_s390x(X)

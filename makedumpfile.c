@@ -3406,8 +3406,6 @@ section_mem_map_addr(unsigned long addr, unsigned long *map_mask)
 	map = ULONG(mem_section + OFFSET(mem_section.section_mem_map));
 	mask = SECTION_MAP_MASK;
 	*map_mask = map & ~mask;
-	if (map == 0x0)
-		*map_mask |= SECTION_MARKED_PRESENT;
 	map &= mask;
 	free(mem_section);
 
@@ -3453,10 +3451,8 @@ validate_mem_section(unsigned long *mem_sec,
 			mem_map = NOT_MEMMAP_ADDR;
 		} else {
 			mem_map = section_mem_map_addr(section, &map_mask);
+			/* for either no mem_map or hot-removed */
 			if (!(map_mask & SECTION_MARKED_PRESENT)) {
-				return FALSE;
-			}
-			if (mem_map == 0) {
 				mem_map = NOT_MEMMAP_ADDR;
 			} else {
 				mem_map = sparse_decode_mem_map(mem_map,

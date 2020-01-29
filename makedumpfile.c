@@ -10954,7 +10954,7 @@ check_param_for_reassembling_dumpfile(int argc, char *argv[])
 		return FALSE;
 
 	if ((info->splitting_info
-	    = malloc(sizeof(splitting_info_t) * info->num_dumpfile))
+	    = malloc(sizeof(struct splitting_info) * info->num_dumpfile))
 	    == NULL) {
 		MSG("Can't allocate memory for splitting_info.\n");
 		return FALSE;
@@ -11042,7 +11042,7 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 			return FALSE;
 		}
 		if ((info->splitting_info
-		    = malloc(sizeof(splitting_info_t) * info->num_dumpfile))
+		    = malloc(sizeof(struct splitting_info) * info->num_dumpfile))
 		    == NULL) {
 			MSG("Can't allocate memory for splitting_info.\n");
 			return FALSE;
@@ -11077,13 +11077,13 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 
 	if (info->num_threads) {
 		if ((info->parallel_info =
-		     malloc(sizeof(parallel_info_t) * info->num_threads))
+		     malloc(sizeof(struct parallel_info) * info->num_threads))
 		    == NULL) {
 			MSG("Can't allocate memory for parallel_info.\n");
 			return FALSE;
 		}
 
-		memset(info->parallel_info, 0, sizeof(parallel_info_t)
+		memset(info->parallel_info, 0, sizeof(struct parallel_info)
 							* info->num_threads);
 	}
 

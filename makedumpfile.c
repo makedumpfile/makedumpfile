@@ -3472,7 +3472,6 @@ static int
 get_mem_section(unsigned int mem_section_size, unsigned long *mem_maps,
 		unsigned int num_section)
 {
-	unsigned long mem_section_ptr;
 	int ret = FALSE;
 	unsigned long *mem_sec = NULL;
 
@@ -3484,34 +3483,18 @@ get_mem_section(unsigned int mem_section_size, unsigned long *mem_maps,
 	ret = validate_mem_section(mem_sec, SYMBOL(mem_section),
 				   mem_section_size, mem_maps, num_section);
 
-	if (is_sparsemem_extreme()) {
-		int symbol_valid = ret;
-		int pointer_valid;
-		int mem_maps_size = sizeof(*mem_maps) * num_section;
-		unsigned long *mem_maps_ex = NULL;
+	if (!ret && is_sparsemem_extreme()) {
+		unsigned long mem_section_ptr;
+
 		if (!readmem(VADDR, SYMBOL(mem_section), &mem_section_ptr,
 			     sizeof(mem_section_ptr)))
 			goto out;
 
-		if ((mem_maps_ex = malloc(mem_maps_size)) == NULL) {
-			ERRMSG("Can't allocate memory for the mem_maps. %s\n",
-			    strerror(errno));
-			goto out;
-		}
+		ret = validate_mem_section(mem_sec, mem_section_ptr,
+				mem_section_size, mem_maps, num_section);
 
-		pointer_valid = validate_mem_section(mem_sec,
-						     mem_section_ptr,
-						     mem_section_size,
-						     mem_maps_ex,
-						     num_section);
-		if (pointer_valid)
-			memcpy(mem_maps, mem_maps_ex, mem_maps_size);
-		if (mem_maps_ex)
-			free(mem_maps_ex);
-		ret = symbol_valid ^ pointer_valid;
-		if (!ret) {
+		if (!ret)
 			ERRMSG("Could not validate mem_section.\n");
-		}
 	}
 out:
 	if (mem_sec != NULL)

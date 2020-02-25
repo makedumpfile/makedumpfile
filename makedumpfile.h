@@ -1301,6 +1301,7 @@ struct DumpInfo {
 	int		flag_read_vmcoreinfo;    /* flag of reading vmcoreinfo file */
 	int		flag_show_usage;     /* flag of showing usage */
 	int		flag_show_version;   /* flag of showing version */
+	int		flag_check_params;   /* only check parameters */
 	int		flag_flatten;        /* flag of outputting flattened
 						format to a standard out */
 	int		flag_rearrange;      /* flag of creating dumpfile from
@@ -2362,6 +2363,7 @@ struct elf_prstatus {
 #define OPT_WORKING_DIR         OPT_START+15
 #define OPT_NUM_THREADS         OPT_START+16
 #define OPT_PARTIAL_DMESG       OPT_START+17
+#define OPT_CHECK_PARAMS        OPT_START+18
 
 /*
  * Function Prototype.

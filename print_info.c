@@ -321,6 +321,10 @@ print_usage(void)
 	MSG("  [-v]:\n");
 	MSG("      Show the version of makedumpfile.\n");
 	MSG("\n");
+	MSG("  [--check-params]:\n");
+	MSG("      Only check whether the command-line parameters are valid or not, and exit.\n");
+	MSG("      Preferable to be given as the first parameter.\n");
+	MSG("\n");
 	MSG("  VMLINUX:\n");
 	MSG("      This is a pathname to the first kernel's vmlinux.\n");
 	MSG("      This file must have the debug information of the first kernel to analyze\n");

@@ -10972,12 +10972,6 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	if (info->flag_generate_vmcoreinfo || info->flag_rearrange)
 		return FALSE;
 
-	if ((message_level < MIN_MSG_LEVEL)
-	    || (MAX_MSG_LEVEL < message_level)) {
-		message_level = DEFAULT_MSG_LEVEL;
-		MSG("Message_level is invalid.\n");
-		return FALSE;
-	}
 	if ((info->flag_compress && info->flag_elf_dumpfile)
 	    || (info->flag_read_vmcoreinfo && info->name_vmlinux)
 	    || (info->flag_read_vmcoreinfo && info->name_xen_syms))
@@ -11006,6 +11000,11 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 
 	if (info->flag_partial_dmesg && !info->flag_dmesg)
 		return FALSE;
+
+	if (info->flag_excludevm && !info->working_dir) {
+		MSG("-%c requires --work-dir\n", OPT_EXCLUDE_UNUSED_VM);
+		return FALSE;
+	}
 
 	if ((argc == optind + 2) && !info->flag_flatten
 				 && !info->flag_split
@@ -11402,6 +11401,23 @@ int show_mem_usage(void)
 	return TRUE;
 }
 
+static int set_message_level(char *str_ml)
+{
+	int ml;
+
+	ml = atoi(str_ml);
+	if ((ml < MIN_MSG_LEVEL) || (MAX_MSG_LEVEL < ml)) {
+		message_level = DEFAULT_MSG_LEVEL;
+		MSG("Message_level(%d) is invalid.\n", ml);
+		return FALSE;
+	}
+
+	if (info->flag_check_params)
+		return TRUE;
+
+	message_level = ml;
+	return TRUE;
+}
 
 static struct option longopts[] = {
 	{"split", no_argument, NULL, OPT_SPLIT},
@@ -11423,6 +11439,7 @@ static struct option longopts[] = {
 	{"splitblock-size", required_argument, NULL, OPT_SPLITBLOCK_SIZE},
 	{"work-dir", required_argument, NULL, OPT_WORKING_DIR},
 	{"num-threads", required_argument, NULL, OPT_NUM_THREADS},
+	{"check-params", no_argument, NULL, OPT_CHECK_PARAMS},
 	{0, 0, 0, 0}
 };
 
@@ -11521,7 +11538,8 @@ main(int argc, char *argv[])
 			info->flag_compress = DUMP_DH_COMPRESSED_LZO;
 			break;
 		case OPT_MESSAGE_LEVEL:
-			message_level = atoi(optarg);
+			if (!set_message_level(optarg))
+				goto out;
 			break;
 		case OPT_DUMP_DMESG:
 			info->flag_dmesg = 1;
@@ -11584,6 +11602,10 @@ main(int argc, char *argv[])
 		case OPT_NUM_THREADS:
 			info->num_threads = MAX(atoi(optarg), 0);
 			break;
+		case OPT_CHECK_PARAMS:
+			info->flag_check_params = TRUE;
+			message_level = DEFAULT_MSG_LEVEL;
+			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");
 			MSG("Try `makedumpfile --help' for more information.\n");
@@ -11593,11 +11615,9 @@ main(int argc, char *argv[])
 	if (flag_debug)
 		message_level |= ML_PRINT_DEBUG_MSG;
 
-	if (info->flag_excludevm && !info->working_dir) {
-		ERRMSG("Error: -%c requires --work-dir\n", OPT_EXCLUDE_UNUSED_VM);
-		ERRMSG("Try `makedumpfile --help' for more information\n");
-		return COMPLETED;
-	}
+	if (info->flag_check_params)
+		/* suppress debugging messages */
+		message_level = DEFAULT_MSG_LEVEL;
 
 	if (info->flag_show_usage) {
 		print_usage();
@@ -11628,6 +11648,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->flag_check_params)
+			goto check_ok;
+
 		if (!open_files_for_generating_vmcoreinfo())
 			goto out;
 
@@ -11651,6 +11674,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->flag_check_params)
+			goto check_ok;
+
 		if (!check_dump_file(info->name_dumpfile))
 			goto out;
 
@@ -11671,6 +11697,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->flag_check_params)
+			goto check_ok;
+
 		if (!check_dump_file(info->name_dumpfile))
 			goto out;
 
@@ -11684,6 +11713,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->flag_check_params)
+			goto check_ok;
+
 		if (!check_dump_file(info->name_dumpfile))
 			goto out;
 		if (!dump_dmesg())
@@ -11697,6 +11729,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->flag_check_params)
+			goto check_ok;
+
 		if (!populate_kernel_version())
 			goto out;
 
@@ -11715,6 +11750,9 @@ main(int argc, char *argv[])
 			MSG("Try `makedumpfile --help' for more information.\n");
 			goto out;
 		}
+		if (info->flag_check_params)
+			goto check_ok;
+
 		if (info->flag_split) {
 			for (i = 0; i < info->num_dumpfile; i++) {
 				SPLITTING_FD_BITMAP(i) = -1;
@@ -11742,13 +11780,16 @@ main(int argc, char *argv[])
 			MSG("The dumpfile is saved to %s.\n", info->name_dumpfile);
 		}
 	}
+check_ok:
 	retcd = COMPLETED;
 out:
-	MSG("\n");
-	if (retcd != COMPLETED)
-		MSG("makedumpfile Failed.\n");
-	else if (!info->flag_mem_usage)
-		MSG("makedumpfile Completed.\n");
+	if (!info->flag_check_params) {
+		MSG("\n");
+		if (retcd != COMPLETED)
+			MSG("makedumpfile Failed.\n");
+		else if (!info->flag_mem_usage)
+			MSG("makedumpfile Completed.\n");
+	}
 
 	free_for_parallel();
 

@@ -52,7 +52,7 @@ OBJ_ARCH=$(patsubst %.c,%.o,$(SRC_ARCH))
 
 LIBS = -ldw -lbz2 -ldl -lelf -lz
 ifneq ($(LINKTYPE), dynamic)
-LIBS := -static $(LIBS)
+LIBS := -static $(LIBS) -llzma
 endif
 
 ifeq ($(USELZO), on)
@@ -62,6 +62,9 @@ endif
 
 ifeq ($(USESNAPPY), on)
 LIBS := -lsnappy $(LIBS)
+ifneq ($(LINKTYPE), dynamic)
+LIBS := $(LIBS) -lstdc++
+endif
 CFLAGS += -DUSESNAPPY
 endif
 

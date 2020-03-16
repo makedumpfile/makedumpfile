@@ -81,7 +81,7 @@ static unsigned long kimage_voffset;
  * Remove the highest order bits that are not a part of the
  * physical address in a section
  */
-#define PMD_SECTION_MASK	((1UL << 40) - 1)
+#define PMD_SECTION_MASK	((1UL << PHYS_MASK_SHIFT) - 1)
 
 #define PMD_TYPE_MASK		3
 #define PMD_TYPE_SECT		1

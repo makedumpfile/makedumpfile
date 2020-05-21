@@ -1732,11 +1732,11 @@ per_cpu_init(void)
 		return FALSE;
 	}
 
-	if (!readmem(VADDR, SYMBOL(__per_cpu_load), &si->__per_cpu_load,
-		     sizeof(unsigned long))) {
-		ERRMSG("Can't read __per_cpu_load memory.\n");
+	if (SYMBOL(__per_cpu_load) == NOT_FOUND_SYMBOL) {
+		ERRMSG("Can't find __per_cpu_load symbol.\n");
 		return FALSE;
 	}
+	si->__per_cpu_load = SYMBOL(__per_cpu_load);
 
 	DEBUG_MSG("sadump: __per_cpu_load: %#lx\n", si->__per_cpu_load);
 	DEBUG_MSG("sadump: __per_cpu_offset: LENGTH: %ld\n",

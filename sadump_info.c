@@ -101,6 +101,7 @@ static int lookup_diskset(unsigned long long whole_offset, int *diskid,
 			  unsigned long long *disk_offset);
 static int max_mask_cpu(void);
 static int cpu_online_mask_init(void);
+static int linux_banner_sanity_check(ulong cr3);
 static int per_cpu_init(void);
 static int get_data_from_elf_note_desc(const char *note_buf, uint32_t n_descsz,
 				       char *name, uint32_t n_type, char **data);
@@ -1293,6 +1294,30 @@ finish:
 	return ret;
 }
 
+static int linux_banner_sanity_check(ulong cr3)
+{
+	unsigned long linux_banner_paddr;
+	char buf[sizeof("Linux version")];
+
+	linux_banner_paddr = vtop4_x86_64_pagetable(SYMBOL(linux_banner), cr3);
+	if (linux_banner_paddr == NOT_PADDR) {
+		DEBUG_MSG("sadump: linux_banner address translation failed\n");
+		return FALSE;
+	}
+
+	if (!readmem(PADDR, linux_banner_paddr, &buf, sizeof(buf))) {
+		DEBUG_MSG("sadump: reading linux_banner failed\n");
+		return FALSE;
+	}
+
+	if (!STRNEQ(buf, "Linux version")) {
+		DEBUG_MSG("sadump: linux_banner sanity check failed\n");
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 /*
  * Calculate kaslr_offset and phys_base
  *
@@ -1370,59 +1395,85 @@ calc_kaslr_offset(void)
 {
 	struct sadump_header *sh = si->sh_memory;
 	uint64_t idtr = 0, cr3 = 0, idtr_paddr;
-	struct sadump_smram_cpu_state smram, zero;
+	struct sadump_smram_cpu_state smram;
 	int apicid;
 	unsigned long divide_error_vmcore, divide_error_vmlinux;
 	unsigned long kaslr_offset, phys_base;
 	unsigned long kaslr_offset_kdump, phys_base_kdump;
+	int sanity_check_passed = FALSE;
 
-	memset(&zero, 0, sizeof(zero));
 	for (apicid = 0; apicid < sh->nr_cpus; ++apicid) {
+
+		DEBUG_MSG("sadump: apicid: %d\n", apicid);
+
 		if (!get_smram_cpu_state(apicid, &smram)) {
 			ERRMSG("get_smram_cpu_state error\n");
 			return FALSE;
 		}
 
-		if (memcmp(&smram, &zero, sizeof(smram)) != 0)
+		idtr = ((uint64_t)smram.IdtUpper)<<32|(uint64_t)smram.IdtLower;
+
+		if (!smram.Cr3 || !idtr) {
+			DEBUG_MSG("sadump: cr3: %lx idt: %lx, skipped\n",
+				  smram.Cr3, idtr);
+			continue;
+		}
+
+		if ((SYMBOL(pti_init) != NOT_FOUND_SYMBOL) ||
+		    (SYMBOL(kaiser_init) != NOT_FOUND_SYMBOL))
+			cr3 = smram.Cr3 & ~(CR3_PCID_MASK|PTI_USER_PGTABLE_MASK);
+		else
+			cr3 = smram.Cr3 & ~CR3_PCID_MASK;
+
+		/* Convert virtual address of IDT table to physical address */
+		idtr_paddr = vtop4_x86_64_pagetable(idtr, cr3);
+		if (idtr_paddr == NOT_PADDR) {
+			DEBUG_MSG("sadump: converting IDT physical address "
+				  "failed.\n");
+			continue;
+		}
+
+		/* Now we can calculate kaslr_offset and phys_base */
+		divide_error_vmlinux = SYMBOL(divide_error);
+		divide_error_vmcore = get_vec0_addr(idtr_paddr);
+		kaslr_offset = divide_error_vmcore - divide_error_vmlinux;
+		phys_base = idtr_paddr -
+			(SYMBOL(idt_table)+kaslr_offset-__START_KERNEL_map);
+
+		info->kaslr_offset = kaslr_offset;
+		info->phys_base = phys_base;
+
+		DEBUG_MSG("sadump: idtr=%" PRIx64 "\n", idtr);
+		DEBUG_MSG("sadump: cr3=%" PRIx64 "\n", cr3);
+		DEBUG_MSG("sadump: idtr(phys)=%" PRIx64 "\n", idtr_paddr);
+		DEBUG_MSG("sadump: devide_error(vmlinux)=%lx\n",
+			  divide_error_vmlinux);
+		DEBUG_MSG("sadump: devide_error(vmcore)=%lx\n",
+			  divide_error_vmcore);
+
+		/* Reload symbol */
+		if (!get_symbol_info()) {
+			ERRMSG("Reading symbol table failed\n");
+			return FALSE;
+		}
+
+		/* Sanity check */
+		if (linux_banner_sanity_check(cr3)) {
+			sanity_check_passed = TRUE;
 			break;
+		}
+
+		info->kaslr_offset = 0;
+		info->phys_base = 0;
 	}
-	if (apicid >= sh->nr_cpus) {
-		ERRMSG("Can't get smram state\n");
-		return FALSE;
+
+	if (!sanity_check_passed) {
+		ERRMSG("failed to calculate kaslr_offset and phys_base; "
+		       "default to 0\n");
+		info->kaslr_offset = 0;
+		info->phys_base = 0;
+		return TRUE;
 	}
-
-	idtr = ((uint64_t)smram.IdtUpper)<<32 | (uint64_t)smram.IdtLower;
-	if ((SYMBOL(pti_init) != NOT_FOUND_SYMBOL) ||
-	    (SYMBOL(kaiser_init) != NOT_FOUND_SYMBOL))
-		cr3 = smram.Cr3 & ~(CR3_PCID_MASK|PTI_USER_PGTABLE_MASK);
-	else
-		cr3 = smram.Cr3 & ~CR3_PCID_MASK;
-
-	/* Convert virtual address of IDT table to physical address */
-	if ((idtr_paddr = vtop4_x86_64_pagetable(idtr, cr3)) == NOT_PADDR)
-		return FALSE;
-
-	/* Now we can calculate kaslr_offset and phys_base */
-	divide_error_vmlinux = SYMBOL(divide_error);
-	divide_error_vmcore = get_vec0_addr(idtr_paddr);
-	kaslr_offset = divide_error_vmcore - divide_error_vmlinux;
-	phys_base = idtr_paddr -
-		(SYMBOL(idt_table) + kaslr_offset - __START_KERNEL_map);
-
-	info->kaslr_offset = kaslr_offset;
-	info->phys_base = phys_base;
-
-	DEBUG_MSG("sadump: idtr=%" PRIx64 "\n", idtr);
-	DEBUG_MSG("sadump: cr3=%" PRIx64 "\n", cr3);
-	DEBUG_MSG("sadump: idtr(phys)=%" PRIx64 "\n", idtr_paddr);
-	DEBUG_MSG("sadump: devide_error(vmlinux)=%lx\n",
-		divide_error_vmlinux);
-	DEBUG_MSG("sadump: devide_error(vmcore)=%lx\n",
-		divide_error_vmcore);
-
-	/* Reload symbol */
-	if (!get_symbol_info())
-		return FALSE;
 
 	/*
 	 * Check if current kaslr_offset/phys_base is for 1st kernel or 2nd
@@ -1430,13 +1481,15 @@ calc_kaslr_offset(void)
 	 * from vmcoreinfo
 	 */
 	if (get_kaslr_offset_from_vmcoreinfo(cr3, &kaslr_offset_kdump,
-					    &phys_base_kdump)) {
+					     &phys_base_kdump)) {
 		info->kaslr_offset = kaslr_offset_kdump;
 		info->phys_base = phys_base_kdump;
 
 		/* Reload symbol */
-		if (!get_symbol_info())
+		if (!get_symbol_info()) {
+			ERRMSG("Reading symbol table failed\n");
 			return FALSE;
+		}
 	}
 
 	DEBUG_MSG("sadump: kaslr_offset=%lx\n", info->kaslr_offset);

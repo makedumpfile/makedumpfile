@@ -18,6 +18,7 @@
      #
      # mkdir /usr/local/include/elfutils/
      # cp ./libdw/libdw.h   /usr/local/include/elfutils/libdw.h
+     # cp ./libdwfl/libdwfl.h /usr/local/include/elfutils/libdwfl.h
      # cp ./libdw/dwarf.h   /usr/local/include/dwarf.h
      # cp ./libelf/libelf.h /usr/local/include/libelf.h
      # cp ./libelf/gelf.h   /usr/local/include/gelf.h

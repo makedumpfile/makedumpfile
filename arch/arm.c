@@ -81,7 +81,13 @@ int
 get_machdep_info_arm(void)
 {
 	info->page_offset = SYMBOL(_stext) & 0xffff0000UL;
-	info->max_physmem_bits = _MAX_PHYSMEM_BITS;
+
+	/* Check if we can get MAX_PHYSMEM_BITS from vmcoreinfo */
+	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER)
+		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
+	else
+		info->max_physmem_bits = _MAX_PHYSMEM_BITS;
+
 	info->kernel_start = SYMBOL(_stext);
 	info->section_size_bits = _SECTION_SIZE_BITS;
 

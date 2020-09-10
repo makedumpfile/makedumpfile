@@ -87,6 +87,11 @@ get_machdep_info_x86(void)
 		DEBUG_MSG("PAE          : OFF\n");
 		info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 	}
+
+	/* Check if we can get MAX_PHYSMEM_BITS from vmcoreinfo */
+	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER)
+		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
+
 	info->page_offset = __PAGE_OFFSET;
 
 	if (SYMBOL(_stext) == NOT_FOUND_SYMBOL) {

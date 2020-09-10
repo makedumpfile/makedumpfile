@@ -25,10 +25,15 @@ int get_versiondep_info_sparc64(void)
 {
 	info->section_size_bits = _SECTION_SIZE_BITS;
 
-	if (info->kernel_version >= KERNEL_VERSION(3, 8, 13))
+	/* Check if we can get MAX_PHYSMEM_BITS from vmcoreinfo */
+	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER)
+		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
+	else if (info->kernel_version >= KERNEL_VERSION(3, 8, 13))
 		info->max_physmem_bits = _MAX_PHYSMEM_BITS_L4;
-	else {
+	else
 		info->max_physmem_bits = _MAX_PHYSMEM_BITS_L3;
+
+	if (info->kernel_version < KERNEL_VERSION(3, 8, 13)) {
 		info->flag_vmemmap = TRUE;
 		info->vmemmap_start = VMEMMAP_BASE_SPARC64;
 		info->vmemmap_end = VMEMMAP_BASE_SPARC64 +

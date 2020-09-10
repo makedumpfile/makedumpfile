@@ -466,6 +466,13 @@ int
 set_ppc64_max_physmem_bits(void)
 {
 	long array_len = ARRAY_LENGTH(mem_section);
+
+	/* Check if we can get MAX_PHYSMEM_BITS from vmcoreinfo */
+	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER) {
+		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
+		return TRUE;
+	}
+
 	/*
 	 * The older ppc64 kernels uses _MAX_PHYSMEM_BITS as 42 and the
 	 * newer kernels 3.7 onwards uses 46 bits.

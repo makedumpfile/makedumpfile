@@ -1728,6 +1728,8 @@ struct size_table {
 	long	cpu_spec;
 
 	long	pageflags;
+
+	long	uts_namespace;
 };
 
 struct offset_table {
@@ -1935,6 +1937,10 @@ struct offset_table {
 	struct cpu_spec_s {
 		long	mmu_features;
 	} cpu_spec;
+
+	struct uts_namespace_s {
+		long	name;
+	} uts_namespace;
 };
 
 /*

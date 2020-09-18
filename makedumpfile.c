@@ -1159,7 +1159,10 @@ check_release(void)
 	if (SYMBOL(system_utsname) != NOT_FOUND_SYMBOL) {
 		utsname = SYMBOL(system_utsname);
 	} else if (SYMBOL(init_uts_ns) != NOT_FOUND_SYMBOL) {
-		utsname = SYMBOL(init_uts_ns) + sizeof(int);
+		if (OFFSET(uts_namespace.name) != NOT_FOUND_STRUCTURE)
+			utsname = SYMBOL(init_uts_ns) + OFFSET(uts_namespace.name);
+		else
+			utsname = SYMBOL(init_uts_ns) + sizeof(int);
 	} else {
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
@@ -2040,6 +2043,11 @@ get_structure_info(void)
 	SIZE_INIT(cpu_spec, "cpu_spec");
 	OFFSET_INIT(cpu_spec.mmu_features, "cpu_spec", "mmu_features");
 
+	/*
+	 * Get offsets of the uts_namespace's members.
+	 */
+	OFFSET_INIT(uts_namespace.name, "uts_namespace", "name");
+
 	return TRUE;
 }
 
@@ -2109,7 +2117,10 @@ get_str_osrelease_from_vmlinux(void)
 	if (SYMBOL(system_utsname) != NOT_FOUND_SYMBOL) {
 		utsname = SYMBOL(system_utsname);
 	} else if (SYMBOL(init_uts_ns) != NOT_FOUND_SYMBOL) {
-		utsname = SYMBOL(init_uts_ns) + sizeof(int);
+		if (OFFSET(uts_namespace.name) != NOT_FOUND_STRUCTURE)
+			utsname = SYMBOL(init_uts_ns) + OFFSET(uts_namespace.name);
+		else
+			utsname = SYMBOL(init_uts_ns) + sizeof(int);
 	} else {
 		ERRMSG("Can't get the symbol of system_utsname.\n");
 		return FALSE;
@@ -2344,6 +2355,7 @@ write_vmcoreinfo_data(void)
 	WRITE_MEMBER_OFFSET("vmemmap_backing.list", vmemmap_backing.list);
 	WRITE_MEMBER_OFFSET("mmu_psize_def.shift", mmu_psize_def.shift);
 	WRITE_MEMBER_OFFSET("cpu_spec.mmu_features", cpu_spec.mmu_features);
+	WRITE_MEMBER_OFFSET("uts_namespace.name", uts_namespace.name);
 
 	if (SYMBOL(node_data) != NOT_FOUND_SYMBOL)
 		WRITE_ARRAY_LENGTH("node_data", node_data);
@@ -2743,6 +2755,7 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("vmemmap_backing.list", vmemmap_backing.list);
 	READ_MEMBER_OFFSET("mmu_psize_def.shift", mmu_psize_def.shift);
 	READ_MEMBER_OFFSET("cpu_spec.mmu_features", cpu_spec.mmu_features);
+	READ_MEMBER_OFFSET("uts_namespace.name", uts_namespace.name);
 
 	READ_STRUCTURE_SIZE("printk_log", printk_log);
 	READ_STRUCTURE_SIZE("printk_ringbuffer", printk_ringbuffer);

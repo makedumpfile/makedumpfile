@@ -502,66 +502,6 @@ paddr_to_offset2(unsigned long long paddr, off_t hint)
 	return offset;
 }
 
-unsigned long long
-page_head_to_phys_start(unsigned long long head_paddr)
-{
-	int i;
-	struct pt_load_segment *pls;
-
-	for (i = 0; i < num_pt_loads; i++) {
-		pls = &pt_loads[i];
-		if ((pls->phys_start <= head_paddr + info->page_size)
-		    && (head_paddr < pls->phys_end)) {
-			return (pls->phys_start > head_paddr) ?
-				pls->phys_start : head_paddr;
-		}
-	}
-
-	return 0;
-}
-
-unsigned long long
-page_head_to_phys_end(unsigned long long head_paddr)
-{
-	int i;
-	struct pt_load_segment *pls;
-
-	for (i = 0; i < num_pt_loads; i++) {
-		pls = &pt_loads[i];
-		if ((pls->phys_start <= head_paddr + info->page_size)
-		    && (head_paddr < pls->phys_end)) {
-			return (pls->phys_end < head_paddr + info->page_size) ?
-				pls->phys_end : head_paddr + info->page_size;
-		}
-	}
-
-	return 0;
-}
-
-/*
- *  Calculate a start File Offset of PT_LOAD from a File Offset
- *  of a page. If this function returns 0x0, the input page is
- *  not in the memory image.
- */
-off_t
-offset_to_pt_load_start(off_t offset)
-{
-	int i;
-	off_t pt_load_start;
-	struct pt_load_segment *pls;
-
-	for (i = pt_load_start = 0; i < num_pt_loads; i++) {
-		pls = &pt_loads[i];
-		if ((offset >= pls->file_offset)
-		    && (offset < pls->file_offset +
-			(pls->phys_end - pls->phys_start))) {
-			pt_load_start = pls->file_offset;
-			break;
-		}
-	}
-	return pt_load_start;
-}
-
 /*
  *  Calculate a end File Offset of PT_LOAD from a File Offset
  *  of a page. If this function returns 0x0, the input page is
@@ -1118,12 +1058,6 @@ get_phdr_memory(int index, Elf64_Phdr *phdr)
 		phdr->p_align  = phdr32.p_align;
 	}
 	return TRUE;
-}
-
-off_t
-get_offset_pt_load_memory(void)
-{
-	return offset_pt_load_memory;
 }
 
 int

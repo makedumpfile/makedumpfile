@@ -32,9 +32,6 @@ int get_elf32_phdr(int fd, char *filename, int index, Elf32_Phdr *phdr);
 
 off_t paddr_to_offset(unsigned long long paddr);
 off_t paddr_to_offset2(unsigned long long paddr, off_t hint);
-unsigned long long page_head_to_phys_start(unsigned long long head_paddr);
-unsigned long long page_head_to_phys_end(unsigned long long head_paddr);
-off_t offset_to_pt_load_start(off_t offset);
 off_t offset_to_pt_load_end(off_t offset);
 unsigned long long vaddr_to_paddr_general(unsigned long long vaddr);
 off_t vaddr_to_offset_slow(int fd, char *filename, unsigned long long vaddr);
@@ -57,7 +54,6 @@ int is_xen_memory(void);
 int get_elf64_phnum(int fd, char *filename, Elf64_Ehdr *ehdr, int *phnum);
 int get_phnum_memory(void);
 int get_phdr_memory(int index, Elf64_Phdr *phdr);
-off_t get_offset_pt_load_memory(void);
 int get_pt_load(int idx,
 	unsigned long long *phys_start,
 	unsigned long long *phys_end,

@@ -8385,7 +8385,6 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	unsigned char buf[info->page_size], *buf_out = NULL;
 	unsigned long len_buf_out;
 	struct timespec ts_start;
-	const off_t failed = (off_t)-1;
 	int ret = FALSE;
 	z_stream z_stream, *stream = NULL;
 #ifdef USELZO
@@ -8421,16 +8420,6 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 
 	per = info->num_dumpable / 10000;
 	per = per ? per : 1;
-
-	/*
-	 * Set a fileoffset of Physical Address 0x0.
-	 */
-	if (lseek(info->fd_memory, get_offset_pt_load_memory(), SEEK_SET)
-	    == failed) {
-		ERRMSG("Can't seek the dump memory(%s). %s\n",
-		       info->name_memory, strerror(errno));
-		goto out;
-	}
 
 	start_pfn = cycle->start_pfn;
 	end_pfn   = cycle->end_pfn;

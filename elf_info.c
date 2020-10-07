@@ -63,7 +63,6 @@ static int			flags_memory;
  */
 static unsigned int		num_pt_loads;
 static struct pt_load_segment	*pt_loads;
-static off_t			offset_pt_load_memory;
 
 /*
  * PT_NOTE information about /proc/vmcore:
@@ -843,15 +842,6 @@ int get_kcore_dump_loads(void)
 			return FALSE;
 		}
 
-		if (j == 0) {
-			offset_pt_load_memory = p->file_offset;
-			if (offset_pt_load_memory == 0) {
-				ERRMSG("Can't get the offset of page data.\n");
-				free(pls);
-				return FALSE;
-			}
-		}
-
 		pls[j] = *p;
 		j++;
 	}
@@ -929,13 +919,6 @@ get_elf_info(int fd, char *filename)
 		if (phdr.p_type != PT_LOAD)
 			continue;
 
-		if (j == 0) {
-			offset_pt_load_memory = phdr.p_offset;
-			if (offset_pt_load_memory == 0) {
-				ERRMSG("Can't get the offset of page data.\n");
-				return FALSE;
-			}
-		}
 		if (j >= num_pt_loads)
 			return FALSE;
 		if(!dump_Elf_load(&phdr, j))

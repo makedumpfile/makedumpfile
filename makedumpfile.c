@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <assert.h>
 #include <zlib.h>
+#include <libgen.h>
 
 struct symbol_table	symbol_table;
 struct size_table	size_table;
@@ -1366,7 +1367,25 @@ open_dump_file(void)
 	if (!info->flag_force)
 		open_flags |= O_EXCL;
 
-	if (info->flag_flatten) {
+	if (info->flag_vmcore_size) {
+		char *namecpy;
+		struct stat statbuf;
+		int res;
+
+		namecpy = strdup(info->name_dumpfile ?
+				 info->name_dumpfile : ".");
+
+		res = stat(dirname(namecpy), &statbuf);
+		free(namecpy);
+		if (res != 0)
+			return FALSE;
+
+		fd = -1;
+		info->dumpsize_info.blksize = statbuf.st_blksize;
+		info->dumpsize_info.block_buff_size = BASE_NUM_BLOCKS;
+		info->dumpsize_info.block_info = calloc(BASE_NUM_BLOCKS, 1);
+		info->dumpsize_info.non_hole_blocks = 0;
+	} else if (info->flag_flatten) {
 		fd = STDOUT_FILENO;
 		info->name_dumpfile = filename_stdout;
 	} else if ((fd = open(info->name_dumpfile, open_flags,
@@ -1383,6 +1402,9 @@ int
 check_dump_file(const char *path)
 {
 	char *err_str;
+
+	if (info->flag_vmcore_size)
+		return TRUE;
 
 	if (access(path, F_OK) != 0)
 		return TRUE; /* File does not exist */
@@ -4622,6 +4644,47 @@ write_and_check_space(int fd, void *buf, size_t buf_size, char *file_name)
 	return TRUE;
 }
 
+static int
+write_buffer_update_size_info(off_t offset, void *buf, size_t buf_size)
+{
+	struct dumpsize_info *dumpsize_info = &info->dumpsize_info;
+	int blk_end_idx = (offset + buf_size - 1) / dumpsize_info->blksize;
+	int i;
+
+	/* Need to grow the dumpsize block buffer? */
+	if (blk_end_idx >= dumpsize_info->block_buff_size) {
+		int alloc_size = MAX(blk_end_idx - dumpsize_info->block_buff_size, BASE_NUM_BLOCKS);
+
+		dumpsize_info->block_info = realloc(dumpsize_info->block_info,
+						    dumpsize_info->block_buff_size + alloc_size);
+		if (!dumpsize_info->block_info) {
+			ERRMSG("Not enough memory\n");
+			return FALSE;
+		}
+
+		memset(dumpsize_info->block_info + dumpsize_info->block_buff_size,
+		       0, alloc_size);
+		dumpsize_info->block_buff_size += alloc_size;
+	}
+
+	for (i = 0; i < buf_size; ++i) {
+		int blk_idx = (offset + i) / dumpsize_info->blksize;
+
+		if (dumpsize_info->block_info[blk_idx]) {
+			i += dumpsize_info->blksize;
+			i = i - (i % dumpsize_info->blksize) - 1;
+			continue;
+		}
+
+		if (((char *) buf)[i] != 0) {
+			dumpsize_info->non_hole_blocks++;
+			dumpsize_info->block_info[blk_idx] = 1;
+		}
+	}
+
+	return TRUE;
+}
+
 int
 write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 {
@@ -4643,6 +4706,8 @@ write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 		}
 		if (!write_and_check_space(fd, &fdh, sizeof(fdh), file_name))
 			return FALSE;
+	} else if (info->flag_vmcore_size && fd == info->fd_dumpfile) {
+		return write_buffer_update_size_info(offset, buf, buf_size);
 	} else {
 		if (lseek(fd, offset, SEEK_SET) == failed) {
 			ERRMSG("Can't seek the dump file(%s). %s\n",
@@ -9018,6 +9083,12 @@ close_dump_file(void)
 	if (info->flag_flatten)
 		return;
 
+	if (info->flag_vmcore_size && info->fd_dumpfile == -1) {
+		free(info->dumpsize_info.block_info);
+		info->dumpsize_info.block_info = NULL;
+		return;
+	}
+
 	if (close(info->fd_dumpfile) < 0)
 		ERRMSG("Can't close the dump file(%s). %s\n",
 		    info->name_dumpfile, strerror(errno));
@@ -10963,6 +11034,12 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	if (info->flag_flatten && info->flag_split)
 		return FALSE;
 
+	if (info->flag_flatten && info->flag_vmcore_size)
+		return FALSE;
+
+	if (info->flag_mem_usage && info->flag_vmcore_size)
+		return FALSE;
+
 	if (info->name_filterconfig && !info->name_vmlinux)
 		return FALSE;
 
@@ -11043,7 +11120,8 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 		 */
 		info->name_memory   = argv[optind];
 
-	} else if ((argc == optind + 1) && info->flag_mem_usage) {
+	} else if ((argc == optind + 1) && (info->flag_mem_usage ||
+					    info->flag_vmcore_size)) {
 		/*
 		* Parameter for showing the page number of memory
 		* in different use from.
@@ -11423,6 +11501,7 @@ static struct option longopts[] = {
 	{"work-dir", required_argument, NULL, OPT_WORKING_DIR},
 	{"num-threads", required_argument, NULL, OPT_NUM_THREADS},
 	{"check-params", no_argument, NULL, OPT_CHECK_PARAMS},
+	{"vmcore-size", no_argument, NULL, OPT_VMCORE_SIZE},
 	{0, 0, 0, 0}
 };
 
@@ -11589,6 +11668,9 @@ main(int argc, char *argv[])
 			info->flag_check_params = TRUE;
 			message_level = DEFAULT_MSG_LEVEL;
 			break;
+		case OPT_VMCORE_SIZE:
+			info->flag_vmcore_size = TRUE;
+			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");
 			MSG("Try `makedumpfile --help' for more information.\n");
@@ -11597,6 +11679,10 @@ main(int argc, char *argv[])
 	}
 	if (flag_debug)
 		message_level |= ML_PRINT_DEBUG_MSG;
+
+	if (info->flag_vmcore_size)
+		/* Suppress progress indicator as dumpfile won't get written */
+		message_level &= ~ML_PRINT_PROGRESS;
 
 	if (info->flag_check_params)
 		/* suppress debugging messages */
@@ -11751,7 +11837,11 @@ main(int argc, char *argv[])
 			goto out;
 
 		MSG("\n");
-		if (info->flag_split) {
+
+		if (info->flag_vmcore_size) {
+			MSG("Estimated size to save vmcore is: %lld Bytes\n",
+			    (long long)info->dumpsize_info.non_hole_blocks * info->dumpsize_info.blksize);
+		} else if (info->flag_split) {
 			MSG("The dumpfiles are saved to ");
 			for (i = 0; i < info->num_dumpfile; i++) {
 				if (i != (info->num_dumpfile - 1))
@@ -11808,6 +11898,8 @@ out:
 			free(info->page_buf);
 		if (info->parallel_info != NULL)
 			free(info->parallel_info);
+		if (info->dumpsize_info.block_info != NULL)
+			free(info->dumpsize_info.block_info);
 		free(info);
 
 		if (splitblock) {

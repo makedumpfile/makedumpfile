@@ -1277,6 +1277,15 @@ struct parallel_info {
 #endif
 };
 
+#define BASE_NUM_BLOCKS	50
+
+struct dumpsize_info {
+	int blksize;
+	int block_buff_size;
+	unsigned char *block_info;
+	int non_hole_blocks;
+};
+
 struct ppc64_vmemmap {
 	unsigned long		phys;
 	unsigned long		virt;
@@ -1321,6 +1330,7 @@ struct DumpInfo {
 	int		flag_vmemmap;        /* kernel supports vmemmap address space */
 	int		flag_excludevm;      /* -e - excluding unused vmemmap pages */
 	int		flag_use_count;      /* _refcount is named _count in struct page */
+	int		flag_vmcore_size;    /* estimate the size of the vmcore file instead of creating it */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
@@ -1425,6 +1435,7 @@ struct DumpInfo {
 	int			num_dumpfile;
 	struct splitting_info	*splitting_info;
 	struct parallel_info	*parallel_info;
+	struct dumpsize_info	dumpsize_info;
 
 	/*
 	 * bitmap info:
@@ -2364,6 +2375,7 @@ struct elf_prstatus {
 #define OPT_NUM_THREADS         OPT_START+16
 #define OPT_PARTIAL_DMESG       OPT_START+17
 #define OPT_CHECK_PARAMS        OPT_START+18
+#define OPT_VMCORE_SIZE         OPT_START+19
 
 /*
  * Function Prototype.

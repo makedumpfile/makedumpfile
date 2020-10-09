@@ -308,6 +308,10 @@ print_usage(void)
 	MSG("      the crashkernel range, then calculates the page number of different kind per\n");
 	MSG("      vmcoreinfo. So currently /proc/kcore need be specified explicitly.\n");
 	MSG("\n");
+	MSG("  [--vmcore-size]:\n");
+	MSG("      This option provides an estimation of the size needed to save VMCORE on disk.\n");
+	MSG("      This option option cannot be used in combination with -F.\n");
+	MSG("\n");
 	MSG("  [-D]:\n");
 	MSG("      Print debugging message.\n");
 	MSG("\n");

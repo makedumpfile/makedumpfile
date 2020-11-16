@@ -101,7 +101,6 @@ static int lookup_diskset(unsigned long long whole_offset, int *diskid,
 			  unsigned long long *disk_offset);
 static int max_mask_cpu(void);
 static int cpu_online_mask_init(void);
-static int linux_banner_sanity_check(ulong cr3);
 static int per_cpu_init(void);
 static int get_data_from_elf_note_desc(const char *note_buf, uint32_t n_descsz,
 				       char *name, uint32_t n_type, char **data);

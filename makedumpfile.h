@@ -1317,6 +1317,7 @@ struct DumpInfo {
 	int             flag_partial_dmesg;  /* dmesg dump only from the last cleared index*/
 	int             flag_mem_usage;  /*show the page number of memory in different use*/
 	int		flag_use_printk_log; /* did we read printk_log symbol name? */
+	int		flag_use_printk_ringbuffer; /* using lockless printk ringbuffer? */
 	int		flag_nospace;	     /* the flag of "No space on device" error */
 	int		flag_vmemmap;        /* kernel supports vmemmap address space */
 	int		flag_excludevm;      /* -e - excluding unused vmemmap pages */
@@ -1602,6 +1603,7 @@ struct symbol_table {
 	unsigned long long	node_data;
 	unsigned long long	pgdat_list;
 	unsigned long long	contig_page_data;
+	unsigned long long	prb;
 	unsigned long long	log_buf;
 	unsigned long long	log_buf_len;
 	unsigned long long	log_end;
@@ -1688,6 +1690,13 @@ struct size_table {
 	long	node_memblk_s;
 	long	nodemask_t;
 	long	printk_log;
+
+	/*
+	 * for lockless printk ringbuffer
+	 */
+	long	printk_ringbuffer;
+	long	prb_desc;
+	long	printk_info;
 
 	/*
 	 * for Xen extraction
@@ -1863,6 +1872,52 @@ struct offset_table {
 		long len;
 		long text_len;
 	} printk_log;
+
+	/*
+	 * for lockless printk ringbuffer
+	 */
+	struct printk_ringbuffer_s {
+		long desc_ring;
+		long text_data_ring;
+		long fail;
+	} printk_ringbuffer;
+
+	struct prb_desc_ring_s {
+		long count_bits;
+		long descs;
+		long infos;
+		long head_id;
+		long tail_id;
+	} prb_desc_ring;
+
+	struct prb_desc_s {
+		long state_var;
+		long text_blk_lpos;
+	} prb_desc;
+
+	struct prb_data_blk_lpos_s {
+		long begin;
+		long next;
+	} prb_data_blk_lpos;
+
+	struct printk_info_s {
+		long seq;
+		long ts_nsec;
+		long text_len;
+		long caller_id;
+		long dev_info;
+	} printk_info;
+
+	struct prb_data_ring_s {
+		long size_bits;
+		long data;
+		long head_lpos;
+		long tail_lpos;
+	} prb_data_ring;
+
+	struct atomic_long_t_s {
+		long counter;
+	} atomic_long_t;
 
 	/*
 	 * symbols on ppc64 arch
@@ -2389,5 +2444,8 @@ ulong htol(char *s, int flags);
 int hexadecimal(char *s, int count);
 int decimal(char *s, int count);
 int file_exists(char *file);
+
+int open_dump_file(void);
+int dump_lockless_dmesg(void);
 
 #endif /* MAKEDUMPFILE_H */

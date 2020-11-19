@@ -614,6 +614,7 @@ search_structure(Dwarf_Die *die, int *found)
 {
 	int tag;
 	const char *name;
+	Dwarf_Die die_type;
 
 	/*
 	 * If we get to here then we don't have any more
@@ -622,9 +623,31 @@ search_structure(Dwarf_Die *die, int *found)
 	do {
 		tag  = dwarf_tag(die);
 		name = dwarf_diename(die);
-		if ((tag != DW_TAG_structure_type) || (!name)
-		    || strcmp(name, dwarf_info.struct_name))
+		if ((!name) || strcmp(name, dwarf_info.struct_name))
 			continue;
+
+		if (tag == DW_TAG_typedef) {
+			if (!get_die_type(die, &die_type)) {
+				ERRMSG("Can't get CU die of DW_AT_type.\n");
+				break;
+			}
+
+			/* Resolve typedefs of typedefs. */
+			while ((tag = dwarf_tag(&die_type)) == DW_TAG_typedef) {
+				if (!get_die_type(&die_type, &die_type)) {
+					ERRMSG("Can't get CU die of DW_AT_type.\n");
+					return;
+				}
+			}
+
+			if (tag != DW_TAG_structure_type)
+				continue;
+			die = &die_type;
+
+		} else if (tag != DW_TAG_structure_type) {
+			continue;
+		}
+
 		/*
 		 * Skip if DW_AT_byte_size is not included.
 		 */
@@ -740,6 +763,15 @@ search_typedef(Dwarf_Die *die, int *found)
 				ERRMSG("Can't get CU die of DW_AT_type.\n");
 				break;
 			}
+
+			/* Resolve typedefs of typedefs. */
+			while ((tag = dwarf_tag(&die_type)) == DW_TAG_typedef) {
+				if (!get_die_type(&die_type, &die_type)) {
+					ERRMSG("Can't get CU die of DW_AT_type.\n");
+					return;
+				}
+			}
+
 			dwarf_info.struct_size = dwarf_bytesize(&die_type);
 			if (dwarf_info.struct_size <= 0)
 				continue;

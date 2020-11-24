@@ -1322,6 +1322,7 @@ struct DumpInfo {
 	int		flag_vmemmap;        /* kernel supports vmemmap address space */
 	int		flag_excludevm;      /* -e - excluding unused vmemmap pages */
 	int		flag_use_count;      /* _refcount is named _count in struct page */
+	int		flag_dry_run;        /* do not create a vmcore file */
 	unsigned long	vaddr_for_vtop;      /* virtual address for debugging */
 	long		page_size;           /* size of page */
 	long		page_shift;
@@ -2425,6 +2426,7 @@ struct elf_prstatus {
 #define OPT_NUM_THREADS         OPT_START+16
 #define OPT_PARTIAL_DMESG       OPT_START+17
 #define OPT_CHECK_PARAMS        OPT_START+18
+#define OPT_DRY_RUN             OPT_START+19
 
 /*
  * Function Prototype.

@@ -637,6 +637,12 @@ Show the version of makedumpfile.
 Only check whether the command-line parameters are valid or not, and exit.
 Preferable to be given as the first parameter.
 
+.TP
+\fB\-\-dry-run\fR
+Do not write the output dump file while still performing operations specified
+by other options.
+This option cannot be used with the --dump-dmesg, --reassemble and -g options.
+
 .SH ENVIRONMENT VARIABLES
 
 .TP 8

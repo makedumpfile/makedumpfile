@@ -308,6 +308,9 @@ print_usage(void)
 	MSG("      the crashkernel range, then calculates the page number of different kind per\n");
 	MSG("      vmcoreinfo. So currently /proc/kcore need be specified explicitly.\n");
 	MSG("\n");
+	MSG("  [--dry-run]:\n");
+	MSG("      This option runs makedumpfile without writting output dump file.\n");
+	MSG("\n");
 	MSG("  [-D]:\n");
 	MSG("      Print debugging message.\n");
 	MSG("\n");

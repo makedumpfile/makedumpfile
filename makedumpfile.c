@@ -1372,6 +1372,8 @@ open_dump_file(void)
 	if (info->flag_flatten) {
 		fd = STDOUT_FILENO;
 		info->name_dumpfile = filename_stdout;
+	} else if (info->flag_dry_run) {
+		fd = -1;
 	} else if ((fd = open(info->name_dumpfile, open_flags,
 	    S_IRUSR|S_IWUSR)) < 0) {
 		ERRMSG("Can't open the dump file(%s). %s\n",
@@ -4711,6 +4713,9 @@ write_and_check_space(int fd, void *buf, size_t buf_size, char *file_name)
 {
 	int status, written_size = 0;
 
+	if (info->flag_dry_run)
+		return TRUE;
+
 	while (written_size < buf_size) {
 		status = write(fd, buf + written_size,
 				   buf_size - written_size);
@@ -4748,13 +4753,12 @@ write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 		}
 		if (!write_and_check_space(fd, &fdh, sizeof(fdh), file_name))
 			return FALSE;
-	} else {
-		if (lseek(fd, offset, SEEK_SET) == failed) {
-			ERRMSG("Can't seek the dump file(%s). %s\n",
-			    file_name, strerror(errno));
-			return FALSE;
-		}
+	} else if (!info->flag_dry_run &&
+		    lseek(fd, offset, SEEK_SET) == failed) {
+		ERRMSG("Can't seek the dump file(%s). %s\n", file_name, strerror(errno));
+		return FALSE;
 	}
+
 	if (!write_and_check_space(fd, buf, buf_size, file_name))
 		return FALSE;
 
@@ -9112,7 +9116,7 @@ close_dump_memory(void)
 void
 close_dump_file(void)
 {
-	if (info->flag_flatten)
+	if (info->flag_flatten || info->flag_dry_run)
 		return;
 
 	if (close(info->fd_dumpfile) < 0)
@@ -10985,6 +10989,11 @@ check_param_for_generating_vmcoreinfo(int argc, char *argv[])
 
 		return FALSE;
 
+	if (info->flag_dry_run) {
+		MSG("--dry-run cannot be used with -g.\n");
+		return FALSE;
+	}
+
 	return TRUE;
 }
 
@@ -11029,6 +11038,11 @@ check_param_for_reassembling_dumpfile(int argc, char *argv[])
 	    || info->flag_exclude_xen_dom || info->flag_split)
 		return FALSE;
 
+	if (info->flag_dry_run) {
+		MSG("--dry-run cannot be used with --reassemble.\n");
+		return FALSE;
+	}
+
 	if ((info->splitting_info
 	    = malloc(sizeof(struct splitting_info) * info->num_dumpfile))
 	    == NULL) {
@@ -11056,6 +11070,11 @@ check_param_for_creating_dumpfile(int argc, char *argv[])
 	    || (info->flag_read_vmcoreinfo && info->name_vmlinux)
 	    || (info->flag_read_vmcoreinfo && info->name_xen_syms))
 		return FALSE;
+
+	if (info->flag_dry_run && info->flag_dmesg) {
+		MSG("--dry-run cannot be used with --dump-dmesg.\n");
+		return FALSE;
+	}
 
 	if (info->flag_flatten && info->flag_split)
 		return FALSE;
@@ -11520,6 +11539,7 @@ static struct option longopts[] = {
 	{"work-dir", required_argument, NULL, OPT_WORKING_DIR},
 	{"num-threads", required_argument, NULL, OPT_NUM_THREADS},
 	{"check-params", no_argument, NULL, OPT_CHECK_PARAMS},
+	{"dry-run", no_argument, NULL, OPT_DRY_RUN},
 	{0, 0, 0, 0}
 };
 
@@ -11685,6 +11705,9 @@ main(int argc, char *argv[])
 		case OPT_CHECK_PARAMS:
 			info->flag_check_params = TRUE;
 			message_level = DEFAULT_MSG_LEVEL;
+			break;
+		case OPT_DRY_RUN:
+			info->flag_dry_run = TRUE;
 			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");

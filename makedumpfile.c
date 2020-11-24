@@ -11540,13 +11540,14 @@ static struct option longopts[] = {
 	{"num-threads", required_argument, NULL, OPT_NUM_THREADS},
 	{"check-params", no_argument, NULL, OPT_CHECK_PARAMS},
 	{"dry-run", no_argument, NULL, OPT_DRY_RUN},
+	{"show-stats", no_argument, NULL, OPT_SHOW_STATS},
 	{0, 0, 0, 0}
 };
 
 int
 main(int argc, char *argv[])
 {
-	int i, opt, flag_debug = FALSE;
+	int i, opt, flag_debug = FALSE, flag_show_stats = FALSE;
 
 	if ((info = calloc(1, sizeof(struct DumpInfo))) == NULL) {
 		ERRMSG("Can't allocate memory for the pagedesc cache. %s.\n",
@@ -11709,6 +11710,9 @@ main(int argc, char *argv[])
 		case OPT_DRY_RUN:
 			info->flag_dry_run = TRUE;
 			break;
+		case OPT_SHOW_STATS:
+			flag_show_stats = TRUE;
+			break;
 		case '?':
 			MSG("Commandline parameter is invalid.\n");
 			MSG("Try `makedumpfile --help' for more information.\n");
@@ -11717,6 +11721,9 @@ main(int argc, char *argv[])
 	}
 	if (flag_debug)
 		message_level |= ML_PRINT_DEBUG_MSG;
+
+	if (flag_show_stats)
+		message_level |= ML_PRINT_REPORT_MSG;
 
 	if (info->flag_check_params)
 		/* suppress debugging messages */

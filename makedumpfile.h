@@ -2427,6 +2427,7 @@ struct elf_prstatus {
 #define OPT_PARTIAL_DMESG       OPT_START+17
 #define OPT_CHECK_PARAMS        OPT_START+18
 #define OPT_DRY_RUN             OPT_START+19
+#define OPT_SHOW_STATS          OPT_START+20
 
 /*
  * Function Prototype.

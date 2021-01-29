@@ -698,55 +698,6 @@ get_elf32_ehdr(int fd, char *filename, Elf32_Ehdr *ehdr)
 	return TRUE;
 }
 
-int
-get_elf_loads(int fd, char *filename)
-{
-	int i, j, phnum, elf_format;
-	Elf64_Phdr phdr;
-
-	/*
-	 * Check ELF64 or ELF32.
-	 */
-	elf_format = check_elf_format(fd, filename, &phnum, &num_pt_loads);
-	if (elf_format == ELF64)
-		flags_memory |= MEMORY_ELF64;
-	else if (elf_format != ELF32)
-		return FALSE;
-
-	if (!num_pt_loads) {
-		ERRMSG("Can't get the number of PT_LOAD.\n");
-		return FALSE;
-	}
-
-	/*
-	 * The below file information will be used as /proc/vmcore.
-	 */
-	fd_memory   = fd;
-	name_memory = filename;
-
-	pt_loads = calloc(sizeof(struct pt_load_segment), num_pt_loads);
-	if (pt_loads == NULL) {
-		ERRMSG("Can't allocate memory for the PT_LOAD. %s\n",
-		    strerror(errno));
-		return FALSE;
-	}
-	for (i = 0, j = 0; i < phnum; i++) {
-		if (!get_phdr_memory(i, &phdr))
-			return FALSE;
-
-		if (phdr.p_type != PT_LOAD)
-			continue;
-
-		if (j >= num_pt_loads)
-			return FALSE;
-		if (!dump_Elf_load(&phdr, j))
-			return FALSE;
-		j++;
-	}
-
-	return TRUE;
-}
-
 static int exclude_segment(struct pt_load_segment **pt_loads,
 			   unsigned int	*num_pt_loads, uint64_t start, uint64_t end)
 {

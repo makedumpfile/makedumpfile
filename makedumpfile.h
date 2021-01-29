@@ -958,6 +958,39 @@ typedef unsigned long pgd_t;
 
 #endif          /* sparc64 */
 
+#ifdef __mips64__ /* mips64 */
+#define KVBASE			PAGE_OFFSET
+#define _SECTION_SIZE_BITS	(28)
+#define _MAX_PHYSMEM_BITS	(48)
+#define _PAGE_PRESENT		(1 << 0)
+#define _PAGE_HUGE		(1 << 4)
+
+typedef unsigned long pte_t;
+typedef unsigned long pmd_t;
+typedef unsigned long pgd_t;
+
+#define PAGE_MASK		(~(PAGESIZE() - 1))
+#define PMD_MASK		(~(PMD_SIZE - 1))
+#define PMD_SHIFT		((PAGESHIFT() - 3) * 2 + 3)
+#define PMD_SIZE		(1UL << PMD_SHIFT)
+#define PGDIR_SHIFT		((PAGESHIFT() - 3) * 3 + 3)
+#define PTRS_PER_PTE		(1 << (PAGESHIFT() - 3))
+#define PTRS_PER_PMD		PTRS_PER_PTE
+#define PTRS_PER_PGD		PTRS_PER_PTE
+
+#define pte_index(vaddr)		(((vaddr) >> PAGESHIFT()) & (PTRS_PER_PTE - 1))
+#define pmd_page_paddr(pmd)		(pmd & (int32_t)PAGE_MASK)
+#define pte_offset(dir, vaddr)		((pte_t *)pmd_page_paddr((*dir)) + pte_index(vaddr))
+
+#define pmd_index(vaddr)		(((vaddr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+#define pgd_page_paddr(pgd)		(pgd & (int32_t)PAGE_MASK)
+#define pmd_offset(pgd, vaddr)		((pmd_t *)pgd_page_paddr((*pgd)) + pmd_index(vaddr))
+
+#define pgd_index(vaddr)		(((vaddr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+#define pgd_offset(pgdir, vaddr)	((pgd_t *)(pgdir) + pgd_index(vaddr))
+
+#endif		/* mips64 */
+
 /*
  * The function of dependence on machine
  */
@@ -1111,6 +1144,22 @@ unsigned long long vaddr_to_paddr_sparc64(unsigned long vaddr);
 #define is_phys_addr(X)		stub_true_ul(X)
 #define arch_crashkernel_mem_size()	stub_false()
 #endif		/* sparc64 */
+
+#ifdef __mips64__ /* mips64 */
+int get_phys_base_mips64(void);
+int get_machdep_info_mips64(void);
+int get_versiondep_info_mips64(void);
+unsigned long long vaddr_to_paddr_mips64(unsigned long vaddr);
+#define find_vmemmap()		stub_false()
+#define get_phys_base() 	get_phys_base_mips64()
+#define get_machdep_info()	get_machdep_info_mips64()
+#define get_versiondep_info()	get_versiondep_info_mips64()
+#define get_kaslr_offset(X)	stub_false()
+#define vaddr_to_paddr(X)	vaddr_to_paddr_mips64(X)
+#define paddr_to_vaddr(X)	paddr_to_vaddr_general(X)
+#define is_phys_addr(X) 	stub_true_ul(X)
+#define arch_crashkernel_mem_size()	stub_false()
+#endif		/* mips64 */
 
 typedef unsigned long long mdf_pfn_t;
 
@@ -2228,6 +2277,12 @@ int get_xen_info_ia64(void);
 #define get_xen_basic_info_arch(X) FALSE
 #define get_xen_info_arch(X) FALSE
 #endif	/* sparc64 */
+
+#ifdef __mips64__ /* mips64 */
+#define kvtop_xen(X)	FALSE
+#define get_xen_basic_info_arch(X) FALSE
+#define get_xen_info_arch(X) FALSE
+#endif	/* mips64 */
 
 struct cycle {
 	mdf_pfn_t start_pfn;

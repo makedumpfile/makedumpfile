@@ -2049,6 +2049,7 @@ struct number_table {
 	long	KERNEL_IMAGE_SIZE;
 #ifdef __aarch64__
 	long 	VA_BITS;
+	long	TCR_EL1_T1SZ;
 	unsigned long	PHYS_OFFSET;
 	unsigned long	kimage_voffset;
 #endif

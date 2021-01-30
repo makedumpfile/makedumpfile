@@ -68,7 +68,7 @@ endif
 CFLAGS += -DUSESNAPPY
 endif
 
-LIBS := -lpthread $(LIBS)
+LIBS := $(LIBS) -lpthread
 
 try-run = $(shell set -e;		\
 	TMP=".$$$$.tmp";		\

@@ -48,6 +48,8 @@ char filename_stdout[] = FILENAME_STDOUT;
 static unsigned long long	cache_hit;
 static unsigned long long	cache_miss;
 
+static unsigned long long	write_bytes;
+
 static void first_cycle(mdf_pfn_t start, mdf_pfn_t max, struct cycle *cycle)
 {
 	cycle->start_pfn = round(start, info->pfn_cyclic);
@@ -4714,6 +4716,8 @@ int
 write_and_check_space(int fd, void *buf, size_t buf_size, char *file_name)
 {
 	int status, written_size = 0;
+
+	write_bytes += buf_size;
 
 	if (info->flag_dry_run)
 		return TRUE;
@@ -10002,6 +10006,7 @@ print_report(void)
 	REPORT_MSG("Memory Hole     : 0x%016llx\n", pfn_memhole);
 	REPORT_MSG("--------------------------------------------------\n");
 	REPORT_MSG("Total pages     : 0x%016llx\n", info->max_mapnr);
+	REPORT_MSG("Write bytes     : %llu\n", write_bytes);
 	REPORT_MSG("\n");
 	REPORT_MSG("Cache hit: %lld, miss: %lld", cache_hit, cache_miss);
 	if (cache_hit + cache_miss)

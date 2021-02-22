@@ -35,8 +35,13 @@ get_phys_base_mips64(void)
 int
 get_machdep_info_mips64(void)
 {
-	info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 	info->section_size_bits = _SECTION_SIZE_BITS;
+
+	/* Check if we can get MAX_PHYSMEM_BITS from vmcoreinfo */
+	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER)
+		info->max_physmem_bits = NUMBER(MAX_PHYSMEM_BITS);
+	else
+		info->max_physmem_bits  = _MAX_PHYSMEM_BITS;
 
 	DEBUG_MSG("max_physmem_bits : %lx\n", info->max_physmem_bits);
 	DEBUG_MSG("section_size_bits: %lx\n", info->section_size_bits);

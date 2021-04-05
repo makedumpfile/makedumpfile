@@ -943,9 +943,11 @@ find_vmemmap_x86_64()
 		vmapp->rep_pfn_start = cur->rep_pfn_start;
 		vmapp->rep_pfn_end = cur->rep_pfn_end;
 		cur = cur->next;
-		free(cur->prev);
+		if (cur->prev != vmaphead)
+			free(cur->prev);
 		i++;
 	} while (cur != vmaphead);
+	free(vmaphead);
 	nr_gvmem_pfns = i;
 	return TRUE;
 }

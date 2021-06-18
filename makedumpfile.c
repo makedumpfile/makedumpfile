@@ -7764,7 +7764,7 @@ write_elf_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_page)
 		if (!get_phdr_memory(i, &load))
 			return FALSE;
 
-		if (load.p_type != PT_LOAD)
+		if (load.p_type != PT_LOAD || load.p_paddr == NOT_PADDR)
 			continue;
 
 		off_memory= load.p_offset;

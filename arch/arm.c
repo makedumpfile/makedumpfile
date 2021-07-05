@@ -80,7 +80,7 @@ get_phys_base_arm(void)
 int
 get_machdep_info_arm(void)
 {
-	info->page_offset = SYMBOL(_stext) & 0xffff0000UL;
+	info->page_offset = SYMBOL(_stext) & 0xffc00000UL;
 
 	/* Check if we can get MAX_PHYSMEM_BITS from vmcoreinfo */
 	if (NUMBER(MAX_PHYSMEM_BITS) != NOT_FOUND_NUMBER)

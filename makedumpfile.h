@@ -2510,7 +2510,8 @@ ulong htol(char *s, int flags);
 int hexadecimal(char *s, int count);
 int decimal(char *s, int count);
 int file_exists(char *file);
-
+int write_and_check_space(int fd, void *buf, size_t buf_size,
+			  const char* desc, const char *file_name);
 int open_dump_file(void);
 int dump_lockless_dmesg(void);
 

@@ -53,7 +53,7 @@ static enum desc_state get_desc_state(unsigned long id,
 	return DESC_STATE(state_val);
 }
 
-static void
+static int
 dump_record(struct prb_map *m, unsigned long id)
 {
 	unsigned long long ts_nsec;
@@ -80,7 +80,7 @@ dump_record(struct prb_map *m, unsigned long id)
 	state_var = ULONG(desc + OFFSET(prb_desc.state_var) + OFFSET(atomic_long_t.counter));
 	state = get_desc_state(id, state_var);
 	if (state != desc_committed && state != desc_finalized)
-		return;
+		return TRUE;
 
 	begin = ULONG(desc + OFFSET(prb_desc.text_blk_lpos) + OFFSET(prb_data_blk_lpos.begin)) %
 			m->text_data_ring_size;
@@ -89,7 +89,7 @@ dump_record(struct prb_map *m, unsigned long id)
 
 	/* skip data-less text blocks */
 	if (begin == next)
-		return;
+		return TRUE;
 
 	inf = m->infos + ((id % m->desc_ring_count) * SIZE(printk_info));
 
@@ -121,8 +121,10 @@ dump_record(struct prb_map *m, unsigned long id)
 
 	for (i = 0, p = text; i < text_len; i++, p++) {
 		if (bufp - buf >= sizeof(buf) - buf_need) {
-			if (write(info->fd_dumpfile, buf, bufp - buf) < 0)
-				return;
+			if (!write_and_check_space(info->fd_dumpfile, buf,
+						   bufp - buf, "log",
+						   info->name_dumpfile))
+				return FALSE;
 			bufp = buf;
 		}
 
@@ -136,7 +138,8 @@ dump_record(struct prb_map *m, unsigned long id)
 
 	*bufp++ = '\n';
 
-	write(info->fd_dumpfile, buf, bufp - buf);
+	return write_and_check_space(info->fd_dumpfile, buf, bufp - buf,
+				     "log", info->name_dumpfile);
 }
 
 int
@@ -219,11 +222,14 @@ dump_lockless_dmesg(void)
 		goto out_text_data;
 	}
 
-	for (id = tail_id; id != head_id; id = (id + 1) & DESC_ID_MASK)
-		dump_record(&m, id);
+	for (id = tail_id; id != head_id; id = (id + 1) & DESC_ID_MASK) {
+		if (!dump_record(&m, id))
+			goto out_text_data;
+	}
 
 	/* dump head record */
-	dump_record(&m, id);
+	if (!dump_record(&m, id))
+		goto out_text_data;
 
 	if (!close_files_for_creating_dumpfile())
 		goto out_text_data;

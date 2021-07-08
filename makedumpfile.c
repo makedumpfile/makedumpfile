@@ -4713,7 +4713,8 @@ is_bigendian(void)
 }
 
 int
-write_and_check_space(int fd, void *buf, size_t buf_size, char *file_name)
+write_and_check_space(int fd, void *buf, size_t buf_size, const char* desc,
+		      const char *file_name)
 {
 	int status, written_size = 0;
 
@@ -4731,8 +4732,8 @@ write_and_check_space(int fd, void *buf, size_t buf_size, char *file_name)
 		}
 		if (errno == ENOSPC)
 			info->flag_nospace = TRUE;
-		MSG("\nCan't write the dump file(%s). %s\n",
-		    file_name, strerror(errno));
+		MSG("\nCan't write the %s file(%s). %s\n", desc, file_name,
+		    strerror(errno));
 		return FALSE;
 	}
 	return TRUE;
@@ -4757,7 +4758,8 @@ write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 			fdh.offset   = bswap_64(offset);
 			fdh.buf_size = bswap_64(buf_size);
 		}
-		if (!write_and_check_space(fd, &fdh, sizeof(fdh), file_name))
+		if (!write_and_check_space(fd, &fdh, sizeof(fdh), "dump",
+					   file_name))
 			return FALSE;
 	} else if (!info->flag_dry_run &&
 		    lseek(fd, offset, SEEK_SET) == failed) {
@@ -4765,7 +4767,7 @@ write_buffer(int fd, off_t offset, void *buf, size_t buf_size, char *file_name)
 		return FALSE;
 	}
 
-	if (!write_and_check_space(fd, buf, buf_size, file_name))
+	if (!write_and_check_space(fd, buf, buf_size, "dump", file_name))
 		return FALSE;
 
 	return TRUE;
@@ -5281,7 +5283,7 @@ reset_bitmap_of_free_pages(unsigned long node_zones, struct cycle *cycle)
 }
 
 static int
-dump_log_entry(char *logptr, int fp)
+dump_log_entry(char *logptr, int fp, const char *file_name)
 {
 	char *msg, *p, *bufp;
 	unsigned int i, text_len, indent_len, buf_need;
@@ -5307,7 +5309,8 @@ dump_log_entry(char *logptr, int fp)
 
 	for (i = 0, p = msg; i < text_len; i++, p++) {
 		if (bufp - buf >= sizeof(buf) - buf_need) {
-			if (write(info->fd_dumpfile, buf, bufp - buf) < 0)
+			if (!write_and_check_space(fp, buf, bufp - buf, "log",
+						   file_name))
 				return FALSE;
 			bufp = buf;
 		}
@@ -5322,10 +5325,7 @@ dump_log_entry(char *logptr, int fp)
 
 	*bufp++ = '\n';
 
-	if (write(info->fd_dumpfile, buf, bufp - buf) < 0)
-		return FALSE;
-	else
-		return TRUE;
+	return write_and_check_space(fp, buf, bufp - buf, "log", file_name);
 }
 
 /*
@@ -5507,7 +5507,9 @@ dump_dmesg()
 			ERRMSG("Can't open output file.\n");
 			goto out;
 		}
-		if (write(info->fd_dumpfile, log_buffer, length_log) < 0)
+		if (!write_and_check_space(info->fd_dumpfile, log_buffer,
+					   length_log, "log",
+					   info->name_dumpfile))
 			goto out;
 
 		if (!close_files_for_creating_dumpfile())
@@ -5532,7 +5534,8 @@ dump_dmesg()
 		idx = log_first_idx;
 		while (idx != log_next_idx) {
 			log_ptr = log_from_idx(idx, log_buffer);
-			if (!dump_log_entry(log_ptr, info->fd_dumpfile))
+			if (!dump_log_entry(log_ptr, info->fd_dumpfile,
+					    info->name_dumpfile))
 				goto out;
 			idx = log_next(idx, log_buffer);
 		}
@@ -6947,8 +6950,9 @@ write_start_flat_header()
 	memset(buf, 0, sizeof(buf));
 	memcpy(buf, &fh, sizeof(fh));
 
-	if (!write_and_check_space(info->fd_dumpfile, buf, MAX_SIZE_MDF_HEADER,
-	    info->name_dumpfile))
+	if (!write_and_check_space(info->fd_dumpfile, buf,
+				   MAX_SIZE_MDF_HEADER, "dump",
+				   info->name_dumpfile))
 		return FALSE;
 
 	return TRUE;
@@ -6966,7 +6970,7 @@ write_end_flat_header(void)
 	fdh.buf_size = END_FLAG_FLAT_HEADER;
 
 	if (!write_and_check_space(info->fd_dumpfile, &fdh, sizeof(fdh),
-	    info->name_dumpfile))
+				   "dump", info->name_dumpfile))
 		return FALSE;
 
 	return TRUE;

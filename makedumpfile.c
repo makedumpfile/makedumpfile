@@ -7993,8 +7993,8 @@ write_kdump_page(struct cache_data *cd_header, struct cache_data *cd_page,
 	 * write the buffer cd_header into dumpfile and then write the cd_page.
 	 * With that, when enospc occurs, we can save more useful information.
 	 */
-	if (cd_header->buf_size + sizeof(*pd) > cd_header->cache_size
-		|| cd_page->buf_size + pd->size > cd_page->cache_size){
+	if (cd_header->buf_size + sizeof(*pd) >= cd_header->cache_size ||
+	    cd_page->buf_size + pd->size >= cd_page->cache_size) {
 		if( !write_cd_buf(cd_header) ) {
 			memset(cd_header->buf, 0, cd_header->cache_size);
 			write_cd_buf(cd_header);

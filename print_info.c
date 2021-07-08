@@ -144,6 +144,9 @@ print_usage(void)
 	MSG("        16  |                                    X\n");
 	MSG("        31  |   X       X        X       X       X\n");
 	MSG("\n");
+	MSG("  [-L SIZE]:\n");
+	MSG("      Limit the size of the output file to SIZE bytes.\n");
+	MSG("\n");
 	MSG("  [-E]:\n");
 	MSG("      Create DUMPFILE in the ELF format.\n");
 	MSG("      This option cannot be specified with the -c, -l or -p options,\n");

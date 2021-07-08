@@ -4716,27 +4716,62 @@ int
 write_and_check_space(int fd, void *buf, size_t buf_size, const char* desc,
 		      const char *file_name)
 {
-	int status, written_size = 0;
+	size_t limit, done = 0;
+	int retval = 0;
+	off_t pos;
 
-	write_bytes += buf_size;
+	if (fd == STDOUT_FILENO) {
+		pos = write_bytes;
+	} else {
+		pos = lseek(fd, 0, SEEK_CUR);
+		if (pos == -1) {
+			ERRMSG("Can't seek the dump file(%s). %s\n",
+			       file_name, strerror(errno));
+			return FALSE;
+		}
+	}
+
+	if (info->size_limit != -1 && pos + buf_size > info->size_limit) {
+		if (pos > info->size_limit)
+			limit = 0;
+		else
+			limit = info->size_limit - pos;
+		info->flag_nospace = TRUE;
+	} else {
+		limit = buf_size;
+	}
 
 	if (info->flag_dry_run)
-		return TRUE;
+		done = limit;
 
-	while (written_size < buf_size) {
-		status = write(fd, buf + written_size,
-				   buf_size - written_size);
-		if (0 < status) {
-			written_size += status;
-			continue;
+	while (done < limit) {
+		retval = write(fd, buf, limit - done);
+		if (retval > 0) {
+			done += retval;
+			buf += retval;
+		} else {
+			if (retval == -1) {
+				if (errno == EINTR)
+					continue;
+				if (errno == ENOSPC)
+					info->flag_nospace = TRUE;
+				else
+					info->flag_nospace = FALSE;
+				MSG("\nCan't write the %s file(%s). %s\n",
+				    desc, file_name, strerror(errno));
+			}
+			break;
 		}
-		if (errno == ENOSPC)
-			info->flag_nospace = TRUE;
-		MSG("\nCan't write the %s file(%s). %s\n", desc, file_name,
-		    strerror(errno));
-		return FALSE;
 	}
-	return TRUE;
+
+	write_bytes += done;
+
+	if (retval != -1 && done < buf_size) {
+		MSG("\nCan't write the %s file(%s). Size limit(%llu) reached.\n",
+		    desc, file_name, (unsigned long long) info->size_limit);
+	}
+
+	return done == buf_size;
 }
 
 int
@@ -11589,6 +11624,7 @@ main(int argc, char *argv[])
 	}
 	info->file_vmcoreinfo = NULL;
 	info->fd_vmlinux = -1;
+	info->size_limit = -1;
 	info->fd_xen_syms = -1;
 	info->fd_memory = -1;
 	info->fd_dumpfile = -1;
@@ -11609,9 +11645,12 @@ main(int argc, char *argv[])
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:eEFfg:hi:lpRvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:eEFfg:hi:lL:pRvXx:", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
+			unsigned long long val;
+			char *endptr;
+
 		case OPT_BLOCK_ORDER:
 			info->block_order = atoi(optarg);
 			break;
@@ -11627,6 +11666,14 @@ main(int argc, char *argv[])
 		case OPT_DUMP_LEVEL:
 			if (!parse_dump_level(optarg))
 				goto out;
+			break;
+		case OPT_SIZE_LIMIT:
+			val = memparse(optarg, &endptr);
+			if (*endptr || val == 0) {
+				MSG("Limit size(%s) is invalid.\n", optarg);
+				goto out;
+			}
+			info->size_limit = val;
 			break;
 		case OPT_ELF_DUMPFILE:
 			info->flag_elf_dumpfile = 1;

@@ -1344,6 +1344,7 @@ struct DumpInfo {
 	int		max_dump_level;      /* maximum dump level */
 	int		num_dump_level;      /* number of dump level */
 	int		array_dump_level[NUM_ARRAY_DUMP_LEVEL];
+	off_t		size_limit;          /* dump file size limit */
 	int		flag_compress;       /* flag of compression */
 	int		flag_lzo_support;    /* flag of LZO compression support */
 	int		flag_elf_dumpfile;   /* flag of creating ELF dumpfile */
@@ -2458,6 +2459,7 @@ struct elf_prstatus {
 #define OPT_HELP                'h'
 #define OPT_READ_VMCOREINFO     'i'
 #define OPT_COMPRESS_LZO        'l'
+#define OPT_SIZE_LIMIT          'L'
 #define OPT_COMPRESS_SNAPPY     'p'
 #define OPT_REARRANGE           'R'
 #define OPT_VERSION             'v'
@@ -2514,5 +2516,6 @@ int write_and_check_space(int fd, void *buf, size_t buf_size,
 			  const char* desc, const char *file_name);
 int open_dump_file(void);
 int dump_lockless_dmesg(void);
+unsigned long long memparse(char *ptr, char **retptr);
 
 #endif /* MAKEDUMPFILE_H */

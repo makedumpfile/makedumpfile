@@ -157,9 +157,10 @@ will be effective if you specify domain-0's \fIvmlinux\fR with \-x option.
 Then the pages are excluded only from domain-0.
 .br
 If specifying multiple dump_levels with the delimiter ',', makedumpfile retries
-to create a \fIDUMPFILE\fR by other dump_level when "No space on device" error
-happens. For example, if dump_level is "11,31" and makedumpfile fails
-by dump_level 11, makedumpfile retries it by dump_level 31.
+to create \fIDUMPFILE\fR using the next dump_level when the size of a dumpfile
+exceeds the limit specified with '-L' or when a "No space on device" error
+happens. For example, if dump_level is "11,31" and makedumpfile fails with
+dump_level 11, makedumpfile retries with dump_level 31.
 .br
 .B Example:
 .br
@@ -221,6 +222,11 @@ Here is the all combinations of the bits.
     30 |      |   X   |   X   |  X   |  X
     31 |  X   |   X   |   X   |  X   |  X
 
+.TP
+\fB\-L\fR \fISIZE\fR
+Limit the size of the output file to \fISIZE\fR bytes. An incomplete
+\fIDUMPFILE\fR or \fILOGFILE\fR is written if the size would otherwise exceed
+\fISIZE\fR.
 
 .TP
 \fB\-E\fR

@@ -764,3 +764,43 @@ hexadecimal_only(char *s, int count)
 
 	return only;
 }
+
+/*
+ * Parse a string of [size[KMG]@]offset[KMG]
+ * Import from Linux kernel(lib/cmdline.c)
+ */
+unsigned long long memparse(char *ptr, char **retptr)
+{
+	char *endptr;
+
+	unsigned long long ret = strtoull(ptr, &endptr, 0);
+
+	switch (*endptr) {
+	case 'E':
+	case 'e':
+		ret <<= 10;
+	case 'P':
+	case 'p':
+		ret <<= 10;
+	case 'T':
+	case 't':
+		ret <<= 10;
+	case 'G':
+	case 'g':
+		ret <<= 10;
+	case 'M':
+	case 'm':
+		ret <<= 10;
+	case 'K':
+	case 'k':
+		ret <<= 10;
+		endptr++;
+	default:
+		break;
+	}
+
+	if (retptr)
+		*retptr = endptr;
+
+	return ret;
+}

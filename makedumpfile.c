@@ -4712,7 +4712,7 @@ write_and_check_space(int fd, void *buf, size_t buf_size, const char* desc,
 	int retval = 0;
 	off_t pos;
 
-	if (fd == STDOUT_FILENO) {
+	if (fd == STDOUT_FILENO || info->flag_dry_run) {
 		pos = write_bytes;
 	} else {
 		pos = lseek(fd, 0, SEEK_CUR);

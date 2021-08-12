@@ -5113,6 +5113,9 @@ check_and_modify_multiple_kdump_headers() {
 int
 check_and_modify_headers()
 {
+	if (info->flag_dry_run)
+		return TRUE;
+
 	if (info->flag_elf_dumpfile)
 		return check_and_modify_elf_headers(info->name_dumpfile);
 	else
@@ -7996,7 +7999,11 @@ get_nr_pages(void *buf, struct cache_data *cd_page){
 	int size, file_end, nr_pages;
 	page_desc_t *pd = buf;
 
-	file_end = lseek(cd_page->fd, 0, SEEK_END);
+	if (info->flag_dry_run)
+		file_end = write_bytes;
+	else
+		file_end = lseek(cd_page->fd, 0, SEEK_END);
+
 	if (file_end < 0) {
 		ERRMSG("Can't seek end of the dump file(%s).\n", cd_page->file_name);
 		return -1;

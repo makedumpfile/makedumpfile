@@ -296,26 +296,18 @@ is_cache_page(unsigned long flags)
 static inline unsigned long
 calculate_len_buf_out(long page_size)
 {
-	unsigned long len_buf_out_zlib, len_buf_out_lzo, len_buf_out_snappy;
-	unsigned long len_buf_out;
-
-	len_buf_out_zlib = len_buf_out_lzo = len_buf_out_snappy = 0;
+	unsigned long zlib = compressBound(page_size);
+	unsigned long lzo = 0;
+	unsigned long snappy = 0;
 
 #ifdef USELZO
-	len_buf_out_lzo = page_size + page_size / 16 + 64 + 3;
+	lzo = page_size + page_size / 16 + 64 + 3;
 #endif
-
 #ifdef USESNAPPY
-	len_buf_out_snappy = snappy_max_compressed_length(page_size);
+	snappy = snappy_max_compressed_length(page_size);
 #endif
 
-	len_buf_out_zlib = compressBound(page_size);
-
-	len_buf_out = MAX(len_buf_out_zlib,
-			  MAX(len_buf_out_lzo,
-			      len_buf_out_snappy));
-
-	return len_buf_out;
+	return MAX(zlib, MAX(lzo, snappy));
 }
 
 #define BITMAP_SECT_LEN 4096

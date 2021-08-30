@@ -1555,6 +1555,7 @@ get_symbol_info(void)
 	SYMBOL_INIT(pgdat_list, "pgdat_list");
 	SYMBOL_INIT(contig_page_data, "contig_page_data");
 	SYMBOL_INIT(prb, "prb");
+	SYMBOL_INIT(clear_seq, "clear_seq");
 	SYMBOL_INIT(log_buf, "log_buf");
 	SYMBOL_INIT(log_buf_len, "log_buf_len");
 	SYMBOL_INIT(log_end, "log_end");
@@ -2000,6 +2001,9 @@ get_structure_info(void)
 		OFFSET_INIT(printk_info.text_len, "printk_info", "text_len");
 
 		OFFSET_INIT(atomic_long_t.counter, "atomic_long_t", "counter");
+
+		SIZE_INIT(latched_seq, "latched_seq");
+		OFFSET_INIT(latched_seq.val, "latched_seq", "val");
 	} else if (SIZE(printk_log) != NOT_FOUND_STRUCTURE) {
 		/*
 		 * In kernel 3.11-rc4 the log structure name was renamed
@@ -2231,6 +2235,7 @@ write_vmcoreinfo_data(void)
 	WRITE_SYMBOL("pgdat_list", pgdat_list);
 	WRITE_SYMBOL("contig_page_data", contig_page_data);
 	WRITE_SYMBOL("prb", prb);
+	WRITE_SYMBOL("clear_seq", clear_seq);
 	WRITE_SYMBOL("log_buf", log_buf);
 	WRITE_SYMBOL("log_buf_len", log_buf_len);
 	WRITE_SYMBOL("log_end", log_end);
@@ -2266,6 +2271,7 @@ write_vmcoreinfo_data(void)
 		WRITE_STRUCTURE_SIZE("printk_ringbuffer", printk_ringbuffer);
 		WRITE_STRUCTURE_SIZE("prb_desc", prb_desc);
 		WRITE_STRUCTURE_SIZE("printk_info", printk_info);
+		WRITE_STRUCTURE_SIZE("latched_seq", latched_seq);
 	} else if (info->flag_use_printk_log)
 		WRITE_STRUCTURE_SIZE("printk_log", printk_log);
 	else
@@ -2335,6 +2341,8 @@ write_vmcoreinfo_data(void)
 		WRITE_MEMBER_OFFSET("printk_info.text_len", printk_info.text_len);
 
 		WRITE_MEMBER_OFFSET("atomic_long_t.counter", atomic_long_t.counter);
+
+		WRITE_MEMBER_OFFSET("latched_seq.val", latched_seq.val);
 	} else if (info->flag_use_printk_log) {
 		WRITE_MEMBER_OFFSET("printk_log.ts_nsec", printk_log.ts_nsec);
 		WRITE_MEMBER_OFFSET("printk_log.len", printk_log.len);
@@ -2676,6 +2684,7 @@ read_vmcoreinfo(void)
 	READ_SYMBOL("pgdat_list", pgdat_list);
 	READ_SYMBOL("contig_page_data", contig_page_data);
 	READ_SYMBOL("prb", prb);
+	READ_SYMBOL("clear_seq", clear_seq);
 	READ_SYMBOL("log_buf", log_buf);
 	READ_SYMBOL("log_buf_len", log_buf_len);
 	READ_SYMBOL("log_end", log_end);
@@ -2784,6 +2793,9 @@ read_vmcoreinfo(void)
 		READ_MEMBER_OFFSET("printk_info.text_len", printk_info.text_len);
 
 		READ_MEMBER_OFFSET("atomic_long_t.counter", atomic_long_t.counter);
+
+		READ_STRUCTURE_SIZE("latched_seq", latched_seq);
+		READ_MEMBER_OFFSET("latched_seq.val", latched_seq.val);
 	} else if (SIZE(printk_log) != NOT_FOUND_STRUCTURE) {
 		info->flag_use_printk_ringbuffer = FALSE;
 		info->flag_use_printk_log = TRUE;

@@ -1656,6 +1656,7 @@ struct symbol_table {
 	unsigned long long	pgdat_list;
 	unsigned long long	contig_page_data;
 	unsigned long long	prb;
+	unsigned long long	clear_seq;
 	unsigned long long	log_buf;
 	unsigned long long	log_buf_len;
 	unsigned long long	log_end;
@@ -1749,6 +1750,7 @@ struct size_table {
 	long	printk_ringbuffer;
 	long	prb_desc;
 	long	printk_info;
+	long	latched_seq;
 
 	/*
 	 * for Xen extraction
@@ -1972,6 +1974,10 @@ struct offset_table {
 	struct atomic_long_t_s {
 		long counter;
 	} atomic_long_t;
+
+	struct latched_seq_s {
+		long val;
+	} latched_seq;
 
 	/*
 	 * symbols on ppc64 arch

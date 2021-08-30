@@ -145,6 +145,7 @@ dump_record(struct prb_map *m, unsigned long id)
 int
 dump_lockless_dmesg(void)
 {
+	unsigned long long clear_seq;
 	unsigned long head_id;
 	unsigned long tail_id;
 	unsigned long kaddr;
@@ -216,6 +217,24 @@ dump_lockless_dmesg(void)
 			OFFSET(atomic_long_t.counter));
 	head_id = ULONG(m.desc_ring + OFFSET(prb_desc_ring.head_id) +
 			OFFSET(atomic_long_t.counter));
+	if (info->flag_partial_dmesg && SYMBOL(clear_seq) != NOT_FOUND_SYMBOL) {
+		if (!readmem(VADDR, SYMBOL(clear_seq), &clear_seq,
+			     sizeof(clear_seq))) {
+			ERRMSG("Can't get clear_seq.\n");
+			goto out_text_data;
+		}
+		if (SIZE(latched_seq) != NOT_FOUND_STRUCTURE) {
+			kaddr = SYMBOL(clear_seq) + OFFSET(latched_seq.val) +
+				(clear_seq & 0x1) * sizeof(clear_seq);
+			if (!readmem(VADDR, kaddr, &clear_seq,
+				     sizeof(clear_seq))) {
+				ERRMSG("Can't get latched clear_seq.\n");
+				goto out_text_data;
+			}
+		}
+		tail_id = head_id - head_id % m.desc_ring_count +
+			  clear_seq % m.desc_ring_count;
+	}
 
 	if (!open_dump_file()) {
 		ERRMSG("Can't open output file.\n");

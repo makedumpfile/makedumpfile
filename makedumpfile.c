@@ -296,18 +296,20 @@ is_cache_page(unsigned long flags)
 static inline unsigned long
 calculate_len_buf_out(long page_size)
 {
-	unsigned long zlib = compressBound(page_size);
-	unsigned long lzo = 0;
-	unsigned long snappy = 0;
+	unsigned long zlib, lzo, snappy, zstd;
+	zlib = lzo = snappy = zstd = 0;
 
+	zlib = compressBound(page_size);
 #ifdef USELZO
 	lzo = page_size + page_size / 16 + 64 + 3;
 #endif
 #ifdef USESNAPPY
 	snappy = snappy_max_compressed_length(page_size);
 #endif
-
-	return MAX(zlib, MAX(lzo, snappy));
+#ifdef USEZSTD
+	zstd = ZSTD_compressBound(page_size);
+#endif
+	return MAX(zlib, MAX(lzo, MAX(snappy, zstd)));
 }
 
 #define BITMAP_SECT_LEN 4096
@@ -830,7 +832,7 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 	 * Read page data
 	 */
 	rdbuf = pd.flags & (DUMP_DH_COMPRESSED_ZLIB | DUMP_DH_COMPRESSED_LZO |
-		DUMP_DH_COMPRESSED_SNAPPY) ? buf : bufptr;
+		DUMP_DH_COMPRESSED_SNAPPY | DUMP_DH_COMPRESSED_ZSTD) ? buf : bufptr;
 	if (read(info->fd_memory, rdbuf, pd.size) != pd.size) {
 		ERRMSG("Can't read %s. %s\n",
 				info->name_memory, strerror(errno));
@@ -872,6 +874,14 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 			return FALSE;
 		}
 #endif
+#ifdef USEZSTD
+	} else if ((pd.flags & DUMP_DH_COMPRESSED_ZSTD)) {
+		ret = ZSTD_decompress(bufptr, info->page_size, buf, pd.size);
+		if (ZSTD_isError(ret) || (ret != info->page_size)) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			return FALSE;
+		}
+#endif
 	}
 
 	return TRUE;
@@ -909,7 +919,7 @@ readpage_kdump_compressed_parallel(int fd_memory, unsigned long long paddr,
 	 * Read page data
 	 */
 	rdbuf = pd.flags & (DUMP_DH_COMPRESSED_ZLIB | DUMP_DH_COMPRESSED_LZO |
-		DUMP_DH_COMPRESSED_SNAPPY) ? buf : bufptr;
+		DUMP_DH_COMPRESSED_SNAPPY | DUMP_DH_COMPRESSED_ZSTD) ? buf : bufptr;
 	if (read(fd_memory, rdbuf, pd.size) != pd.size) {
 		ERRMSG("Can't read %s. %s\n",
 				info->name_memory, strerror(errno));
@@ -947,6 +957,14 @@ readpage_kdump_compressed_parallel(int fd_memory, unsigned long long paddr,
 
 		ret = snappy_uncompress(buf, pd.size, bufptr, (size_t *)&retlen);
 		if ((ret != SNAPPY_OK) || (retlen != info->page_size)) {
+			ERRMSG("Uncompress failed: %d\n", ret);
+			return FALSE;
+		}
+#endif
+#ifdef USEZSTD
+	} else if ((pd.flags & DUMP_DH_COMPRESSED_ZSTD)) {
+		ret = ZSTD_decompress(bufptr, info->page_size, buf, pd.size);
+		if (ZSTD_isError(ret) || (ret != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
 			return FALSE;
 		}
@@ -3891,6 +3909,12 @@ initial_for_parallel()
 			return FALSE;
 		}
 #endif
+#ifdef USEZSTD
+		if ((ZSTD_CCTX_PARALLEL(i) = ZSTD_createCCtx()) == NULL) {
+			MSG("Can't allocate ZSTD_CCtx.\n");
+			return FALSE;
+		}
+#endif
 	}
 
 	info->num_buffers = PAGE_DATA_NUM * info->num_threads;
@@ -3997,6 +4021,10 @@ free_for_parallel()
 #ifdef USELZO
 			if (WRKMEM_PARALLEL(i) != NULL)
 				free(WRKMEM_PARALLEL(i));
+#endif
+#ifdef USEZSTD
+			if (ZSTD_CCTX_PARALLEL(i) != NULL)
+				ZSTD_freeCCtx(ZSTD_CCTX_PARALLEL(i));
 #endif
 
 		}
@@ -4168,6 +4196,14 @@ initial(void)
 		MSG("because this binary doesn't support snappy "
 		    "compression.\n");
 		MSG("Try `make USESNAPPY=on` when building.\n");
+	}
+#endif
+
+#ifndef USEZSTD
+	if (info->flag_compress == DUMP_DH_COMPRESSED_ZSTD) {
+		MSG("'-z' option is disabled, ");
+		MSG("because this binary doesn't support zstd compression.\n");
+		MSG("Try `make USEZSTD=on` when building.\n");
 	}
 #endif
 
@@ -7289,6 +7325,10 @@ write_kdump_header(void)
 	else if (info->flag_compress & DUMP_DH_COMPRESSED_SNAPPY)
 		dh->status |= DUMP_DH_COMPRESSED_SNAPPY;
 #endif
+#ifdef USEZSTD
+	else if (info->flag_compress & DUMP_DH_COMPRESSED_ZSTD)
+		dh->status |= DUMP_DH_COMPRESSED_ZSTD;
+#endif
 
 	size = sizeof(struct disk_dump_header);
 	if (!write_buffer(info->fd_dumpfile, 0, dh, size, info->name_dumpfile))
@@ -8151,6 +8191,9 @@ kdump_thread_function_cyclic(void *arg) {
 #ifdef USELZO
 	lzo_bytep wrkmem = WRKMEM_PARALLEL(kdump_thread_args->thread_num);
 #endif
+#ifdef USEZSTD
+	ZSTD_CCtx *cctx = ZSTD_CCTX_PARALLEL(kdump_thread_args->thread_num);
+#endif
 
 	buf = BUF_PARALLEL(kdump_thread_args->thread_num);
 	buf_out = BUF_OUT_PARALLEL(kdump_thread_args->thread_num);
@@ -8281,6 +8324,17 @@ kdump_thread_function_cyclic(void *arg) {
 				   && (size_out < info->page_size)) {
 				page_data_buf[index].flags =
 						DUMP_DH_COMPRESSED_SNAPPY;
+				page_data_buf[index].size  = size_out;
+				memcpy(page_data_buf[index].buf, buf_out, size_out);
+#endif
+#ifdef USEZSTD
+			} else if ((info->flag_compress & DUMP_DH_COMPRESSED_ZSTD)
+				   && (size_out = ZSTD_compressCCtx(cctx,
+						buf_out, kdump_thread_args->len_buf_out,
+						buf, info->page_size, 1))
+				   && (!ZSTD_isError(size_out))
+				   && (size_out < info->page_size)) {
+				page_data_buf[index].flags = DUMP_DH_COMPRESSED_ZSTD;
 				page_data_buf[index].size  = size_out;
 				memcpy(page_data_buf[index].buf, buf_out, size_out);
 #endif
@@ -8558,6 +8612,9 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 #ifdef USELZO
 	lzo_bytep wrkmem = NULL;
 #endif
+#ifdef USEZSTD
+	ZSTD_CCtx *cctx = NULL;
+#endif
 
 	if (info->flag_elf_dumpfile)
 		return FALSE;
@@ -8575,6 +8632,14 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 		ERRMSG("Can't allocate memory for the working memory. %s\n",
 		       strerror(errno));
 		goto out;
+	}
+#endif
+#ifdef USEZSTD
+	if (info->flag_compress & DUMP_DH_COMPRESSED_ZSTD) {
+		if ((cctx = ZSTD_createCCtx()) == NULL) {
+			ERRMSG("Can't allocate ZSTD_CCtx.\n");
+			goto out;
+		}
 	}
 #endif
 
@@ -8660,6 +8725,16 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 			pd.flags = DUMP_DH_COMPRESSED_SNAPPY;
 			pd.size  = size_out;
 #endif
+#ifdef USEZSTD
+		} else if ((info->flag_compress & DUMP_DH_COMPRESSED_ZSTD)
+			    && (size_out = ZSTD_compressCCtx(cctx,
+						buf_out, len_buf_out,
+						buf, info->page_size, 1))
+			    && (!ZSTD_isError(size_out))
+			    && (size_out < info->page_size)) {
+			pd.flags = DUMP_DH_COMPRESSED_ZSTD;
+			pd.size  = size_out;
+#endif
 		} else {
 			pd.flags = 0;
 			pd.size  = info->page_size;
@@ -8679,6 +8754,10 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 out:
 	if (buf_out != NULL)
 		free(buf_out);
+#ifdef USEZSTD
+	if (cctx != NULL)
+		ZSTD_freeCCtx(cctx);
+#endif
 #ifdef USELZO
 	if (wrkmem != NULL)
 		free(wrkmem);
@@ -11656,7 +11735,7 @@ main(int argc, char *argv[])
 
 	info->block_order = DEFAULT_ORDER;
 	message_level = DEFAULT_MSG_LEVEL;
-	while ((opt = getopt_long(argc, argv, "b:cDd:eEFfg:hi:lL:pRvXx:", longopts,
+	while ((opt = getopt_long(argc, argv, "b:cDd:eEFfg:hi:lL:pRvXx:z", longopts,
 	    NULL)) != -1) {
 		switch (opt) {
 			unsigned long long val;
@@ -11738,6 +11817,9 @@ main(int argc, char *argv[])
 		       break;
 		case OPT_COMPRESS_SNAPPY:
 			info->flag_compress = DUMP_DH_COMPRESSED_SNAPPY;
+			break;
+		case OPT_COMPRESS_ZSTD:
+			info->flag_compress = DUMP_DH_COMPRESSED_ZSTD;
 			break;
 		case OPT_XEN_PHYS_START:
 			info->xen_phys_start = strtoul(optarg, NULL, 0);

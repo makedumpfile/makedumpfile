@@ -132,10 +132,19 @@ configuration, you need to use --diskset option.
 .SH OPTIONS
 
 .TP
-\fB\-c,\-l,\-p\fR
-Compress dump data by each page using zlib for -c option, lzo for -l
-option or snappy for -p option.
-(-l option needs USELZO=on and -p option needs USESNAPPY=on when building)
+\fB\-c,\-l,\-p,\-z\fR
+Compress dump data by the page using the following compression library respectively:
+.br
+	\fB-c\fR : zlib
+.br
+	\fB-l\fR : lzo
+.br
+	\fB-p\fR : snappy
+.br
+	\fB-z\fR : zstd
+.br
+(-l, -p and -z option need USELZO=on, USESNAPPY=on and USEZSTD=on respectively
+when building makedumpfile)
 .br
 A user cannot specify this option with \-E option, because the ELF format does
 not support compressed data.

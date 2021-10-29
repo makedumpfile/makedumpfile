@@ -2320,6 +2320,9 @@ is_on(char *bitmap, mdf_pfn_t i)
 static inline int
 is_cyclic_region(mdf_pfn_t pfn, struct cycle *cycle)
 {
+	if (!cycle)
+		return FALSE;
+
 	if (pfn < cycle->start_pfn || cycle->end_pfn <= pfn)
 		return FALSE;
 	else

@@ -1417,8 +1417,9 @@ check_dump_file(const char *path)
 int
 open_dump_bitmap(void)
 {
-	int i, fd;
 	char *tmpname;
+	size_t len;
+	int i, fd;
 
 	/* Unnecessary to open */
 	if (!info->working_dir && !info->flag_reassemble && !info->flag_refiltering
@@ -1431,15 +1432,15 @@ open_dump_bitmap(void)
 	else if (!tmpname)
 		tmpname = "/tmp";
 
-	if ((info->name_bitmap = (char *)malloc(sizeof(FILENAME_BITMAP) +
-						strlen(tmpname) + 1)) == NULL) {
+	/* +2 for '/' and terminating '\0' */
+	len = strlen(FILENAME_BITMAP) +	strlen(tmpname) + 2;
+	info->name_bitmap = malloc(len);
+	if (!info->name_bitmap) {
 		ERRMSG("Can't allocate memory for the filename. %s\n",
 		    strerror(errno));
 		return FALSE;
 	}
-	strcpy(info->name_bitmap, tmpname);
-	strcat(info->name_bitmap, "/");
-	strcat(info->name_bitmap, FILENAME_BITMAP);
+	snprintf(info->name_bitmap, len, "%s/%s", tmpname, FILENAME_BITMAP);
 	if ((fd = mkstemp(info->name_bitmap)) < 0) {
 		ERRMSG("Can't open the bitmap file(%s). %s\n",
 		    info->name_bitmap, strerror(errno));
@@ -7026,7 +7027,7 @@ write_start_flat_header()
 	if (!info->flag_flatten)
 		return FALSE;
 
-	strcpy(fh.signature, MAKEDUMPFILE_SIGNATURE);
+	strncpy(fh.signature, MAKEDUMPFILE_SIGNATURE, sizeof(fh.signature));
 
 	/*
 	 * For sending dump data to a different architecture, change the values

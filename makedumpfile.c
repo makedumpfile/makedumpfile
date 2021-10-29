@@ -10514,13 +10514,20 @@ writeout_multiple_dumpfiles(void)
 {
 	int i, status, ret = TRUE;
 	pid_t pid;
-	pid_t array_pid[info->num_dumpfile];
+	pid_t *array_pid;
 
 	if (!setup_splitting())
 		return FALSE;
 
+	array_pid = malloc(sizeof(*array_pid) * info->num_dumpfile);
+	if (!array_pid) {
+		ERRMSG("Can't allocate memory for PID array. %s\n", strerror(errno));
+		return FALSE;
+	}
+
 	for (i = 0; i < info->num_dumpfile; i++) {
 		if ((pid = fork()) < 0) {
+			free(array_pid);
 			return FALSE;
 
 		} else if (pid == 0) { /* Child */
@@ -10552,6 +10559,8 @@ writeout_multiple_dumpfiles(void)
 		} else if ((ret == TRUE) && (WEXITSTATUS(status) == 2))
 			ret = NOSPACE;
 	}
+
+	free(array_pid);
 	return ret;
 }
 

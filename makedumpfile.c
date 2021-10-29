@@ -816,8 +816,8 @@ static int
 readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 {
 	page_desc_t pd;
-	char buf[info->page_size], *rdbuf;
-	int ret;
+	char *buf, *rdbuf;
+	int ret, out;
 	unsigned long retlen;
 
 	if (!is_dumpable(info->bitmap_memory, paddr_to_pfn(paddr), NULL)) {
@@ -837,6 +837,14 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 		return FALSE;
 	}
 
+	buf = malloc(info->page_size);
+	if (!buf) {
+		ERRMSG("Cannot allocate buffer for decompression. %s\n",
+		       strerror(errno));
+		return FALSE;
+	}
+	out = FALSE;
+
 	/*
 	 * Read page data
 	 */
@@ -845,7 +853,7 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 	if (read(info->fd_memory, rdbuf, pd.size) != pd.size) {
 		ERRMSG("Can't read %s. %s\n",
 				info->name_memory, strerror(errno));
-		return FALSE;
+		goto out_error;
 	}
 
 	if (pd.flags & DUMP_DH_COMPRESSED_ZLIB) {
@@ -854,7 +862,7 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 					(unsigned char *)buf, pd.size);
 		if ((ret != Z_OK) || (retlen != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			return FALSE;
+			goto out_error;
 		}
 #ifdef USELZO
 	} else if (info->flag_lzo_support
@@ -865,7 +873,7 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 					    LZO1X_MEM_DECOMPRESS);
 		if ((ret != LZO_E_OK) || (retlen != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			return FALSE;
+			goto out_error;
 		}
 #endif
 #ifdef USESNAPPY
@@ -874,13 +882,13 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 		ret = snappy_uncompressed_length(buf, pd.size, (size_t *)&retlen);
 		if (ret != SNAPPY_OK) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			return FALSE;
+			goto out_error;
 		}
 
 		ret = snappy_uncompress(buf, pd.size, bufptr, (size_t *)&retlen);
 		if ((ret != SNAPPY_OK) || (retlen != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			return FALSE;
+			goto out_error;
 		}
 #endif
 #ifdef USEZSTD
@@ -888,12 +896,16 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 		ret = ZSTD_decompress(bufptr, info->page_size, buf, pd.size);
 		if (ZSTD_isError(ret) || (ret != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
-			return FALSE;
+			goto out_error;
 		}
 #endif
 	}
 
-	return TRUE;
+	out = TRUE;
+
+out_error:
+	free(buf);
+	return out;
 }
 
 static int

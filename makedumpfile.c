@@ -9417,6 +9417,7 @@ init_xen_crash_info(void)
 {
 	off_t		offset_xen_crash_info;
 	unsigned long	size_xen_crash_info;
+	int		ret = FALSE;
 	void		*buf;
 
 	get_xen_crash_info(&offset_xen_crash_info, &size_xen_crash_info);
@@ -9441,13 +9442,13 @@ init_xen_crash_info(void)
 	if (lseek(info->fd_memory, offset_xen_crash_info, SEEK_SET) < 0) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		       info->name_memory, strerror(errno));
-		return FALSE;
+		goto out_error;
 	}
 	if (read(info->fd_memory, buf, size_xen_crash_info)
 	    != size_xen_crash_info) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		       info->name_memory, strerror(errno));
-		return FALSE;
+		goto out_error;
 	}
 
 	info->xen_crash_info.com = buf;
@@ -9458,7 +9459,11 @@ init_xen_crash_info(void)
 	else
 		info->xen_crash_info_v = 0;
 
-	return TRUE;
+	ret = TRUE;
+
+out_error:
+	free(buf);
+	return ret;
 }
 
 int

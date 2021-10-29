@@ -6484,6 +6484,8 @@ init_save_control()
 		ERRMSG("Can't allocate a page for pfn buf.\n");
 		return FALSE;
 	}
+	memset(sc.sc_buf, 0, info->page_size);
+
 	sc.sc_buflen = info->page_size;
 	sc.sc_bufposition = 0;
 	sc.sc_fileposition = 0;

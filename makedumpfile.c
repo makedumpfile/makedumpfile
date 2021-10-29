@@ -2502,7 +2502,9 @@ read_vmcoreinfo_basic_info(void)
 			/* if the release have been stored, skip this time. */
 			if (strlen(info->release))
 				continue;
-			strcpy(info->release, buf + strlen(STR_OSRELEASE));
+			memcpy(info->release, buf + strlen(STR_OSRELEASE),
+			       STRLEN_OSRELEASE-1);
+			info->release[STRLEN_OSRELEASE-1] = '\0';
 		}
 		if (strncmp(buf, STR_PAGESIZE, strlen(STR_PAGESIZE)) == 0) {
 			page_size = strtol(buf+strlen(STR_PAGESIZE),&endp,10);

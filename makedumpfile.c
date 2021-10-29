@@ -8739,7 +8739,7 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	mdf_pfn_t start_pfn, end_pfn;
 	unsigned long size_out;
 	struct page_desc pd;
-	unsigned char buf[info->page_size], *buf_out = NULL;
+	unsigned char *buf = NULL, *buf_out = NULL;
 	unsigned long len_buf_out;
 	struct timespec ts_start;
 	int ret = FALSE;
@@ -8783,6 +8783,12 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 	if ((buf_out = malloc(len_buf_out)) == NULL) {
 		ERRMSG("Can't allocate memory for the compression buffer. %s\n",
 		       strerror(errno));
+		goto out;
+	}
+
+	buf = malloc(info->page_size);
+	if (!buf) {
+		ERRMSG("Can't allocate memory. %s\n", strerror(errno));
 		goto out;
 	}
 
@@ -8887,6 +8893,9 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 
 	ret = TRUE;
 out:
+	if (buf != NULL)
+		free(buf);
+
 	if (buf_out != NULL)
 		free(buf_out);
 #ifdef USEZSTD

@@ -217,15 +217,22 @@ get_dom0_mapnr()
 
 		info->dom0_mapnr = max_pfn;
 	} else if (info->p2m_frames) {
-		unsigned long mfns[MFNS_PER_FRAME];
 		unsigned long mfn_idx = info->p2m_frames - 1;
 		unsigned long long maddr;
+		unsigned long *mfns;
 		unsigned i;
 
+		mfns = malloc(sizeof(*mfns) * MFNS_PER_FRAME);
+		if (!mfns) {
+			ERRMSG("Can't allocate mfns buffer: %s\n", strerror(errno));
+			return FALSE;
+		}
+
 		maddr = pfn_to_paddr(info->p2m_mfn_frame_list[mfn_idx]);
-		if (!readmem(PADDR, maddr, &mfns, sizeof(mfns))) {
+		if (!readmem(PADDR, maddr, mfns, MFNS_PER_FRAME)) {
 			ERRMSG("Can't read %ld domain-0 mfns at 0x%llu\n",
 				(long)MFNS_PER_FRAME, maddr);
+			free(mfns);
 			return FALSE;
 		}
 
@@ -234,6 +241,8 @@ get_dom0_mapnr()
 				break;
 
 		info->dom0_mapnr = mfn_idx * MFNS_PER_FRAME + i;
+
+		free(mfns);
 	} else {
 		/* dom0_mapnr is unavailable, which may be non-critical */
 		return TRUE;

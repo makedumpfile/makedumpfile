@@ -9271,7 +9271,6 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	struct page_desc pd_zero;
 	off_t offset_data=0;
 	struct disk_dump_header *dh = info->dump_header;
-	unsigned char buf[info->page_size];
 	struct timespec ts_start;
 
 	cd_header->offset
@@ -9284,13 +9283,25 @@ write_kdump_pages_and_bitmap_cyclic(struct cache_data *cd_header, struct cache_d
 	 * Write the data of zero-filled page.
 	 */
 	if (info->dump_level & DL_EXCLUDE_ZERO) {
+		unsigned char *buf;
+
 		pd_zero.size = info->page_size;
 		pd_zero.flags = 0;
 		pd_zero.offset = offset_data;
 		pd_zero.page_flags = 0;
-		memset(buf, 0, pd_zero.size);
-		if (!write_cache(cd_page, buf, pd_zero.size))
+
+		buf = malloc(info->page_size);
+		if (!buf) {
+			ERRMSG("Can't allocate memory. %s\n", strerror(errno));
 			return FALSE;
+		}
+		memset(buf, 0, pd_zero.size);
+
+		if (!write_cache(cd_page, buf, pd_zero.size)) {
+			free(buf);
+			return FALSE;
+		}
+		free(buf);
 		offset_data += pd_zero.size;
 	}
 

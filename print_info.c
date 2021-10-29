@@ -380,21 +380,24 @@ static void calc_delta(struct timespec *ts_start, struct timespec *delta)
 	}
 }
 
-/* produce less than 12 bytes on msg */
-static int eta_to_human_short (unsigned long secs, char* msg)
+static int eta_to_human_short (unsigned long secs, char *msg, size_t len)
 {
-	strcpy(msg, "eta: ");
-	msg += strlen("eta: ");
+	unsigned long minutes, hours, days;
+
+	minutes = secs / 60;
+	hours = minutes / 60;
+	days = hours / 24;
+
 	if (secs < 100)
-		sprintf(msg, "%lus", secs);
-	else if (secs < 100 * 60)
-		sprintf(msg, "%lum%lus", secs / 60, secs % 60);
-	else if (secs < 48 * 3600)
-		sprintf(msg, "%luh%lum", secs / 3600, (secs / 60) % 60);
-	else if (secs < 100 * 86400)
-		sprintf(msg, "%lud%luh", secs / 86400, (secs / 3600) % 24);
+		snprintf(msg, len, "eta: %lus", secs);
+	else if (minutes < 100)
+		snprintf(msg, len, "eta: %lum%lus", minutes, secs % 60);
+	else if (hours < 48)
+		snprintf(msg, len, "eta: %luh%lum", hours, minutes % 60);
+	else if (days < 100)
+		snprintf(msg, len, "eta: %lud%luh", days, hours % 24);
 	else
-		sprintf(msg, ">2day");
+		snprintf(msg, len, "eta: >100day");
 	return 0;
 }
 
@@ -409,7 +412,7 @@ print_progress(const char *msg, unsigned long current, unsigned long end, struct
 	static const char *spinner = "/|\\-";
 	struct timespec delta;
 	unsigned long eta;
-	char eta_msg[16] = " ";
+	char eta_msg[32] = " ";
 
 	if (current < end) {
 		tm = time(NULL);
@@ -424,7 +427,7 @@ print_progress(const char *msg, unsigned long current, unsigned long end, struct
 		calc_delta(start, &delta);
 		eta = 1000 * delta.tv_sec + delta.tv_nsec / (NSEC_PER_SEC / 1000);
 		eta = eta / progress - delta.tv_sec;
-		eta_to_human_short(eta, eta_msg);
+		eta_to_human_short(eta, eta_msg, sizeof(eta_msg));
 	}
 	if (flag_ignore_r_char) {
 		PROGRESS_MSG("%-" PROGRESS_MAXLEN "s: [%3u.%u %%] %c  %16s\n",

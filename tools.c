@@ -276,19 +276,27 @@ strip_ending_whitespace(char *line)
 char *
 strip_beginning_whitespace(char *line)
 {
-	char buf[BUFSIZE];
+	size_t len;
 	char *p;
 
-	if (line == NULL || strlen(line) == 0)
-		return(line);
+	if (line == NULL)
+		return line;
 
-	strcpy(buf, line);
-	p = &buf[0];
-	while (*p == ' ' || *p == '\t')
+	len = strlen(line);
+
+	if (len == 0)
+		return line;
+
+	p = line;
+	while (whitespace(*p)) {
 		p++;
-	strcpy(line, p);
+		len--;
+	}
+	/* for memmove src and dest may overlap */
+	memmove(line, p, len);
+	line[len + 1] = '\0';
 
-	return(line);
+	return line;
 }
 
 /*

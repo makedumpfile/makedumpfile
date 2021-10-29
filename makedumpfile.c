@@ -5886,10 +5886,11 @@ static mdf_pfn_t count_bits(char *buf, int sz)
 int
 copy_1st_bitmap_from_memory(void)
 {
-	char buf[info->dh_memory->block_size];
 	off_t offset_page;
 	off_t bitmap_offset;
 	struct disk_dump_header *dh = info->dh_memory;
+	int buf_size, ret;
+	char *buf;
 
 	bitmap_offset = (DISKDUMP_HEADER_BLOCKS + dh->sub_hdr_size)
 			 * dh->block_size;
@@ -5904,22 +5905,35 @@ copy_1st_bitmap_from_memory(void)
 		    info->bitmap1->file_name, strerror(errno));
 		return FALSE;
 	}
+
+	buf_size = dh->block_size;
+	buf = malloc(buf_size);
+	if (!buf) {
+		ERRMSG("Can't allocate memory. %s\n", strerror(errno));
+		return FALSE;
+	}
+	ret = FALSE;
+
 	offset_page = 0;
 	while (offset_page < (info->len_bitmap / 2)) {
-		if (read(info->fd_memory, buf, sizeof(buf)) != sizeof(buf)) {
+		if (read(info->fd_memory, buf, buf_size) != buf_size) {
 			ERRMSG("Can't read %s. %s\n",
 					info->name_memory, strerror(errno));
-			return FALSE;
+			goto out;
 		}
-		pfn_memhole -= count_bits(buf, sizeof(buf));
-		if (write(info->bitmap1->fd, buf, sizeof(buf)) != sizeof(buf)) {
+		pfn_memhole -= count_bits(buf, buf_size);
+		if (write(info->bitmap1->fd, buf, buf_size) != buf_size) {
 			ERRMSG("Can't write the bitmap(%s). %s\n",
 			    info->bitmap1->file_name, strerror(errno));
-			return FALSE;
+			goto out;
 		}
-		offset_page += sizeof(buf);
+		offset_page += buf_size;
 	}
-	return TRUE;
+
+	ret = TRUE;
+out:
+	free(buf);
+	return ret;
 }
 
 int

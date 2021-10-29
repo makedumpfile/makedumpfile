@@ -73,6 +73,15 @@ LIBS := -lzstd $(LIBS)
 CFLAGS += -DUSEZSTD
 endif
 
+ifeq ($(DEBUG), on)
+# Requires libasan
+CFLAGS += -fsanitize=address
+# Requires libubsan
+CFLAGS += -fsanitize=undefined
+# Warning: extremely slow
+#CFLAGS += -fanalyzer
+endif
+
 LIBS := $(LIBS) -lpthread
 
 try-run = $(shell set -e;		\

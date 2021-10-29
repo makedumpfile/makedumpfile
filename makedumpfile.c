@@ -7790,7 +7790,8 @@ write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
 {
 	long page_size = info->page_size;
 	long long bufsz_write;
-	char buf[info->page_size];
+	int ret = FALSE;
+	char *buf;
 
 	off_memory = paddr_to_offset2(paddr, off_memory);
 	if (!off_memory) {
@@ -7804,6 +7805,12 @@ write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
 		return FALSE;
 	}
 
+	buf = malloc(page_size);
+	if (!buf) {
+		ERRMSG("Can't allocate memory. %s\n", strerror(errno));
+		return FALSE;
+	}
+
 	while (size > 0) {
 		if (size >= page_size)
 			bufsz_write = page_size;
@@ -7813,16 +7820,20 @@ write_elf_load_segment(struct cache_data *cd_page, unsigned long long paddr,
 		if (read(info->fd_memory, buf, bufsz_write) != bufsz_write) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
 			    info->name_memory, strerror(errno));
-			return FALSE;
+			goto out_error;
 		}
 		filter_data_buffer((unsigned char *)buf, paddr, bufsz_write);
 		paddr += bufsz_write;
 		if (!write_cache(cd_page, buf, bufsz_write))
-			return FALSE;
+			goto out_error;
 
 		size -= page_size;
 	}
-	return TRUE;
+
+	ret = TRUE;
+out_error:
+	free(buf);
+	return ret;
 }
 
 int

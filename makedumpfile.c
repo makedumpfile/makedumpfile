@@ -3346,13 +3346,15 @@ get_mm_discontigmem(void)
 	unsigned long pgdat, mem_map, pfn_start, pfn_end, node_spanned_pages;
 	unsigned long vmem_map;
 	struct mem_map_data temp_mmd;
+	struct mem_map_data *mmd;
+	int ret;
 
 	num_mem_map = get_num_mm_discontigmem();
 	if (num_mem_map < vt.numnodes) {
 		ERRMSG("Can't get the number of mem_map.\n");
 		return FALSE;
 	}
-	struct mem_map_data mmd[num_mem_map];
+
 	if (vt.numnodes < num_mem_map) {
 		separate_mm = TRUE;
 	}
@@ -3383,17 +3385,26 @@ get_mm_discontigmem(void)
 		ERRMSG("Can't get pgdat list.\n");
 		return FALSE;
 	}
+
+	mmd = malloc(sizeof(*mmd) * num_mem_map);
+	if (!mmd) {
+		ERRMSG("Can't allocate memory for the mem_map_data. %s\n",
+		       strerror(errno));
+		return FALSE;
+	}
+
+	ret = FALSE;
 	id_mm = 0;
 	for (i = 0; i < vt.numnodes; i++) {
 		if (!readmem(VADDR, pgdat + OFFSET(pglist_data.node_start_pfn),
 		    &pfn_start, sizeof pfn_start)) {
 			ERRMSG("Can't get node_start_pfn.\n");
-			return FALSE;
+			goto out_error;
 		}
 		if (!readmem(VADDR,pgdat+OFFSET(pglist_data.node_spanned_pages),
 		    &node_spanned_pages, sizeof node_spanned_pages)) {
 			ERRMSG("Can't get node_spanned_pages.\n");
-			return FALSE;
+			goto out_error;
 		}
 		pfn_end = pfn_start + node_spanned_pages;
 
@@ -3401,7 +3412,7 @@ get_mm_discontigmem(void)
 			if (!readmem(VADDR, pgdat + OFFSET(pglist_data.node_mem_map),
 			    &mem_map, sizeof mem_map)) {
 				ERRMSG("Can't get mem_map.\n");
-				return FALSE;
+				goto out_error;
 			}
 		} else
 			mem_map = vmem_map + (SIZE(page) * pfn_start);
@@ -3427,7 +3438,7 @@ get_mm_discontigmem(void)
 			if (!separate_mem_map(&mmd[id_mm], &id_mm, node,
 			    mem_map, pfn_start)) {
 				ERRMSG("Can't separate mem_map.\n");
-				return FALSE;
+				goto out_error;
 			}
 		} else {
 			if (info->max_mapnr < pfn_end) {
@@ -3456,11 +3467,11 @@ get_mm_discontigmem(void)
 		if (i < (vt.numnodes - 1)) {
 			if ((node = next_online_node(node + 1)) < 0) {
 				ERRMSG("Can't get next online node.\n");
-				return FALSE;
+				goto out_error;
 			} else if (!(pgdat = next_online_pgdat(node))) {
 				ERRMSG("Can't determine pgdat list (node %d).\n",
 				    node);
-				return FALSE;
+				goto out_error;
 			}
 		}
 	}
@@ -3490,7 +3501,7 @@ get_mm_discontigmem(void)
 			ERRMSG("The mem_map is overlapped with the next one.\n");
 			ERRMSG("mmd[%d].pfn_end   = %llx\n", i, mmd[i].pfn_end);
 			ERRMSG("mmd[%d].pfn_start = %llx\n", i + 1, mmd[i + 1].pfn_start);
-			return FALSE;
+			goto out_error;
 		} else if (mmd[i].pfn_end == mmd[i + 1].pfn_start)
 			/*
 			 * Continuous mem_map
@@ -3509,7 +3520,7 @@ get_mm_discontigmem(void)
 	    malloc(sizeof(struct mem_map_data)*info->num_mem_map)) == NULL) {
 		ERRMSG("Can't allocate memory for the mem_map_data. %s\n",
 		    strerror(errno));
-		return FALSE;
+		goto out_error;
 	}
 
 	/*
@@ -3541,7 +3552,11 @@ get_mm_discontigmem(void)
 			dump_mem_map(mmd[i].pfn_end, info->max_mapnr,
 			    NOT_MEMMAP_ADDR, id_mm);
 	}
-	return TRUE;
+
+	ret = TRUE;
+out_error:
+	free(mmd);
+	return ret;
 }
 
 static unsigned long

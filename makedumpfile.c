@@ -6214,7 +6214,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 	unsigned long index_pg, pfn_mm;
 	unsigned long long maddr;
 	mdf_pfn_t pfn_read_start, pfn_read_end;
-	unsigned char page_cache[SIZE(page) * PGMM_CACHED];
+	unsigned char *page_cache;
 	unsigned char *pcache;
 	unsigned int _count, _mapcount = 0, compound_order = 0;
 	unsigned int order_offset, dtor_offset;
@@ -6239,6 +6239,12 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 	pfn_read_start = ULONGLONG_MAX;
 	pfn_read_end   = 0;
 
+	page_cache = malloc(SIZE(page) * PGMM_CACHED);
+	if (!page_cache) {
+		ERRMSG("Can't allocate page cache: %s\n", strerror(errno));
+		return FALSE;
+	}
+
 	for (pfn = pfn_start; pfn < pfn_end; pfn++, mem_map += SIZE(page)) {
 
 		/*
@@ -6255,6 +6261,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 			if (maddr == NOT_PADDR) {
 				ERRMSG("Can't convert a physical address(%llx) to machine address.\n",
 				    pfn_to_paddr(pfn));
+				free(page_cache);
 				return FALSE;
 			}
 			if (!is_in_segs(maddr))
@@ -6265,22 +6272,22 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		}
 
 		index_pg = pfn % PGMM_CACHED;
+		pcache  = page_cache + (index_pg * SIZE(page));
+
 		if (pfn < pfn_read_start || pfn_read_end < pfn) {
 			if (roundup(pfn + 1, PGMM_CACHED) < pfn_end)
 				pfn_mm = PGMM_CACHED - index_pg;
 			else
 				pfn_mm = pfn_end - pfn;
 
-			if (!readmem(VADDR, mem_map,
-			    page_cache + (index_pg * SIZE(page)),
-			    SIZE(page) * pfn_mm)) {
+			if (!readmem(VADDR, mem_map, pcache, SIZE(page) * pfn_mm)) {
 				ERRMSG("Can't read the buffer of struct page.\n");
+				free(page_cache);
 				return FALSE;
 			}
 			pfn_read_start = pfn;
 			pfn_read_end   = pfn + pfn_mm - 1;
 		}
-		pcache  = page_cache + (index_pg * SIZE(page));
 
 		flags   = ULONG(pcache + OFFSET(page.flags));
 		_count  = UINT(pcache + OFFSET(page._refcount));
@@ -6436,6 +6443,8 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 			mem_map += (nr_pages - 1) * SIZE(page);
 		}
 	}
+
+	free(page_cache);
 	return TRUE;
 }
 

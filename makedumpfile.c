@@ -5193,11 +5193,18 @@ out_close_file:
 int
 check_and_modify_multiple_kdump_headers() {
 	int i, status, ret = TRUE;
+	pid_t *array_pid;
 	pid_t pid;
-	pid_t array_pid[info->num_dumpfile];
+
+	array_pid = malloc(sizeof(*array_pid) * info->num_dumpfile);
+	if (!array_pid) {
+		ERRMSG("Can't allocate memory for PID array. %s\n", strerror(errno));
+		return FALSE;
+	}
 
 	for (i = 0; i < info->num_dumpfile; i++) {
 		if ((pid = fork()) < 0) {
+			free(array_pid);
 			return FALSE;
 
 		} else if (pid == 0) { /* Child */
@@ -5217,6 +5224,7 @@ check_and_modify_multiple_kdump_headers() {
 		}
 	}
 
+	free(array_pid);
 	return ret;
 }
 

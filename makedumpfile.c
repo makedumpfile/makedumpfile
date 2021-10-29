@@ -6067,7 +6067,14 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 {
 	mdf_pfn_t pfn;
 	unsigned long long paddr;
-	unsigned char buf[info->page_size];
+	unsigned char *buf;
+	int ret = FALSE;
+
+	buf = malloc(info->page_size);
+	if (!buf) {
+		ERRMSG("Can't allocate memory: %s\n", strerror(errno));
+		return FALSE;
+	}
 
 	for (pfn = cycle->start_pfn, paddr = pfn_to_paddr(pfn); pfn < cycle->end_pfn;
 	    pfn++, paddr += info->page_size) {
@@ -6076,7 +6083,7 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 			continue;
 
 		if (!sync_2nd_bitmap())
-			return FALSE;
+			goto out_error;
 
 		if (!is_dumpable(info->bitmap2, pfn, cycle))
 			continue;
@@ -6084,7 +6091,7 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 		if (!readmem(PADDR, paddr, buf, info->page_size)) {
 			ERRMSG("Can't get the page data(pfn:%llx, max_mapnr:%llx).\n",
 			    pfn, info->max_mapnr);
-			return FALSE;
+			goto out_error;
 		}
 		if (is_zero_page(buf, info->page_size)) {
 			if (clear_bit_on_2nd_bitmap(pfn, cycle))
@@ -6092,7 +6099,11 @@ exclude_zero_pages_cyclic(struct cycle *cycle)
 		}
 	}
 
-	return TRUE;
+	ret = TRUE;
+
+out_error:
+	free(buf);
+	return ret;
 }
 
 int

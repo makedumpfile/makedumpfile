@@ -280,10 +280,8 @@ __load_module_symbol(struct module_info *modules, unsigned long addr_module)
 	}
 
 	module_name = (char *)(module_struct_mem + OFFSET(module.name));
-	if (strlen(module_name) < MOD_NAME_LEN)
-		strcpy(modules->name, module_name);
-	else
-		strncpy(modules->name, module_name, MOD_NAME_LEN-1);
+	strncpy(modules->name, module_name, MOD_NAME_LEN - 1);
+	modules->name[MOD_NAME_LEN - 1] = '\0';
 
 	mod_init = ULONG(module_struct_mem +
 					OFFSET(module.module_init));

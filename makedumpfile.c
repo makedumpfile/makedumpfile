@@ -5941,11 +5941,11 @@ create_1st_bitmap_file(void)
 {
 	int i;
 	unsigned int num_pt_loads = get_num_pt_loads();
- 	char buf[info->page_size];
 	mdf_pfn_t pfn, pfn_start, pfn_end, pfn_bitmap1;
 	unsigned long long phys_start, phys_end;
 	struct timespec ts_start;
 	off_t offset_page;
+	char *buf;
 
 	if (info->flag_refiltering)
 		return copy_1st_bitmap_from_memory();
@@ -5953,26 +5953,31 @@ create_1st_bitmap_file(void)
 	if (info->flag_sadump)
 		return sadump_copy_1st_bitmap_from_memory();
 
-	/*
-	 * At first, clear all the bits on the 1st-bitmap.
-	 */
-	memset(buf, 0, sizeof(buf));
-
 	if (lseek(info->bitmap1->fd, info->bitmap1->offset, SEEK_SET) < 0) {
 		ERRMSG("Can't seek the bitmap(%s). %s\n",
 		    info->bitmap1->file_name, strerror(errno));
 		return FALSE;
 	}
+
+	buf = malloc(info->page_size);
+	if (!buf) {
+		ERRMSG("Can't allocate memory. %s\n", strerror(errno));
+		return FALSE;
+	}
+	memset(buf, 0, info->page_size);
+
 	offset_page = 0;
 	while (offset_page < (info->len_bitmap / 2)) {
 		if (write(info->bitmap1->fd, buf, info->page_size)
 		    != info->page_size) {
 			ERRMSG("Can't write the bitmap(%s). %s\n",
 			    info->bitmap1->file_name, strerror(errno));
+			free(buf);
 			return FALSE;
 		}
 		offset_page += info->page_size;
 	}
+	free(buf);
 
 	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 

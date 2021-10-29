@@ -6502,10 +6502,19 @@ int
 copy_bitmap_file(void)
 {
 	off_t base, offset = 0;
-	unsigned char buf[info->page_size];
  	const off_t failed = (off_t)-1;
 	int fd;
 	struct disk_dump_header *dh = info->dh_memory;
+	unsigned char *buf;
+	int ret = FALSE;
+	long buf_size;
+
+	buf_size = info->page_size;
+	buf = malloc(buf_size);
+	if (!buf) {
+		ERRMSG("Can't allocate memory. %s\n", strerror(errno));
+		return FALSE;
+	}
 
 	if (info->flag_refiltering) {
 		fd = info->fd_memory;
@@ -6518,29 +6527,33 @@ copy_bitmap_file(void)
 	while (offset < (info->len_bitmap / 2)) {
 		if (lseek(fd, base + offset, SEEK_SET) == failed) {
 			ERRMSG("Can't seek the bitmap(%s). %s\n",
-			    info->name_bitmap, strerror(errno));
-			return FALSE;
+			       info->name_bitmap, strerror(errno));
+			goto out_error;
 		}
-		if (read(fd, buf, sizeof(buf)) != sizeof(buf)) {
+		if (read(fd, buf, buf_size) != buf_size) {
 			ERRMSG("Can't read the dump memory(%s). %s\n",
-			    info->name_memory, strerror(errno));
-			return FALSE;
+			       info->name_memory, strerror(errno));
+			goto out_error;
 		}
 		if (lseek(info->bitmap2->fd, info->bitmap2->offset + offset,
 		    SEEK_SET) == failed) {
 			ERRMSG("Can't seek the bitmap(%s). %s\n",
-			    info->name_bitmap, strerror(errno));
-			return FALSE;
+			       info->name_bitmap, strerror(errno));
+			goto out_error;
 		}
-		if (write(info->bitmap2->fd, buf, sizeof(buf)) != sizeof(buf)) {
+		if (write(info->bitmap2->fd, buf, buf_size) != buf_size) {
 			ERRMSG("Can't write the bitmap(%s). %s\n",
-		    	info->name_bitmap, strerror(errno));
-			return FALSE;
+			       info->name_bitmap, strerror(errno));
+			goto out_error;
 		}
-		offset += sizeof(buf);
+		offset += buf_size;
 	}
 
-	return TRUE;
+	ret = TRUE;
+
+out_error:
+	free(buf);
+	return ret;
 }
 
 int

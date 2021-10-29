@@ -214,11 +214,12 @@ int
 sadump_copy_1st_bitmap_from_memory(void)
 {
 	struct sadump_header *sh = si->sh_memory;
-	char buf[si->sh_memory->block_size];
 	off_t offset_page;
 	unsigned long bitmap_offset, bitmap_len;
 	mdf_pfn_t pfn, pfn_bitmap1;
 	extern mdf_pfn_t pfn_memhole;
+	size_t buf_len;
+	char *buf;
 
 	bitmap_offset =	si->sub_hdr_offset + sh->block_size*sh->sub_hdr_size;
 	bitmap_len = sh->block_size * sh->bitmap_blocks;
@@ -233,11 +234,21 @@ sadump_copy_1st_bitmap_from_memory(void)
 		       info->bitmap1->file_name, strerror(errno));
 		return FALSE;
 	}
+
+	buf_len = si->sh_memory->block_size;
+	buf = malloc(buf_len);
+	if (!buf) {
+		ERRMSG("Can't allocate buffer. %s\n", strerror(errno));
+		return FALSE;
+	}
+	memset(buf, 0, buf_len);
+
 	offset_page = 0;
 	while (offset_page < bitmap_len) {
-		if (read(info->fd_memory, buf, sizeof(buf)) != sizeof(buf)) {
+		if (read(info->fd_memory, buf, buf_len) != buf_len) {
 			ERRMSG("Can't read %s. %s\n",
 			       info->name_memory, strerror(errno));
+			free(buf);
 			return FALSE;
 		}
 		/*
@@ -247,13 +258,14 @@ sadump_copy_1st_bitmap_from_memory(void)
 		 * order to reuse bitmaps in sadump formats in the
 		 * kdump-compressed format.
 		 */
-		reverse_bit(buf, sizeof(buf));
-		if (write(info->bitmap1->fd, buf, sizeof(buf)) != sizeof(buf)) {
+		reverse_bit(buf, buf_len);
+		if (write(info->bitmap1->fd, buf, buf_len) != buf_len) {
 			ERRMSG("Can't write the bitmap(%s). %s\n",
 			       info->bitmap1->file_name, strerror(errno));
+			free(buf);
 			return FALSE;
 		}
-		offset_page += sizeof(buf);
+		offset_page += buf_len;
 	}
 
 	pfn_bitmap1 = 0;
@@ -288,6 +300,7 @@ sadump_copy_1st_bitmap_from_memory(void)
 		}
 	}
 
+	free(buf);
 	return TRUE;
 }
 

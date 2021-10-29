@@ -466,37 +466,6 @@ fixup_percent(char *s)
 }
 
 /*
- * Append a two-character string to a number to make 1, 2, 3 and 4 into
- * 1st, 2nd, 3rd, 4th, and so on...
- */
-char *
-ordinal(ulong val, char *buf)
-{
-	char *p1;
-
-	sprintf(buf, "%ld", val);
-	p1 = &buf[strlen(buf)-1];
-
-	switch (*p1)
-	{
-	case '1':
-		strcat(buf, "st");
-		break;
-	case '2':
-		strcat(buf, "nd");
-		break;
-	case '3':
-		strcat(buf, "rd");
-		break;
-	default:
-		strcat(buf, "th");
-		break;
-	}
-
-	return buf;
-}
-
-/*
  * Determine whether a string contains only decimal characters.
  * If count is non-zero, limit the search to count characters.
  */

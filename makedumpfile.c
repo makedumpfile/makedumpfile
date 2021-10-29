@@ -6463,15 +6463,15 @@ copy_bitmap(void)
 int
 init_save_control()
 {
+	char *basename = "makedumpfilepfns";
+	size_t len;
 	int flags;
-	char *filename;
 
-	filename = malloc(50);
-	*filename = '\0';
-	strcpy(filename, info->working_dir);
-	strcat(filename, "/");
-	strcat(filename, "makedumpfilepfns");
-	sc.sc_filename = filename;
+	/* +2 for '/' and terminating '\0' */
+	len = strlen(info->working_dir) + strlen(basename) + 2;
+	sc.sc_filename = malloc(len);
+	snprintf(sc.sc_filename, len, "%s/%s", info->working_dir, basename);
+
 	flags = O_RDWR|O_CREAT|O_TRUNC;
 	if ((sc.sc_fd = open(sc.sc_filename, flags, S_IRUSR|S_IWUSR)) < 0) {
 		ERRMSG("Can't open the pfn file %s.\n", sc.sc_filename);

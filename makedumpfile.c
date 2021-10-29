@@ -2877,39 +2877,50 @@ read_vmcoreinfo(void)
 int
 copy_vmcoreinfo(off_t offset, unsigned long size)
 {
-	int fd;
-	char buf[VMCOREINFO_BYTES];
 	const off_t failed = (off_t)-1;
+	int ret = FALSE;
+	char *buf;
+	int fd;
 
 	if (!offset || !size)
 		return FALSE;
 
+	buf = malloc(size);
+	if (!buf) {
+		ERRMSG("Can't allocate buffer for vmcoreinfo. %s\n",
+		    strerror(errno));
+		return FALSE;
+	}
+
 	if ((fd = mkstemp(info->name_vmcoreinfo)) < 0) {
 		ERRMSG("Can't open the vmcoreinfo file(%s). %s\n",
 		    info->name_vmcoreinfo, strerror(errno));
-		return FALSE;
+		goto out;
 	}
 	if (lseek(info->fd_memory, offset, SEEK_SET) == failed) {
 		ERRMSG("Can't seek the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
-		return FALSE;
+		goto out;
 	}
-	if (read(info->fd_memory, &buf, size) != size) {
+	if (read(info->fd_memory, buf, size) != size) {
 		ERRMSG("Can't read the dump memory(%s). %s\n",
 		    info->name_memory, strerror(errno));
-		return FALSE;
+		goto out;
 	}
-	if (write(fd, &buf, size) != size) {
+	if (write(fd, buf, size) != size) {
 		ERRMSG("Can't write the vmcoreinfo file(%s). %s\n",
 		    info->name_vmcoreinfo, strerror(errno));
-		return FALSE;
+		goto out;
 	}
 	if (close(fd) < 0) {
 		ERRMSG("Can't close the vmcoreinfo file(%s). %s\n",
 		    info->name_vmcoreinfo, strerror(errno));
-		return FALSE;
+		goto out;
 	}
-	return TRUE;
+	ret = TRUE;
+out:
+	free(buf);
+	return ret;
 }
 
 int

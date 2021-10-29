@@ -506,7 +506,6 @@ do { \
 /*
  * vmcoreinfo in /proc/vmcore
  */
-#define VMCOREINFO_BYTES		(4096)
 #define FILENAME_VMCOREINFO		"/tmp/vmcoreinfoXXXXXX"
 
 /*

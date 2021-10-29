@@ -147,7 +147,6 @@ next:
 			str[i] = NULLCHAR;
 			/* keep falling... */
 		case NULLCHAR:
-			argv[j] = NULLCHAR;
 			return(j);
 		}
 	}

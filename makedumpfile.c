@@ -5810,7 +5810,7 @@ static mdf_pfn_t count_bits(char *buf, int sz)
 	for (i = 0; i < sz; i++, p++) {
 		if (*p == 0)
 			continue;
-		else if (*p == 0xff) {
+		else if ((*p & 0xff) == 0xff) {
 			cnt += 8;
 			continue;
 		}

@@ -193,9 +193,10 @@ int
 get_machdep_info_x86_64(void)
 {
 	unsigned long p2m_mfn;
-	int i, j, mfns[MAX_X86_64_FRAMES];
-	unsigned long frame_mfn[MAX_X86_64_FRAMES];
-	unsigned long buf[MFNS_PER_FRAME];
+	int i, j, *mfns = NULL;
+	unsigned long *frame_mfn = NULL;
+	unsigned long *buf = NULL;
+	int ret = FALSE;
 
 	info->section_size_bits = _SECTION_SIZE_BITS;
 
@@ -211,10 +212,28 @@ get_machdep_info_x86_64(void)
 		ERRMSG("Can't get p2m_mfn address.\n");
 		return FALSE;
 	}
-	if (!readmem(PADDR, pfn_to_paddr(p2m_mfn),
-		     &frame_mfn, PAGESIZE())) {
-		ERRMSG("Can't read p2m_mfn.\n");
+
+	frame_mfn = malloc(sizeof(*frame_mfn) * MAX_X86_64_FRAMES);
+	if (!frame_mfn) {
+		ERRMSG("Can't allocate frame_mfn buffer. %s\n", strerror(errno));
 		return FALSE;
+	}
+
+	if (!readmem(PADDR, pfn_to_paddr(p2m_mfn), frame_mfn, PAGESIZE())) {
+		ERRMSG("Can't read p2m_mfn.\n");
+		goto out;
+	}
+
+	mfns = malloc(sizeof(*mfns) * MAX_X86_64_FRAMES);
+	if (!mfns) {
+		ERRMSG("Can't allocate mfns buffer. %s\n", strerror(errno));
+		goto out;
+	}
+
+	buf = malloc(sizeof(*buf) * MFNS_PER_FRAME);
+	if (!buf) {
+		ERRMSG("Can't allocate buffer. %s\n", strerror(errno));
+		goto out;
 	}
 
 	/*
@@ -225,10 +244,9 @@ get_machdep_info_x86_64(void)
 		if (!frame_mfn[i])
 			break;
 
-		if (!readmem(PADDR, pfn_to_paddr(frame_mfn[i]), &buf,
-		    PAGESIZE())) {
+		if (!readmem(PADDR, pfn_to_paddr(frame_mfn[i]), buf, PAGESIZE())) {
 			ERRMSG("Can't get frame_mfn[%d].\n", i);
-			return FALSE;
+			goto out;
 		}
 		for (j = 0; j < MFNS_PER_FRAME; j++) {
 			if (!buf[j])
@@ -243,7 +261,7 @@ get_machdep_info_x86_64(void)
 	if (info->p2m_mfn_frame_list == NULL) {
 		ERRMSG("Can't allocate memory for p2m_mfn_frame_list. %s\n",
 		    strerror(errno));
-		return FALSE;
+		goto out;
 	}
 
 	/*
@@ -257,12 +275,18 @@ get_machdep_info_x86_64(void)
 		    &info->p2m_mfn_frame_list[i * MFNS_PER_FRAME],
 		    mfns[i] * sizeof(unsigned long))) {
 			ERRMSG("Can't get p2m_mfn_frame_list.\n");
-			return FALSE;
+			goto out;
 		}
 		if (mfns[i] != MFNS_PER_FRAME)
 			break;
 	}
-	return TRUE;
+
+	ret = TRUE;
+out:
+	free(buf);
+	free(mfns);
+	free(frame_mfn);
+	return ret;
 }
 
 int

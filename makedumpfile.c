@@ -1667,6 +1667,8 @@ get_symbol_info(void)
 	SYMBOL_INIT(cur_cpu_spec, "cur_cpu_spec");
 
 	SYMBOL_INIT(divide_error, "divide_error");
+	if (SYMBOL(divide_error) == NOT_FOUND_SYMBOL)
+		SYMBOL_INIT(divide_error, "asm_exc_divide_error");
 	SYMBOL_INIT(idt_table, "idt_table");
 	SYMBOL_INIT(saved_command_line, "saved_command_line");
 	SYMBOL_INIT(pti_init, "pti_init");

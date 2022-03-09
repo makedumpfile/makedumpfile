@@ -7,11 +7,11 @@ License: GPL
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-root
 Distribution: Linux 2.6 or greater
-Packager: Kazuhito Hagio <k-hagio-ab@nec.com>
+Packager: The makedumpfile team <https://github.com/makedumpfile>
 ExclusiveOS: Linux
 ExclusiveArch: i386 ia64 ppc ppc64 ppc64pseries ppc64iseries x86_64
 Buildroot: %{_tmppath}/%{name}-root
-BuildRequires: zlib-devel elfutils-devel-static
+BuildRequires: zlib-devel elfutils-devel
 
 %description
 makedumpfile package.
@@ -20,7 +20,7 @@ makedumpfile package.
 %setup
 
 %build
-make
+make LINKTYPE=dynamic
 
 %install
 rm -rf %{buildroot}
@@ -46,5 +46,5 @@ rm -rf %{buildroot}
 * Wed Dec 18 2013 Atsushi Kumagai <kumagai-atsushi@mxc.nes.nec.co.jp>
 - reflect the changing of installation directory.
 
-* Fri Aug 21 2008 Ken'ichi Ohmichi <oomichi@mxs.nes.nec.co.jp>
+* Thu Aug 21 2008 Ken'ichi Ohmichi <oomichi@mxs.nes.nec.co.jp>
 - initial release.

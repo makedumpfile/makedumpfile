@@ -865,9 +865,13 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+	} else if ((pd.flags & DUMP_DH_COMPRESSED_LZO)) {
 #ifdef USELZO
-	} else if (info->flag_lzo_support
-		   && (pd.flags & DUMP_DH_COMPRESSED_LZO)) {
+		if (!info->flag_lzo_support) {
+			ERRMSG("lzo compression unsupported\n");
+			goto out_error;
+		}
+
 		retlen = info->page_size;
 		ret = lzo1x_decompress_safe((unsigned char *)buf, pd.size,
 					    (unsigned char *)bufptr, &retlen,
@@ -876,9 +880,13 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+#else
+		ERRMSG("lzo compression unsupported\n");
+		ERRMSG("Try `make USELZO=on` when building.\n");
+		goto out_error;
 #endif
-#ifdef USESNAPPY
 	} else if ((pd.flags & DUMP_DH_COMPRESSED_SNAPPY)) {
+#ifdef USESNAPPY
 
 		ret = snappy_uncompressed_length(buf, pd.size, (size_t *)&retlen);
 		if (ret != SNAPPY_OK) {
@@ -891,14 +899,22 @@ readpage_kdump_compressed(unsigned long long paddr, void *bufptr)
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+#else
+		ERRMSG("snappy compression unsupported\n");
+		ERRMSG("Try `make USESNAPPY=on` when building.\n");
+		goto out_error;
 #endif
-#ifdef USEZSTD
 	} else if ((pd.flags & DUMP_DH_COMPRESSED_ZSTD)) {
+#ifdef USEZSTD
 		ret = ZSTD_decompress(bufptr, info->page_size, buf, pd.size);
 		if (ZSTD_isError(ret) || (ret != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+#else
+		ERRMSG("zstd compression unsupported\n");
+		ERRMSG("Try `make USEZSTD=on` when building.\n");
+		goto out_error;
 #endif
 	}
 
@@ -964,9 +980,13 @@ readpage_kdump_compressed_parallel(int fd_memory, unsigned long long paddr,
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+	} else if ((pd.flags & DUMP_DH_COMPRESSED_LZO)) {
 #ifdef USELZO
-	} else if (info->flag_lzo_support
-		   && (pd.flags & DUMP_DH_COMPRESSED_LZO)) {
+		if (!info->flag_lzo_support) {
+			ERRMSG("lzo compression unsupported\n");
+			goto out_error;
+		}
+
 		retlen = info->page_size;
 		ret = lzo1x_decompress_safe((unsigned char *)buf, pd.size,
 					    (unsigned char *)bufptr, &retlen,
@@ -975,9 +995,13 @@ readpage_kdump_compressed_parallel(int fd_memory, unsigned long long paddr,
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+#else
+		ERRMSG("lzo compression unsupported\n");
+		ERRMSG("Try `make USELZO=on` when building.\n");
+		goto out_error;
 #endif
-#ifdef USESNAPPY
 	} else if ((pd.flags & DUMP_DH_COMPRESSED_SNAPPY)) {
+#ifdef USESNAPPY
 
 		ret = snappy_uncompressed_length(buf, pd.size, (size_t *)&retlen);
 		if (ret != SNAPPY_OK) {
@@ -990,14 +1014,22 @@ readpage_kdump_compressed_parallel(int fd_memory, unsigned long long paddr,
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+#else
+		ERRMSG("snappy compression unsupported\n");
+		ERRMSG("Try `make USESNAPPY=on` when building.\n");
+		goto out_error;
 #endif
-#ifdef USEZSTD
 	} else if ((pd.flags & DUMP_DH_COMPRESSED_ZSTD)) {
+#ifdef USEZSTD
 		ret = ZSTD_decompress(bufptr, info->page_size, buf, pd.size);
 		if (ZSTD_isError(ret) || (ret != info->page_size)) {
 			ERRMSG("Uncompress failed: %d\n", ret);
 			goto out_error;
 		}
+#else
+		ERRMSG("zstd compression unsupported\n");
+		ERRMSG("Try `make USEZSTD=on` when building.\n");
+		goto out_error;
 #endif
 	}
 

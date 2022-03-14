@@ -15,6 +15,7 @@
  */
 #include "makedumpfile.h"
 #include "print_info.h"
+#include "detect_cycle.h"
 #include "dwarf_info.h"
 #include "elf_info.h"
 #include "erase_info.h"
@@ -5526,10 +5527,11 @@ dump_dmesg()
 	unsigned long index, log_buf, log_end;
 	unsigned int log_first_idx, log_next_idx;
 	unsigned long long first_idx_sym;
+	struct detect_cycle *dc = NULL;
 	unsigned long log_end_2_6_24;
 	unsigned      log_end_2_6_25;
 	char *log_buffer = NULL, *log_ptr = NULL;
-	char *ptr;
+	char *ptr, *next_ptr;
 
 	/*
 	 * log_end has been changed to "unsigned" since linux-2.6.25.
@@ -5677,12 +5679,55 @@ dump_dmesg()
 			goto out;
 		}
 		ptr = log_buffer + log_first_idx;
+		dc = dc_init(ptr, log_buffer, log_next);
 		while (ptr != log_buffer + log_next_idx) {
 			log_ptr = log_from_ptr(ptr, log_buffer);
 			if (!dump_log_entry(log_ptr, info->fd_dumpfile,
 					    info->name_dumpfile))
 				goto out;
 			ptr = log_next(ptr, log_buffer);
+			if (dc_next(dc, (void **) &next_ptr)) {
+				unsigned long len;
+				int in_cycle;
+				char *first;
+
+				/* Clear everything we have already written... */
+				ftruncate(info->fd_dumpfile, 0);
+				lseek(info->fd_dumpfile, 0, SEEK_SET);
+
+				/* ...and only write up to the corruption. */
+				dc_find_start(dc, (void **) &first, &len);
+				ptr = log_buffer + log_first_idx;
+				in_cycle = FALSE;
+				while (len) {
+					log_ptr = log_from_ptr(ptr, log_buffer);
+					if (!dump_log_entry(log_ptr,
+							    info->fd_dumpfile,
+							    info->name_dumpfile))
+						goto out;
+					ptr = log_next(ptr, log_buffer);
+
+					if (log_ptr == first)
+						in_cycle = TRUE;
+
+					if (in_cycle)
+						len--;
+				}
+				ERRMSG("Cycle when parsing dmesg detected.\n");
+				ERRMSG("The printk log_buf is most likely corrupted.\n");
+				ERRMSG("log_buf = 0x%lx, idx = 0x%lx\n", log_buf, ptr - log_buffer);
+				close_files_for_creating_dumpfile();
+				goto out;
+			}
+			if (next_ptr < log_buffer ||
+			    next_ptr > log_buffer + log_buf_len - SIZE(printk_log)) {
+				ERRMSG("Index outside log_buf detected.\n");
+				ERRMSG("The printk log_buf is most likely corrupted.\n");
+				ERRMSG("log_buf = 0x%lx, idx = 0x%lx\n", log_buf, ptr - log_buffer);
+				close_files_for_creating_dumpfile();
+				goto out;
+			}
+			ptr = next_ptr;
 		}
 		if (!close_files_for_creating_dumpfile())
 			goto out;
@@ -5692,6 +5737,7 @@ dump_dmesg()
 out:
 	if (log_buffer)
 		free(log_buffer);
+	free(dc);
 
 	return ret;
 }

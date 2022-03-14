@@ -5482,12 +5482,9 @@ dump_log_entry(char *logptr, int fp, const char *file_name)
  * get log record by index; idx must point to valid message.
  */
 static char *
-log_from_idx(unsigned int idx, char *logbuf)
+log_from_ptr(char *logptr, char *logbuf)
 {
-	char *logptr;
 	unsigned int msglen;
-
-	logptr = logbuf + idx;
 
 	/*
 	 * A length == 0 record is the end of buffer marker.
@@ -5497,18 +5494,15 @@ log_from_idx(unsigned int idx, char *logbuf)
 
 	msglen = USHORT(logptr + OFFSET(printk_log.len));
 	if (!msglen)
-		logptr = logbuf;
+		return logbuf;
 
 	return logptr;
 }
 
-static long
-log_next(unsigned int idx, char *logbuf)
+static void *
+log_next(void *logptr, void *logbuf)
 {
-	char *logptr;
 	unsigned int msglen;
-
-	logptr = logbuf + idx;
 
 	/*
 	 * A length == 0 record is the end of buffer marker. Wrap around and
@@ -5519,10 +5513,10 @@ log_next(unsigned int idx, char *logbuf)
 	msglen = USHORT(logptr + OFFSET(printk_log.len));
 	if (!msglen) {
 		msglen = USHORT(logbuf + OFFSET(printk_log.len));
-		return msglen;
+		return logbuf + msglen;
 	}
 
-	return idx + msglen;
+	return logptr + msglen;
 }
 
 int
@@ -5530,11 +5524,12 @@ dump_dmesg()
 {
 	int log_buf_len, length_log, length_oldlog, ret = FALSE;
 	unsigned long index, log_buf, log_end;
-	unsigned int idx, log_first_idx, log_next_idx;
+	unsigned int log_first_idx, log_next_idx;
 	unsigned long long first_idx_sym;
 	unsigned long log_end_2_6_24;
 	unsigned      log_end_2_6_25;
 	char *log_buffer = NULL, *log_ptr = NULL;
+	char *ptr;
 
 	/*
 	 * log_end has been changed to "unsigned" since linux-2.6.25.
@@ -5681,13 +5676,13 @@ dump_dmesg()
 			ERRMSG("Can't open output file.\n");
 			goto out;
 		}
-		idx = log_first_idx;
-		while (idx != log_next_idx) {
-			log_ptr = log_from_idx(idx, log_buffer);
+		ptr = log_buffer + log_first_idx;
+		while (ptr != log_buffer + log_next_idx) {
+			log_ptr = log_from_ptr(ptr, log_buffer);
 			if (!dump_log_entry(log_ptr, info->fd_dumpfile,
 					    info->name_dumpfile))
 				goto out;
-			idx = log_next(idx, log_buffer);
+			ptr = log_next(ptr, log_buffer);
 		}
 		if (!close_files_for_creating_dumpfile())
 			goto out;

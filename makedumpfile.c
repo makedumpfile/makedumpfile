@@ -8884,16 +8884,16 @@ write_kdump_pages_cyclic(struct cache_data *cd_header, struct cache_data *cd_pag
 
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 
-		if ((num_dumped % per) == 0)
-			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
-
 		/*
 		 * Check the excluded page.
 		 */
 		if (!is_dumpable(info->bitmap2, pfn, cycle))
 			continue;
 
+		if ((num_dumped % per) == 0)
+			print_progress(PROGRESS_COPY, num_dumped, info->num_dumpable, &ts_start);
 		num_dumped++;
+
 		if (!read_pfn(pfn, buf))
 			goto out;
 

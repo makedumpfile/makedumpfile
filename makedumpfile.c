@@ -6457,6 +6457,12 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		else if ((info->dump_level & DL_EXCLUDE_FREE)
 		    && info->page_is_buddy
 		    && info->page_is_buddy(flags, _mapcount, private, _count)) {
+			if ((ARRAY_LENGTH(zone.free_area) != NOT_FOUND_STRUCTURE) &&
+			    (private >= ARRAY_LENGTH(zone.free_area))) {
+				MSG("WARNING: Invalid free page order: pfn=%llx, order=%lu, max order=%lu\n",
+				    pfn, private, ARRAY_LENGTH(zone.free_area) - 1);
+				continue;
+			}
 			nr_pages = 1 << private;
 			pfn_counter = &pfn_free;
 		}

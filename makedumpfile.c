@@ -3698,6 +3698,22 @@ validate_mem_section(unsigned long *mem_sec,
 	return ret;
 }
 
+/*
+ * SYMBOL(mem_section) varies with the combination of memory model and
+ * its source:
+ *
+ * SPARSEMEM
+ *   vmcoreinfo: address of mem_section root array
+ *   -x vmlinux: address of mem_section root array
+ *
+ * SPARSEMEM_EXTREME v1
+ *   vmcoreinfo: address of mem_section root array
+ *   -x vmlinux: address of mem_section root array
+ *
+ * SPARSEMEM_EXTREME v2 (with 83e3c48729d9 and a0b1280368d1) 4.15+
+ *   vmcoreinfo: address of mem_section root array
+ *   -x vmlinux: address of pointer to mem_section root array
+ */
 static int
 get_mem_section(unsigned int mem_section_size, unsigned long *mem_maps,
 		unsigned int num_section)
@@ -3710,12 +3726,27 @@ get_mem_section(unsigned int mem_section_size, unsigned long *mem_maps,
 		    strerror(errno));
 		return FALSE;
 	}
+
+	/*
+	 * There was a report that the first validation wrongly returned TRUE
+	 * with -x vmlinux and SPARSEMEM_EXTREME v2 on s390x, so skip it.
+	 * Howerver, leave the fallback validation as it is for the -i option.
+	 */
+	if (is_sparsemem_extreme() && info->name_vmlinux) {
+		unsigned long flag = 0;
+		if (get_symbol_type_name("mem_section", DWARF_INFO_GET_SYMBOL_TYPE,
+					NULL, &flag)
+		    && !(flag & TYPE_ARRAY))
+			goto skip_1st_validation;
+	}
+
 	ret = validate_mem_section(mem_sec, SYMBOL(mem_section),
 				   mem_section_size, mem_maps, num_section);
 
 	if (!ret && is_sparsemem_extreme()) {
 		unsigned long mem_section_ptr;
 
+skip_1st_validation:
 		if (!readmem(VADDR, SYMBOL(mem_section), &mem_section_ptr,
 			     sizeof(mem_section_ptr)))
 			goto out;

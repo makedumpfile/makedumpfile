@@ -25,7 +25,6 @@ make LINKTYPE=dynamic
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/sbin
-mkdir -p %{buildroot}/etc
 mkdir -p %{buildroot}/usr/share/man/man5
 mkdir -p %{buildroot}/usr/share/man/man8
 mkdir -p %{buildroot}/usr/share/%{name}-%{version}/eppic-scripts/
@@ -35,11 +34,11 @@ make install DESTDIR=%{buildroot}
 rm -rf %{buildroot}
 
 %files
-/etc/makedumpfile.conf.sample
 /usr/sbin/makedumpfile
 /usr/sbin/makedumpfile-R.pl
 /usr/share/man/man5/makedumpfile.conf.5.gz
 /usr/share/man/man8/makedumpfile.8.gz
+/usr/share/%{name}-%{version}/makedumpfile.conf.sample
 /usr/share/%{name}-%{version}/eppic_scripts/
 
 %changelog

@@ -52,7 +52,7 @@ get_machdep_info_mips64(void)
 int
 get_versiondep_info_mips64(void)
 {
-	info->page_offset  = 0x9800000000000000ULL;
+	info->page_offset  = _PAGE_OFFSET;
 
 	DEBUG_MSG("page_offset : %lx\n", info->page_offset);
 
@@ -79,7 +79,7 @@ vaddr_to_paddr_mips64(unsigned long vaddr)
 	/*
 	 * XKPHYS
 	 */
-	if (vaddr >= 0x9000000000000000ULL && vaddr < 0xc000000000000000ULL)
+	if (vaddr >= _XKPHYS_START_ADDR && vaddr < _XKPHYS_END_ADDR)
 		return vaddr & ((1ULL << MAX_PHYSMEM_BITS()) - 1);
 
 	if (SYMBOL(swapper_pg_dir) == NOT_FOUND_SYMBOL) {

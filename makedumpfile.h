@@ -965,8 +965,25 @@ typedef unsigned long pgd_t;
 
 #ifdef __mips64__ /* mips64 */
 #define KVBASE			PAGE_OFFSET
+
+#ifndef _XKPHYS_START_ADDR
+#define _XKPHYS_START_ADDR	0x9000000000000000ULL /* _LOONGSON_XKPHYS_START_ADDR */
+#endif
+
+#ifndef _XKPHYS_END_ADDR
+#define _XKPHYS_END_ADDR	0xc000000000000000ULL /* _LOONGSON_XKPHYS_END_ADDR */
+#endif
+
+#ifndef _PAGE_OFFSET
+#define _PAGE_OFFSET		0x9800000000000000ULL
+#endif
+
 #define _SECTION_SIZE_BITS	(28)
+
+#ifndef _MAX_PHYSMEM_BITS
 #define _MAX_PHYSMEM_BITS	(48)
+#endif
+
 #define _PAGE_PRESENT		(1 << 0)
 #define _PAGE_HUGE		(1 << 4)
 

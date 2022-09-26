@@ -9668,7 +9668,6 @@ init_xen_crash_info(void)
 {
 	off_t		offset_xen_crash_info;
 	unsigned long	size_xen_crash_info;
-	int		ret = FALSE;
 	void		*buf;
 
 	get_xen_crash_info(&offset_xen_crash_info, &size_xen_crash_info);
@@ -9710,11 +9709,11 @@ init_xen_crash_info(void)
 	else
 		info->xen_crash_info_v = 0;
 
-	ret = TRUE;
+	return TRUE;
 
 out_error:
 	free(buf);
-	return ret;
+	return FALSE;
 }
 
 int
@@ -12377,6 +12376,8 @@ out:
 			free(info->dump_header);
 		if (info->splitting_info != NULL)
 			free(info->splitting_info);
+		if (info->xen_crash_info.com != NULL)
+			free(info->xen_crash_info.com);
 		if (info->p2m_mfn_frame_list != NULL)
 			free(info->p2m_mfn_frame_list);
 		if (info->page_buf != NULL)

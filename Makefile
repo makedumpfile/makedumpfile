@@ -130,6 +130,6 @@ install:
 	install -m 755 -t ${DESTDIR}/usr/sbin makedumpfile $(VPATH)makedumpfile-R.pl
 	install -m 644 -t ${DESTDIR}/usr/share/man/man8 makedumpfile.8
 	install -m 644 -t ${DESTDIR}/usr/share/man/man5 makedumpfile.conf.5
-	mkdir -p ${DESTDIR}/usr/share/makedumpfile-${VERSION}/eppic_scripts
-	install -m 644 -D $(VPATH)makedumpfile.conf ${DESTDIR}/usr/share/makedumpfile-${VERSION}/makedumpfile.conf.sample
-	install -m 644 -t ${DESTDIR}/usr/share/makedumpfile-${VERSION}/eppic_scripts/ $(VPATH)eppic_scripts/*
+	mkdir -p ${DESTDIR}/usr/share/makedumpfile/eppic_scripts
+	install -m 644 -D $(VPATH)makedumpfile.conf ${DESTDIR}/usr/share/makedumpfile/makedumpfile.conf.sample
+	install -m 644 -t ${DESTDIR}/usr/share/makedumpfile/eppic_scripts/ $(VPATH)eppic_scripts/*

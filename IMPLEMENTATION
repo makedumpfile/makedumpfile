@@ -280,3 +280,48 @@
 
     If there is no segment dumped into the DUMPFILE, the DUMPFILE can't be
     analysed by crash.
+
+
+* The flattened format
+
+  This format is mostly used to send dump data to a remote host via SSH.
+  The kdump-compressed format and ELF format require random access to create
+  a DUMPFILE, so it cannot be written directly to standard output.
+  The flattened format adds the original offset and size of each data block,
+  and it can be rearranged to the original format on the remote host.
+
+  - File structure
+
+    This is the case of the kdump-compressed format.
+                                                 File offset
+    +------------------------------------------+ 0x0
+    | flat header (struct makedumpfile_header) |
+    |                                          |
+    |------------------------------------------| 0x1000 (4096)
+    | flat data header                         |
+    |     (struct makedumpfile_data_header)    |
+    |   main header (struct disk_dump_header)  |
+    |------------------------------------------| (not aligned)
+    | flat data header                         |
+    |                    :                     |
+
+    Note: For the ELF format, ELF header is not always the first data.
+
+  - flat header
+
+    struct makedumpfile_header {
+            char    signature[SIG_LEN_MDF]; /* = "makedumpfile\0\0\0\0" */
+            int64_t type;                   /* = TYPE_FLAT_HEADER (1) */
+            int64_t version;                /* = VERSION_FLAT_HEADER (1) */
+    };
+
+    Note: the type and version are big endian.
+
+  - flat data header
+
+    struct makedumpfile_data_header {
+            int64_t offset;
+            int64_t buf_size;
+    };
+
+    Note: the offset and buf_size are big endian.

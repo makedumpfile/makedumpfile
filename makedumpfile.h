@@ -161,12 +161,9 @@ test_bit(int nr, unsigned long addr)
 #define isSwapBacked(flags)	test_bit(NUMBER(PG_swapbacked), flags)
 #define isHWPOISON(flags)	(test_bit(NUMBER(PG_hwpoison), flags) \
 				&& (NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER))
-
-static inline int
-isAnon(unsigned long mapping)
-{
-	return ((unsigned long)mapping & PAGE_MAPPING_ANON) != 0;
-}
+#define isSlab(flags)		test_bit(NUMBER(PG_slab), flags)
+#define isAnon(mapping, flags)	(((unsigned long)mapping & PAGE_MAPPING_ANON) != 0 \
+				&& !isSlab(flags))
 
 #define PTOB(X)			(((unsigned long long)(X)) << PAGESHIFT())
 #define BTOP(X)			(((unsigned long long)(X)) >> PAGESHIFT())

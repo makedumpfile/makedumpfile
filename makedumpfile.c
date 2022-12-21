@@ -6502,7 +6502,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_CACHE)
 		    && is_cache_page(flags)
-		    && !isPrivate(flags) && !isAnon(mapping)) {
+		    && !isPrivate(flags) && !isAnon(mapping, flags)) {
 			pfn_counter = &pfn_cache;
 		}
 		/*
@@ -6510,7 +6510,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_CACHE_PRI)
 		    && is_cache_page(flags)
-		    && !isAnon(mapping)) {
+		    && !isAnon(mapping, flags)) {
 			if (isPrivate(flags))
 				pfn_counter = &pfn_cache_private;
 			else
@@ -6522,7 +6522,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		 *  - hugetlbfs pages
 		 */
 		else if ((info->dump_level & DL_EXCLUDE_USER_DATA)
-			 && (isAnon(mapping) || isHugetlb(compound_dtor))) {
+			 && (isAnon(mapping, flags) || isHugetlb(compound_dtor))) {
 			pfn_counter = &pfn_user;
 		}
 		/*

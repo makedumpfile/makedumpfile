@@ -1362,6 +1362,7 @@ static int linux_banner_sanity_check(ulong cr3)
 #define PTI_USER_PGTABLE_BIT		(info->page_shift)
 #define PTI_USER_PGTABLE_MASK		(1 << PTI_USER_PGTABLE_BIT)
 #define CR3_PCID_MASK			0xFFFull
+#define CR4_LA57			(1 << 12)
 int
 calc_kaslr_offset(void)
 {
@@ -1397,6 +1398,8 @@ calc_kaslr_offset(void)
 		else
 			cr3 = smram.Cr3 & ~CR3_PCID_MASK;
 
+		NUMBER(pgtable_l5_enabled) = !!(smram.Cr4 & CR4_LA57);
+
 		/* Convert virtual address of IDT table to physical address */
 		idtr_paddr = vtop4_x86_64_pagetable(idtr, cr3);
 		if (idtr_paddr == NOT_PADDR) {
@@ -1417,6 +1420,7 @@ calc_kaslr_offset(void)
 
 		DEBUG_MSG("sadump: idtr=%" PRIx64 "\n", idtr);
 		DEBUG_MSG("sadump: cr3=%" PRIx64 "\n", cr3);
+		DEBUG_MSG("sadump: cr4=%" PRIx32 "\n", smram.Cr4);
 		DEBUG_MSG("sadump: idtr(phys)=%" PRIx64 "\n", idtr_paddr);
 		DEBUG_MSG("sadump: devide_error(vmlinux)=%lx\n",
 			  divide_error_vmlinux);

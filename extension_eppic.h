@@ -71,6 +71,7 @@ typedef TYPE_S {
 	ull rtype;  /* type_t a reference refers too */
 } type_t;
 
+#undef ERRMSG
 #define ERRMSG(x...) \
 do { \
 		fprintf(stderr, __FUNCTION__); \

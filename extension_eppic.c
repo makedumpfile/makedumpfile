@@ -122,7 +122,7 @@ drilldown(ull offset, type_t *t)
 {
 	int type_flag, len = 0, t_len = 0, nidx = 0;
 	int fctflg = 0, ref = 0, *idxlst = 0;
-	ull die_off = offset, t_die_off;
+	unsigned long long die_off = offset, t_die_off;
 	char *tstr = NULL, *tstr_dup = NULL;
 
 	while (GET_DIE_ATTR_TYPE(die_off, &type_flag, &t_die_off)) {
@@ -221,7 +221,7 @@ apimember(char *mname, ull idx, type_t *tm, member_t *m, ull *last_index)
 	int index, nfields = -1, size;
 	int nbits = 0, fbits = 0;
 	long offset;
-	ull m_die, die_off = idx;
+	unsigned long long m_die, die_off = idx;
 	char *name = NULL;
 
 	nfields = GET_DIE_NFIELDS_ALL(die_off);

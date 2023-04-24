@@ -1878,6 +1878,10 @@ struct offset_table {
 		long	compound_order;
 		long	compound_head;
 	} page;
+	struct folio {
+		long	_folio_dtor;
+		long	_folio_order;
+	} folio;
 	struct mem_section {
 		long	section_mem_map;
 	} mem_section;

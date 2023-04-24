@@ -1732,6 +1732,9 @@ get_structure_info(void)
 	OFFSET_INIT(page.compound_dtor, "page", "compound_dtor");
 	OFFSET_INIT(page.compound_order, "page", "compound_order");
 	OFFSET_INIT(page.compound_head, "page", "compound_head");
+	/* Linux 6.3 and later */
+	OFFSET_INIT(folio._folio_dtor, "folio", "_folio_dtor");
+	OFFSET_INIT(folio._folio_order, "folio", "_folio_order");
 
 	/*
 	 * Some vmlinux(s) don't have debugging information about
@@ -2381,6 +2384,10 @@ write_vmcoreinfo_data(void)
 	WRITE_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
 	WRITE_MEMBER_OFFSET("page.compound_order", page.compound_order);
 	WRITE_MEMBER_OFFSET("page.compound_head", page.compound_head);
+	/* Linux 6.3 and later */
+	WRITE_MEMBER_OFFSET("folio._folio_dtor", folio._folio_dtor);
+	WRITE_MEMBER_OFFSET("folio._folio_order", folio._folio_order);
+
 	WRITE_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	WRITE_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
@@ -2821,6 +2828,10 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
 	READ_MEMBER_OFFSET("page.compound_order", page.compound_order);
 	READ_MEMBER_OFFSET("page.compound_head", page.compound_head);
+	/* Linux 6.3 and later */
+	READ_MEMBER_OFFSET("folio._folio_dtor", folio._folio_dtor);
+	READ_MEMBER_OFFSET("folio._folio_order", folio._folio_order);
+
 	READ_MEMBER_OFFSET("mem_section.section_mem_map",
 	    mem_section.section_mem_map);
 	READ_MEMBER_OFFSET("pglist_data.node_zones", pglist_data.node_zones);
@@ -4300,14 +4311,19 @@ out:
 void
 init_compound_offset(void) {
 
-	if (OFFSET(page.compound_order) != NOT_FOUND_STRUCTURE)
+	/* Linux 6.3 and later */
+	if (OFFSET(folio._folio_order) != NOT_FOUND_STRUCTURE)
+		info->compound_order_offset = OFFSET(folio._folio_order) - SIZE(page);
+	else if (OFFSET(page.compound_order) != NOT_FOUND_STRUCTURE)
 		info->compound_order_offset = OFFSET(page.compound_order);
 	else if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
 		info->compound_order_offset = OFFSET(page.lru) + OFFSET(list_head.prev);
 	else
 		info->compound_order_offset = 0;
 
-	if (OFFSET(page.compound_dtor) != NOT_FOUND_STRUCTURE)
+	if (OFFSET(folio._folio_dtor) != NOT_FOUND_STRUCTURE)
+		info->compound_dtor_offset = OFFSET(folio._folio_dtor) - SIZE(page);
+	else if (OFFSET(page.compound_dtor) != NOT_FOUND_STRUCTURE)
 		info->compound_dtor_offset = OFFSET(page.compound_dtor);
 	else if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
 		info->compound_dtor_offset = OFFSET(page.lru) + OFFSET(list_head.next);

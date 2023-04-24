@@ -4297,6 +4297,27 @@ out:
 	return ret;
 }
 
+void
+init_compound_offset(void) {
+
+	if (OFFSET(page.compound_order) != NOT_FOUND_STRUCTURE)
+		info->compound_order_offset = OFFSET(page.compound_order);
+	else if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
+		info->compound_order_offset = OFFSET(page.lru) + OFFSET(list_head.prev);
+	else
+		info->compound_order_offset = 0;
+
+	if (OFFSET(page.compound_dtor) != NOT_FOUND_STRUCTURE)
+		info->compound_dtor_offset = OFFSET(page.compound_dtor);
+	else if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
+		info->compound_dtor_offset = OFFSET(page.lru) + OFFSET(list_head.next);
+	else
+		info->compound_dtor_offset = 0;
+
+	DEBUG_MSG("compound_order_offset : %u\n", info->compound_order_offset);
+	DEBUG_MSG("compound_dtor_offset  : %u\n", info->compound_dtor_offset);
+}
+
 int
 initial(void)
 {
@@ -4605,6 +4626,8 @@ out:
 	/* (this can reduce pages scan of 1TB memory from 60sec to 30sec) */
 	if (info->dump_level & DL_EXCLUDE_FREE)
 		setup_page_is_buddy();
+
+	init_compound_offset();
 
 	if (info->flag_usemmap == MMAP_TRY ) {
 		if (initialize_mmap()) {
@@ -6351,6 +6374,9 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		return FALSE;
 	}
 
+	order_offset = info->compound_order_offset;
+	dtor_offset = info->compound_dtor_offset;
+
 	for (pfn = pfn_start; pfn < pfn_end; pfn++, mem_map += SIZE(page)) {
 
 		/*
@@ -6399,24 +6425,6 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		_count  = UINT(pcache + OFFSET(page._refcount));
 		mapping = ULONG(pcache + OFFSET(page.mapping));
 
-		if (OFFSET(page.compound_order) != NOT_FOUND_STRUCTURE) {
-			order_offset = OFFSET(page.compound_order);
-		} else {
-			if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
-				order_offset = OFFSET(page.lru) + OFFSET(list_head.prev);
-			else
-				order_offset = 0;
-		}
-
-		if (OFFSET(page.compound_dtor) != NOT_FOUND_STRUCTURE) {
-			dtor_offset = OFFSET(page.compound_dtor);
-		} else {
-			if (info->kernel_version < KERNEL_VERSION(4, 4, 0))
-				dtor_offset = OFFSET(page.lru) + OFFSET(list_head.next);
-			else
-				dtor_offset = 0;
-		}
-
 		compound_order = 0;
 		compound_dtor = 0;
 		/*
@@ -6428,14 +6436,10 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 			unsigned char *addr = pcache + SIZE(page);
 
 			if (order_offset) {
-				if (info->kernel_version >=
-				    KERNEL_VERSION(4, 16, 0)) {
-					compound_order =
-						UCHAR(addr + order_offset);
-				} else {
-					compound_order =
-						USHORT(addr + order_offset);
-				}
+				if (info->kernel_version >= KERNEL_VERSION(4, 16, 0))
+					compound_order = UCHAR(addr + order_offset);
+				else
+					compound_order = USHORT(addr + order_offset);
 			}
 
 			if (dtor_offset) {
@@ -6443,18 +6447,12 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 				 * compound_dtor has been changed from the address of descriptor
 				 * to the ID of it since linux-4.4.
 				 */
-				if (info->kernel_version >=
-				    KERNEL_VERSION(4, 16, 0)) {
-					compound_dtor =
-						UCHAR(addr + dtor_offset);
-				} else if (info->kernel_version >=
-					   KERNEL_VERSION(4, 4, 0)) {
-					compound_dtor =
-						USHORT(addr + dtor_offset);
-				} else {
-					compound_dtor =
-						ULONG(addr + dtor_offset);
-				}
+				if (info->kernel_version >= KERNEL_VERSION(4, 16, 0))
+					compound_dtor = UCHAR(addr + dtor_offset);
+				else if (info->kernel_version >= KERNEL_VERSION(4, 4, 0))
+					compound_dtor = USHORT(addr + dtor_offset);
+				else
+					compound_dtor = ULONG(addr + dtor_offset);
 			}
 
 			if ((compound_order >= sizeof(unsigned long) * 8)

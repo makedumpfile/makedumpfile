@@ -1468,6 +1468,12 @@ struct DumpInfo {
 	unsigned long	kaslr_offset;
 
 	/*
+	 * for compound page
+	 */
+	unsigned int	compound_order_offset;
+	unsigned int	compound_dtor_offset;
+
+	/*
 	 * page table info for ppc64
 	 */
 	int		cur_mmu_type;

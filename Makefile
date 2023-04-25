@@ -1,7 +1,7 @@
 # makedumpfile
 
-VERSION=1.7.2++
-DATE=20 Oct 2022
+VERSION=1.7.3
+DATE=25 Apr 2023
 
 # Honour the environment variable CC
 ifeq ($(strip $CC),)

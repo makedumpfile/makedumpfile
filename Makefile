@@ -1,6 +1,6 @@
 # makedumpfile
 
-VERSION=1.7.3
+VERSION=1.7.3++
 DATE=25 Apr 2023
 
 # Honour the environment variable CC

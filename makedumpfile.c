@@ -1710,6 +1710,9 @@ get_symbol_info(void)
 	return TRUE;
 }
 
+#define MOD_DATA	1
+#define MOD_INIT_DATA	5
+
 int
 get_structure_info(void)
 {
@@ -1817,6 +1820,26 @@ get_structure_info(void)
 	OFFSET_INIT(module.num_symtab, "module", "num_symtab");
 	OFFSET_INIT(module.list, "module", "list");
 	OFFSET_INIT(module.name, "module", "name");
+
+	/* kernel >= 6.4 */
+	SIZE_INIT(module_memory, "module_memory");
+	if (SIZE(module_memory) != NOT_FOUND_STRUCTURE) {
+		OFFSET_INIT(module.mem, "module", "mem");
+		OFFSET_INIT(module_memory.base, "module_memory", "base");
+		OFFSET_INIT(module_memory.size, "module_memory", "size");
+
+		OFFSET(module.module_core) = OFFSET(module.mem) +
+			SIZE(module_memory) * MOD_DATA + OFFSET(module_memory.base);
+		OFFSET(module.core_size) = OFFSET(module.mem) +
+			SIZE(module_memory) * MOD_DATA + OFFSET(module_memory.size);
+		OFFSET(module.module_init) = OFFSET(module.mem) +
+			SIZE(module_memory) * MOD_INIT_DATA + OFFSET(module_memory.base);
+		OFFSET(module.init_size) = OFFSET(module.mem) +
+			SIZE(module_memory) * MOD_INIT_DATA + OFFSET(module_memory.size);
+
+		goto module_end;
+	}
+
 	OFFSET_INIT(module.module_core, "module", "module_core");
 	if (OFFSET(module.module_core) == NOT_FOUND_STRUCTURE) {
 		/* for kernel version 4.5 and above */
@@ -1858,6 +1881,7 @@ get_structure_info(void)
 		OFFSET(module.init_size) += init_layout;
 	}
 
+module_end:
 	ENUM_NUMBER_INIT(NR_FREE_PAGES, "NR_FREE_PAGES");
 	ENUM_NUMBER_INIT(N_ONLINE, "N_ONLINE");
 	ENUM_NUMBER_INIT(pgtable_l5_enabled, "pgtable_l5_enabled");

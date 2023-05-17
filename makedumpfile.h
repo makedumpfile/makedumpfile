@@ -1842,6 +1842,7 @@ struct size_table {
 	 * for loading module symbol data
 	 */
 	long	module;
+	long	module_memory;
 
 	/*
 	 * for sadump
@@ -1944,7 +1945,13 @@ struct offset_table {
 		long	num_symtab;
 		long	symtab;
 		long	strtab;
+		long	mem;
 	} module;
+
+	struct module_memory {
+		long	base;
+		long	size;
+	} module_memory;
 
 	/*
 	 * for loading elf_prstaus symbol data

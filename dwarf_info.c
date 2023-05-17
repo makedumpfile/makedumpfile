@@ -1091,6 +1091,8 @@ get_symbol_addr(char *symname)
 out:
 	clean_dwfl_info();
 
+	DEBUG_MSG("%s   : %s %llx\n", __func__, symname, symbol);
+
 	return symbol;
 }
 
@@ -1175,6 +1177,8 @@ get_next_symbol_addr(char *symname)
 out:
 	clean_dwfl_info();
 
+	DEBUG_MSG("%s: %s %lx\n", __func__, symname, next_symbol);
+
 	return next_symbol;
 }
 
@@ -1192,8 +1196,12 @@ get_structure_size(char *structname, int flag_typedef)
 	dwarf_info.struct_name = structname;
 	dwarf_info.struct_size = NOT_FOUND_STRUCTURE;
 
-	if (!get_debug_info())
+	if (!get_debug_info()) {
+		DEBUG_MSG("%s: %s failed\n", __func__, structname);
 		return FAILED_DWARFINFO;
+	}
+
+	DEBUG_MSG("%s: %s %ld\n", __func__, structname, dwarf_info.struct_size);
 
 	return dwarf_info.struct_size;
 }
@@ -1251,8 +1259,13 @@ get_member_offset(char *structname, char *membername, int cmd)
 	else
 		dwarf_info.member_name = membername;
 
-	if (!get_debug_info())
+	if (!get_debug_info()) {
+		DEBUG_MSG("%s : %s.%s failed\n", __func__, structname, membername);
 		return FAILED_DWARFINFO;
+	}
+
+	DEBUG_MSG("%s : %s.%s %ld\n", __func__, structname, membername,
+			dwarf_info.member_offset);
 
 	return dwarf_info.member_offset;
 }
@@ -1309,8 +1322,12 @@ get_array_length(char *name01, char *name02, unsigned int cmd)
 	dwarf_info.member_offset = NOT_FOUND_STRUCTURE;
 	dwarf_info.array_length  = NOT_FOUND_STRUCTURE;
 
-	if (!get_debug_info())
+	if (!get_debug_info()) {
+		DEBUG_MSG("%s  : %s.%s failed\n", __func__, name01, name02);
 		return FAILED_DWARFINFO;
+	}
+
+	DEBUG_MSG("%s  : %s.%s %ld\n", __func__, name01, name02, dwarf_info.array_length);
 
 	return dwarf_info.array_length;
 }
@@ -1322,8 +1339,12 @@ get_enum_number(char *enum_name)
 	dwarf_info.enum_name   = enum_name;
 	dwarf_info.enum_number = NOT_FOUND_NUMBER;
 
-	if (!get_debug_info())
+	if (!get_debug_info()) {
+		DEBUG_MSG("%s   : %s failed\n", __func__, enum_name);
 		return FAILED_DWARFINFO;
+	}
+
+	DEBUG_MSG("%s   : %s %ld\n", __func__, enum_name, dwarf_info.enum_number);
 
 	return dwarf_info.enum_number;
 }

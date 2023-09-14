@@ -678,6 +678,12 @@ unsigned long get_kvbase_arm64(void);
 #define REGION_SHIFT            (60UL)
 #define VMEMMAP_REGION_ID       (0xfUL)
 
+/*
+ * If PAGE_PTE is set, then it's a leaf PTE for hugepage
+ */
+#define PAGE_PTE (1UL << 62)
+#define IS_HUGEPAGE(pte) (!!((pte) & PAGE_PTE))
+
 /* 4-level page table support */
 
 /* 4K pagesize */

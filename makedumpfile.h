@@ -1052,6 +1052,77 @@ typedef unsigned long pgd_t;
 
 #endif /* loongarch64 */
 
+#ifdef __riscv64__
+/*
+ * Referencing the riscv64_is_kvaddr() in Crash-utility,
+ * set the vmemmap start address as the lowest kernel virtual base.
+ */
+#define KVBASE			(NUMBER(vmemmap_start))
+#define _SECTION_SIZE_BITS	(27)
+#define _MAX_PHYSMEM_BITS	(56)
+
+typedef ulong pgd_t;
+typedef ulong p4d_t;
+typedef ulong pud_t;
+typedef ulong pmd_t;
+typedef ulong pte_t;
+
+/* arch/riscv/include/asm/pgtable-64.h */
+
+#define PGD_SHIFT_L3		(30)
+#define PGD_SHIFT_L4		(39)
+#define PGD_SHIFT_L5		(48)
+
+#define P4D_SHIFT		(39)
+#define PUD_SHIFT		(30)
+#define PMD_SHIFT		(21)
+
+#define PTRS_PER_PGD		(512)
+#define PTRS_PER_P4D		(512)
+#define PTRS_PER_PUD		(512)
+#define PTRS_PER_PMD		(512)
+#define PTRS_PER_PTE		(512)
+
+/*
+ * 3/4/5-levels pg indexs
+ */
+#define pgd_index_l3(addr)	(((addr) >> PGD_SHIFT_L3) & (PTRS_PER_PGD - 1))
+#define pgd_index_l4(addr)	(((addr) >> PGD_SHIFT_L4) & (PTRS_PER_PGD - 1))
+#define pgd_index_l5(addr)	(((addr) >> PGD_SHIFT_L5) & (PTRS_PER_PGD - 1))
+#define p4d_index(addr)		(((addr) >> P4D_SHIFT) & (PTRS_PER_P4D - 1))
+#define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
+#define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+#define pte_index(addr)		(((addr) >> PAGESHIFT()) & (PTRS_PER_PTE - 1))
+
+/* arch/riscv/include/asm/pgtable-bits.h */
+
+#define _PAGE_PRESENT	(1 << 0)
+#define _PAGE_READ	(1 << 1)	/* Readable */
+#define _PAGE_WRITE	(1 << 2)	/* Writable */
+#define _PAGE_EXEC	(1 << 3)	/* Executable */
+#define _PAGE_USER	(1 << 4)	/* User */
+#define _PAGE_GLOBAL	(1 << 5)	/* Global */
+#define _PAGE_ACCESSED	(1 << 6)	/* Set by hardware on any access */
+#define _PAGE_DIRTY	(1 << 7)	/* Set by hardware on any write */
+#define _PAGE_SOFT	(1 << 8)	/* Reserved for software */
+
+#define _PAGE_PFN_SHIFT	(10)
+#define _PAGE_LEAF	(_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC)
+
+/*
+ * Mask for bit 0~53(PROT and PPN) of PTE
+ * 63 6261  60    54  53 10  9 8 7 6 5 4 3 2 1 0
+ * N  PBMT  Reserved  P P N  RSW D A G U X W R V
+ */
+#define PTE_PFN_PROT_MASK	0x3FFFFFFFFFFFFF
+
+#define VA_BITS_SV39	(39)
+#define VA_BITS_SV48	(48)
+#define VA_BITS_SV57	(57)
+
+#endif /* riscv64 */
+
+
 /*
  * The function of dependence on machine
  */
@@ -1238,6 +1309,22 @@ unsigned long long vaddr_to_paddr_loongarch64(unsigned long vaddr);
 #define is_phys_addr(X)		stub_true_ul(X)
 #define arch_crashkernel_mem_size()	stub_false()
 #endif /* loongarch64 */
+
+#ifdef __riscv64__
+int get_phys_base_riscv64(void);
+int get_machdep_info_riscv64(void);
+unsigned long long vaddr_to_paddr_riscv64(unsigned long vaddr);
+#define paddr_to_vaddr_riscv64(X) ((X) + PAGE_OFFSET - info->phys_base)
+#define find_vmemmap()		stub_false()
+#define get_phys_base()		get_phys_base_riscv64()
+#define get_machdep_info()	get_machdep_info_riscv64()
+#define get_versiondep_info()	stub_true()
+#define get_kaslr_offset(X)	stub_false()
+#define vaddr_to_paddr(X)	vaddr_to_paddr_riscv64(X)
+#define paddr_to_vaddr(X)	paddr_to_vaddr_riscv64(X)
+#define is_phys_addr(X)		stub_true_ul(X)
+#define arch_crashkernel_mem_size()	stub_false()
+#endif /* riscv64 */
 
 typedef unsigned long long mdf_pfn_t;
 
@@ -2158,6 +2245,19 @@ struct number_table {
 	unsigned long	PHYS_OFFSET;
 	unsigned long	kimage_voffset;
 #endif
+#ifdef __riscv64__
+	long va_bits;
+	unsigned long phys_ram_base;
+	unsigned long page_offset;
+	unsigned long vmalloc_start;
+	unsigned long vmalloc_end;
+	unsigned long vmemmap_start;
+	unsigned long vmemmap_end;
+	unsigned long modules_vaddr;
+	unsigned long modules_end;
+	unsigned long kernel_link_addr;
+	unsigned long va_kernel_pa_offset;
+#endif
 };
 
 struct srcfile_table {
@@ -2395,6 +2495,12 @@ int get_xen_info_ia64(void);
 #define get_xen_basic_info_arch(X) FALSE
 #define get_xen_info_arch(X) FALSE
 #endif /* loongarch64 */
+
+#ifdef __riscv64__ /* riscv64 */
+#define kvtop_xen(X)	FALSE
+#define get_xen_basic_info_arch(X) FALSE
+#define get_xen_info_arch(X) FALSE
+#endif /* riscv64 */
 
 struct cycle {
 	mdf_pfn_t start_pfn;

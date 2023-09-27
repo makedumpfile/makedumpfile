@@ -2972,6 +2972,20 @@ read_vmcoreinfo(void)
 	READ_NUMBER_UNSIGNED("kimage_voffset", kimage_voffset);
 #endif
 
+#ifdef __riscv64__
+	READ_NUMBER("VA_BITS", va_bits);
+	READ_NUMBER_UNSIGNED("phys_ram_base", phys_ram_base);
+	READ_NUMBER_UNSIGNED("PAGE_OFFSET", page_offset);
+	READ_NUMBER_UNSIGNED("VMALLOC_START", vmalloc_start);
+	READ_NUMBER_UNSIGNED("VMALLOC_END", vmalloc_end);
+	READ_NUMBER_UNSIGNED("VMEMMAP_START", vmemmap_start);
+	READ_NUMBER_UNSIGNED("VMEMMAP_END", vmemmap_end);
+	READ_NUMBER_UNSIGNED("MODULES_VADDR", modules_vaddr);
+	READ_NUMBER_UNSIGNED("MODULES_END", modules_end);
+	READ_NUMBER_UNSIGNED("KERNEL_LINK_ADDR", kernel_link_addr);
+	READ_NUMBER_UNSIGNED("va_kernel_pa_offset", va_kernel_pa_offset);
+#endif
+
 	READ_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
 
 	return TRUE;

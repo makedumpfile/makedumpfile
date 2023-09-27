@@ -3302,7 +3302,11 @@ get_mm_flatmem(void)
 	if (is_xen_memory())
 		dump_mem_map(0, info->dom0_mapnr, mem_map, 0);
 	else
+#ifdef __riscv64__
+		dump_mem_map((info->phys_base >> PAGESHIFT()), info->max_mapnr, mem_map, 0);
+#else
 		dump_mem_map(0, info->max_mapnr, mem_map, 0);
+#endif
 
 	return TRUE;
 }

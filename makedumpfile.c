@@ -262,13 +262,17 @@ is_in_same_page(unsigned long vaddr1, unsigned long vaddr2)
 	return FALSE;
 }
 
+/* For Linux 6.6 and later */
+#define IS_HUGETLB	((unsigned long)-1)
+
 static inline int
 isHugetlb(unsigned long dtor)
 {
-        return ((NUMBER(HUGETLB_PAGE_DTOR) != NOT_FOUND_NUMBER)
-		&& (NUMBER(HUGETLB_PAGE_DTOR) == dtor))
-                || ((SYMBOL(free_huge_page) != NOT_FOUND_SYMBOL)
-                    && (SYMBOL(free_huge_page) == dtor));
+	return (dtor == IS_HUGETLB)
+		|| ((NUMBER(HUGETLB_PAGE_DTOR) != NOT_FOUND_NUMBER)
+		   && (NUMBER(HUGETLB_PAGE_DTOR) == dtor))
+		|| ((SYMBOL(free_huge_page) != NOT_FOUND_SYMBOL)
+		   && (SYMBOL(free_huge_page) == dtor));
 }
 
 static int
@@ -1893,6 +1897,7 @@ module_end:
 	ENUM_NUMBER_INIT(PG_buddy, "PG_buddy");
 	ENUM_NUMBER_INIT(PG_slab, "PG_slab");
 	ENUM_NUMBER_INIT(PG_hwpoison, "PG_hwpoison");
+	ENUM_NUMBER_INIT(PG_hugetlb, "PG_hugetlb");
 
 	ENUM_NUMBER_INIT(PG_head_mask, "PG_head_mask");
 	if (NUMBER(PG_head_mask) == NOT_FOUND_NUMBER) {
@@ -2507,6 +2512,7 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER("PG_buddy", PG_buddy);
 	WRITE_NUMBER("PG_slab", PG_slab);
 	WRITE_NUMBER("PG_hwpoison", PG_hwpoison);
+	WRITE_NUMBER("PG_hugetlb", PG_hugetlb);
 
 	WRITE_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 	WRITE_NUMBER("PAGE_OFFLINE_MAPCOUNT_VALUE",
@@ -2956,6 +2962,7 @@ read_vmcoreinfo(void)
 	READ_NUMBER("PG_slab", PG_slab);
 	READ_NUMBER("PG_buddy", PG_buddy);
 	READ_NUMBER("PG_hwpoison", PG_hwpoison);
+	READ_NUMBER("PG_hugetlb", PG_hugetlb);
 	READ_NUMBER("SECTION_SIZE_BITS", SECTION_SIZE_BITS);
 	READ_NUMBER("MAX_PHYSMEM_BITS", MAX_PHYSMEM_BITS);
 
@@ -6493,6 +6500,21 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 		if ((index_pg < PGMM_CACHED - 1) && isCompoundHead(flags)) {
 			unsigned char *addr = pcache + SIZE(page);
 
+			/*
+			 * Linux 6.6 and later.  Kernels that have PG_hugetlb should also
+			 * have the compound order in the low byte of folio._flags_1.
+			 */
+			if (NUMBER(PG_hugetlb) != NOT_FOUND_NUMBER) {
+				unsigned long _flags_1 = ULONG(addr + OFFSET(page.flags));
+
+				compound_order = _flags_1 & 0xff;
+
+				if (_flags_1 & (1UL << NUMBER(PG_hugetlb)))
+					compound_dtor = IS_HUGETLB;
+
+				goto check_order;
+			}
+
 			if (order_offset) {
 				if (info->kernel_version >= KERNEL_VERSION(4, 16, 0))
 					compound_order = UCHAR(addr + order_offset);
@@ -6512,7 +6534,7 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 				else
 					compound_dtor = ULONG(addr + dtor_offset);
 			}
-
+check_order:
 			if ((compound_order >= sizeof(unsigned long) * 8)
 			    || ((pfn & ((1UL << compound_order) - 1)) != 0)) {
 				/* Invalid order */

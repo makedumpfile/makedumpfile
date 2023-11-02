@@ -2231,6 +2231,7 @@ struct number_table {
 	long	PG_buddy;
 	long	PG_slab;
 	long    PG_hwpoison;
+	long    PG_hugetlb;
 
 	long	PAGE_BUDDY_MAPCOUNT_VALUE;
 	long	PAGE_OFFLINE_MAPCOUNT_VALUE;

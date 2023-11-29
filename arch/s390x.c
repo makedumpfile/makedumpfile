@@ -167,7 +167,7 @@ _kl_rsg_table_deref_s390x(unsigned long vaddr, unsigned long table,
 		return 0;
 	}
 
-	if (!readmem(VADDR, table + offset, &entry, sizeof(entry))) {
+	if (!readmem(PADDR, table + offset, &entry, sizeof(entry))) {
 		if (level)
 			ERRMSG("Can't read region table %d entry\n", level);
 		else
@@ -201,7 +201,7 @@ static ulong _kl_pg_table_deref_s390x(unsigned long vaddr, unsigned long table)
 	unsigned long offset, entry;
 
 	offset = pte_offset(vaddr);
-	readmem(VADDR, table + offset, &entry, sizeof(entry));
+	readmem(PADDR, table + offset, &entry, sizeof(entry));
 	/*
 	 * Check if the page table entry could be read and doesn't have
 	 * the reserved bit set.
@@ -227,17 +227,22 @@ static unsigned long long
 vtop_s390x(unsigned long vaddr)
 {
 	unsigned long long paddr = NOT_PADDR;
+	unsigned long long swapper_pg_dir;
 	unsigned long table, entry;
 	int level, len;
 
-	if (SYMBOL(swapper_pg_dir) == NOT_FOUND_SYMBOL) {
+	swapper_pg_dir = SYMBOL(swapper_pg_dir);
+	if (swapper_pg_dir == NOT_FOUND_SYMBOL) {
 		ERRMSG("Can't get the symbol of swapper_pg_dir.\n");
 		return NOT_PADDR;
 	}
-	table = SYMBOL(swapper_pg_dir);
+	table = vaddr_to_paddr(swapper_pg_dir);
 
 	/* Read the first entry to find the number of page table levels. */
-	readmem(VADDR, table, &entry, sizeof(entry));
+	if (!readmem(PADDR, table, &entry, sizeof(entry))) {
+		ERRMSG("Can't read swapper_pg_dir entry.\n");
+		return NOT_PADDR;
+	}
 	level = TABLE_LEVEL(entry);
 	len = TABLE_LENGTH(entry);
 

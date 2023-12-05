@@ -1235,6 +1235,7 @@ unsigned long long vaddr_to_paddr_ppc(unsigned long vaddr);
 #ifdef __s390x__ /* s390x */
 int get_machdep_info_s390x(void);
 unsigned long long vaddr_to_paddr_s390x(unsigned long vaddr);
+unsigned long paddr_to_vaddr_s390x(unsigned long long paddr);
 int is_iomem_phys_addr_s390x(unsigned long addr);
 #define find_vmemmap()		stub_false()
 #define get_phys_base()		stub_true()
@@ -1242,7 +1243,7 @@ int is_iomem_phys_addr_s390x(unsigned long addr);
 #define get_versiondep_info()	stub_true()
 #define get_kaslr_offset(X)	get_kaslr_offset_general(X)
 #define vaddr_to_paddr(X)	vaddr_to_paddr_s390x(X)
-#define paddr_to_vaddr(X)	paddr_to_vaddr_general(X)
+#define paddr_to_vaddr(X)	paddr_to_vaddr_s390x(X)
 #define is_phys_addr(X)		is_iomem_phys_addr_s390x(X)
 #define arch_crashkernel_mem_size()	stub_false()
 #endif          /* s390x */
@@ -1760,6 +1761,14 @@ struct DumpInfo {
 	pthread_mutex_t current_pfn_mutex;
 	pthread_mutex_t page_data_mutex;
 	pthread_mutex_t filter_mutex;
+
+#ifdef __s390x__ /* s390x */
+	unsigned long identity_map_base;
+	unsigned long kvbase;
+	unsigned long __kaslr_offset_phys;
+	unsigned long amode31_start;
+	unsigned long amode31_end;
+#endif
 };
 extern struct DumpInfo		*info;
 

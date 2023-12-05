@@ -59,6 +59,69 @@
 #define rsg_offset(x, y)	(rsg_index( x, y) * sizeof(unsigned long))
 #define pte_offset(x)		(pte_index(x) * sizeof(unsigned long))
 
+#define LOWCORE_SIZE		0x2000
+
+#define OS_INFO_VERSION_MAJOR	1
+#define OS_INFO_VERSION_MINOR	1
+
+#define OS_INFO_VMCOREINFO	0
+#define OS_INFO_REIPL_BLOCK	1
+#define OS_INFO_FLAGS_ENTRY	2
+#define OS_INFO_RESERVED	3
+#define OS_INFO_IDENTITY_BASE	4
+#define OS_INFO_KASLR_OFFSET	5
+#define OS_INFO_KASLR_OFF_PHYS	6
+#define OS_INFO_VMEMMAP		7
+#define OS_INFO_AMODE31_START	8
+#define OS_INFO_AMODE31_END	9
+
+struct os_info_entry {
+	union {
+		uint64_t	addr;
+		uint64_t	val;
+	};
+	uint64_t		size;
+	uint32_t		csum;
+} __attribute__((packed));
+
+struct os_info {
+	uint64_t		magic;
+	uint32_t		csum;
+	uint16_t		version_major;
+	uint16_t		version_minor;
+	uint64_t		crashkernel_addr;
+	uint64_t		crashkernel_size;
+	struct	os_info_entry	entry[10];
+	uint8_t			reserved[3864];
+} __attribute__((packed));
+
+#define S390X_LC_OS_INFO	0x0e18
+
+struct s390_ops {
+	unsigned long long	(*virt_to_phys)(unsigned long vaddr);
+	unsigned long		(*phys_to_virt)(unsigned long long paddr);
+};
+
+static unsigned long long vaddr_to_paddr_s390x_legacy(unsigned long vaddr);
+static unsigned long long vaddr_to_paddr_s390x_vr(unsigned long vaddr);
+static unsigned long paddr_to_vaddr_s390x_legacy(unsigned long long paddr);
+static unsigned long paddr_to_vaddr_s390x_vr(unsigned long long paddr);
+
+struct s390_ops s390_ops = {
+	.virt_to_phys = vaddr_to_paddr_s390x_legacy,
+	.phys_to_virt = paddr_to_vaddr_s390x_legacy,
+};
+
+unsigned long long vaddr_to_paddr_s390x(unsigned long vaddr)
+{
+	return s390_ops.virt_to_phys(vaddr);
+}
+
+unsigned long paddr_to_vaddr_s390x(unsigned long long paddr)
+{
+	return s390_ops.phys_to_virt(paddr);
+}
+
 int
 set_s390x_max_physmem_bits(void)
 {
@@ -88,11 +151,52 @@ set_s390x_max_physmem_bits(void)
 	return FALSE;
 }
 
+static int s390x_init_vm(void)
+{
+	struct os_info os_info;
+	ulong addr;
+
+	if (!readmem(PADDR, S390X_LC_OS_INFO, &addr,
+			sizeof(addr)) || !addr) {
+		ERRMSG("Can't get s390x os_info ptr.\n");
+		return FALSE;
+	}
+
+	if (addr == 0)
+		return TRUE;
+
+	if (!readmem(PADDR, addr, &os_info, offsetof(struct os_info, reserved))) {
+		ERRMSG("Can't get os_info header.\n");
+		return FALSE;
+	}
+
+	if (!os_info.entry[OS_INFO_KASLR_OFFSET].val)
+		return TRUE;
+
+	MSG("The -vr kernel detected.\n");
+
+	info->identity_map_base   = os_info.entry[OS_INFO_IDENTITY_BASE].val;
+	info->kvbase              = os_info.entry[OS_INFO_KASLR_OFFSET].val;
+	info->__kaslr_offset_phys = os_info.entry[OS_INFO_KASLR_OFF_PHYS].val;
+	info->vmemmap_start       = os_info.entry[OS_INFO_VMEMMAP].val;
+	info->amode31_start       = os_info.entry[OS_INFO_AMODE31_START].val;
+	info->amode31_end         = os_info.entry[OS_INFO_AMODE31_END].val;
+
+	s390_ops.virt_to_phys	= vaddr_to_paddr_s390x_vr;
+	s390_ops.phys_to_virt	= paddr_to_vaddr_s390x_vr;
+
+	return TRUE;
+}
+
+
 int
 get_machdep_info_s390x(void)
 {
 	unsigned long vmalloc_start;
 	char *term_str = getenv("TERM");
+
+	if (!s390x_init_vm())
+		return FALSE;
 
 	if (term_str && strcmp(term_str, "dumb") == 0)
 		/* '\r' control character is ignored on "dumb" terminal. */
@@ -295,8 +399,8 @@ vtop_s390x(unsigned long vaddr)
 	return paddr;
 }
 
-unsigned long long
-vaddr_to_paddr_s390x(unsigned long vaddr)
+static unsigned long long
+vaddr_to_paddr_s390x_legacy(unsigned long vaddr)
 {
 	unsigned long long paddr;
 
@@ -318,6 +422,32 @@ vaddr_to_paddr_s390x(unsigned long vaddr)
 	}
 
 	return paddr;
+}
+
+static unsigned long long
+vaddr_to_paddr_s390x_vr(unsigned long vaddr)
+{
+	if (vaddr < LOWCORE_SIZE)
+		return vaddr;
+	if ((vaddr < info->amode31_end) && (vaddr >= info->amode31_start))
+		return vaddr;
+	if (vaddr < info->vmemmap_start)
+		return vaddr - info->identity_map_base;
+	if (vaddr >= info->kvbase)
+		return vaddr - info->kvbase + info->__kaslr_offset_phys;
+	return vtop_s390x(vaddr);
+}
+
+unsigned long
+paddr_to_vaddr_s390x_legacy(unsigned long long paddr)
+{
+	return (unsigned long)paddr_to_vaddr_general(paddr);
+}
+
+unsigned long
+paddr_to_vaddr_s390x_vr(unsigned long long paddr)
+{
+	return info->identity_map_base + (unsigned long)paddr;
 }
 
 struct addr_check {

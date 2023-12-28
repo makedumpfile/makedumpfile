@@ -501,6 +501,12 @@ do { \
 #define LATEST_VERSION		KERNEL_VERSION(6, 6, 0)  /* linux-6.6.0 */
 
 /*
+ * for printk caller_id support
+ */
+#define PID_CHARS_MAX 16	/* Max Number of PID characters */
+#define PID_CHARS_DEFAULT 8	/* Default number of PID characters */
+
+/*
  * vmcoreinfo in /proc/vmcore
  */
 #define FILENAME_VMCOREINFO		"/tmp/vmcoreinfoXXXXXX"
@@ -2116,10 +2122,17 @@ struct offset_table {
 		long	p_memsz;
 	} elf64_phdr;
 
+	/*
+	 * The caller_id was added by the Linux 5.1 Kernel to hold
+	 * the Thread id or CPU id of the caller adding a printk
+	 * dmesg to the ring buffer. As such older versions of the
+	 * kernel can ignore this field as it won't be filled in.
+	 */
 	struct printk_log_s {
 		long ts_nsec;
 		long len;
 		long text_len;
+		long caller_id;
 	} printk_log;
 
 	/*

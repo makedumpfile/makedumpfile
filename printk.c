@@ -114,6 +114,18 @@ dump_record(struct prb_map *m, unsigned long id)
 
 	bufp = buf;
 	bufp += sprintf(buf, "[%5lld.%06ld] ", nanos, rem/1000);
+
+	if (OFFSET(printk_info.caller_id) != NOT_FOUND_STRUCTURE) {
+		const unsigned int cpuid = 0x80000000;
+		char cidbuf[PID_CHARS_MAX];
+		unsigned int cid;
+
+		/* Get id type, isolate id value in cid for print */
+		cid = UINT(inf + OFFSET(printk_info.caller_id));
+		sprintf(cidbuf, "%c%u", (cid & cpuid) ? 'C' : 'T', cid & ~cpuid);
+		bufp += sprintf(bufp, "[%*s] ", PID_CHARS_DEFAULT, cidbuf);
+	}
+
 	indent_len = strlen(buf);
 
 	/* How much buffer space is needed in the worst case */

@@ -250,7 +250,7 @@ ppc64_vmalloc_init(void)
 		/*
 		 * 64K pagesize
 		 */
-		if (info->cur_mmu_type & RADIX_MMU) {
+		if (info->cur_mmu_type & MMU_TYPE_RADIX) {
 			info->l1_index_size = PTE_INDEX_SIZE_RADIX_64K;
 			info->l2_index_size = PMD_INDEX_SIZE_RADIX_64K;
 			info->l3_index_size = PUD_INDEX_SIZE_RADIX_64K;
@@ -300,7 +300,7 @@ ppc64_vmalloc_init(void)
 		/*
 		 * 4K pagesize
 		 */
-		if (info->cur_mmu_type & RADIX_MMU) {
+		if (info->cur_mmu_type & MMU_TYPE_RADIX) {
 			info->l1_index_size = PTE_INDEX_SIZE_RADIX_4K;
 			info->l2_index_size = PMD_INDEX_SIZE_RADIX_4K;
 			info->l3_index_size = PUD_INDEX_SIZE_RADIX_4K;
@@ -635,14 +635,19 @@ get_versiondep_info_ppc64()
 	 * On PowerISA 3.0 based server processors, a kernel can run with
 	 * radix MMU or standard MMU. Get the current MMU type.
 	 */
-	info->cur_mmu_type = STD_MMU;
-	if ((SYMBOL(cur_cpu_spec) != NOT_FOUND_SYMBOL)
+	info->cur_mmu_type = MMU_TYPE_STD;
+
+	if (NUMBER(RADIX_MMU) != NOT_FOUND_SYMBOL) {
+		if (NUMBER(RADIX_MMU) == 1) {
+			info->cur_mmu_type = MMU_TYPE_RADIX;
+		}
+	} else if ((SYMBOL(cur_cpu_spec) != NOT_FOUND_SYMBOL)
 	    && (OFFSET(cpu_spec.mmu_features) != NOT_FOUND_STRUCTURE)) {
 		if (readmem(VADDR, SYMBOL(cur_cpu_spec), &cur_cpu_spec,
 		    sizeof(cur_cpu_spec))) {
 			if (readmem(VADDR, cur_cpu_spec + OFFSET(cpu_spec.mmu_features),
 			    &mmu_features, sizeof(mmu_features)))
-				info->cur_mmu_type = mmu_features & RADIX_MMU;
+				info->cur_mmu_type = mmu_features & MMU_TYPE_RADIX;
 		}
 	}
 

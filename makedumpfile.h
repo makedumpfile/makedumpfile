@@ -753,12 +753,13 @@ unsigned long get_kvbase_arm64(void);
 /*
  * Supported MMU types
  */
-#define STD_MMU         0x0
+#define MMU_TYPE_STD         0x0
 /*
  * The flag bit for radix MMU in cpu_spec.mmu_features
- * in the kernel. Use the same flag here.
+ * in the kernel (MMU_FTR_TYPE_RADIX).
+ * Use the same flag here.
  */
-#define RADIX_MMU       0x40
+#define MMU_TYPE_RADIX       0x40
 
 
 #define PGD_MASK_L4		\
@@ -2281,6 +2282,8 @@ struct number_table {
 	unsigned long kernel_link_addr;
 	unsigned long va_kernel_pa_offset;
 #endif
+
+	unsigned long RADIX_MMU;
 };
 
 struct srcfile_table {

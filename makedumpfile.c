@@ -3000,6 +3000,7 @@ read_vmcoreinfo(void)
 #endif
 
 	READ_NUMBER("HUGETLB_PAGE_DTOR", HUGETLB_PAGE_DTOR);
+	READ_NUMBER("RADIX_MMU", RADIX_MMU);
 
 	return TRUE;
 }

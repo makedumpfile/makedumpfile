@@ -541,8 +541,6 @@ do { \
  * The value of dependence on machine
  */
 #define PAGE_OFFSET		(info->page_offset)
-#define VMALLOC_START		(info->vmalloc_start)
-#define VMALLOC_END		(info->vmalloc_end)
 #define VMEMMAP_START		(info->vmemmap_start)
 #define VMEMMAP_END		(info->vmemmap_end)
 #define PMASK			(0x7ffffffffffff000UL)
@@ -2263,6 +2261,9 @@ struct number_table {
 	long    HUGETLB_PAGE_DTOR;
 	long	phys_base;
 	long	KERNEL_IMAGE_SIZE;
+
+	unsigned long vmalloc_start;
+
 #ifdef __aarch64__
 	long 	VA_BITS;
 	long	TCR_EL1_T1SZ;
@@ -2273,7 +2274,6 @@ struct number_table {
 	long va_bits;
 	unsigned long phys_ram_base;
 	unsigned long page_offset;
-	unsigned long vmalloc_start;
 	unsigned long vmalloc_end;
 	unsigned long vmemmap_start;
 	unsigned long vmemmap_end;

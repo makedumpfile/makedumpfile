@@ -568,7 +568,9 @@ get_machdep_info_ppc64(void)
 	/*
 	 * Get vmalloc_start value from either vmap_area_list or vmlist.
 	 */
-	if ((SYMBOL(vmap_area_list) != NOT_FOUND_SYMBOL)
+	if (NUMBER(vmalloc_start) != NOT_FOUND_NUMBER) {
+		vmalloc_start = NUMBER(vmalloc_start);
+	} else if ((SYMBOL(vmap_area_list) != NOT_FOUND_SYMBOL)
 	    && (OFFSET(vmap_area.va_start) != NOT_FOUND_STRUCTURE)
 	    && (OFFSET(vmap_area.list) != NOT_FOUND_STRUCTURE)) {
 		if (!readmem(VADDR, SYMBOL(vmap_area_list) + OFFSET(list_head.next),
@@ -689,11 +691,16 @@ vaddr_to_paddr_ppc64(unsigned long vaddr)
 	if ((SYMBOL(vmap_area_list) == NOT_FOUND_SYMBOL)
 	    || (OFFSET(vmap_area.va_start) == NOT_FOUND_STRUCTURE)
 	    || (OFFSET(vmap_area.list) == NOT_FOUND_STRUCTURE)) {
-		if ((SYMBOL(vmlist) == NOT_FOUND_SYMBOL)
-		    || (OFFSET(vm_struct.addr) == NOT_FOUND_STRUCTURE)) {
-			ERRMSG("Can't get info for vmalloc translation.\n");
-			return NOT_PADDR;
-		}
+		/*
+		 * Don't depend on vmap_area_list/vmlist if vmalloc_start is set in
+		 * vmcoreinfo, in that case proceed without error
+		 */
+		if (NUMBER(vmalloc_start) == NOT_FOUND_NUMBER)
+			if ((SYMBOL(vmlist) == NOT_FOUND_SYMBOL)
+				|| (OFFSET(vm_struct.addr) == NOT_FOUND_STRUCTURE)) {
+				ERRMSG("Can't get info for vmalloc translation.\n");
+				return NOT_PADDR;
+			}
 	}
 
 	return ppc64_vtop_level4(vaddr);

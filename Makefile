@@ -101,6 +101,8 @@ LINK_TEST_PROG="int main() { return 0; }"
 LIBS := $(LIBS) $(call try-run,\
 	echo $(LINK_TEST_PROG) | $(CC) -o "$$TMP" -x c - -lebl,-lebl,)
 
+SBINDIR ?= /usr/sbin
+
 all: makedumpfile
 
 $(OBJ_PART): $(SRC_PART)
@@ -126,8 +128,8 @@ clean:
 	rm -f $(OBJ) $(OBJ_PART) $(OBJ_ARCH) makedumpfile makedumpfile.8 makedumpfile.conf.5
 
 install:
-	install -m 755 -d ${DESTDIR}/usr/sbin ${DESTDIR}/usr/share/man/man5 ${DESTDIR}/usr/share/man/man8
-	install -m 755 -t ${DESTDIR}/usr/sbin makedumpfile $(VPATH)makedumpfile-R.pl
+	install -m 755 -d ${DESTDIR}/${SBINDIR} ${DESTDIR}/usr/share/man/man5 ${DESTDIR}/usr/share/man/man8
+	install -m 755 -t ${DESTDIR}/${SBINDIR} makedumpfile $(VPATH)makedumpfile-R.pl
 	install -m 644 -t ${DESTDIR}/usr/share/man/man8 makedumpfile.8
 	install -m 644 -t ${DESTDIR}/usr/share/man/man5 makedumpfile.conf.5
 	mkdir -p ${DESTDIR}/usr/share/makedumpfile/eppic_scripts

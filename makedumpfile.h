@@ -165,6 +165,8 @@ test_bit(int nr, unsigned long addr)
 #define isAnon(mapping, flags)	(((unsigned long)mapping & PAGE_MAPPING_ANON) != 0 \
 				&& !isSlab(flags))
 
+#define PAGE_TYPE_BASE		(0xf0000000)
+
 #define PTOB(X)			(((unsigned long long)(X)) << PAGESHIFT())
 #define BTOP(X)			(((unsigned long long)(X)) >> PAGESHIFT())
 
@@ -2255,6 +2257,7 @@ struct number_table {
 	long    PG_hugetlb;
 
 	long	PAGE_BUDDY_MAPCOUNT_VALUE;
+	long	PAGE_HUGETLB_MAPCOUNT_VALUE;
 	long	PAGE_OFFLINE_MAPCOUNT_VALUE;
 	long	SECTION_SIZE_BITS;
 	long	MAX_PHYSMEM_BITS;

@@ -161,9 +161,8 @@ test_bit(int nr, unsigned long addr)
 #define isSwapBacked(flags)	test_bit(NUMBER(PG_swapbacked), flags)
 #define isHWPOISON(flags)	(test_bit(NUMBER(PG_hwpoison), flags) \
 				&& (NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER))
-#define isSlab(flags)		test_bit(NUMBER(PG_slab), flags)
-#define isAnon(mapping, flags)	(((unsigned long)mapping & PAGE_MAPPING_ANON) != 0 \
-				&& !isSlab(flags))
+#define isAnon(mapping, flags, _mapcount) \
+	(((unsigned long)mapping & PAGE_MAPPING_ANON) != 0 && !isSlab(flags, _mapcount))
 
 #define PAGE_TYPE_BASE		(0xf0000000)
 
@@ -2259,6 +2258,7 @@ struct number_table {
 	long	PAGE_BUDDY_MAPCOUNT_VALUE;
 	long	PAGE_HUGETLB_MAPCOUNT_VALUE;
 	long	PAGE_OFFLINE_MAPCOUNT_VALUE;
+	long	PAGE_SLAB_MAPCOUNT_VALUE;
 	long	SECTION_SIZE_BITS;
 	long	MAX_PHYSMEM_BITS;
 	long    HUGETLB_PAGE_DTOR;

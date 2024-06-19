@@ -5254,6 +5254,9 @@ reserve_diskspace(int fd, off_t start_offset, off_t end_offset, char *file_name)
 
 	int ret = FALSE;
 
+	if (info->flag_flatten)
+		return TRUE;
+
 	assert(start_offset < end_offset);
 	buf_size = end_offset - start_offset;
 

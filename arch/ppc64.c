@@ -566,7 +566,9 @@ get_machdep_info_ppc64(void)
 	DEBUG_MSG("kernel_start : %lx\n", info->kernel_start);
 
 	/*
-	 * Get vmalloc_start value from either vmap_area_list or vmlist.
+	 * To get vmalloc_start, prefer NUMBER(vmalloc_start) if exported in
+	 * vmcoreinfo, as 'vmap_area_list' and 'vmlist' in Linux 6.9 and later
+	 * kernels might be empty
 	 */
 	if (NUMBER(vmalloc_start) != NOT_FOUND_NUMBER) {
 		vmalloc_start = NUMBER(vmalloc_start);

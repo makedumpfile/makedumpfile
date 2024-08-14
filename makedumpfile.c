@@ -6075,12 +6075,10 @@ setup_page_is_buddy(void)
 	if (OFFSET(page.private) == NOT_FOUND_STRUCTURE)
 		goto out;
 
-	if (NUMBER(PG_buddy) == NOT_FOUND_NUMBER) {
-		if (NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) != NOT_FOUND_NUMBER) {
-			if (OFFSET(page._mapcount) != NOT_FOUND_STRUCTURE)
-				info->page_is_buddy = page_is_buddy_v3;
-		}
-	} else
+	if (NUMBER(PAGE_BUDDY_MAPCOUNT_VALUE) != NOT_FOUND_NUMBER) {
+		if (OFFSET(page._mapcount) != NOT_FOUND_STRUCTURE)
+			info->page_is_buddy = page_is_buddy_v3;
+	} else if (NUMBER(PG_buddy) != NOT_FOUND_NUMBER)
 		info->page_is_buddy = page_is_buddy_v2;
 
 out:

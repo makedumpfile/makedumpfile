@@ -5881,7 +5881,11 @@ dump_dmesg()
 				char *first;
 
 				/* Clear everything we have already written... */
-				ftruncate(info->fd_dumpfile, 0);
+				if (ftruncate(info->fd_dumpfile, 0) != 0) {
+					ERRMSG("Can't truncate file(%s). %s\n",
+					       info->name_dumpfile, strerror(errno));
+					goto out;
+				}
 				lseek(info->fd_dumpfile, 0, SEEK_SET);
 
 				/* ...and only write up to the corruption. */

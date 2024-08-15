@@ -2351,7 +2351,7 @@ sadump_format_type_name(void)
 	case SADUMP_UNKNOWN:
 		return "unknown";
 	}
-	return NULL;
+	return "";
 }
 
 void

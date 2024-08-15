@@ -142,7 +142,7 @@ sadump_head_disk_name_memory(void)
 
 static inline char *sadump_format_type_name(void)
 {
-	return NULL;
+	return "";
 }
 
 static inline void free_sadump_info(void)

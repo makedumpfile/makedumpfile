@@ -156,8 +156,7 @@ static int s390x_init_vm(void)
 	struct os_info os_info;
 	ulong addr;
 
-	if (!readmem(PADDR, S390X_LC_OS_INFO, &addr,
-			sizeof(addr)) || !addr) {
+	if (!readmem(PADDR, S390X_LC_OS_INFO, &addr, sizeof(addr))) {
 		ERRMSG("Can't get s390x os_info ptr.\n");
 		return FALSE;
 	}

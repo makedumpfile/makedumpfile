@@ -5215,7 +5215,7 @@ exclude_nodata_pages(struct cycle *cycle)
 				   NULL, &file_size)) {
 		unsigned long long pfn, pfn_end;
 
-		pfn = paddr_to_pfn(phys_start + file_size);
+		pfn = paddr_to_pfn(roundup(phys_start + file_size, PAGESIZE()));
 		pfn_end = paddr_to_pfn(roundup(phys_end, PAGESIZE()));
 
 		if (pfn < cycle->start_pfn)

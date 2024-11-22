@@ -280,8 +280,7 @@ isSlab(unsigned long flags, unsigned int _mapcount)
 {
 	/* Linux 6.10 and later */
 	if (NUMBER(PAGE_SLAB_MAPCOUNT_VALUE) != NOT_FOUND_NUMBER) {
-		unsigned int PG_slab = ~NUMBER(PAGE_SLAB_MAPCOUNT_VALUE);
-		if ((_mapcount & (PAGE_TYPE_BASE | PG_slab)) == PAGE_TYPE_BASE)
+		if (_mapcount == (int)NUMBER(PAGE_SLAB_MAPCOUNT_VALUE))
 			return TRUE;
 	}
 
@@ -6549,11 +6548,10 @@ __exclude_unnecessary_pages(unsigned long mem_map,
 			 */
 			if (NUMBER(PAGE_HUGETLB_MAPCOUNT_VALUE) != NOT_FOUND_NUMBER) {
 				unsigned long _flags_1 = ULONG(addr + OFFSET(page.flags));
-				unsigned int PG_hugetlb = ~NUMBER(PAGE_HUGETLB_MAPCOUNT_VALUE);
 
 				compound_order = _flags_1 & 0xff;
 
-				if ((_mapcount & (PAGE_TYPE_BASE | PG_hugetlb)) == PAGE_TYPE_BASE)
+				if (_mapcount == (int)NUMBER(PAGE_HUGETLB_MAPCOUNT_VALUE))
 					compound_dtor = IS_HUGETLB;
 
 				goto check_order;

@@ -164,8 +164,6 @@ test_bit(int nr, unsigned long addr)
 #define isAnon(mapping, flags, _mapcount) \
 	(((unsigned long)mapping & PAGE_MAPPING_ANON) != 0 && !isSlab(flags, _mapcount))
 
-#define PAGE_TYPE_BASE		(0xf0000000)
-
 #define PTOB(X)			(((unsigned long long)(X)) << PAGESHIFT())
 #define BTOP(X)			(((unsigned long long)(X)) >> PAGESHIFT())
 

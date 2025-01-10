@@ -4444,7 +4444,7 @@ initial(void)
 #endif
 
 	if (info->flag_exclude_xen_dom && !is_xen_memory()) {
-		MSG("'-X' option is disable,");
+		MSG("'-X' option is disabled, ");
 		MSG("because %s is not Xen's memory core image.\n", info->name_memory);
 		MSG("Commandline parameter is invalid.\n");
 		MSG("Try `makedumpfile --help' for more information.\n");
@@ -4527,7 +4527,7 @@ initial(void)
 
 	if (info->flag_refiltering) {
 		if (info->flag_elf_dumpfile) {
-			MSG("'-E' option is disable, ");
+			MSG("'-E' option is disabled, ");
 			MSG("because %s is kdump compressed format.\n",
 							info->name_memory);
 			return FALSE;
@@ -4541,7 +4541,7 @@ initial(void)
 
 	} else if (info->flag_sadump) {
 		if (info->flag_elf_dumpfile) {
-			MSG("'-E' option is disable, ");
+			MSG("'-E' option is disabled, ");
 			MSG("because %s is sadump %s format.\n",
 			    info->name_memory, sadump_format_type_name());
 			return FALSE;
@@ -4635,14 +4635,14 @@ out:
 
 	if (info->num_threads) {
 		if (is_xen_memory()) {
-			MSG("'--num-threads' option is disable,\n");
+			MSG("'--num-threads' option is disabled,\n");
 			MSG("because %s is Xen's memory core image.\n",
 							info->name_memory);
 			return FALSE;
 		}
 
 		if (info->flag_sadump) {
-			MSG("'--num-threads' option is disable,\n");
+			MSG("'--num-threads' option is disabled,\n");
 			MSG("because %s is sadump %s format.\n",
 			    info->name_memory, sadump_format_type_name());
 			return FALSE;
@@ -4721,7 +4721,7 @@ out:
 			DEBUG_MSG("mmap() is available on the kernel.\n");
 			info->flag_usemmap = MMAP_ENABLE;
 		} else {
-			DEBUG_MSG("The kernel doesn't support mmap(),");
+			DEBUG_MSG("The kernel doesn't support mmap(), ");
 			DEBUG_MSG("read() will be used instead.\n");
 			info->flag_usemmap = MMAP_DISABLE;
 		}

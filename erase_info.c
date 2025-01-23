@@ -2192,7 +2192,7 @@ process_eppic_file(char *name_config)
 {
 	void *handle;
 	void (*eppic_load)(char *), (*eppic_unload)(char *);
-	int (*eppic_init)();
+	int (*eppic_init)(struct call_back *);
 
 	/*
 	 * Dynamically load the eppic_makedumpfile.so library.

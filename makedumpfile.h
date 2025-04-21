@@ -497,7 +497,7 @@ do { \
 #define KVER_MIN_SHIFT 16
 #define KERNEL_VERSION(x,y,z) (((x) << KVER_MAJ_SHIFT) | ((y) << KVER_MIN_SHIFT) | (z))
 #define OLDEST_VERSION		KERNEL_VERSION(2, 6, 15) /* linux-2.6.15 */
-#define LATEST_VERSION		KERNEL_VERSION(6, 11, 4) /* linux-6.11.4 */
+#define LATEST_VERSION		KERNEL_VERSION(6, 14, 2) /* linux-6.14.2 */
 
 /*
  * for printk caller_id support

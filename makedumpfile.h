@@ -163,6 +163,8 @@ test_bit(int nr, unsigned long addr)
 				&& (NUMBER(PG_hwpoison) != NOT_FOUND_NUMBER))
 #define isAnon(mapping, flags, _mapcount) \
 	(((unsigned long)mapping & PAGE_MAPPING_ANON) != 0 && !isSlab(flags, _mapcount))
+#define isUnaccepted(_mapcount)	(_mapcount == (int)NUMBER(PAGE_UNACCEPTED_MAPCOUNT_VALUE) \
+				&& (NUMBER(PAGE_UNACCEPTED_MAPCOUNT_VALUE) != NOT_FOUND_NUMBER))
 
 #define PTOB(X)			(((unsigned long long)(X)) << PAGESHIFT())
 #define BTOP(X)			(((unsigned long long)(X)) >> PAGESHIFT())
@@ -2257,6 +2259,7 @@ struct number_table {
 	long	PAGE_HUGETLB_MAPCOUNT_VALUE;
 	long	PAGE_OFFLINE_MAPCOUNT_VALUE;
 	long	PAGE_SLAB_MAPCOUNT_VALUE;
+	long	PAGE_UNACCEPTED_MAPCOUNT_VALUE;
 	long	SECTION_SIZE_BITS;
 	long	MAX_PHYSMEM_BITS;
 	long    HUGETLB_PAGE_DTOR;

@@ -2533,6 +2533,8 @@ write_vmcoreinfo_data(void)
 	WRITE_NUMBER("PAGE_BUDDY_MAPCOUNT_VALUE", PAGE_BUDDY_MAPCOUNT_VALUE);
 	WRITE_NUMBER("PAGE_OFFLINE_MAPCOUNT_VALUE",
 		     PAGE_OFFLINE_MAPCOUNT_VALUE);
+	WRITE_NUMBER("PAGE_UNACCEPTED_MAPCOUNT_VALUE",
+			PAGE_UNACCEPTED_MAPCOUNT_VALUE);
 	WRITE_NUMBER("phys_base", phys_base);
 	WRITE_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
 
@@ -2990,6 +2992,7 @@ read_vmcoreinfo(void)
 	READ_NUMBER("PAGE_HUGETLB_MAPCOUNT_VALUE", PAGE_HUGETLB_MAPCOUNT_VALUE);
 	READ_NUMBER("PAGE_OFFLINE_MAPCOUNT_VALUE", PAGE_OFFLINE_MAPCOUNT_VALUE);
 	READ_NUMBER("PAGE_SLAB_MAPCOUNT_VALUE", PAGE_SLAB_MAPCOUNT_VALUE);
+	READ_NUMBER("PAGE_UNACCEPTED_MAPCOUNT_VALUE", PAGE_UNACCEPTED_MAPCOUNT_VALUE);
 	READ_NUMBER("phys_base", phys_base);
 	READ_NUMBER("KERNEL_IMAGE_SIZE", KERNEL_IMAGE_SIZE);
 
@@ -6628,6 +6631,17 @@ check_order:
 				continue;
 			}
 			nr_pages = 1 << private;
+			pfn_counter = &pfn_free;
+		}
+		/*
+		 * Exclude the unaccepted free pages not managed by buddy.
+		 * By convention, pages can be added to the zone.unaccepted_pages list
+		 * only when the order is MAX_PAGE_ORDER.  Otherwise, the page is
+		 * accepted immediately without being on the list.
+		 */
+		else if ((info->dump_level & DL_EXCLUDE_FREE)
+			&& isUnaccepted(_mapcount)) {
+			nr_pages = 1 << (ARRAY_LENGTH(zone.free_area) - 1);
 			pfn_counter = &pfn_free;
 		}
 		/*

@@ -8635,7 +8635,8 @@ kdump_thread_function_cyclic(void *arg) {
 
 		while (buf_ready == FALSE) {
 			pthread_testcancel();
-			if (page_flag_buf->ready == FLAG_READY)
+			if (__atomic_load_n(&page_flag_buf->ready,
+					__ATOMIC_SEQ_CST) == FLAG_READY)
 				continue;
 
 			/* get next dumpable pfn */
@@ -8651,7 +8652,8 @@ kdump_thread_function_cyclic(void *arg) {
 			info->current_pfn = pfn + 1;
 
 			page_flag_buf->pfn = pfn;
-			page_flag_buf->ready = FLAG_FILLING;
+			__atomic_store_n(&page_flag_buf->ready, FLAG_FILLING,
+					__ATOMIC_SEQ_CST);
 			pthread_mutex_unlock(&info->current_pfn_mutex);
 			sem_post(&info->page_flag_buf_sem);
 
@@ -8740,7 +8742,8 @@ kdump_thread_function_cyclic(void *arg) {
 			page_flag_buf->index = index;
 			buf_ready = TRUE;
 next:
-			page_flag_buf->ready = FLAG_READY;
+			__atomic_store_n(&page_flag_buf->ready, FLAG_READY,
+					__ATOMIC_SEQ_CST);
 			page_flag_buf = page_flag_buf->next;
 
 		}
@@ -8869,7 +8872,8 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 			 * current_pfn is used for recording the value of pfn when checking the pfn.
 			 */
 			for (i = 0; i < info->num_threads; i++) {
-				if (info->page_flag_buf[i]->ready == FLAG_UNUSED)
+				if (__atomic_load_n(&info->page_flag_buf[i]->ready,
+						__ATOMIC_SEQ_CST) == FLAG_UNUSED)
 					continue;
 				temp_pfn = info->page_flag_buf[i]->pfn;
 
@@ -8877,7 +8881,8 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 				 * count how many threads have reached the end.
 				 */
 				if (temp_pfn >= end_pfn) {
-					info->page_flag_buf[i]->ready = FLAG_UNUSED;
+					__atomic_store_n(&info->page_flag_buf[i]->ready,
+						FLAG_UNUSED, __ATOMIC_SEQ_CST);
 					end_count++;
 					continue;
 				}
@@ -8899,7 +8904,8 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 			 * If the page_flag_buf is not ready, the pfn recorded may be changed.
 			 * So we should recheck.
 			 */
-			if (info->page_flag_buf[consuming]->ready != FLAG_READY) {
+			if (__atomic_load_n(&info->page_flag_buf[consuming]->ready,
+					__ATOMIC_SEQ_CST) != FLAG_READY) {
 				clock_gettime(CLOCK_MONOTONIC, &new);
 				if (new.tv_sec - last.tv_sec > WAIT_TIME) {
 					ERRMSG("Can't get data of pfn.\n");
@@ -8941,7 +8947,8 @@ write_kdump_pages_parallel_cyclic(struct cache_data *cd_header,
 				goto out;
 			page_data_buf[index].used = FALSE;
 		}
-		info->page_flag_buf[consuming]->ready = FLAG_UNUSED;
+		__atomic_store_n(&info->page_flag_buf[consuming]->ready,
+				FLAG_UNUSED, __ATOMIC_SEQ_CST);
 		info->page_flag_buf[consuming] = info->page_flag_buf[consuming]->next;
 	}
 finish:

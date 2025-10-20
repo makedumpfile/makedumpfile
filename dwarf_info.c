@@ -1007,6 +1007,13 @@ get_debug_info(void)
 			ERRMSG("Can't get CU die.\n");
 			goto out;
 		}
+
+		/* NOTE: currently Rust is not supported. */
+		if (dwarf_srclang(&cu_die) == DW_LANG_Rust) {
+			off = next_off;
+			continue;
+		}
+
 		search_die_tree(&cu_die, &found);
 		if (found)
 			break;

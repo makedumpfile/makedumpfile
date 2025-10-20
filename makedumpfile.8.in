@@ -80,6 +80,7 @@ nested loops to traverse and erase kernel data. --eppic requires
 can be built from makedumpfile source. Refer to
 \fBhttp://code.google.com/p/eppic/\fR to build eppic library \fBlibeppic.a\fR
 and for more information on writing eppic macros.
+NOTE: currently Rust is not supported in this function.
 .PP
 To analyze the first kernel's memory usage, makedumpfile can refer to
 \fIVMCOREINFO\fR instead of \fIVMLINUX\fR. \fIVMCOREINFO\fR contains the first

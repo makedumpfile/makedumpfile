@@ -1881,7 +1881,7 @@ get_symbol_addr_all(char *name) {
 	if (!strcmp(get_dwarf_module_name(), "vmlinux")) {
 		symbol_addr = get_symbol_addr(name);
 		if (symbol_addr)
-			return symbol_addr;
+			return symbol_addr + info->kaslr_offset;
 
 		vmlinux_searched = 1;
 	}
@@ -1942,9 +1942,9 @@ get_symbol_addr_all(char *name) {
 	 * this function is called with debuginfo set to a particular
 	 * kernel module and we are looking for symbol in vmlinux
 	 */
-	if (!vmlinux_searched)
-		return get_symbol_addr(name);
-	else
+	if (!vmlinux_searched && !!(symbol_addr = get_symbol_addr(name))) {
+		return symbol_addr + info->kaslr_offset;
+	} else
 		return NOT_FOUND_SYMBOL;
 }
 

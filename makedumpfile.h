@@ -972,7 +972,7 @@ typedef unsigned long pgd_t;
 
 #endif          /* sparc64 */
 
-#ifdef __mips64__ /* mips64 */
+#if defined(__mips64__) || defined(__mips64) /* mips64 */
 #define KVBASE			PAGE_OFFSET
 
 #ifndef _XKPHYS_START_ADDR
@@ -1285,7 +1285,7 @@ unsigned long long vaddr_to_paddr_sparc64(unsigned long vaddr);
 #define arch_crashkernel_mem_size()	stub_false()
 #endif		/* sparc64 */
 
-#ifdef __mips64__ /* mips64 */
+#if defined(__mips64__) || defined(__mips64) /* mips64 */
 int get_phys_base_mips64(void);
 int get_machdep_info_mips64(void);
 int get_versiondep_info_mips64(void);
@@ -2514,7 +2514,7 @@ int get_xen_info_ia64(void);
 #define get_xen_info_arch(X) FALSE
 #endif	/* sparc64 */
 
-#ifdef __mips64__ /* mips64 */
+#if defined(__mips64__) || defined(__mips64) /* mips64 */
 #define kvtop_xen(X)	FALSE
 #define get_xen_basic_info_arch(X) FALSE
 #define get_xen_info_arch(X) FALSE

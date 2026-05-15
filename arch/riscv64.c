@@ -107,8 +107,12 @@ vtop_riscv64(pgd_t * pgd, unsigned long vaddr, long va_bits)
 
 	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
 
-	if (pt_val & _PAGE_LEAF)
-		goto out;
+	if (pt_val & _PAGE_LEAF) {
+		unsigned long shift = (va_bits == VA_BITS_SV57) ? PGD_SHIFT_L5 :
+				      (va_bits == VA_BITS_SV48) ? PGD_SHIFT_L4 : PGD_SHIFT_L3;
+		paddr = (pt_phys & ~((1ULL << shift) - 1)) + (vaddr & ((1ULL << shift) - 1));
+		return paddr;
+	}
 
 	if (va_bits == VA_BITS_SV57)
 		goto p4d;
@@ -133,8 +137,10 @@ p4d:
 
 	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
 
-	if (pt_val & _PAGE_LEAF)
-		goto out;
+	if (pt_val & _PAGE_LEAF) {
+		paddr = (pt_phys & ~((1ULL << P4D_SHIFT) - 1)) + (vaddr & ((1ULL << P4D_SHIFT) - 1));
+		return paddr;
+	}
 pud:
 	/* PUD */
 	puda = (pud_t *)(pt_phys) + pud_index(vaddr);
@@ -152,8 +158,10 @@ pud:
 
 	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
 
-	if(pt_val & _PAGE_LEAF)
-		goto out;
+	if (pt_val & _PAGE_LEAF) {
+		paddr = (pt_phys & ~((1ULL << PUD_SHIFT) - 1)) + (vaddr & ((1ULL << PUD_SHIFT) - 1));
+		return paddr;
+	}
 pmd:
 	/* PMD */
 	pmda = (pmd_t *)(pt_phys) + pmd_index(vaddr);
@@ -171,8 +179,10 @@ pmd:
 
 	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
 
-	if (pt_val & _PAGE_LEAF)
-		goto out;
+	if (pt_val & _PAGE_LEAF) {
+		paddr = (pt_phys & ~((1ULL << PMD_SHIFT) - 1)) + (vaddr & ((1ULL << PMD_SHIFT) - 1));
+		return paddr;
+	}
 
 	/* PTE */
 	ptea = (pte_t *)(pt_phys) + pte_index(vaddr);
@@ -190,8 +200,7 @@ pmd:
 
 	pt_phys = (pt_val >> _PAGE_PFN_SHIFT) << PAGESHIFT();
 
-out:
-	paddr = pt_phys + PAGEOFFSET(vaddr);
+	return pt_phys + PAGEOFFSET(vaddr);
 invalid:
 	return paddr;
 }

@@ -202,6 +202,8 @@ vaddr_to_paddr_riscv64(unsigned long vaddr)
 	unsigned long long swapper_phys;
 
 	if (vaddr >= PAGE_OFFSET &&
+	    !(vaddr >= NUMBER(vmalloc_start) && vaddr <= NUMBER(vmalloc_end)) &&
+	    !(vaddr >= NUMBER(vmemmap_start) && vaddr <= NUMBER(vmemmap_end)) &&
 	    !(vaddr >= NUMBER(modules_vaddr) && vaddr <= NUMBER(modules_end))){
 		return VTOP(vaddr);
 	}

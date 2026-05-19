@@ -29,6 +29,10 @@ typedef struct {
 
 typedef struct {
 	pgd_t pgd;
+} p4d_t;
+
+typedef struct {
+	p4d_t p4d;
 } pud_t;
 
 typedef struct {
@@ -42,6 +46,7 @@ typedef struct {
 #define __pte(x)	((pte_t) { (x) } )
 #define __pmd(x)	((pmd_t) { (x) } )
 #define __pud(x)	((pud_t) { (x) } )
+#define __p4d(x)	((p4d_t) { (x) } )
 #define __pgd(x)	((pgd_t) { (x) } )
 
 static int lpa_52_bit_support_available;
@@ -62,7 +67,8 @@ static unsigned long kimage_voffset;
 #define PAGE_OFFSET_48		((0xffffffffffffffffUL) << 48)
 
 #define pgd_val(x)		((x).pgd)
-#define pud_val(x)		(pgd_val((x).pgd))
+#define p4d_val(x)		(pgd_val((x).pgd))
+#define pud_val(x)		(p4d_val((x).p4d))
 #define pmd_val(x)		(pud_val((x).pud))
 #define pte_val(x)		((x).pte)
 
@@ -75,6 +81,7 @@ static unsigned long kimage_voffset;
 typedef unsigned long pteval_t;
 typedef unsigned long pmdval_t;
 typedef unsigned long pudval_t;
+typedef unsigned long p4dval_t;
 typedef unsigned long pgdval_t;
 
 #define PAGE_SHIFT	PAGESHIFT()
@@ -102,13 +109,21 @@ typedef unsigned long pgdval_t;
 #define PTRS_PER_PUD		PTRS_PER_PTE
 
 /*
+ * P4D_SHIFT determines the size a level 0 page table entry can map.
+ */
+#define P4D_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(0)
+#define P4D_SIZE		(_AC(1, UL) << P4D_SHIFT)
+#define P4D_MASK		(~(P4D_SIZE-1))
+#define PTRS_PER_P4D		PTRS_PER_PTE
+
+/*
  * PGDIR_SHIFT determines the size a top-level page table entry can map
  * (depending on the configuration, this level can be 0, 1 or 2).
  */
 #define PGDIR_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - (pgtable_level))
 #define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
 #define PGDIR_MASK		(~(PGDIR_SIZE-1))
-#define PTRS_PER_PGD		(1 << ((va_bits) - PGDIR_SHIFT))
+#define PTRS_PER_PGD		(1 << ((vabits_actual) - PGDIR_SHIFT))
 
 /*
  * Section address mask and size definitions.
@@ -178,6 +193,22 @@ pgd_pte(pgd_t pgd)
 #define __pgd_to_phys(pgd)		__pte_to_phys(pgd_pte(pgd))
 #define pgd_offset(pgd, vaddr)		((pgd_t *)(pgd) + pgd_index(vaddr))
 
+/* P4D */
+#define p4d_index(vaddr)		(((vaddr) >> P4D_SHIFT) & (PTRS_PER_P4D - 1))
+
+static inline pte_t p4d_pte(p4d_t p4d)
+{
+	return __pte(p4d_val(p4d));
+}
+
+#define __p4d_to_phys(p4d)		__pte_to_phys(p4d_pte(p4d))
+
+static inline unsigned long
+p4d_page_paddr(p4d_t p4d)
+{
+	return __p4d_to_phys(p4d);
+}
+
 static inline pte_t pud_pte(pud_t pud)
 {
 	return __pte(pud_val(pud));
@@ -237,13 +268,22 @@ __pa(unsigned long vaddr)
 		return (vaddr - kimage_voffset);
 }
 
+static p4d_t *
+p4d_offset(pgd_t *pgda, pgd_t *pgdv, unsigned long vaddr)
+{
+	if (pgtable_level > 4)
+		return (p4d_t *)(pgd_page_paddr(*pgdv) + p4d_index(vaddr) * sizeof(p4d_t));
+	else
+		return (p4d_t *)(pgda);
+}
+
 static pud_t *
-pud_offset(pgd_t *pgda, pgd_t *pgdv, unsigned long vaddr)
+pud_offset(p4d_t *p4da, p4d_t *p4dv, unsigned long vaddr)
 {
 	if (pgtable_level > 3)
-		return (pud_t *)(pgd_page_paddr(*pgdv) + pud_index(vaddr) * sizeof(pud_t));
+		return (pud_t *)(p4d_page_paddr(*p4dv) + pud_index(vaddr) * sizeof(pud_t));
 	else
-		return (pud_t *)(pgda);
+		return (pud_t *)(p4da);
 }
 
 static pmd_t *
@@ -257,20 +297,32 @@ pmd_offset(pud_t *puda, pud_t *pudv, unsigned long vaddr)
 
 static int calculate_plat_config(void)
 {
-	/* derive pgtable_level as per arch/arm64/Kconfig */
-	if ((PAGESIZE() == SZ_16K && va_bits == 36) ||
-			(PAGESIZE() == SZ_64K && va_bits == 42)) {
+	/*
+	 * Derive pgtable_level as per arch/arm64/Kconfig.
+	 * Use vabits_actual (runtime VA size) rather than va_bits (compile-time)
+	 * because the kernel may reduce the VA space at boot if the hardware
+	 * does not support 52-bit VA (LVA). In that case va_bits=52 but
+	 * vabits_actual=48, and the page tables are 4-level, not 5-level.
+	 */
+	int va = vabits_actual;
+
+	if ((PAGESIZE() == SZ_16K && va == 36) ||
+			(PAGESIZE() == SZ_64K && va == 42)) {
 		pgtable_level = 2;
-	} else if ((PAGESIZE() == SZ_64K && va_bits == 48) ||
-			(PAGESIZE() == SZ_64K && va_bits == 52) ||
-			(PAGESIZE() == SZ_4K && va_bits == 39) ||
-			(PAGESIZE() == SZ_16K && va_bits == 47)) {
+	} else if ((PAGESIZE() == SZ_64K && va == 48) ||
+			(PAGESIZE() == SZ_64K && va == 52) ||
+			(PAGESIZE() == SZ_4K && va == 39) ||
+			(PAGESIZE() == SZ_16K && va == 47)) {
 		pgtable_level = 3;
-	} else if ((PAGESIZE() != SZ_64K && va_bits == 48)) {
+	} else if ((PAGESIZE() == SZ_4K && va == 48) ||
+			(PAGESIZE() == SZ_16K && va == 48) ||
+			(PAGESIZE() == SZ_16K && va == 52)) {
 		pgtable_level = 4;
+	} else if (PAGESIZE() == SZ_4K && va == 52) {
+		pgtable_level = 5;
 	} else {
 		ERRMSG("PAGE SIZE %#lx and VA Bits %d not supported\n",
-				PAGESIZE(), va_bits);
+				PAGESIZE(), va);
 		return FALSE;
 	}
 	DEBUG_MSG("pgtable_level: %d\n", pgtable_level);
@@ -548,6 +600,7 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
 	unsigned long long paddr = NOT_PADDR;
 	unsigned long long swapper_phys;
 	pgd_t	*pgda, pgdv;
+	p4d_t	*p4da, p4dv;
 	pud_t	*puda, pudv;
 	pmd_t	*pmda, pmdv;
 	pte_t 	*ptea, ptev;
@@ -565,7 +618,13 @@ vaddr_to_paddr_arm64(unsigned long vaddr)
 		return NOT_PADDR;
 	}
 
-	puda = pud_offset(pgda, &pgdv, vaddr);
+	p4da = p4d_offset(pgda, &pgdv, vaddr);
+	if (!readmem(PADDR, (unsigned long long)p4da, &p4dv, sizeof(p4dv))) {
+		ERRMSG("Can't read p4d\n");
+		return NOT_PADDR;
+	}
+
+	puda = pud_offset(p4da, &p4dv, vaddr);
 	if (!readmem(PADDR, (unsigned long long)puda, &pudv, sizeof(pudv))) {
 		ERRMSG("Can't read pud\n");
 		return NOT_PADDR;

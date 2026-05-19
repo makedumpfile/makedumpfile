@@ -1751,6 +1751,9 @@ get_structure_info(void)
 	OFFSET_INIT(page.compound_dtor, "page", "compound_dtor");
 	OFFSET_INIT(page.compound_order, "page", "compound_order");
 	OFFSET_INIT(page.compound_head, "page", "compound_head");
+	/* Linux 7.1 and later */
+	if (OFFSET(page.compound_head) == NOT_FOUND_STRUCTURE)
+		OFFSET_INIT(page.compound_head, "page", "compound_info");
 	/* Linux 6.3 and later */
 	OFFSET_INIT(folio._folio_dtor, "folio", "_folio_dtor");
 	OFFSET_INIT(folio._folio_order, "folio", "_folio_order");
@@ -2426,6 +2429,10 @@ write_vmcoreinfo_data(void)
 	WRITE_MEMBER_OFFSET("page.private", page.private);
 	WRITE_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
 	WRITE_MEMBER_OFFSET("page.compound_order", page.compound_order);
+	/*
+	 * on Linux 7.1 and later, this has page.compound_info's value, but
+	 * it's OK to write it as 'page.compound_head'. See read_vmcoreinfo().
+	 */
 	WRITE_MEMBER_OFFSET("page.compound_head", page.compound_head);
 	/* Linux 6.3 and later */
 	WRITE_MEMBER_OFFSET("folio._folio_dtor", folio._folio_dtor);
@@ -2876,6 +2883,8 @@ read_vmcoreinfo(void)
 	READ_MEMBER_OFFSET("page.compound_dtor", page.compound_dtor);
 	READ_MEMBER_OFFSET("page.compound_order", page.compound_order);
 	READ_MEMBER_OFFSET("page.compound_head", page.compound_head);
+	/* Linux 7.1 and later */
+	READ_MEMBER_OFFSET("page.compound_info", page.compound_head);
 	/* Linux 6.3 and later */
 	READ_MEMBER_OFFSET("folio._folio_dtor", folio._folio_dtor);
 	READ_MEMBER_OFFSET("folio._folio_order", folio._folio_order);

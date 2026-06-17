@@ -6,6 +6,7 @@
 #include <string.h>
 #include "makedumpfile.h"
 #include "kallsyms.h"
+#include "btf_info.h"
 
 static uint32_t *kallsyms_offsets = NULL;
 static uint16_t *kallsyms_token_index = NULL;
@@ -381,6 +382,163 @@ out:
 	}
 	return ret;
 }
+
+INIT_MOD_SYM(vmlinux, modules);
+
+INIT_MOD_STRUCT_MEMBER(vmlinux, list_head, next);
+INIT_MOD_STRUCT_MEMBER(vmlinux, module, list);
+INIT_MOD_STRUCT_MEMBER(vmlinux, module, name);
+INIT_MOD_STRUCT_MEMBER(vmlinux, module, core_kallsyms);
+INIT_MOD_STRUCT_MEMBER(vmlinux, mod_kallsyms, symtab);
+INIT_MOD_STRUCT_MEMBER(vmlinux, mod_kallsyms, num_symtab);
+INIT_MOD_STRUCT_MEMBER(vmlinux, mod_kallsyms, strtab);
+INIT_MOD_STRUCT_MEMBER(vmlinux, elf64_sym, st_name);
+INIT_MOD_STRUCT_MEMBER(vmlinux, elf64_sym, st_value);
+
+#define MEMBER_OFF(S, M) \
+	GET_MOD_STRUCT_MEMBER_MOFF(vmlinux, S, M) / 8
+#define GET_KERN_STRUCT_MEMBER_MSIZE(S, M) \
+	GET_MOD_STRUCT_MEMBER_MSIZE(vmlinux, S, M)
+#define KERN_STRUCT_MEMBER_EXIST(S, M) \
+	MOD_STRUCT_MEMBER_EXIST(vmlinux, S, M)
+#define GET_KERN_STRUCT_MEMBER_SSIZE(S, M) \
+	GET_MOD_STRUCT_MEMBER_SSIZE(vmlinux, S, M)
+#define GET_KERN_SYM(SYM) GET_MOD_SYM(vmlinux, SYM)
+#define KERN_SYM_EXIST(SYM) MOD_SYM_EXIST(vmlinux, SYM)
+
+uint64_t next_list(uint64_t list)
+{
+	uint64_t next = 0;
+
+	if (!readmem(VADDR, list + MEMBER_OFF(list_head, next),
+		&next, GET_KERN_STRUCT_MEMBER_MSIZE(list_head, next))) {
+		ERRMSG("Can't get next list!\n");
+	}
+	return next;
+}
+
+bool init_module_kallsyms(void)
+{
+	uint64_t modules, list, value = 0, symtab = 0, strtab = 0;
+	uint32_t st_name = 0;
+	int num_symtab, i, j;
+	struct ksym_info **p;
+	char symname[512], ch;
+	char *modname = NULL;
+	bool ret = false;
+
+	modules = GET_KERN_SYM(modules);
+	if (!KERN_SYM_EXIST(modules)) {
+		/* Not a failure if no module enabled */
+		ret = true;
+		goto out;
+	}
+
+	if (!KERN_STRUCT_MEMBER_EXIST(list_head, next) ||
+	    !KERN_STRUCT_MEMBER_EXIST(module, list) ||
+	    !KERN_STRUCT_MEMBER_EXIST(module, name) ||
+	    !KERN_STRUCT_MEMBER_EXIST(module, core_kallsyms) ||
+	    !KERN_STRUCT_MEMBER_EXIST(mod_kallsyms, symtab) ||
+	    !KERN_STRUCT_MEMBER_EXIST(mod_kallsyms, num_symtab) ||
+	    !KERN_STRUCT_MEMBER_EXIST(mod_kallsyms, strtab) ||
+	    !KERN_STRUCT_MEMBER_EXIST(elf64_sym, st_name) ||
+	    !KERN_STRUCT_MEMBER_EXIST(elf64_sym, st_value)) {
+		/* Fail when module enabled but any required types not found */
+		ERRMSG("Missing required module syms/types!\n");
+		goto out;
+	}
+
+	modname = (char *)malloc(GET_KERN_STRUCT_MEMBER_MSIZE(module, name));
+	if (!modname)
+		goto no_mem;
+
+	for (list = next_list(modules); list != modules; list = next_list(list)) {
+		if (!readmem(VADDR, list - MEMBER_OFF(module, list) +
+				MEMBER_OFF(module, name),
+			modname, GET_KERN_STRUCT_MEMBER_MSIZE(module, name))) {
+			ERRMSG("Can't get module modname!\n");
+			goto out;
+		}
+		if (!check_ksyms_require_modname(modname, NULL))
+			continue;
+		if (!readmem(VADDR, list - MEMBER_OFF(module, list) +
+				MEMBER_OFF(module, core_kallsyms) +
+				MEMBER_OFF(mod_kallsyms, num_symtab),
+			&num_symtab, GET_KERN_STRUCT_MEMBER_MSIZE(mod_kallsyms, num_symtab))) {
+			ERRMSG("Can't get module num_symtab!\n");
+			goto out;
+		}
+		if (!readmem(VADDR, list - MEMBER_OFF(module, list) +
+				MEMBER_OFF(module, core_kallsyms) +
+				MEMBER_OFF(mod_kallsyms, symtab),
+			&symtab, GET_KERN_STRUCT_MEMBER_MSIZE(mod_kallsyms, symtab))) {
+			ERRMSG("Can't get module symtab!\n");
+			goto out;
+		}
+		if (!readmem(VADDR, list - MEMBER_OFF(module, list) +
+				MEMBER_OFF(module, core_kallsyms) +
+				MEMBER_OFF(mod_kallsyms, strtab),
+			&strtab, GET_KERN_STRUCT_MEMBER_MSIZE(mod_kallsyms, strtab))) {
+			ERRMSG("Can't get module strtab!\n");
+			goto out;
+		}
+		for (i = 0; i < num_symtab; i++) {
+			j = 0;
+			if (!readmem(VADDR, symtab + i * GET_KERN_STRUCT_MEMBER_SSIZE(elf64_sym, st_value) +
+					MEMBER_OFF(elf64_sym, st_value),
+				&value, GET_KERN_STRUCT_MEMBER_MSIZE(elf64_sym, st_value))) {
+				ERRMSG("Can't get module st_value!\n");
+				goto out;
+			}
+			if (!readmem(VADDR, symtab + i * GET_KERN_STRUCT_MEMBER_SSIZE(elf64_sym, st_name) +
+					MEMBER_OFF(elf64_sym, st_name),
+				&st_name, GET_KERN_STRUCT_MEMBER_MSIZE(elf64_sym, st_name))) {
+				ERRMSG("Can't get module st_name!\n");
+				goto out;
+			}
+			do {
+				if (!readmem(VADDR, strtab + st_name + j++, &ch, 1)) {
+					ERRMSG("Can't get module symname's next char!\n");
+					goto out;
+				}
+			} while (ch != '\0');
+			if (j == 1 || j > sizeof(symname))
+				/* Skip empty or too long string */
+				continue;
+			if (!readmem(VADDR, strtab + st_name, symname, j)) {
+				ERRMSG("Can't get module symname!\n");
+				goto out;
+			}
+
+			for (j = 0; j < sr_len; j++) {
+				for (p = (struct ksym_info **)(sr[j]->start);
+				     p < (struct ksym_info **)(sr[j]->stop);
+				     p++) {
+					if (!strcmp((*p)->modname, modname) &&
+					    !strcmp((*p)->symname, symname)) {
+						(*p)->value = value;
+						(*p)->index = i;
+					}
+				}
+			}
+		}
+	}
+	ret = true;
+	goto out;
+no_mem:
+	ERRMSG("Not enough memory!\n");
+out:
+	if (modname)
+		free(modname);
+	return ret;
+}
+
+void cleanup_kallsyms(void)
+{
+	cleanup_ksyms_section_range();
+	cleanup_ksyms_modname();
+}
+
 #else /* EXTENSION */
 
 bool read_vmcoreinfo_kallsyms(void)

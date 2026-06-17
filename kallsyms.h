@@ -79,5 +79,8 @@ bool check_ksyms_require_modname(char *modname, int *total);
 bool register_ksym_section(char *start, char *stop);
 bool read_vmcoreinfo_kallsyms(void);
 bool init_kernel_kallsyms(void);
+uint64_t next_list(uint64_t list);
+bool init_module_kallsyms(void);
+void cleanup_kallsyms(void);
 #endif /* _KALLSYMS_H */
 

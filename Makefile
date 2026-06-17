@@ -113,7 +113,7 @@ $(OBJ_ARCH): $(SRC_ARCH)
 	$(CC) $(CFLAGS_ARCH) -c -o ./$@ $(VPATH)$(@:.o=.c)
 
 makedumpfile: $(SRC_BASE) $(OBJ_PART) $(OBJ_ARCH)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ_PART) $(OBJ_ARCH) -rdynamic -o $@ $< $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJ_PART) $(OBJ_ARCH) -rdynamic -Wl,-T,makedumpfile.ld -o $@ $< $(LIBS)
 	@sed -e "s/@DATE@/$(DATE)/" \
 	     -e "s/@VERSION@/$(VERSION)/" \
 	     $(VPATH)makedumpfile.8.in > $(VPATH)makedumpfile.8

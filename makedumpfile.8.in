@@ -2,7 +2,7 @@
 .SH NAME
 makedumpfile \- make a small dumpfile of kdump
 .SH SYNOPSIS
-\fBmakedumpfile\fR    [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR \fIDUMPFILE\fR
+\fBmakedumpfile\fR    [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] [--extension \fIEXTENSION1.SO\fR [--extension \fIEXTENSION2.SO\fR ..]]] \fIVMCORE\fR \fIDUMPFILE\fR
 .br
 \fBmakedumpfile\fR \-F [\fIOPTION\fR] [\-x \fIVMLINUX\fR|\-i \fIVMCOREINFO\fR] \fIVMCORE\fR
 .br
@@ -663,6 +663,15 @@ This option cannot be used with the --dump-dmesg, --reassemble and -g options.
 \fB\-\-show-stats\fR
 Display report messages. This is an alternative to enabling bit 4 in the level
 provided to --message-level.
+
+.TP
+\fB\-\-extension\fR \fIEXTENSION.SO\fR
+Load makedumpfile extensions. By using extensions, users can programmably
+customize mm page keeping / discard, alone with the traditional page-flag
+(-d dump_level) based filtering; as well as kernel data erasure. The option
+can be used multiple times to select various extensions. NOTE: this option
+needs EXTENSION=on when build makedumpfile with libbpf (>= v1.4.0). Also this
+option only works for kernels with DEBUG_INFO_BTF & KALLSYMS enabled.
 
 .SH ENVIRONMENT VARIABLES
 

@@ -65,6 +65,12 @@
     # make USEZSTD=on ; make install
     The user has to prepare zstd library.
 
+  - Build with extension support:
+    # make EXTENSION=on ; make install
+    The user has to prepare libbpf with version v1.4.0 or later.
+    Note: the extension will only work for kernels with DEBUG_INFO_BTF
+    & KALLSYMS enabled.
+
   - Build the extension module for --eppic option.
     # make eppic_makedumpfile.so
     The user has to prepare eppic library from the following site:

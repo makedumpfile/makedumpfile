@@ -1,5 +1,5 @@
 CC ?= gcc
-CONTRIB_SO :=
+CONTRIB_SO := sample.so
 
 all: $(CONTRIB_SO)
 

@@ -234,5 +234,138 @@ out:
 		free(buf);
 	return ret;
 }
+
+INIT_MOD_SYM(vmlinux, btf_modules);
+
+INIT_MOD_STRUCT_MEMBER(vmlinux, btf_module, list);
+INIT_MOD_STRUCT_MEMBER(vmlinux, btf_module, btf);
+INIT_MOD_STRUCT_MEMBER(vmlinux, btf_module, module);
+DECLARE_MOD_STRUCT_MEMBER(vmlinux, module, name);
+INIT_MOD_STRUCT_MEMBER(vmlinux, btf, data);
+INIT_MOD_STRUCT_MEMBER(vmlinux, btf, data_size);
+
+#define KERN_STRUCT_MEMBER_EXIST(S, M) MOD_STRUCT_MEMBER_EXIST(vmlinux, S, M)
+#define MEMBER_OFF(S, M) GET_MOD_STRUCT_MEMBER_MOFF(vmlinux, S, M) / 8
+#define GET_KERN_STRUCT_MEMBER_MSIZE(S, M) GET_MOD_STRUCT_MEMBER_MSIZE(vmlinux, S, M)
+#define GET_KERN_SYM(SYM) GET_MOD_SYM(vmlinux, SYM)
+
+bool init_module_btf(void)
+{
+	struct btf *btf_mod;
+	uint64_t btf_modules, list;
+	uint64_t btf = 0, data = 0, module = 0;
+	int data_size = 0;
+	bool ret = false;
+	char *btf_buf = NULL;
+	char *modname = NULL;
+	struct ktype_info **p;
+
+	btf_modules = GET_KERN_SYM(btf_modules);
+	if (!KERN_SYM_EXIST(btf_modules))
+		/* Maybe module is not enabled, this is not an error */
+		return true;
+
+	if (!KERN_STRUCT_MEMBER_EXIST(btf_module, list) ||
+	    !KERN_STRUCT_MEMBER_EXIST(btf_module, btf) ||
+	    !KERN_STRUCT_MEMBER_EXIST(btf_module, module) ||
+	    !KERN_STRUCT_MEMBER_EXIST(btf, data) ||
+	    !KERN_STRUCT_MEMBER_EXIST(btf, data_size)) {
+		/* Fail when module enabled but any required types not found */
+		ERRMSG("Missing required btf syms/types!\n");
+		goto out;
+	}
+
+	modname = (char *)malloc(GET_KERN_STRUCT_MEMBER_MSIZE(module, name));
+	if (!modname)
+		goto no_mem;
+
+	for (list = next_list(btf_modules); list != btf_modules; list = next_list(list)) {
+		if (!readmem(VADDR, list - MEMBER_OFF(btf_module, list) +
+				MEMBER_OFF(btf_module, btf),
+			&btf, GET_KERN_STRUCT_MEMBER_MSIZE(btf_module, btf))) {
+			ERRMSG("Can't get btf_module member btf!\n");
+			goto out;
+		}
+		if (!readmem(VADDR, list - MEMBER_OFF(btf_module, list) +
+				MEMBER_OFF(btf_module, module),
+			&module, GET_KERN_STRUCT_MEMBER_MSIZE(btf_module, module))) {
+			ERRMSG("Can't get btf_module member module!\n");
+			goto out;
+		}
+		if (!readmem(VADDR, module + MEMBER_OFF(module, name),
+			modname, GET_KERN_STRUCT_MEMBER_MSIZE(module, name))) {
+			ERRMSG("Can't get module modname!\n");
+			goto out;
+		}
+		if (!check_ktypes_require_modname(modname, NULL)) {
+			continue;
+		}
+		if (!readmem(VADDR, btf + MEMBER_OFF(btf, data),
+			&data, GET_KERN_STRUCT_MEMBER_MSIZE(btf, data))) {
+			ERRMSG("Can't get module btf address!\n");
+			goto out;
+		}
+		if (!readmem(VADDR, btf + MEMBER_OFF(btf, data_size),
+			&data_size, GET_KERN_STRUCT_MEMBER_MSIZE(btf, data_size))) {
+			ERRMSG("Can't get module btf data size!\n");
+			goto out;
+		}
+		btf_buf = (char *)malloc(data_size);
+		if (!btf_buf)
+			goto no_mem;
+		if (!readmem(VADDR, data, btf_buf, data_size)) {
+			ERRMSG("Can't get module btf data!\n");
+			goto out;
+		}
+		btf_mod = btf__new_split(btf_buf, data_size, btf_arr[0]->btf);
+		free(btf_buf);
+		if (libbpf_get_error(btf_mod) != 0 ||
+		    add_to_btf_arr(btf_mod, strdup(modname)) == false) {
+			ERRMSG("init %s btf fail\n", modname);
+			goto out;
+		}
+	}
+
+	/* OK, we have loaded all needed modules's btf, now resolve the types */
+	for (int i = 0; i < sr_len; i++) {
+		for (p = (struct ktype_info **)(sr[i]->start);
+		     p < (struct ktype_info **)(sr[i]->stop);
+		     p++)
+			get_ktype_info(*p, NULL);
+	}
+
+	ret = true;
+	goto out;
+
+no_mem:
+	ERRMSG("Not enough memory!\n");
+out:
+	if (modname)
+		free(modname);
+	return ret;
+}
+
+static void cleanup_btf_arr(void)
+{
+	for (int i = 0; i < btf_arr_len; i++) {
+		free(btf_arr[i]->module);
+		btf__free(btf_arr[i]->btf);
+		free(btf_arr[i]);
+	}
+	if (btf_arr) {
+		free(btf_arr);
+		btf_arr = NULL;
+	}
+	btf_arr_len = 0;
+	btf_arr_cap = 0;
+}
+
+void cleanup_btf(void)
+{
+	cleanup_btf_arr();
+	cleanup_ktypes_section_range();
+	cleanup_ktypes_modname();
+}
+
 #endif /* EXTENSION */
 

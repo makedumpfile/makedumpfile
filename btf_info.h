@@ -22,6 +22,8 @@ struct ktype_info {
 bool check_ktypes_require_modname(char *modname, int *total);
 bool register_ktype_section(char *start, char *stop);
 bool init_kernel_btf(void);
+bool init_module_btf(void);
+void cleanup_btf(void);
 
 #define _GEN_NAME_PTR_IMPL(PTR, NAME)		PTR##NAME
 #define _GEN_NAME_PTR(PTR, NAME)		_GEN_NAME_PTR_IMPL(PTR, NAME)

@@ -26,18 +26,18 @@ int
 proc()
 {
 	struct list_head *head, *next;
-	struct task_struct *tsk;
+	struct task_struct *task;
+	unsigned long offset;
 
-	tsk = &init_task;
+	task = &init_task;
+	offset = ((unsigned long)&(task->tasks) - (unsigned long)task);
 
-	head = (struct list_head *) &(tsk->tasks);
-	next = (struct list_head *) tsk->tasks.next;
+	head = (struct list_head *) &(task->tasks);
+	next = (struct list_head *) task->tasks.next;
 
 	while (next != head)
 	{
-		struct task_struct *task, *off = 0;
-
-		task = (struct task_struct *)((unsigned long)next - ((unsigned long)&(off->tasks)));
+		task = (struct task_struct *)((unsigned long)next - offset);
 
 		if (task->mm)
 			memset((char *)task->comm, 'L', 0x16);

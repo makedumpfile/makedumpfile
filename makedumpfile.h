@@ -195,6 +195,11 @@ test_bit(int nr, unsigned long addr)
  *     version 4.12,
  *  2. it has been verified that (1UL<<2) was never set, so it is
  *     safe to mask that bit off even in old kernels.
+ *  3. since Linux 6.15 (SECTION_IS_VMEMMAP_PREINIT, bit 5 with
+ *     CONFIG_ZONE_DEVICE) there are six flag bits, so this value is
+ *     stale; section_mem_map_addr() derives the real mask from
+ *     SIZE(page) and only falls back to SECTION_MAP_MASK when that
+ *     is not possible.
  */
 #define SECTION_MAP_LAST_BIT	(1UL<<5)
 #define SECTION_MAP_MASK	(~(SECTION_MAP_LAST_BIT-1))

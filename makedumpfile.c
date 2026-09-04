@@ -3705,7 +3705,21 @@ section_mem_map_addr(unsigned long addr, unsigned long *map_mask)
 		return NOT_KV_ADDR;
 	}
 	map = ULONG(mem_section + OFFSET(mem_section.section_mem_map));
-	mask = SECTION_MAP_MASK;
+	/*
+	 * The encoded mem_map is struct page pointer arithmetic, so it is
+	 * always SIZE(page)-aligned, and the kernel guarantees that all
+	 * section flag bits fit below that alignment.
+	 * Derive the mask from SIZE(page) instead of hardcoding the number of
+	 * flag bits, which changed in Linux 4.13, 5.x and again in 6.15
+	 * (SECTION_IS_VMEMMAP_PREINIT, bit 5 with CONFIG_ZONE_DEVICE), and
+	 * fall back to SECTION_MAP_MASK if SIZE(page) is unknown or not a
+	 * power of two.
+	 */
+	if (SIZE(page) != NOT_FOUND_STRUCTURE && SIZE(page) > 0
+	    && !(SIZE(page) & (SIZE(page) - 1)))
+		mask = ~((unsigned long)SIZE(page) - 1);
+	else
+		mask = SECTION_MAP_MASK;
 	*map_mask = map & ~mask;
 	map &= mask;
 	free(mem_section);

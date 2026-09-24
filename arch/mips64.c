@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#ifdef __mips64__
+#if defined(__mips64__) || defined(__mips64)
 
 #include "../print_info.h"
 #include "../elf_info.h"
